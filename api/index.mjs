@@ -151,15 +151,15 @@ function parseContactLine(line) {
   };
 }
 const BUSINESS_CONTACT = parseContactLine(BUSINESS_CONTACT_LINE);
-function escapeHtml$9(value) {
+function escapeHtml$a(value) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 function clientEmailContactLineHtml(color = "#666666") {
   const style = `color:${color};text-decoration:underline;`;
   return [
-    escapeHtml$9(BUSINESS_CONTACT.address),
-    `<a href="${BUSINESS_CONTACT.phoneHref}" style="${style}">${escapeHtml$9(BUSINESS_CONTACT.phoneDisplay)}</a>`,
-    `<a href="${BUSINESS_CONTACT.emailHref}" style="${style}">${escapeHtml$9(BUSINESS_CONTACT.email)}</a>`
+    escapeHtml$a(BUSINESS_CONTACT.address),
+    `<a href="${BUSINESS_CONTACT.phoneHref}" style="${style}">${escapeHtml$a(BUSINESS_CONTACT.phoneDisplay)}</a>`,
+    `<a href="${BUSINESS_CONTACT.emailHref}" style="${style}">${escapeHtml$a(BUSINESS_CONTACT.email)}</a>`
   ].join(" | ");
 }
 const __vite_import_meta_env__ = {};
@@ -207,13 +207,13 @@ function dotOptInPath(token) {
   params.set("t", token);
   return `/api/orders/dot-opt-in?${params.toString()}`;
 }
-function escapeHtml$8(value) {
+function escapeHtml$9(value) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 function linkDoorsOpenTour(sentence) {
   const at = sentence.indexOf(DOORS_OPEN_TOUR_NAME);
-  if (at < 0) return escapeHtml$8(sentence);
-  return escapeHtml$8(sentence.slice(0, at)) + `<a href="${DOORS_OPEN_TOUR_URL}" rel="noreferrer" style="color:#111111;font-weight:600;">${DOORS_OPEN_TOUR_NAME}</a>` + escapeHtml$8(sentence.slice(at + DOORS_OPEN_TOUR_NAME.length));
+  if (at < 0) return escapeHtml$9(sentence);
+  return escapeHtml$9(sentence.slice(0, at)) + `<a href="${DOORS_OPEN_TOUR_URL}" rel="noreferrer" style="color:#111111;font-weight:600;">${DOORS_OPEN_TOUR_NAME}</a>` + escapeHtml$9(sentence.slice(at + DOORS_OPEN_TOUR_NAME.length));
 }
 const noteStyle = "font-family:Inter,ui-sans-serif,system-ui,sans-serif;font-size:15px;line-height:1.5;color:#333333;margin:16px 0;";
 function doorsOpenDeliveryEmailHtml() {
@@ -223,7 +223,7 @@ function doorsOpenReceiptEmailHtml(optInUrl) {
   const sentence = `<p style="${noteStyle}">${linkDoorsOpenTour(DOT_RECEIPT_LINE)}</p>`;
   const url = optInUrl.trim();
   if (!url.startsWith("https://") || url.includes(" ")) return sentence;
-  return sentence + `<p style="margin:16px 0;"><a href="${escapeHtml$8(url)}" style="font-family:Inter,ui-sans-serif,system-ui,sans-serif;background:#000000;color:#ffffff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">${DOT_OPT_IN_ACTION_LABEL}</a></p>`;
+  return sentence + `<p style="margin:16px 0;"><a href="${escapeHtml$9(url)}" style="font-family:Inter,ui-sans-serif,system-ui,sans-serif;background:#000000;color:#ffffff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">${DOT_OPT_IN_ACTION_LABEL}</a></p>`;
 }
 function dotOptInResultHtml(ok) {
   const title = ok === true ? "Your open house is listed." : ok === "wait" ? "Please try that link again in a moment." : "This link is not valid.";
@@ -249,16 +249,16 @@ const SETTLED$1 = /* @__PURE__ */ new Set(["paid", "comped"]);
 function isGuessableInvoiceId(id) {
   return id.startsWith("listing_") || id.startsWith("ordreq_") || id.startsWith("playtest-");
 }
-function text$t(value) {
+function text$u(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function settled$1(invoice) {
-  return SETTLED$1.has(text$t(invoice?.status).toLowerCase());
+  return SETTLED$1.has(text$u(invoice?.status).toLowerCase());
 }
 function invoicePayLinkFor(invoice, env, extra) {
   if (!invoice || settled$1(invoice)) return null;
-  const id = text$t(invoice.id);
-  const token = text$t(invoice.payToken);
+  const id = text$u(invoice.id);
+  const token = text$u(invoice.payToken);
   if (!id || !token) return null;
   const url = new URL(`${publicSiteUrl(env)}/invoice/${encodeURIComponent(id)}`);
   url.searchParams.set("t", token);
@@ -269,7 +269,7 @@ function clientInvoiceUrl(invoice, env, extra) {
   const tokenized = invoicePayLinkFor(invoice, env, extra);
   if (tokenized) return tokenized;
   if (!invoice || settled$1(invoice)) return null;
-  const id = text$t(invoice.id);
+  const id = text$u(invoice.id);
   if (!id || isGuessableInvoiceId(id)) return null;
   const url = new URL(`${publicSiteUrl(env)}/invoice/${encodeURIComponent(id)}`);
   applyQuery(url, extra);
@@ -278,7 +278,7 @@ function clientInvoiceUrl(invoice, env, extra) {
 function applyQuery(url, extra) {
   if (!extra) return;
   for (const [key, value] of Object.entries(extra)) {
-    const textValue = text$t(value);
+    const textValue = text$u(value);
     if (textValue && key !== "t") url.searchParams.set(key, textValue);
   }
 }
@@ -1108,7 +1108,7 @@ function findCatalogItem(catalog, id) {
   const priced = matches.filter((item) => item.price === price);
   return priced.length === 1 ? priced[0] : void 0;
 }
-function roundMoney$9(value) {
+function roundMoney$a(value) {
   return Math.round(value * 100) / 100;
 }
 function catalogLineName(pkg, qty = 1) {
@@ -1122,13 +1122,13 @@ function catalogLineName(pkg, qty = 1) {
 }
 function catalogLine(pkg, qty = 1) {
   const count2 = qty > 0 ? qty : 1;
-  const unitPrice = roundMoney$9(pkg.price);
+  const unitPrice = roundMoney$a(pkg.price);
   const line = {
     id: pkg.bookingId || pkg.id,
     name: catalogLineName(pkg, count2),
     unitPrice,
     qty: count2,
-    price: roundMoney$9(unitPrice * count2)
+    price: roundMoney$a(unitPrice * count2)
   };
   if (pkg.description) line.description = pkg.description;
   if (pkg.category) line.category = pkg.category;
@@ -1344,7 +1344,7 @@ function resolveSubmittedBooking(body, catalog) {
   }
   return {
     lineItems,
-    total: roundMoney$9(sumLineItemPrices(lineItems)),
+    total: roundMoney$a(sumLineItemPrices(lineItems)),
     promoCode: promo?.code ?? null,
     promoDiscount: promo?.discount ?? 0,
     selectedService: selectedService || null,
@@ -1422,7 +1422,7 @@ function adjustmentKind(item) {
   return null;
 }
 function invoiceAdjustmentLine(kind, amount) {
-  const price = roundMoney$8(Math.max(0, amount));
+  const price = roundMoney$9(Math.max(0, amount));
   const name = kind === "processing" ? "Processing" : kind === "fees" ? "Fees" : "Travel";
   return {
     id: ADJUSTMENT_LINE_IDS[kind],
@@ -1433,7 +1433,7 @@ function invoiceAdjustmentLine(kind, amount) {
     category: ADJUSTMENT_LINE_IDS[kind]
   };
 }
-function roundMoney$8(value) {
+function roundMoney$9(value) {
   if (!Number.isFinite(value)) return 0;
   return Math.round(value * 100) / 100;
 }
@@ -1571,9 +1571,9 @@ function computeInvoiceTotals(input) {
   const travel = nonNegativeMoney(input.travel);
   const tax = nonNegativeMoney(input.tax);
   const amountPaid = nonNegativeMoney(input.amountPaid);
-  const netServices = roundMoney$7(Math.max(0, subtotal - promotions));
-  const processingBase = roundMoney$7(Math.max(0, netServices + fees));
-  const saleBeforeProcessing = roundMoney$7(netServices + fees + travel + tax);
+  const netServices = roundMoney$8(Math.max(0, subtotal - promotions));
+  const processingBase = roundMoney$8(Math.max(0, netServices + fees));
+  const saleBeforeProcessing = roundMoney$8(netServices + fees + travel + tax);
   const comped = input.comped === true;
   const stored = input.processing == null || !Number.isFinite(Number(input.processing)) ? null : nonNegativeMoney(input.processing);
   let processing = 0;
@@ -1588,7 +1588,7 @@ function computeInvoiceTotals(input) {
     processing = processingFee(processingBase);
     processingPolicy = "included";
   }
-  const total = roundMoney$7(saleBeforeProcessing + processing);
+  const total = roundMoney$8(saleBeforeProcessing + processing);
   return {
     subtotal,
     promotions,
@@ -1599,7 +1599,7 @@ function computeInvoiceTotals(input) {
     processing,
     total,
     amountPaid,
-    amountDue: roundMoney$7(Math.max(0, total - amountPaid)),
+    amountDue: roundMoney$8(Math.max(0, total - amountPaid)),
     processingPolicy
   };
 }
@@ -1608,14 +1608,14 @@ function toCents$1(value) {
   return Math.round(value * 100);
 }
 function fromCents(cents2) {
-  return roundMoney$7(cents2 / 100);
+  return roundMoney$8(cents2 / 100);
 }
 function nonNegativeMoney(value) {
   const amount = Number(value);
   if (!Number.isFinite(amount) || amount <= 0) return 0;
-  return roundMoney$7(amount);
+  return roundMoney$8(amount);
 }
-function roundMoney$7(value) {
+function roundMoney$8(value) {
   if (!Number.isFinite(value)) return 0;
   return Math.round(value * 100) / 100;
 }
@@ -1625,8 +1625,8 @@ const TEAL = "#14B8C4";
 const GREEN = "#16A34A";
 const ROW = "#F3F4F6";
 function receiptProcessing(input) {
-  const status2 = text$s(input.invoice.status).toLowerCase();
-  const paymentStatus = text$s(input.invoice.paymentStatus).toLowerCase();
+  const status2 = text$t(input.invoice.status).toLowerCase();
+  const paymentStatus = text$t(input.invoice.paymentStatus).toLowerCase();
   if (status2 === "comped" || paymentStatus === "comped") return 0;
   const base = roundCents(input.subtotal - input.promotions + input.fees);
   const stored = finite$1(input.invoice.processing);
@@ -1715,7 +1715,7 @@ function receiptHtml(content) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${escapeHtml$7(content.invoiceNumber)} receipt</title>
+<title>${escapeHtml$8(content.invoiceNumber)} receipt</title>
 <style>
 @media only screen and (max-width: 480px) {
   .totals-desktop { display: none !important; }
@@ -1729,7 +1729,7 @@ function receiptHtml(content) {
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:700px;font-family:${FONT};color:#111111;">
 ${headerBlock(content)}
 <tr><td style="padding:28px 28px 8px;font-family:${FONT};font-size:14px;line-height:1.5;color:#222222;">
-Hi ${escapeHtml$7(content.clientName)}, we received your payment for invoice ${escapeHtml$7(content.invoiceNumber)}.
+Hi ${escapeHtml$8(content.clientName)}, we received your payment for invoice ${escapeHtml$8(content.invoiceNumber)}.
 </td></tr>
 <tr><td style="padding:0 28px 4px;font-family:${FONT};font-size:14px;line-height:1.5;color:#111111;">${BOOKING_PROCESSING_LABEL}</td></tr>
 <tr><td style="padding:12px 20px 0;">
@@ -1746,19 +1746,19 @@ ${rows}
 <tr><td style="padding:22px 20px 8px;">
 <table class="totals-desktop" role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:2px solid #000000;border-collapse:separate;font-family:${FONT};">
 <tr>
-${totalCell("SUB TOTAL", money$7(content.subtotal), false)}
-${totalCell("PROCESSING", money$7(content.processing), false)}
-${totalCell("PROMOTIONS", money$7(content.promotions), false)}
-${totalCell("FEES", money$7(content.fees), false)}
-${totalCell("TOTAL PAID", money$7(content.totalPaid), true)}
+${totalCell("SUB TOTAL", money$8(content.subtotal), false)}
+${totalCell("PROCESSING", money$8(content.processing), false)}
+${totalCell("PROMOTIONS", money$8(content.promotions), false)}
+${totalCell("FEES", money$8(content.fees), false)}
+${totalCell("TOTAL PAID", money$8(content.totalPaid), true)}
 </tr>
 </table>
 <table class="totals-mobile" role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="display:none;border:2px solid #000000;border-collapse:separate;font-family:${FONT};">
-${totalRow("SUB TOTAL", money$7(content.subtotal), false)}
-${totalRow("PROCESSING", money$7(content.processing), false)}
-${totalRow("PROMOTIONS", money$7(content.promotions), false)}
-${totalRow("FEES", money$7(content.fees), false)}
-${totalRow("TOTAL PAID", money$7(content.totalPaid), true)}
+${totalRow("SUB TOTAL", money$8(content.subtotal), false)}
+${totalRow("PROCESSING", money$8(content.processing), false)}
+${totalRow("PROMOTIONS", money$8(content.promotions), false)}
+${totalRow("FEES", money$8(content.fees), false)}
+${totalRow("TOTAL PAID", money$8(content.totalPaid), true)}
 </table>
 </td></tr>
 ${downloads}
@@ -1776,11 +1776,11 @@ function headerBlock(content) {
 <td valign="top" style="font-family:${FONT};">
 <div style="font-family:${FONT};font-size:32px;line-height:1;font-weight:bold;letter-spacing:6px;color:${YELLOW};">RECEIPT</div>
 <div style="font-family:${FONT};font-size:12px;line-height:1.4;font-weight:bold;letter-spacing:3px;color:${YELLOW};padding-top:10px;">PAYMENT RECEIVED</div>
-<div style="font-family:${FONT};font-size:13px;line-height:1.5;color:#ffffff;padding-top:16px;">INVOICE NO : ${escapeHtml$7(content.invoiceNumber)}</div>
-<div style="font-family:${FONT};font-size:13px;line-height:1.5;color:#ffffff;padding-top:4px;">${escapeHtml$7(content.paidAtLabel)}</div>
+<div style="font-family:${FONT};font-size:13px;line-height:1.5;color:#ffffff;padding-top:16px;">INVOICE NO : ${escapeHtml$8(content.invoiceNumber)}</div>
+<div style="font-family:${FONT};font-size:13px;line-height:1.5;color:#ffffff;padding-top:4px;">${escapeHtml$8(content.paidAtLabel)}</div>
 </td>
 <td valign="top" align="right" width="160" style="padding-left:12px;">
-<img src="${escapeHtml$7(content.logoUrl)}" alt="Iconic Images" width="140" style="display:block;border:0;outline:none;text-decoration:none;width:140px;max-width:140px;height:auto;">
+<img src="${escapeHtml$8(content.logoUrl)}" alt="Iconic Images" width="140" style="display:block;border:0;outline:none;text-decoration:none;width:140px;max-width:140px;height:auto;">
 </td>
 </tr>
 </table>
@@ -1789,10 +1789,10 @@ function headerBlock(content) {
 function lineRow(line, index) {
   const bg = index % 2 === 0 ? ROW : "#ffffff";
   return `<tr>
-<td bgcolor="${bg}" style="background:${bg};font-family:${FONT};font-size:13px;font-weight:bold;letter-spacing:0.5px;color:${TEAL};padding:14px;border-bottom:1px solid #e5e7eb;">${escapeHtml$7(line.name.toUpperCase())}</td>
-<td bgcolor="${bg}" align="right" style="background:${bg};font-family:${FONT};font-size:13px;color:#374151;padding:14px 10px;border-bottom:1px solid #e5e7eb;">${escapeHtml$7(String(line.qty))}</td>
-<td bgcolor="${bg}" align="right" style="background:${bg};font-family:${FONT};font-size:13px;color:#374151;padding:14px 10px;border-bottom:1px solid #e5e7eb;">${escapeHtml$7(money$7(line.unit))}</td>
-<td bgcolor="${bg}" align="right" style="background:${bg};font-family:${FONT};font-size:13px;color:#111111;padding:14px;border-bottom:1px solid #e5e7eb;">${escapeHtml$7(money$7(line.total))}</td>
+<td bgcolor="${bg}" style="background:${bg};font-family:${FONT};font-size:13px;font-weight:bold;letter-spacing:0.5px;color:${TEAL};padding:14px;border-bottom:1px solid #e5e7eb;">${escapeHtml$8(line.name.toUpperCase())}</td>
+<td bgcolor="${bg}" align="right" style="background:${bg};font-family:${FONT};font-size:13px;color:#374151;padding:14px 10px;border-bottom:1px solid #e5e7eb;">${escapeHtml$8(String(line.qty))}</td>
+<td bgcolor="${bg}" align="right" style="background:${bg};font-family:${FONT};font-size:13px;color:#374151;padding:14px 10px;border-bottom:1px solid #e5e7eb;">${escapeHtml$8(money$8(line.unit))}</td>
+<td bgcolor="${bg}" align="right" style="background:${bg};font-family:${FONT};font-size:13px;color:#111111;padding:14px;border-bottom:1px solid #e5e7eb;">${escapeHtml$8(money$8(line.total))}</td>
 </tr>`;
 }
 function totalRow(label, value, emphasis, note) {
@@ -1800,7 +1800,7 @@ function totalRow(label, value, emphasis, note) {
   const noteHtml = "";
   return `<tr>
 <td style="padding:12px 16px;font-family:${FONT};font-size:11px;font-weight:bold;letter-spacing:0.8px;color:#111111;border-bottom:1px solid #e5e7eb;">${label}</td>
-<td align="right" style="padding:12px 16px;font-family:${FONT};${valueStyle}border-bottom:1px solid #e5e7eb;">${escapeHtml$7(value)}${noteHtml}</td>
+<td align="right" style="padding:12px 16px;font-family:${FONT};${valueStyle}border-bottom:1px solid #e5e7eb;">${escapeHtml$8(value)}${noteHtml}</td>
 </tr>`;
 }
 function totalCell(label, value, emphasis, note) {
@@ -1808,7 +1808,7 @@ function totalCell(label, value, emphasis, note) {
   const noteHtml = "";
   return `<td valign="top" align="center" style="padding:14px 6px;font-family:${FONT};">
 <div style="font-family:${FONT};font-size:10px;font-weight:bold;letter-spacing:0.8px;color:#111111;">${label}</div>
-<div style="font-family:${FONT};${valueStyle}padding-top:6px;">${escapeHtml$7(value)}</div>
+<div style="font-family:${FONT};${valueStyle}padding-top:6px;">${escapeHtml$8(value)}</div>
 ${noteHtml}
 </td>`;
 }
@@ -1819,13 +1819,13 @@ function downloadsBlock(content) {
   const primaryHref = presentation || gallery;
   const primaryLabel = presentation ? "View your listing presentation" : "Your downloads &amp; invoice";
   const secondary = presentation && gallery ? `<tr><td align="center" style="padding-top:12px;font-family:${FONT};font-size:14px;">
-<a href="${escapeHtml$7(gallery)}" style="color:${TEAL};font-family:${FONT};font-weight:bold;text-decoration:underline;">Your downloads &amp; invoice</a>
+<a href="${escapeHtml$8(gallery)}" style="color:${TEAL};font-family:${FONT};font-weight:bold;text-decoration:underline;">Your downloads &amp; invoice</a>
 </td></tr>` : "";
   return `<tr><td style="padding:28px 24px 12px;">
 <div style="font-family:${FONT};font-size:22px;line-height:1.3;font-weight:bold;color:#111111;">Your downloads are ready</div>
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:16px;">
 <tr><td bgcolor="#000000" style="background:#000000;border-radius:4px;">
-<a href="${escapeHtml$7(primaryHref)}" style="display:inline-block;padding:14px 22px;font-family:${FONT};font-size:15px;font-weight:bold;color:${YELLOW};text-decoration:none;">${primaryLabel}</a>
+<a href="${escapeHtml$8(primaryHref)}" style="display:inline-block;padding:14px 22px;font-family:${FONT};font-size:15px;font-weight:bold;color:${YELLOW};text-decoration:none;">${primaryLabel}</a>
 </td></tr>
 ${secondary}
 </table>
@@ -1834,7 +1834,7 @@ ${secondary}
 function balanceBlock(content) {
   if (content.balance <= 0) return "";
   return `<tr><td style="padding:20px 24px 8px;font-family:${FONT};font-size:14px;color:#111111;">
-Balance due: <strong>${escapeHtml$7(money$7(content.balance))}</strong>. Downloads stay locked until the invoice is paid in full.
+Balance due: <strong>${escapeHtml$8(money$8(content.balance))}</strong>. Downloads stay locked until the invoice is paid in full.
 </td></tr>`;
 }
 function footerBlock() {
@@ -1843,12 +1843,12 @@ function footerBlock() {
 <tr>
 <td valign="top" style="font-family:${FONT};font-size:13px;line-height:1.55;color:#ffffff;">
 <div style="font-family:${FONT};font-size:12px;font-weight:bold;letter-spacing:0.6px;color:${GREEN};padding-bottom:8px;">PAYMENT INFORMATION:</div>
-${escapeHtml$7(LEGAL_BUSINESS_NAME)}<br>
+${escapeHtml$8(LEGAL_BUSINESS_NAME)}<br>
 <div style="font-family:${FONT};font-size:13px;line-height:1.55;color:#ffffff;padding-top:8px;">${clientEmailContactLineHtml("#ffffff")}</div>
 </td>
 <td valign="top" align="right" style="font-family:${FONT};font-size:13px;line-height:1.55;color:#ffffff;">
-${escapeHtml$7(BUSINESS_CONTACT.streetAddress)}<br>
-${escapeHtml$7(BUSINESS_CONTACT.addressLine2)}
+${escapeHtml$8(BUSINESS_CONTACT.streetAddress)}<br>
+${escapeHtml$8(BUSINESS_CONTACT.addressLine2)}
 </td>
 </tr>
 </table>
@@ -1861,14 +1861,14 @@ function receiptText(content) {
     qty: 1,
     unit: content.totalPaid,
     total: content.totalPaid
-  }]).map((line) => `${line.name}  qty ${line.qty}  ${money$7(line.unit)}  ${money$7(line.total)}`);
+  }]).map((line) => `${line.name}  qty ${line.qty}  ${money$8(line.unit)}  ${money$8(line.total)}`);
   const links = [];
   if (content.unlocked) {
     links.push("Your downloads are ready");
     if (content.presentationUrl) links.push(`View your listing presentation: ${content.presentationUrl}`);
     if (content.galleryUrl) links.push(`Your downloads & invoice: ${content.galleryUrl}`);
   } else if (content.balance > 0) {
-    links.push(`Balance due: ${money$7(content.balance)}. Downloads stay locked until the invoice is paid in full.`);
+    links.push(`Balance due: ${money$8(content.balance)}. Downloads stay locked until the invoice is paid in full.`);
   }
   return [
     "RECEIPT",
@@ -1881,11 +1881,11 @@ function receiptText(content) {
     "",
     ...itemLines,
     "",
-    `SUB TOTAL ${money$7(content.subtotal)}`,
-    `PROCESSING ${money$7(content.processing)}`,
-    `PROMOTIONS ${money$7(content.promotions)}`,
-    `FEES ${money$7(content.fees)}`,
-    `TOTAL PAID ${money$7(content.totalPaid)}`,
+    `SUB TOTAL ${money$8(content.subtotal)}`,
+    `PROCESSING ${money$8(content.processing)}`,
+    `PROMOTIONS ${money$8(content.promotions)}`,
+    `FEES ${money$8(content.fees)}`,
+    `TOTAL PAID ${money$8(content.totalPaid)}`,
     "",
     ...links,
     "",
@@ -1896,7 +1896,7 @@ function receiptText(content) {
     "THANK YOU FOR BEING ICONIC"
   ].filter((line) => line !== void 0).join("\n");
 }
-function money$7(value) {
+function money$8(value) {
   return (Number(value) || 0).toLocaleString("en-US", { style: "currency", currency: "USD" });
 }
 function roundCents(value) {
@@ -1915,10 +1915,10 @@ function dollars$1(value) {
   const amount = Number(String(value).replace(/[^0-9.-]/g, ""));
   return Number.isFinite(amount) ? amount : 0;
 }
-function text$s(value) {
+function text$t(value) {
   return typeof value === "string" ? value.trim() : "";
 }
-function escapeHtml$7(value) {
+function escapeHtml$8(value) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 const EMAIL_TEMPLATES_COLLECTION = "emailTemplates";
@@ -2228,7 +2228,7 @@ function narrowGatedClientRecipients(input, env = process.env) {
     held
   };
 }
-const db$z = () => admin.firestore();
+const db$B = () => admin.firestore();
 class EmailNotConfiguredError extends Error {
   code = "email_not_configured";
   constructor() {
@@ -2284,7 +2284,7 @@ async function sendEmail(options) {
   let textBody = options.text;
   try {
     if (admin.apps.length) {
-      const templateDoc = await db$z().collection(EMAIL_TEMPLATES_COLLECTION).doc(template).get();
+      const templateDoc = await db$B().collection(EMAIL_TEMPLATES_COLLECTION).doc(template).get();
       const override = templateDoc.exists ? readEmailTemplateOverride(templateDoc.data()) : null;
       if (override && !(lockHtml && html)) {
         subject = fillEmailPlaceholders(override.subject, variables);
@@ -2558,7 +2558,7 @@ function addressText(value) {
   if (typeof value === "string") return value.trim();
   if (typeof value !== "object" || Array.isArray(value)) return "";
   const address = value;
-  const formatted = text$r(address.formatted) || text$r(address.label);
+  const formatted = text$s(address.formatted) || text$s(address.label);
   if (formatted) return formatted;
   return [address.street, address.city, address.state, address.zip].filter((part) => typeof part === "string" && part.trim()).join(", ");
 }
@@ -2571,7 +2571,7 @@ function recordAddressText(record2) {
   }
   return "";
 }
-function text$r(value) {
+function text$s(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 const PLAYTEST_ADDRESS = "100 Playtest Lane, Austin, TX 78701";
@@ -2825,7 +2825,7 @@ function applyServerTravel(lineItems, address, clientTravelFeeCents) {
   const next = [...kept, travelInvoiceLine(travel)];
   return {
     lineItems: next,
-    total: roundMoney$6(sumLineItemPrices(next)),
+    total: roundMoney$7(sumLineItemPrices(next)),
     travel
   };
 }
@@ -2898,7 +2898,7 @@ function emailMoney(cents2) {
 function roundMiles(miles) {
   return Math.round(miles * 100) / 100;
 }
-function roundMoney$6(value) {
+function roundMoney$7(value) {
   return Math.round(value * 100) / 100;
 }
 function toRad(degrees) {
@@ -3817,10 +3817,10 @@ function clockTime(value) {
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 function storedAmount(value) {
-  if (typeof value === "number" && Number.isFinite(value)) return roundMoney$5(value);
+  if (typeof value === "number" && Number.isFinite(value)) return roundMoney$6(value);
   if (typeof value === "string" && value.trim()) {
     const parsed = Number(value.replace(/[$,\s]/g, ""));
-    if (Number.isFinite(parsed)) return roundMoney$5(parsed);
+    if (Number.isFinite(parsed)) return roundMoney$6(parsed);
   }
   return null;
 }
@@ -3886,7 +3886,7 @@ function buildClientInvoice(id, data, now = /* @__PURE__ */ new Date()) {
       createdAt: data.createdAt
     }, now),
     status: typeof data.status === "string" && data.status.trim() ? data.status.trim() : "",
-    clientName: text$q(data.clientName),
+    clientName: text$r(data.clientName),
     address: addressText(data.billToAddress || data.address || data.propertyAddress),
     createdAt,
     issuedOn: formatPortalDate(data.createdAt) || formatPortalDate(data.sentAt) || formatPortalDate(data.paidAt),
@@ -3896,7 +3896,7 @@ function buildClientInvoice(id, data, now = /* @__PURE__ */ new Date()) {
     fees: storedAmount(data.fees),
     travel: storedAmount(data.travel),
     promoDiscount: storedAmount(data.promoDiscount),
-    promoCode: text$q(data.promoCode),
+    promoCode: text$r(data.promoCode),
     tax: storedAmount(data.tax),
     total: storedAmount(data.total),
     amountPaid: storedAmount(data.amountPaid),
@@ -3948,15 +3948,15 @@ function storedLines(lineItems, services2) {
     if (typeof item === "string" && item.trim()) return [{ name: item.trim(), qty: null, amount: null }];
     if (!item || typeof item !== "object") return [];
     const record2 = item;
-    const named = text$q(record2.name) || text$q(record2.label);
-    const description = text$q(record2.description);
+    const named = text$r(record2.name) || text$r(record2.label);
+    const description = text$r(record2.description);
     const name = named || description;
     const qty = storedQty(record2.qty ?? record2.quantity);
     const amount = storedAmount(record2.price ?? record2.amount ?? record2.total);
     if (!name && amount == null && qty == null) return [];
     const line = { name: name || "Line item", qty, amount };
-    const id = text$q(record2.id);
-    const category = text$q(record2.category);
+    const id = text$r(record2.id);
+    const category = text$r(record2.category);
     if (id) line.id = id;
     if (category) line.category = category;
     if (named && description) line.description = description;
@@ -3992,10 +3992,10 @@ function isoStamp(value) {
   if (typeof value === "number" && Number.isFinite(value)) return new Date(value).toISOString();
   return null;
 }
-function text$q(value) {
+function text$r(value) {
   return typeof value === "string" ? value.trim() : "";
 }
-function roundMoney$5(value) {
+function roundMoney$6(value) {
   return Math.round(value * 100) / 100;
 }
 const MONTHS = {
@@ -4223,17 +4223,17 @@ async function listCalendarScheduleEvents({
   const readFailures = results.filter((result) => result.status === "rejected").length;
   return { configured: true, events, readFailures };
 }
-const db$y = () => admin.firestore();
+const db$A = () => admin.firestore();
 async function upsertPortalClient(input) {
   const email = normalizeEmail$1(input.email);
   const firstName = cleanPersonName(input.firstName);
   const lastName = cleanPersonName(input.lastName);
   const phone = String(input.phone || "").trim().slice(0, 40);
   const now = admin.firestore.FieldValue.serverTimestamp();
-  const existing = email ? await db$y().collection("clients").where("email", "==", email).limit(5).get() : null;
+  const existing = email ? await db$A().collection("clients").where("email", "==", email).limit(5).get() : null;
   const linked = existing?.docs.find((doc) => doc.id !== input.uid);
   const linkedData = linked?.data() || {};
-  const uidRef = db$y().collection("clients").doc(input.uid);
+  const uidRef = db$A().collection("clients").doc(input.uid);
   const uidSnap = await uidRef.get();
   const previous = uidSnap.exists ? uidSnap.data() || {} : {};
   await uidRef.set({
@@ -4265,7 +4265,7 @@ async function upsertPortalClient(input) {
 }
 async function resolveClientIdentity(uid, email) {
   const ids = /* @__PURE__ */ new Set([uid]);
-  const direct = await db$y().collection("clients").doc(uid).get();
+  const direct = await db$A().collection("clients").doc(uid).get();
   let profile = direct.exists ? { id: direct.id, ...direct.data() } : null;
   const redirectId = typeof profile?._redirect === "string" ? profile._redirect : "";
   if (redirectId) ids.add(redirectId);
@@ -4273,14 +4273,14 @@ async function resolveClientIdentity(uid, email) {
   if (linkedId) ids.add(linkedId);
   const normalized = normalizeEmail$1(email || profile?.email);
   if (normalized) {
-    const matches = await db$y().collection("clients").where("email", "==", normalized).limit(10).get();
+    const matches = await db$A().collection("clients").where("email", "==", normalized).limit(10).get();
     for (const doc of matches.docs) {
       ids.add(doc.id);
       if (!profile) profile = { id: doc.id, ...doc.data() };
     }
   }
   if (redirectId && profile && !profile.email) {
-    const real = await db$y().collection("clients").doc(redirectId).get();
+    const real = await db$A().collection("clients").doc(redirectId).get();
     if (real.exists) profile = { id: real.id, ...real.data(), portalDocId: uid };
   }
   return { ids: [...ids], profile, email: normalized };
@@ -4309,7 +4309,7 @@ function planBookingAccount(input) {
     skipReason: null
   };
 }
-const db$x = () => admin.firestore();
+const db$z = () => admin.firestore();
 async function attachBookingClient(input) {
   const email = normalizeEmail$1(input.email);
   if (!email || !email.includes("@")) {
@@ -4318,7 +4318,7 @@ async function attachBookingClient(input) {
   const firstName = cleanPersonName(input.firstName) || "Client";
   const lastName = cleanPersonName(input.lastName);
   const phone = String(input.phone || "").trim().slice(0, 40);
-  const staffHit = await db$x().collection("staff").where("email", "==", email).limit(1).get();
+  const staffHit = await db$z().collection("staff").where("email", "==", email).limit(1).get();
   let authUid = null;
   if (staffHit.empty) {
     try {
@@ -4400,7 +4400,7 @@ async function sendFirebasePasswordEmail(email) {
 }
 async function createRequestedAppointment(input) {
   const now = admin.firestore.FieldValue.serverTimestamp();
-  await db$x().collection("appointments").add({
+  await db$z().collection("appointments").add({
     orderRequestId: input.orderRequestId,
     clientId: input.clientId,
     clientName: input.clientName,
@@ -4455,40 +4455,40 @@ function bookingListingGroups(input) {
   for (const doc of requests) {
     const node = nodeId("orderRequests", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("listings", text$p(doc.data.listingId)));
-    uf.link(node, nodeId("orders", text$p(doc.data.orderId) || text$p(doc.data.convertedToOrderId)));
-    uf.link(node, nodeId("invoices", text$p(doc.data.invoiceId)));
-    uf.link(node, nodeId("galleries", text$p(doc.data.galleryId)));
+    uf.link(node, nodeId("listings", text$q(doc.data.listingId)));
+    uf.link(node, nodeId("orders", text$q(doc.data.orderId) || text$q(doc.data.convertedToOrderId)));
+    uf.link(node, nodeId("invoices", text$q(doc.data.invoiceId)));
+    uf.link(node, nodeId("galleries", text$q(doc.data.galleryId)));
   }
   for (const doc of orders) {
     const node = nodeId("orders", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$p(doc.data.orderRequestId)));
-    uf.link(node, nodeId("listings", text$p(doc.data.listingId)));
-    uf.link(node, nodeId("invoices", text$p(doc.data.invoiceId)));
-    uf.link(node, nodeId("galleries", text$p(doc.data.galleryId)));
+    uf.link(node, nodeId("orderRequests", text$q(doc.data.orderRequestId)));
+    uf.link(node, nodeId("listings", text$q(doc.data.listingId)));
+    uf.link(node, nodeId("invoices", text$q(doc.data.invoiceId)));
+    uf.link(node, nodeId("galleries", text$q(doc.data.galleryId)));
   }
   for (const doc of invoices) {
     const node = nodeId("invoices", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$p(doc.data.orderRequestId)));
-    uf.link(node, nodeId("orders", text$p(doc.data.orderId)));
-    uf.link(node, nodeId("listings", text$p(doc.data.listingId)));
+    uf.link(node, nodeId("orderRequests", text$q(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$q(doc.data.orderId)));
+    uf.link(node, nodeId("listings", text$q(doc.data.listingId)));
   }
   for (const doc of appointments) {
     const node = nodeId("appointments", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$p(doc.data.orderRequestId)));
-    uf.link(node, nodeId("orders", text$p(doc.data.orderId)));
-    uf.link(node, nodeId("listings", text$p(doc.data.listingId)));
+    uf.link(node, nodeId("orderRequests", text$q(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$q(doc.data.orderId)));
+    uf.link(node, nodeId("listings", text$q(doc.data.listingId)));
   }
   for (const doc of galleries) {
     const node = nodeId("galleries", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$p(doc.data.orderRequestId)));
-    uf.link(node, nodeId("orders", text$p(doc.data.orderId)));
-    uf.link(node, nodeId("invoices", text$p(doc.data.invoiceId)));
-    uf.link(node, nodeId("listings", text$p(doc.data.listingId)));
+    uf.link(node, nodeId("orderRequests", text$q(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$q(doc.data.orderId)));
+    uf.link(node, nodeId("invoices", text$q(doc.data.invoiceId)));
+    uf.link(node, nodeId("listings", text$q(doc.data.listingId)));
   }
   const groups = [];
   for (const nodes of uf.components()) {
@@ -4548,7 +4548,7 @@ function fillEmptyListingFields(existing, desired) {
   return patch;
 }
 function clientOwnsListing(listing, clients) {
-  const clientId2 = text$p(listing.clientId);
+  const clientId2 = text$q(listing.clientId);
   const email = normalizeEmail$1(listing.clientEmail || listing.email);
   if (!clientId2 && !email) return true;
   if (clientId2 && clients.ids.includes(clientId2)) return true;
@@ -4620,10 +4620,10 @@ function chooseListing(group, listings, clients) {
 }
 function listingMatches(doc, group) {
   if (doc.id === group.stableId || group.preferredListingIds.includes(doc.id)) return true;
-  const requestId = text$p(doc.data.orderRequestId);
-  const orderId = text$p(doc.data.orderId);
-  const invoiceId = text$p(doc.data.invoiceId);
-  const appointmentId = text$p(doc.data.appointmentId);
+  const requestId = text$q(doc.data.orderRequestId);
+  const orderId = text$q(doc.data.orderId);
+  const invoiceId = text$q(doc.data.invoiceId);
+  const appointmentId = text$q(doc.data.appointmentId);
   return Boolean(
     requestId && group.orderRequestIds.includes(requestId) || orderId && group.orderIds.includes(orderId) || invoiceId && group.invoiceIds.includes(invoiceId) || appointmentId && group.appointmentIds.includes(appointmentId)
   );
@@ -4633,7 +4633,7 @@ function linksFor(group, listingId, listings, clients) {
   const links = [];
   const push = (collection, docs) => {
     for (const doc of docs) {
-      const current = text$p(doc.data.listingId);
+      const current = text$q(doc.data.listingId);
       if (current === listingId) continue;
       if (current && isPortalListingId(current) && ownedIds.has(current)) continue;
       links.push({ collection, id: doc.id });
@@ -4650,7 +4650,7 @@ function clientsFor(group, identity) {
   const ids = /* @__PURE__ */ new Set();
   const emails = /* @__PURE__ */ new Set();
   const addId = (value) => {
-    const id = text$p(value);
+    const id = text$q(value);
     if (id) ids.add(id);
   };
   const addEmail = (value) => {
@@ -4669,7 +4669,7 @@ function clientsFor(group, identity) {
 function preferredListingIds(group) {
   const ids = [];
   const push = (value) => {
-    const id = text$p(value);
+    const id = text$q(value);
     if (id && isPortalListingId(id) && !ids.includes(id)) ids.push(id);
   };
   for (const doc of [...group.orderRequests, ...group.orders, ...group.invoices, ...group.appointments, ...group.galleries]) {
@@ -4704,9 +4704,9 @@ function bestAddress(group) {
   }
   for (const doc of propertyDocs(group)) {
     for (const key of ["address", "propertyAddress", "shootLocation"]) {
-      if (typeof doc.data[key] === "string" && text$p(doc.data[key])) return text$p(doc.data[key]);
+      if (typeof doc.data[key] === "string" && text$q(doc.data[key])) return text$q(doc.data[key]);
     }
-    if (text$p(doc.data.addressLabel)) return text$p(doc.data.addressLabel);
+    if (text$q(doc.data.addressLabel)) return text$q(doc.data.addressLabel);
   }
   return null;
 }
@@ -4722,7 +4722,7 @@ function firstScheduleDate(group) {
 function firstScheduleTime(group) {
   for (const doc of [...group.appointments, ...group.orders, ...group.orderRequests]) {
     for (const key of ["scheduledTime", "appointmentTime", "apptTime", "requestedTime"]) {
-      const value = text$p(doc.data[key]);
+      const value = text$q(doc.data[key]);
       if (value && !/^tbd$/i.test(value)) return value;
     }
   }
@@ -4739,7 +4739,7 @@ function projectType(group) {
     if (doc.data.projectType === "real_estate") return "real_estate";
     const service = doc.data.selectedService;
     if (service && typeof service === "object") {
-      const category = text$p(service.category);
+      const category = text$q(service.category);
       if (category === "business" || category === "branding") return "business";
       if (category === "listings") return "real_estate";
     }
@@ -4765,7 +4765,7 @@ function namesFrom(value) {
   for (const item of value) {
     if (typeof item === "string" && item.trim()) names.push(item.trim());
     else if (item && typeof item === "object") {
-      const name = text$p(item.name);
+      const name = text$q(item.name);
       if (name) names.push(name);
     }
     if (names.length >= 40) break;
@@ -4775,12 +4775,12 @@ function namesFrom(value) {
 function firstTotal(group) {
   for (const doc of [...group.orders, ...group.invoices, ...group.orderRequests]) {
     if (doc.data.total != null && doc.data.total !== "") {
-      const parsed = money$6(doc.data.total);
+      const parsed = money$7(doc.data.total);
       if (parsed != null) return parsed;
     }
     const pricing = doc.data.pricing;
     if (pricing && typeof pricing === "object") {
-      const parsed = money$6(pricing.total);
+      const parsed = money$7(pricing.total);
       if (pricing.total != null && pricing.total !== "" && parsed != null) return parsed;
     }
   }
@@ -4790,8 +4790,8 @@ function accessInfo(group) {
   return [firstText$2(group, ["accessMethod"]), firstText$2(group, ["lockboxCode"])].filter(Boolean).join(" - ");
 }
 function clientId(group, identity) {
-  const bookingIds = propertyDocs(group).map((doc) => text$p(doc.data.clientId)).filter(Boolean);
-  const identityIds = (identity?.ids || []).map((id) => text$p(id)).filter(Boolean);
+  const bookingIds = propertyDocs(group).map((doc) => text$q(doc.data.clientId)).filter(Boolean);
+  const identityIds = (identity?.ids || []).map((id) => text$q(id)).filter(Boolean);
   return bookingIds.find((id) => identityIds.includes(id)) || bookingIds[0] || identityIds[0] || "";
 }
 function clientEmail(group, identity) {
@@ -4805,8 +4805,8 @@ function clientEmail(group, identity) {
 }
 function clientName$1(group) {
   for (const doc of propertyDocs(group)) {
-    if (text$p(doc.data.clientName)) return text$p(doc.data.clientName);
-    const joined = `${text$p(doc.data.firstName)} ${text$p(doc.data.lastName)}`.trim();
+    if (text$q(doc.data.clientName)) return text$q(doc.data.clientName);
+    const joined = `${text$q(doc.data.firstName)} ${text$q(doc.data.lastName)}`.trim();
     if (joined) return joined;
   }
   return "";
@@ -4814,7 +4814,7 @@ function clientName$1(group) {
 function chosenInvoiceId(group) {
   const known = new Set(group.invoiceIds);
   for (const doc of [...group.orderRequests, ...group.orders]) {
-    const id = text$p(doc.data.invoiceId);
+    const id = text$q(doc.data.invoiceId);
     if (id && known.has(id)) return id;
   }
   return newestDoc(group.invoices)?.id || group.invoiceIds[0] || "";
@@ -4823,7 +4823,7 @@ function chosenId(docs, ids, pointers = [], keys = []) {
   const known = new Set(ids);
   for (const doc of pointers) {
     for (const key of keys) {
-      const id = text$p(doc.data[key]);
+      const id = text$q(doc.data[key]);
       if (id && known.has(id)) return id;
     }
   }
@@ -4835,7 +4835,7 @@ function propertyDocs(group) {
 function firstText$2(group, keys) {
   for (const doc of propertyDocs(group)) {
     for (const key of keys) {
-      const value = text$p(doc.data[key]);
+      const value = text$q(doc.data[key]);
       if (value) return value;
     }
   }
@@ -4903,12 +4903,12 @@ function hasAddress(value) {
   if (typeof value === "string") return value.trim().length > 0;
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const record2 = value;
-  return ["formatted", "label", "street", "line1", "addressLine1", "city", "state", "zip"].some((key) => text$p(record2[key]).length > 0);
+  return ["formatted", "label", "street", "line1", "addressLine1", "city", "state", "zip"].some((key) => text$q(record2[key]).length > 0);
 }
 function statusKey(value) {
   return String(value || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
 }
-function money$6(value) {
+function money$7(value) {
   const parsed = typeof value === "number" ? value : typeof value === "string" && value.trim() ? Number(value.replace(/[$,\s]/g, "")) : Number.NaN;
   if (!Number.isFinite(parsed)) return null;
   return Math.round(parsed * 100) / 100;
@@ -4935,14 +4935,14 @@ function isEmpty(value) {
 function isSentinel$1(value) {
   return Boolean(value && typeof value === "object" && "_methodName" in value);
 }
-function text$p(value) {
+function text$q(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function cleanDocs(docs) {
   const out = [];
   const seen = /* @__PURE__ */ new Set();
   for (const doc of docs || []) {
-    const id = text$p(doc?.id);
+    const id = text$q(doc?.id);
     if (!id || seen.has(id)) continue;
     seen.add(id);
     out.push({ id, data: doc.data && typeof doc.data === "object" ? doc.data : {} });
@@ -4996,7 +4996,7 @@ function visibleToPortalClient(record2, identity) {
   if (!email) return false;
   return [record2.email, record2.clientEmail].some((value) => normalizeEmail$1(value) === email);
 }
-const db$w = () => admin.firestore();
+const db$y = () => admin.firestore();
 const LINK_COLLECTIONS = /* @__PURE__ */ new Set([
   "orderRequests",
   "orders",
@@ -5017,7 +5017,7 @@ const LOCK_FIELDS = /* @__PURE__ */ new Set(["lockDownloads", "requirePayment", 
 async function ensureBookingListingForRequest(orderRequestId) {
   const id = orderRequestId.trim();
   if (!id) return null;
-  const snap = await db$w().collection("orderRequests").doc(id).get();
+  const snap = await db$y().collection("orderRequests").doc(id).get();
   if (!snap.exists) return null;
   const request = asDoc(snap.id, snap.data());
   const bundle = await hydrateBundle({
@@ -5028,7 +5028,7 @@ async function ensureBookingListingForRequest(orderRequestId) {
     galleries: []
   });
   const identity = {
-    ids: text$o(request.data.clientId) ? [text$o(request.data.clientId)] : [],
+    ids: text$p(request.data.clientId) ? [text$p(request.data.clientId)] : [],
     email: normalizeEmail$1(request.data.clientEmail || request.data.email)
   };
   const plans = await plansFor(bundle, identity);
@@ -5071,7 +5071,7 @@ async function plansFor(bundle, identity) {
 }
 async function applyBookingListingPlan(plan) {
   if (!isPortalListingId(plan.listingId)) throw new Error("Listing id is not valid.");
-  const ref = db$w().collection("listings").doc(plan.listingId);
+  const ref = db$y().collection("listings").doc(plan.listingId);
   let created = false;
   if (plan.create) {
     try {
@@ -5081,7 +5081,7 @@ async function applyBookingListingPlan(plan) {
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
       created = true;
-      console.info(`[Listings] Created ${plan.listingId} for booking ${text$o(plan.createFields.orderRequestId) || text$o(plan.createFields.orderId) || text$o(plan.createFields.invoiceId)}`);
+      console.info(`[Listings] Created ${plan.listingId} for booking ${text$p(plan.createFields.orderRequestId) || text$p(plan.createFields.orderId) || text$p(plan.createFields.invoiceId)}`);
     } catch (err) {
       if (!alreadyExists(err)) throw err;
       await fillListing(ref, plan.createFields);
@@ -5107,10 +5107,10 @@ async function fillListing(ref, desired) {
 }
 async function linkRecord(collectionName2, id, listingId) {
   if (!LINK_COLLECTIONS.has(collectionName2) || !id) return;
-  const ref = db$w().collection(collectionName2).doc(id);
+  const ref = db$y().collection(collectionName2).doc(id);
   const snap = await ref.get();
   if (!snap.exists) return;
-  if (text$o(snap.data()?.listingId) === listingId) return;
+  if (text$p(snap.data()?.listingId) === listingId) return;
   await ref.update({
     listingId,
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
@@ -5124,9 +5124,9 @@ async function loadVisibleSeeds(identity) {
   const keep = (map, docs) => {
     for (const doc of docs) {
       if (!visibleToPortalClient({
-        clientId: text$o(doc.data.clientId),
-        email: text$o(doc.data.email),
-        clientEmail: text$o(doc.data.clientEmail)
+        clientId: text$p(doc.data.clientId),
+        email: text$p(doc.data.email),
+        clientEmail: text$p(doc.data.clientEmail)
       }, identity)) continue;
       if (!map.has(doc.id)) map.set(doc.id, doc);
     }
@@ -5165,36 +5165,36 @@ async function hydrateBundle(seed) {
   const galleries = mapDocs(seed.galleries);
   const requestIds = new Set(requests.keys());
   for (const doc of [...orders.values(), ...invoices.values(), ...appointments.values()]) {
-    const id = text$o(doc.data.orderRequestId);
+    const id = text$p(doc.data.orderRequestId);
     if (id) requestIds.add(id);
   }
   await readMissing("orderRequests", requestIds, requests);
   const orderIds = new Set(orders.keys());
   for (const doc of requests.values()) {
-    const id = text$o(doc.data.convertedToOrderId) || text$o(doc.data.orderId);
+    const id = text$p(doc.data.convertedToOrderId) || text$p(doc.data.orderId);
     if (id) orderIds.add(id);
   }
   for (const doc of [...invoices.values(), ...appointments.values()]) {
-    const id = text$o(doc.data.orderId);
+    const id = text$p(doc.data.orderId);
     if (id) orderIds.add(id);
   }
   await readMissing("orders", orderIds, orders);
   const invoiceIds = new Set(invoices.keys());
   for (const doc of [...requests.values(), ...orders.values()]) {
-    const id = text$o(doc.data.invoiceId);
+    const id = text$p(doc.data.invoiceId);
     if (id) invoiceIds.add(id);
   }
   await readMissing("invoices", invoiceIds, invoices);
   const legacyIds = /* @__PURE__ */ new Set();
   for (const doc of requests.values()) {
-    for (const id of legacyInvoiceDocIds({ orderRequestId: doc.id, listingId: text$o(doc.data.listingId) })) {
+    for (const id of legacyInvoiceDocIds({ orderRequestId: doc.id, listingId: text$p(doc.data.listingId) })) {
       legacyIds.add(id);
     }
   }
   for (const doc of orders.values()) {
     for (const id of legacyInvoiceDocIds({
-      orderRequestId: text$o(doc.data.orderRequestId),
-      listingId: text$o(doc.data.listingId)
+      orderRequestId: text$p(doc.data.orderRequestId),
+      listingId: text$p(doc.data.listingId)
     })) {
       legacyIds.add(id);
     }
@@ -5207,7 +5207,7 @@ async function hydrateBundle(seed) {
   mergeDocs(appointments, await queryIn("appointments", "orderId", [...orders.keys()]));
   const galleryIds = new Set(galleries.keys());
   for (const doc of [...requests.values(), ...orders.values()]) {
-    const id = text$o(doc.data.galleryId);
+    const id = text$p(doc.data.galleryId);
     if (id) galleryIds.add(id);
   }
   await readMissing("galleries", galleryIds, galleries);
@@ -5259,7 +5259,7 @@ async function followInvoiceRedirects(invoices) {
 async function readMissing(collectionName2, ids, into) {
   const missing = [...ids].filter((id) => id && !into.has(id)).slice(0, 100);
   if (missing.length === 0) return;
-  const snaps = await db$w().getAll(...missing.map((id) => db$w().collection(collectionName2).doc(id)));
+  const snaps = await db$y().getAll(...missing.map((id) => db$y().collection(collectionName2).doc(id)));
   snaps.forEach((snap) => {
     if (!snap.exists || into.has(snap.id)) return;
     into.set(snap.id, asDoc(snap.id, snap.data()));
@@ -5269,14 +5269,14 @@ async function queryIn(collectionName2, field, values) {
   const unique2 = [...new Set(values.map((value) => value.trim()).filter(Boolean))];
   const docs = [];
   for (const part of chunk$1(unique2, 30)) {
-    const snap = await db$w().collection(collectionName2).where(field, "in", part).limit(100).get();
+    const snap = await db$y().collection(collectionName2).where(field, "in", part).limit(100).get();
     snap.docs.forEach((doc) => docs.push(asDoc(doc.id, doc.data())));
   }
   return docs;
 }
 async function queryEqual$1(collectionName2, field, value) {
   if (!value) return [];
-  const snap = await db$w().collection(collectionName2).where(field, "==", value).limit(100).get();
+  const snap = await db$y().collection(collectionName2).where(field, "==", value).limit(100).get();
   return snap.docs.map((doc) => asDoc(doc.id, doc.data()));
 }
 function mergeDocs(into, docs) {
@@ -5336,7 +5336,7 @@ function alreadyExists(err) {
 function isSentinel(value) {
   return Boolean(value && typeof value === "object" && "_methodName" in value);
 }
-function text$o(value) {
+function text$p(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function chunk$1(items, size) {
@@ -5353,14 +5353,14 @@ const BOOKING_PHOTOGRAPHER_STAFF_UIDS = {
   "david-gonzalez": "",
   "cadi-torres": ""
 };
-function text$n(value) {
+function text$o(value) {
   return typeof value === "string" ? value.trim().toLowerCase() : "";
 }
 function resolveBookingPhotographerStaff(input) {
   const publicId = input.publicId.trim();
   const configured = String(BOOKING_PHOTOGRAPHER_STAFF_UIDS[publicId] || "").trim();
-  const calendar = text$n(input.calendarId);
-  const match = calendar ? (input.staff || []).find((member) => text$n(member.email) === calendar || text$n(member.googleCalendarId) === calendar) : void 0;
+  const calendar = text$o(input.calendarId);
+  const match = calendar ? (input.staff || []).find((member) => text$o(member.email) === calendar || text$o(member.googleCalendarId) === calendar) : void 0;
   const candidate = String(match?.id || configured || "").trim();
   const uid = candidate && candidate !== publicId ? candidate : null;
   const matchedName = typeof match?.name === "string" ? match.name.trim() : "";
@@ -5410,13 +5410,13 @@ function preferenceName(id) {
   if (id === NO_PREFERENCE_ID) return NO_PREFERENCE_NAME;
   return bookingPhotographerById(id)?.name || NO_PREFERENCE_NAME;
 }
-const db$v = () => admin.firestore();
+const db$x = () => admin.firestore();
 async function assignBookingPhotographerToListing(listingId, request) {
   const id = listingId.trim();
   const publicId = typeof request.bookingPhotographerId === "string" ? request.bookingPhotographerId.trim() : "";
   if (!id || !publicId) return { uid: null, publicId };
   const person = bookingPhotographerById(publicId);
-  const staffSnap = await db$v().collection("staff").limit(200).get();
+  const staffSnap = await db$x().collection("staff").limit(200).get();
   const staff = staffSnap.docs.map((doc) => {
     const data = doc.data() || {};
     return {
@@ -5434,7 +5434,7 @@ async function assignBookingPhotographerToListing(listingId, request) {
   });
   const patch = listingPhotographerAssignment(resolved);
   if (!patch) return { uid: null, publicId };
-  await db$v().collection("listings").doc(id).set({
+  await db$x().collection("listings").doc(id).set({
     ...patch,
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
   }, { merge: true });
@@ -5479,24 +5479,24 @@ function nestedTotal(pricing) {
   return pricing.total;
 }
 function warnWhenStoredTotalDiffers(record2, lineItems) {
-  const stored = [money$5(record2.total), money$5(nestedTotal(record2.pricing))].filter((amount) => amount != null);
+  const stored = [money$6(record2.total), money$6(nestedTotal(record2.pricing))].filter((amount) => amount != null);
   if (stored.length === 0) return;
-  const rebuilt = roundMoney$4(sumLineItemPrices(chargedServiceLines(lineItems)));
+  const rebuilt = roundMoney$5(sumLineItemPrices(chargedServiceLines(lineItems)));
   const drifted = [...new Set(stored.filter((amount) => Math.abs(amount - rebuilt) > 9e-3))];
   if (drifted.length === 0) return;
   console.warn(
     `[Bookings] Package repair kept stored total ${drifted.join(" / ")}; catalog lines total ${rebuilt}.`
   );
 }
-function money$5(value) {
-  if (typeof value === "number" && Number.isFinite(value)) return roundMoney$4(value);
+function money$6(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return roundMoney$5(value);
   if (typeof value === "string" && value.trim()) {
     const parsed = Number(value.replace(/[$,\s]/g, ""));
-    if (Number.isFinite(parsed)) return roundMoney$4(parsed);
+    if (Number.isFinite(parsed)) return roundMoney$5(parsed);
   }
   return void 0;
 }
-function roundMoney$4(value) {
+function roundMoney$5(value) {
   return Math.round(value * 100) / 100;
 }
 const PACKAGE_LABEL_KEYS = [
@@ -5518,14 +5518,14 @@ function orderServiceLines(record2, linked) {
   return synthesized ? [synthesized] : [];
 }
 function orderChargeSummary(record2, lines) {
-  const lineSubtotal = roundMoney$3(lines.reduce((sum, line) => sum + line.price, 0));
+  const lineSubtotal = roundMoney$4(lines.reduce((sum, line) => sum + line.price, 0));
   const pricing = nested$2(record2?.pricing);
   const tax = moneyOrNull$1(record2?.tax) ?? moneyOrNull$1(pricing.tax) ?? 0;
   const storedTotal = moneyOrNull$1(record2?.total) ?? moneyOrNull$1(pricing.total);
-  const total = storedTotal ?? roundMoney$3(lineSubtotal + tax);
+  const total = storedTotal ?? roundMoney$4(lineSubtotal + tax);
   const storedSubtotal = moneyOrNull$1(record2?.subtotal) ?? moneyOrNull$1(pricing.subtotal);
   const subtotal = lineSubtotal > 0 ? lineSubtotal : storedSubtotal && storedSubtotal > 0 ? storedSubtotal : total;
-  return { subtotal: roundMoney$3(subtotal), tax: roundMoney$3(tax), total: roundMoney$3(total) };
+  return { subtotal: roundMoney$4(subtotal), tax: roundMoney$4(tax), total: roundMoney$4(total) };
 }
 function storedServiceLines(record2) {
   if (!record2) return [];
@@ -5543,7 +5543,7 @@ function synthesizePackageLine(record2) {
 }
 function packageLabel(record2) {
   for (const key of PACKAGE_LABEL_KEYS) {
-    const value = text$m(record2[key]);
+    const value = text$n(record2[key]);
     if (value) return value;
   }
   return "";
@@ -5579,10 +5579,10 @@ function moneyOrNull$1(value) {
 function nested$2(value) {
   return value && typeof value === "object" ? value : {};
 }
-function text$m(value) {
+function text$n(value) {
   return typeof value === "string" ? value.trim() : "";
 }
-function roundMoney$3(value) {
+function roundMoney$4(value) {
   return Math.round(value * 100) / 100;
 }
 const LISTING_HERO = "/media/launch/hero_day_exterior_front.jpg";
@@ -5611,7 +5611,7 @@ function buildAdminOrderTile(record2) {
   const packageName = skin2?.title || named || "Custom order";
   const charges = orderChargeSummary(record2, lines);
   return {
-    id: text$l(record2.id) || packageName,
+    id: text$m(record2.id) || packageName,
     orderCode: orderCode(kind, record2),
     kind,
     typeLabel: kind === "business" ? "Business" : "Listing",
@@ -5634,7 +5634,7 @@ function buildAdminOrderTile(record2) {
   };
 }
 function orderKind(record2, skin2) {
-  const raw = text$l(record2.projectType || record2.orderType || record2.type).toLowerCase();
+  const raw = text$m(record2.projectType || record2.orderType || record2.type).toLowerCase();
   if (raw === "business" || raw === "brand" || raw === "social") return "business";
   if (raw === "real_estate" || raw === "listing" || raw === "property") return "listing";
   if (skin2?.category === "listing") return "listing";
@@ -5648,9 +5648,9 @@ function channelFor(skin2, kind) {
   return kind === "business" ? "Human Brand" : "Listings & Spaces";
 }
 function orderCode(kind, record2) {
-  const explicit = text$l(record2.orderCode || record2.orderNumber || record2.displayId);
+  const explicit = text$m(record2.orderCode || record2.orderNumber || record2.displayId);
   if (explicit) return explicit.toUpperCase();
-  const id = text$l(record2.id);
+  const id = text$m(record2.id);
   const prefix = kind === "listing" ? "L" : "B";
   return `ORD - ${prefix} - ${orderCodeTail(id)}`;
 }
@@ -5668,29 +5668,29 @@ function orderCodeTail(id, salt = 0) {
   return String(1e4 + (h >>> 0) % 9e4);
 }
 function heroFromRecord(record2) {
-  const explicit = text$l(record2.heroUrl) || text$l(record2.coverUrl) || text$l(record2.coverImage);
+  const explicit = text$m(record2.heroUrl) || text$m(record2.coverUrl) || text$m(record2.coverImage);
   if (explicit) return explicit;
   const images = record2.images;
   if (!Array.isArray(images)) return "";
   for (const image of images) {
     if (typeof image === "string" && image.trim()) return image.trim();
     if (image && typeof image === "object") {
-      const url = text$l(image.url) || text$l(image.thumbnailUrl);
+      const url = text$m(image.url) || text$m(image.thumbnailUrl);
       if (url) return url;
     }
   }
   return "";
 }
 function clientName(record2) {
-  const named = text$l(record2.clientName) || text$l(record2.customerName) || text$l(record2.agentName) || [text$l(record2.firstName), text$l(record2.lastName)].filter(Boolean).join(" ");
+  const named = text$m(record2.clientName) || text$m(record2.customerName) || text$m(record2.agentName) || [text$m(record2.firstName), text$m(record2.lastName)].filter(Boolean).join(" ");
   return named || "—";
 }
 function appointmentLabel(record2) {
   const raw = record2.appointmentDate ?? record2.apptDate ?? record2.scheduledDate ?? record2.requestedDate;
   const key = calendarDateKey(raw);
   const date = formatShootDateLabel(key, typeof raw === "string" ? raw : void 0);
-  const time = text$l(record2.scheduledTime || record2.appointmentTime || record2.requestedTime);
-  const photographer = text$l(record2.assignedPhotographerName || record2.photographerName || record2.photographerPreference);
+  const time = text$m(record2.scheduledTime || record2.appointmentTime || record2.requestedTime);
+  const photographer = text$m(record2.assignedPhotographerName || record2.photographerName || record2.photographerPreference);
   return [date, time, photographer].filter(Boolean).join(" · ") || "—";
 }
 function tilePrice(amount) {
@@ -5729,8 +5729,8 @@ function paidState(record2) {
   const invoice = nested$1(record2.invoice);
   const explicit = [record2.paymentStatus, record2.invoiceStatus, invoice.status].map((value) => normalize(value)).join(" ");
   if (/\bpartial\b/.test(explicit) || normalize(record2.status) === "partial") return "partial";
-  const total = money$4(invoice.total ?? record2.total ?? record2.amount);
-  const paid = money$4(invoice.amountPaid ?? record2.amountPaid);
+  const total = money$5(invoice.total ?? record2.total ?? record2.amount);
+  const paid = money$5(invoice.amountPaid ?? record2.amountPaid);
   if (paid > 0 && total > 0 && paid + 9e-3 < total) return "partial";
   if (/\bpaid\b/.test(explicit) || record2.paidAt || paid > 0 && (total === 0 || paid >= total)) return "paid";
   const status2 = normalize(record2.status);
@@ -5750,7 +5750,7 @@ function nested$1(value) {
 function normalize(value) {
   return String(value ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
 }
-function money$4(value) {
+function money$5(value) {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string" && value.trim()) {
     const parsed = Number(value.replace(/[$,\s]/g, ""));
@@ -5758,7 +5758,7 @@ function money$4(value) {
   }
   return 0;
 }
-function text$l(value) {
+function text$m(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 const NOT_PROVIDED = "Not provided";
@@ -5779,7 +5779,7 @@ function officeNewOrderEmail(saved, options) {
   const notes = notesOf(saved);
   const fields = [
     ["Order number", orderNumber],
-    ["Admin link", text$k(options?.adminUrl) || NOT_PROVIDED],
+    ["Admin link", text$l(options?.adminUrl) || NOT_PROVIDED],
     ["Client name", clientName2],
     ["Client email", firstText$1(saved, ["clientEmail", "email"])],
     ["Client phone", firstText$1(saved, ["clientPhone", "phone"])],
@@ -5813,12 +5813,12 @@ function officeNewOrderEmail(saved, options) {
     ["Notes", notes],
     ["Booked via", bookedVia(saved)]
   ];
-  const officeNote = text$k(saved.officeNote);
+  const officeNote = text$l(saved.officeNote);
   if (officeNote) fields.unshift(["Office note", officeNote]);
   const subjectCore = `New order ${orderNumber} — ${packageName} — ${address} — ${requestedDate}`;
   const subject = isTestOrder(clientName2, notes) ? `[TEST] ${subjectCore}` : subjectCore;
   const plain = fields.map(([label, value]) => `${label}: ${value}`).join("\n");
-  const html = `<div style="font-family:Arial,sans-serif;max-width:640px;color:#111"><h1 style="font-size:18px">${escapeHtml$6(subject)}</h1><table style="width:100%;border-collapse:collapse">${fields.map(([label, value]) => `<tr><td style="padding:6px 10px;border-bottom:1px solid #eee;font-weight:bold;vertical-align:top">${escapeHtml$6(label)}</td><td style="padding:6px 10px;border-bottom:1px solid #eee;white-space:pre-wrap">${escapeHtml$6(value)}</td></tr>`).join("")}</table></div>`;
+  const html = `<div style="font-family:Arial,sans-serif;max-width:640px;color:#111"><h1 style="font-size:18px">${escapeHtml$7(subject)}</h1><table style="width:100%;border-collapse:collapse">${fields.map(([label, value]) => `<tr><td style="padding:6px 10px;border-bottom:1px solid #eee;font-weight:bold;vertical-align:top">${escapeHtml$7(label)}</td><td style="padding:6px 10px;border-bottom:1px solid #eee;white-space:pre-wrap">${escapeHtml$7(value)}</td></tr>`).join("")}</table></div>`;
   return { subject, text: plain, html, orderNumber, packageName };
 }
 function isTestOrder(clientName2, notes) {
@@ -5827,19 +5827,19 @@ ${notes}`.toUpperCase().includes("TEST ORDER");
 }
 function orderNumberOf(saved) {
   for (const key of ["orderNumber", "orderCode", "displayId"]) {
-    const value = text$k(saved[key]);
+    const value = text$l(saved[key]);
     if (value && value !== NOT_PROVIDED) return value;
   }
-  if (!text$k(saved.id)) return NOT_PROVIDED;
+  if (!text$l(saved.id)) return NOT_PROVIDED;
   return buildAdminOrderTile(saved).orderCode;
 }
 function explicitPackageName(saved) {
   for (const key of ["packageName", "serviceName"]) {
-    const value = text$k(saved[key]);
+    const value = text$l(saved[key]);
     if (value && value !== NOT_PROVIDED) return cleanPackageName(value) || value;
   }
-  const selected = text$k(saved.selectedService);
-  if (text$k(saved.id) || selected) {
+  const selected = text$l(saved.selectedService);
+  if (text$l(saved.id) || selected) {
     const tileName = buildAdminOrderTile(saved).packageName;
     if (tileName && tileName !== "Custom order") return tileName;
   }
@@ -5849,7 +5849,7 @@ function explicitPackageName(saved) {
 function clientNameOf(saved) {
   const named = firstText$1(saved, ["clientName", "customerName"]);
   if (named) return named;
-  const joined = [text$k(saved.firstName), text$k(saved.lastName)].filter(Boolean).join(" ");
+  const joined = [text$l(saved.firstName), text$l(saved.lastName)].filter(Boolean).join(" ");
   return joined || NOT_PROVIDED;
 }
 function agentContactOf(saved) {
@@ -5867,7 +5867,7 @@ function agentField(saved, keys, nestedKey) {
   if (direct !== NOT_PROVIDED) return direct;
   for (const holder of [saved.agent, saved.listingAgent, saved.realtor]) {
     const record2 = nested(holder);
-    const value = text$k(record2[nestedKey]);
+    const value = text$l(record2[nestedKey]);
     if (value) return value;
   }
   return "";
@@ -5876,7 +5876,7 @@ function digits$1(value) {
   return value === NOT_PROVIDED ? "" : value.replace(/\D/g, "");
 }
 function notesOf(saved) {
-  const parts = ["vibeNote", "notes", "specialInstructions", "internalNotes"].map((key) => text$k(saved[key])).filter(Boolean);
+  const parts = ["vibeNote", "notes", "specialInstructions", "internalNotes"].map((key) => text$l(saved[key])).filter(Boolean);
   return parts.length ? parts.join("\n") : NOT_PROVIDED;
 }
 function lockboxOf(saved) {
@@ -5884,12 +5884,12 @@ function lockboxOf(saved) {
   return code || NOT_PROVIDED;
 }
 function occupancyOf(saved) {
-  const parts = ["occupancy", "propertyStatus", "furnishingStatus"].map((key) => text$k(saved[key])).filter(Boolean);
+  const parts = ["occupancy", "propertyStatus", "furnishingStatus"].map((key) => text$l(saved[key])).filter(Boolean);
   return parts.length ? parts.join(", ") : NOT_PROVIDED;
 }
 function bookedVia(saved) {
-  const lead = text$k(saved.leadSource);
-  const source = text$k(saved.source);
+  const lead = text$l(saved.leadSource);
+  const source = text$l(saved.source);
   const blob = `${lead} ${source}`.toLowerCase();
   if (!blob.trim()) return NOT_PROVIDED;
   if (/admin/.test(blob)) return "Admin";
@@ -5899,7 +5899,7 @@ function bookedVia(saved) {
 }
 function paymentOf(saved, total) {
   const invoice = nested(saved.invoice);
-  const explicit = [saved.paymentStatus, saved.invoiceStatus, invoice.status].map((value) => text$k(value).toLowerCase()).find(Boolean) || "";
+  const explicit = [saved.paymentStatus, saved.invoiceStatus, invoice.status].map((value) => text$l(value).toLowerCase()).find(Boolean) || "";
   if (/partial/.test(explicit)) return "Partial";
   if (/\bpaid\b/.test(explicit) && !/unpaid/.test(explicit)) return "Paid";
   if (/unpaid/.test(explicit)) return "Unpaid";
@@ -6006,10 +6006,10 @@ function moneyOrNull(value) {
 function nested(value) {
   return value && typeof value === "object" ? value : {};
 }
-function text$k(value) {
+function text$l(value) {
   return typeof value === "string" ? value.trim() : "";
 }
-function escapeHtml$6(value) {
+function escapeHtml$7(value) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 const OFFICE_NEW_ORDER_EMAIL_TEMPLATE = "office_new_order";
@@ -6315,15 +6315,15 @@ function canonicalSlotTime(value) {
   if (hour < 1 || hour > 12) return null;
   return `${hour}:${match[2]} ${match[3].toUpperCase()}`;
 }
-function text$j(value) {
+function text$k(value) {
   return typeof value === "string" ? value : "";
 }
 function isHolidayTestBooking(order) {
-  const email = `${text$j(order.email)} ${text$j(order.clientEmail)}`.toLowerCase();
+  const email = `${text$k(order.email)} ${text$k(order.clientEmail)}`.toLowerCase();
   if (email.includes("ops+deliveryqa@")) return true;
   if (order.playtest === true || order.test === true || order.isTest === true) return true;
-  const name = text$j(order.clientName) || `${text$j(order.firstName)} ${text$j(order.lastName)}`.trim();
-  const notes = text$j(order.vibeNote) || text$j(order.notes);
+  const name = text$k(order.clientName) || `${text$k(order.firstName)} ${text$k(order.lastName)}`.trim();
+  const notes = text$k(order.vibeNote) || text$k(order.notes);
   return `${name}
 ${notes}`.toUpperCase().includes("TEST ORDER");
 }
@@ -6344,15 +6344,15 @@ function holidayStoredDate(order) {
       }).format(date);
     }
   }
-  const fromNote = /^Date:\s*(\d{4}-\d{2}-\d{2})/im.exec(text$j(order.vibeNote));
+  const fromNote = /^Date:\s*(\d{4}-\d{2}-\d{2})/im.exec(text$k(order.vibeNote));
   if (fromNote) return fromNote[1];
-  if (text$j(order.leadSource).trim() === HOLIDAY_RSVP_LEAD) return THANKFUL_EVENT_DATE;
+  if (text$k(order.leadSource).trim() === HOLIDAY_RSVP_LEAD) return THANKFUL_EVENT_DATE;
   return null;
 }
 function holidayStoredTime(order) {
   const labeled = canonicalSlotTime(order.requestedTimeLabel);
   if (labeled) return labeled;
-  const note = text$j(order.vibeNote);
+  const note = text$k(order.vibeNote);
   const requested = /Requested photo time:\s*(\d{1,2}:\d{2}\s*[AP]M)/i.exec(note);
   if (requested) return canonicalSlotTime(requested[1]);
   const line = /^Time:\s*(\d{1,2}:\d{2}\s*[AP]M)/im.exec(note);
@@ -6362,8 +6362,8 @@ function holidayStoredTime(order) {
 function holidaySlotClaim(leadSource, date, time) {
   const clock = canonicalSlotTime(time);
   if (!clock) return null;
-  const lead = text$j(leadSource).trim();
-  const day = text$j(date).trim().slice(0, 10);
+  const lead = text$k(leadSource).trim();
+  const day = text$k(date).trim().slice(0, 10);
   if (lead === HOLIDAY_RSVP_LEAD) {
     const thankfulDay = day || THANKFUL_EVENT_DATE;
     if (thankfulDay !== THANKFUL_EVENT_DATE || !thankfulSlotTimes().includes(clock)) return null;
@@ -6389,7 +6389,7 @@ function holidayTakenFromOrders(orders, limit = HOLIDAY_SLOT_LIMIT) {
   const counts = /* @__PURE__ */ new Map();
   for (const order of orders) {
     if (isHolidayTestBooking(order)) continue;
-    const status2 = text$j(order.status).trim().toLowerCase();
+    const status2 = text$k(order.status).trim().toLowerCase();
     if (CLOSED_STATUSES$1.has(status2)) continue;
     const claim = holidaySlotClaim(order.leadSource, holidayStoredDate(order), holidayStoredTime(order));
     if (!claim) continue;
@@ -6422,18 +6422,18 @@ const HOLIDAY_SLOT_MINUTES = 15;
 const LEGACY_THANKFUL_DATE = "2026-11-14";
 const LEGACY_THANKFUL_TIME = "11:00 AM";
 const CLOSED_STATUSES = /* @__PURE__ */ new Set(["declined", "cancelled", "canceled"]);
-function text$i(value) {
+function text$j(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function noteOf(order) {
-  return text$i(order.vibeNote) || text$i(order.notes);
+  return text$j(order.vibeNote) || text$j(order.notes);
 }
 function lineValue(note, label) {
   const match = new RegExp(`^${label}:\\s*(.*)$`, "im").exec(note);
   return match ? match[1].trim() : "";
 }
 function holidayGuestName(order) {
-  const named = text$i(order.clientName) || `${text$i(order.firstName)} ${text$i(order.lastName)}`.trim();
+  const named = text$j(order.clientName) || `${text$j(order.firstName)} ${text$j(order.lastName)}`.trim();
   return named || "Guest";
 }
 function holidayHeadcountLabel(order) {
@@ -6467,18 +6467,18 @@ function holidayNotesLabel(order) {
   return lineValue(noteOf(order), "Notes");
 }
 function holidayPackageLabel(order) {
-  const selected = text$i(order.selectedService);
+  const selected = text$j(order.selectedService);
   if (selected) return selected;
-  const named = text$i(order.packageName);
+  const named = text$j(order.packageName);
   if (named) return named;
   const fromNote = lineValue(noteOf(order), "Package");
   return fromNote || "Holiday shoot";
 }
 function closedStatus(order) {
-  return CLOSED_STATUSES.has(text$i(order.status).toLowerCase());
+  return CLOSED_STATUSES.has(text$j(order.status).toLowerCase());
 }
 function holidayLead(order) {
-  const lead = text$i(order.leadSource);
+  const lead = text$j(order.leadSource);
   if (lead === HOLIDAY_RSVP_LEAD) return "thankful";
   if (lead === HOLIDAY_SEASON_LEAD) return "season";
   return null;
@@ -6534,11 +6534,11 @@ function buildPlan(order, adminUrl) {
   const name = holidayGuestName(order);
   const headcount = holidayHeadcountLabel(order);
   const headcountTitle = holidayHeadcountNumber(headcount) ?? (headcount || "—");
-  const orderNumber = text$i(order.orderNumber);
+  const orderNumber = text$j(order.orderNumber);
   const summary = kind === "thankful" ? `Thankful RSVP — ${name} (${headcountTitle})` : `'Tis shoot — ${name} — ${holidayPackageLabel(order)}`;
   const description = [
-    `Email: ${text$i(order.email) || text$i(order.clientEmail) || "—"}`,
-    `Phone: ${text$i(order.phone) || text$i(order.clientPhone) || "—"}`,
+    `Email: ${text$j(order.email) || text$j(order.clientEmail) || "—"}`,
+    `Phone: ${text$j(order.phone) || text$j(order.clientPhone) || "—"}`,
     `Headcount: ${headcount || "—"}`,
     `Kids/Santa: ${holidaySantaLabel(order) || "—"}`,
     `Menu vote: ${holidayMenuVote(order) || "—"}`,
@@ -6547,7 +6547,7 @@ function buildPlan(order, adminUrl) {
     `Admin: ${adminUrl}`
   ].join("\n");
   return {
-    orderId: text$i(order.id),
+    orderId: text$j(order.id),
     orderNumber,
     kind,
     name,
@@ -6564,7 +6564,7 @@ function classifyHolidayCalendarOrder(order, adminUrl) {
   if (!holidayLead(order)) return { action: "skip", reason: "notASlot" };
   if (isHolidayTestBooking(order)) return { action: "skip", reason: "test" };
   if (closedStatus(order)) return { action: "skip", reason: "cancelled" };
-  if (text$i(order.calendarEventId)) return { action: "skip", reason: "already" };
+  if (text$j(order.calendarEventId)) return { action: "skip", reason: "already" };
   const plan = buildPlan(order, adminUrl);
   if (!plan) return { action: "skip", reason: "notASlot" };
   return { action: "create", plan };
@@ -6804,11 +6804,11 @@ async function createHolidaySquareCheckout(input) {
     squareOrderId: result.payment_link?.order_id
   };
 }
-const db$u = () => admin.firestore();
+const db$w = () => admin.firestore();
 async function holidayOrderSnaps() {
   const [rsvp, season] = await Promise.all([
-    db$u().collection("orderRequests").where("leadSource", "==", HOLIDAY_RSVP_LEAD).get(),
-    db$u().collection("orderRequests").where("leadSource", "==", HOLIDAY_SEASON_LEAD).get()
+    db$w().collection("orderRequests").where("leadSource", "==", HOLIDAY_RSVP_LEAD).get(),
+    db$w().collection("orderRequests").where("leadSource", "==", HOLIDAY_SEASON_LEAD).get()
   ]);
   const byId = /* @__PURE__ */ new Map();
   for (const doc of [...rsvp.docs, ...season.docs]) {
@@ -6857,22 +6857,22 @@ function emptySocials() {
     realtor: ""
   };
 }
-function text$h(value, max = 160) {
+function text$i(value, max = 160) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
 }
 function record$2(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
 }
 function hubEmail(value) {
-  const email = text$h(value, 160).toLowerCase();
+  const email = text$i(value, 160).toLowerCase();
   if (!email || !email.includes("@") || email.includes(" ")) return "";
   return email;
 }
 function hubPhone(value) {
-  return text$h(value, 40).replace(/[^\d+().\-\s]/g, "");
+  return text$i(value, 40).replace(/[^\d+().\-\s]/g, "");
 }
 function hubHttpUrl(value, max = 400) {
-  const raw = text$h(value, max);
+  const raw = text$i(value, max);
   if (!raw) return "";
   if (raw.startsWith("/media/") && !raw.includes("..") && !raw.includes("\\")) return raw;
   try {
@@ -6884,7 +6884,7 @@ function hubHttpUrl(value, max = 400) {
   }
 }
 function hubImageUrl(value) {
-  const raw = text$h(value, 500);
+  const raw = text$i(value, 500);
   if (!raw) return "";
   if (raw.startsWith("data:image/")) return "";
   return hubHttpUrl(raw, 500);
@@ -6900,13 +6900,13 @@ function profileFromClient(data) {
   const customSocials = Array.isArray(stored.customSocials) ? stored.customSocials.slice(0, 12).map((entry2, index) => {
     const row = record$2(entry2);
     return {
-      id: text$h(row.id, 40) || `custom-${index + 1}`,
-      label: text$h(row.label, 40),
+      id: text$i(row.id, 40) || `custom-${index + 1}`,
+      label: text$i(row.label, 40),
       url: hubHttpUrl(row.url)
     };
   }).filter((entry2) => entry2.label && entry2.url) : [];
-  const firstName = text$h(stored.firstName, 80) || text$h(source.firstName, 80);
-  const lastName = text$h(stored.lastName, 80) || text$h(source.lastName, 80);
+  const firstName = text$i(stored.firstName, 80) || text$i(source.firstName, 80);
+  const lastName = text$i(stored.lastName, 80) || text$i(source.lastName, 80);
   return {
     firstName,
     lastName,
@@ -6914,7 +6914,7 @@ function profileFromClient(data) {
     email: hubEmail(stored.email || source.email),
     headshotUrl: hubImageUrl(stored.headshotUrl),
     companyLogoUrl: hubImageUrl(stored.companyLogoUrl),
-    brokerage: text$h(stored.brokerage, 160) || text$h(source.company, 160),
+    brokerage: text$i(stored.brokerage, 160) || text$i(source.company, 160),
     brokerageLogoUrl: hubImageUrl(stored.brokerageLogoUrl),
     website: hubHttpUrl(stored.website),
     socials,
@@ -6939,21 +6939,21 @@ function applyProfileToAgent(agent, profile) {
   const name = profile ? profileDisplayName(profile) : "";
   const links = profile ? socialLinks(profile) : [];
   return {
-    name: text$h(current.name, 160) || name,
-    brokerage: text$h(current.brokerage, 160) || profile?.brokerage || "",
-    license: text$h(current.license, 40),
-    phone: text$h(current.phone, 40) || profile?.phone || "",
+    name: text$i(current.name, 160) || name,
+    brokerage: text$i(current.brokerage, 160) || profile?.brokerage || "",
+    license: text$i(current.license, 40),
+    phone: text$i(current.phone, 40) || profile?.phone || "",
     email: hubEmail(current.email) || profile?.email || "",
     headshotUrl: hubImageUrl(current.headshotUrl) || profile?.headshotUrl || "",
     companyLogoUrl: hubImageUrl(current.companyLogoUrl) || profile?.companyLogoUrl || "",
     brokerageLogoUrl: hubImageUrl(current.brokerageLogoUrl) || profile?.brokerageLogoUrl || "",
     website: hubHttpUrl(current.website) || profile?.website || "",
-    socials: Array.isArray(current.socials) && current.socials.length ? current.socials.map((item) => ({ label: text$h(item.label, 40), url: hubHttpUrl(item.url) })).filter((item) => item.label && item.url) : links
+    socials: Array.isArray(current.socials) && current.socials.length ? current.socials.map((item) => ({ label: text$i(item.label, 40), url: hubHttpUrl(item.url) })).filter((item) => item.label && item.url) : links
   };
 }
 function normalizePermissions(value) {
   const list2 = Array.isArray(value) ? value : [];
-  const picked = [...new Set(list2.map((item) => text$h(item, 20)).filter((item) => PERMISSION_SET.has(item)))];
+  const picked = [...new Set(list2.map((item) => text$i(item, 20)).filter((item) => PERMISSION_SET.has(item)))];
   if (picked.includes("admin")) return [...TEAM_PERMISSIONS];
   if (picked.length === 0) return ["view"];
   if (!picked.includes("view")) picked.unshift("view");
@@ -6983,8 +6983,8 @@ function grantFromMembers(ownerClientId, teamId, members) {
   return grant;
 }
 function hubAllows(input) {
-  const uid = text$h(input.uid, 128);
-  const ownerClientId = text$h(input.ownerClientId, 128);
+  const uid = text$i(input.uid, 128);
+  const ownerClientId = text$i(input.ownerClientId, 128);
   if (!uid || !ownerClientId) return false;
   if (uid === ownerClientId) return true;
   const grant = input.grant;
@@ -7001,34 +7001,34 @@ function hubAllows(input) {
   return false;
 }
 function contactStatus(value) {
-  const status2 = text$h(value, 40);
+  const status2 = text$i(value, 40);
   return STATUS_SET.has(status2) ? status2 : "lead";
 }
 function sanitizeContact(input, ownerClientId, teamId = "") {
   const row = record$2(input);
-  const tags = Array.isArray(row.tags) ? row.tags.map((tag) => text$h(tag, 40)).filter(Boolean).slice(0, 12) : text$h(row.tags, 200).split(/[|,]/).map((tag) => tag.trim()).filter(Boolean).slice(0, 12);
+  const tags = Array.isArray(row.tags) ? row.tags.map((tag) => text$i(tag, 40)).filter(Boolean).slice(0, 12) : text$i(row.tags, 200).split(/[|,]/).map((tag) => tag.trim()).filter(Boolean).slice(0, 12);
   return {
     ownerClientId,
     teamId,
-    name: text$h(row.name, 120),
+    name: text$i(row.name, 120),
     email: hubEmail(row.email),
     phone: hubPhone(row.phone),
     tags,
-    notes: text$h(row.notes, 2e3),
-    lastContact: /^\d{4}-\d{2}-\d{2}$/.test(text$h(row.lastContact, 10)) ? text$h(row.lastContact, 10) : "",
+    notes: text$i(row.notes, 2e3),
+    lastContact: /^\d{4}-\d{2}-\d{2}$/.test(text$i(row.lastContact, 10)) ? text$i(row.lastContact, 10) : "",
     status: contactStatus(row.status),
     source: row.source === "share" || row.source === "import" ? row.source : "manual",
-    shareRef: text$h(row.shareRef, 160)
+    shareRef: text$i(row.shareRef, 160)
   };
 }
 function shareContactsFromListing(listing, ownerClientId) {
-  const listingId = text$h(listing.id, 128) || "listing";
+  const listingId = text$i(listing.id, 128) || "listing";
   const rows = [];
   const inquiries = Array.isArray(listing.listingSiteInquiries) ? listing.listingSiteInquiries : [];
   inquiries.forEach((entry2, index) => {
     const row = record$2(entry2);
-    const name = text$h(row.name, 120);
-    const contact = text$h(row.contact, 160);
+    const name = text$i(row.name, 120);
+    const contact = text$i(row.contact, 160);
     if (!name && !contact) return;
     const email = hubEmail(contact);
     rows.push({
@@ -7038,8 +7038,8 @@ function shareContactsFromListing(listing, ownerClientId) {
       email,
       phone: email ? "" : hubPhone(contact),
       tags: ["shared"],
-      notes: text$h(row.when, 80) ? `Showing request: ${text$h(row.when, 80)}` : "Shared from the listing site.",
-      lastContact: text$h(row.at, 10).slice(0, 10),
+      notes: text$i(row.when, 80) ? `Showing request: ${text$i(row.when, 80)}` : "Shared from the listing site.",
+      lastContact: text$i(row.at, 10).slice(0, 10),
       status: "lead",
       source: "share",
       shareRef: `${listingId}:${index}`
@@ -7048,7 +7048,7 @@ function shareContactsFromListing(listing, ownerClientId) {
   const shares = Array.isArray(listing.shares) ? listing.shares : [];
   shares.forEach((entry2, index) => {
     const row = record$2(entry2);
-    const name = text$h(row.name, 120);
+    const name = text$i(row.name, 120);
     const email = hubEmail(row.email);
     if (!name && !email) return;
     rows.push({
@@ -7178,11 +7178,11 @@ function sanitizeBilling(input) {
   return {
     email: hubEmail(row.email || row.billingEmail),
     phone: hubPhone(row.phone || row.billingPhone),
-    line1: text$h(row.line1 || address.line1, 120),
-    line2: text$h(row.line2 || address.line2, 120),
-    city: text$h(row.city || address.city, 80),
-    state: text$h(row.state || address.state, 40),
-    postalCode: text$h(row.postalCode || address.postalCode || address.zip, 20)
+    line1: text$i(row.line1 || address.line1, 120),
+    line2: text$i(row.line2 || address.line2, 120),
+    city: text$i(row.city || address.city, 80),
+    state: text$i(row.state || address.state, 40),
+    postalCode: text$i(row.postalCode || address.postalCode || address.zip, 20)
   };
 }
 function billingAddressLine(billing) {
@@ -7194,7 +7194,7 @@ function portalBillingStamp(source) {
   const billing = sanitizeBilling(row.billing && typeof row.billing === "object" ? row.billing : row);
   const email = hubEmail(row.billingEmail) || billing.email;
   const phone = hubPhone(row.billingPhone) || billing.phone;
-  const address = text$h(row.billToAddress, 240) || billingAddressLine(billing);
+  const address = text$i(row.billToAddress, 240) || billingAddressLine(billing);
   const stamp2 = {};
   if (email) stamp2.billingEmail = email;
   if (phone) stamp2.billingPhone = phone;
@@ -7207,7 +7207,7 @@ function squareBuyerPrefill(invoice) {
   if (email) data.buyer_email = email;
   const phone = hubPhone(invoice.billingPhone) || hubPhone(invoice.clientPhone);
   if (phone) data.buyer_phone_number = phone;
-  const address = text$h(invoice.billToAddress, 240);
+  const address = text$i(invoice.billToAddress, 240);
   if (address) data.buyer_address = { address_line_1: address, country: "US" };
   return data;
 }
@@ -7217,17 +7217,17 @@ function accountBalanceCents(invoices, storedCents = 0) {
   return Number.isFinite(storedCents) ? Math.round(storedCents) : 0;
 }
 function cardOnFileFromSquare(card, customerId) {
-  const last4 = text$h(card.last_4 || card.last4, 4);
+  const last4 = text$i(card.last_4 || card.last4, 4);
   if (!/^\d{4}$/.test(last4)) return null;
   const expMonth = Number(card.exp_month || card.expMonth);
   const expYear = Number(card.exp_year || card.expYear);
   return {
-    brand: text$h(card.card_brand || card.brand, 20) || "Card",
+    brand: text$i(card.card_brand || card.brand, 20) || "Card",
     last4,
     expMonth: Number.isFinite(expMonth) ? expMonth : 0,
     expYear: Number.isFinite(expYear) ? expYear : 0,
-    squareCardId: text$h(card.id || card.squareCardId, 80),
-    squareCustomerId: text$h(customerId, 80)
+    squareCardId: text$i(card.id || card.squareCardId, 80),
+    squareCustomerId: text$i(customerId, 80)
   };
 }
 function teamInviteDelivery(env = process.env) {
@@ -7256,11 +7256,11 @@ async function nextOrderNumber() {
   return formatOrderNumber(n);
 }
 const SETTLED = /* @__PURE__ */ new Set(["paid", "comped"]);
-function text$g(value) {
+function text$h(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function status(value) {
-  return text$g(value).toLowerCase();
+  return text$h(value).toLowerCase();
 }
 function settled(value) {
   return SETTLED.has(status(value));
@@ -7268,12 +7268,12 @@ function settled(value) {
 function isPlaytestDoc(doc) {
   if (!doc) return false;
   if (doc.playtest === true) return true;
-  return text$g(doc.id).toLowerCase().startsWith("playtest-");
+  return text$h(doc.id).toLowerCase().startsWith("playtest-");
 }
 function nestedInvoiceStatus(listing) {
   const nested2 = listing?.invoice;
   if (!nested2 || typeof nested2 !== "object") return "";
-  return text$g(nested2.status);
+  return text$h(nested2.status);
 }
 function releaseFlags(subject) {
   const listing = subject.listing;
@@ -7731,7 +7731,7 @@ const APPRENTICESHIP_PAID_NEEDS_RESCHEDULE_STATUS = "paid_needs_reschedule";
 function apprenticeshipHoldExpiresAt(created, minutes = APPRENTICESHIP_HOLD_MINUTES) {
   return new Date(created.getTime() + minutes * 60 * 1e3).toISOString();
 }
-function timeValue(value) {
+function timeValue$1(value) {
   if (!value) return null;
   if (typeof value === "string" || typeof value === "number") {
     const parsed = new Date(value).getTime();
@@ -7747,8 +7747,8 @@ function apprenticeshipHoldExpired(order, now) {
   if (order.source !== APPRENTICESHIP_ORDER_SOURCE) return false;
   if (order.status !== APPRENTICESHIP_AWAITING_DEPOSIT_STATUS) return false;
   if ((Number(order.depositPaid) || 0) > 0) return false;
-  const explicit = timeValue(order.holdExpiresAt);
-  const created = timeValue(order.createdAt);
+  const explicit = timeValue$1(order.holdExpiresAt);
+  const created = timeValue$1(order.createdAt);
   const expires = explicit ?? (created == null ? null : created + APPRENTICESHIP_HOLD_MINUTES * 60 * 1e3);
   return expires != null && expires <= now.getTime();
 }
@@ -7942,7 +7942,7 @@ function openApprenticeshipSlots(input) {
   }
   return slots;
 }
-function roundMoney$2(value) {
+function roundMoney$3(value) {
   return Math.round(value * 100) / 100;
 }
 function quoteApprenticeship(input) {
@@ -7978,41 +7978,41 @@ function quoteApprenticeship(input) {
       total: draft.total,
       bookingFee: APPRENTICESHIP_BOOKING_FEE,
       bookingFeeLine: APPRENTICESHIP_BOOKING_FEE_LINE,
-      balanceDue: roundMoney$2(Math.max(0, draft.total - APPRENTICESHIP_BOOKING_FEE)),
+      balanceDue: roundMoney$3(Math.max(0, draft.total - APPRENTICESHIP_BOOKING_FEE)),
       balanceLine: APPRENTICESHIP_BALANCE_LINE,
       lineItems: draft.lineItems
     }
   };
 }
-const EMAIL_RE$3 = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-function text$f(value) {
+const EMAIL_RE$4 = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+function text$g(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function parseApprenticeshipOrder(body) {
   const raw = body && typeof body === "object" ? body : {};
-  if (text$f(raw.website) || text$f(raw.companyWebsite)) {
+  if (text$g(raw.website) || text$g(raw.companyWebsite)) {
     return { ok: false, error: "Received.", honeypot: true };
   }
-  const name = text$f(raw.name);
-  const explicitFirst = text$f(raw.firstName);
-  const explicitLast = text$f(raw.lastName);
+  const name = text$g(raw.name);
+  const explicitFirst = text$g(raw.firstName);
+  const explicitLast = text$g(raw.lastName);
   const parts = name.split(/\s+/).filter(Boolean);
   const firstName = explicitFirst || parts[0] || "";
   const lastName = explicitLast || parts.slice(1).join(" ") || (explicitFirst ? "" : "");
-  const email = text$f(raw.email).toLowerCase();
-  const phone = text$f(raw.phone);
-  const address = text$f(raw.address);
-  const packageId = text$f(raw.packageId);
-  const slotStart = text$f(raw.slotStart);
-  const preferredTime = text$f(raw.preferredTime);
-  const details = text$f(raw.details);
-  const gclid = text$f(raw.gclid);
+  const email = text$g(raw.email).toLowerCase();
+  const phone = text$g(raw.phone);
+  const address = text$g(raw.address);
+  const packageId = text$g(raw.packageId);
+  const slotStart = text$g(raw.slotStart);
+  const preferredTime = text$g(raw.preferredTime);
+  const details = text$g(raw.details);
+  const gclid = text$g(raw.gclid);
   if (!isApprenticeshipPackage(packageId) || !findApprenticeshipPackage(packageId)) {
     return { ok: false, error: "Choose an apprenticeship package." };
   }
   if (firstName.length < 2) return { ok: false, error: "Enter your name." };
   if (`${firstName} ${lastName}`.trim().length > 80) return { ok: false, error: "Name is too long." };
-  if (!EMAIL_RE$3.test(email)) return { ok: false, error: "Enter a valid email." };
+  if (!EMAIL_RE$4.test(email)) return { ok: false, error: "Enter a valid email." };
   const digits2 = phone.replace(/\D/g, "");
   if (digits2.length < 10 || digits2.length > 15) return { ok: false, error: "Enter a phone number." };
   if (address.length < 5) return { ok: false, error: "Enter the property address." };
@@ -8399,6 +8399,235 @@ function samePlace(booking, location) {
   const left = booking.split(",")[0]?.trim() || "";
   const right = location.split(",")[0]?.trim() || "";
   return left.length >= 8 && left === right;
+}
+const HEADSHOTS_LEAD_SOURCE = "Tuesday $10 headshots (Google Ads)";
+const HEADSHOTS_ORDER_SOURCE = "headshots-10";
+const HEADSHOTS_TIME_ZONE = "America/Chicago";
+const HEADSHOTS_UNIT_PRICE = 10;
+const HEADSHOTS_BOOKING_FEE = 10;
+const HEADSHOTS_SLOT_MINUTES = 10;
+const HEADSHOTS_DAY_START_MINUTES = 10 * 60;
+const HEADSHOTS_DAY_END_MINUTES = 14 * 60;
+const HEADSHOTS_HORIZON_DAYS = 35;
+const HEADSHOTS_MAX_QUANTITY = 10;
+const HEADSHOTS_DOUBLE_SLOT_AT = 6;
+const HEADSHOTS_SLOT_CAPACITY = 1;
+const HEADSHOTS_HOLD_MINUTES = 60;
+const HEADSHOTS_HOLD_PREFIX = "HOLD · $10 fee due · ";
+const HEADSHOTS_UNPAID_NOTE = "Booking fee NOT PAID YET. Hold until the Square payment lands.";
+const HEADSHOTS_PAID_NOTE = "Booking fee PAID. The $10 counts toward the headshots.";
+const HEADSHOTS_STUDIO_NAME = "Iconic Studios";
+const HEADSHOTS_STUDIO_ADDRESS = "26410 Oakridge Dr. Ste 105, Spring, TX 77380";
+const HEADSHOTS_STUDIO_LINE = `${HEADSHOTS_STUDIO_NAME}, ${HEADSHOTS_STUDIO_ADDRESS}`;
+const HEADSHOTS_H1 = "$10 Tuesdays! Headshots for $10/Ea.";
+const HEADSHOTS_PRICE_LINE = "$10 per headshot + 2.8% processing fee.";
+const HEADSHOTS_CALENDAR_FALLBACK = "Open times are not listed right now. Call or email and we will set the time with you.";
+const HEADSHOT_PATHS = {
+  home: "/headshots-10",
+  book: "/headshots-10/book",
+  how: "/headshots-10/how-it-works"
+};
+function headshotsWeek() {
+  const tuesday = {
+    startMinutes: HEADSHOTS_DAY_START_MINUTES,
+    endMinutes: HEADSHOTS_DAY_END_MINUTES,
+    latestStartMinutes: HEADSHOTS_DAY_END_MINUTES
+  };
+  return {
+    timeZone: HEADSHOTS_TIME_ZONE,
+    horizonDays: HEADSHOTS_HORIZON_DAYS,
+    days: [null, null, tuesday, null, null, null, null]
+  };
+}
+function money$4(value) {
+  return `$${value.toFixed(2)}`;
+}
+function roundMoney$2(value) {
+  return Math.round(value * 100) / 100;
+}
+function headshotConfig(env = {}) {
+  return {
+    maxQuantity: boundedInt(env.HEADSHOTS_MAX_QUANTITY, HEADSHOTS_MAX_QUANTITY, 1, 30),
+    doubleSlotAt: boundedInt(env.HEADSHOTS_DOUBLE_SLOT_AT, HEADSHOTS_DOUBLE_SLOT_AT, 2, 30),
+    slotCapacity: boundedInt(env.HEADSHOTS_SLOT_CAPACITY, HEADSHOTS_SLOT_CAPACITY, 1, 5)
+  };
+}
+function boundedInt(value, fallback, min, max) {
+  if (value == null || value.trim() === "") return fallback;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < min || parsed > max) return fallback;
+  return parsed;
+}
+function clampHeadshotQuantity(value, maxQuantity = HEADSHOTS_MAX_QUANTITY) {
+  const parsed = Math.round(Number(value));
+  if (!Number.isFinite(parsed) || parsed < 1) return 1;
+  return Math.min(maxQuantity, parsed);
+}
+function headshotSlotsNeeded(quantity, doubleSlotAt = HEADSHOTS_DOUBLE_SLOT_AT) {
+  return quantity >= doubleSlotAt ? 2 : 1;
+}
+function quoteHeadshots(quantity, applyProcessing = true, maxQuantity = HEADSHOTS_MAX_QUANTITY) {
+  const qty = clampHeadshotQuantity(quantity, maxQuantity);
+  const subtotal = roundMoney$2(qty * HEADSHOTS_UNIT_PRICE);
+  const bookingFee = Math.min(HEADSHOTS_BOOKING_FEE, subtotal);
+  const dueTodayProcessing = applyProcessing ? processingFee(bookingFee) : 0;
+  const dueToday = roundMoney$2(bookingFee + dueTodayProcessing);
+  const balanceSubtotal = roundMoney$2(subtotal - bookingFee);
+  const balanceProcessing = applyProcessing && balanceSubtotal > 0 ? processingFee(balanceSubtotal) : 0;
+  const balanceTotal = roundMoney$2(balanceSubtotal + balanceProcessing);
+  const processing = roundMoney$2(dueTodayProcessing + balanceProcessing);
+  const total = roundMoney$2(subtotal + processing);
+  const balanceLine = balanceSubtotal > 0 ? applyProcessing ? `Balance on delivery: ${money$4(balanceSubtotal)} + 2.8%` : `Balance on delivery: ${money$4(balanceSubtotal)}` : null;
+  return {
+    quantity: qty,
+    unitPrice: HEADSHOTS_UNIT_PRICE,
+    subtotal,
+    processing,
+    total,
+    bookingFee,
+    dueTodayProcessing,
+    dueToday,
+    balanceSubtotal,
+    balanceProcessing,
+    balanceTotal,
+    balanceLine,
+    dueTodayLine: `Due today: ${money$4(dueToday)}`,
+    priceLine: applyProcessing ? HEADSHOTS_PRICE_LINE : `${money$4(HEADSHOTS_UNIT_PRICE)} per headshot.`,
+    slotsNeeded: headshotSlotsNeeded(qty)
+  };
+}
+function headshotLineItems(quantity, maxQuantity = HEADSHOTS_MAX_QUANTITY) {
+  const qty = clampHeadshotQuantity(quantity, maxQuantity);
+  const price = roundMoney$2(qty * HEADSHOTS_UNIT_PRICE);
+  return [{
+    id: "tuesday-headshot",
+    name: "Tuesday headshot",
+    unitPrice: HEADSHOTS_UNIT_PRICE,
+    qty,
+    price
+  }];
+}
+function publishHeadshotSlots(slots, quantity, options) {
+  const capacity = options?.capacity ?? HEADSHOTS_SLOT_CAPACITY;
+  const needed = headshotSlotsNeeded(quantity, options?.doubleSlotAt ?? HEADSHOTS_DOUBLE_SLOT_AT);
+  const byStart = /* @__PURE__ */ new Map();
+  for (const slot of slots) {
+    const group = byStart.get(slot.start) ?? [];
+    group.push(slot);
+    byStart.set(slot.start, group);
+  }
+  const starts = [...byStart.keys()].sort();
+  const published = [];
+  for (const start of starts) {
+    const group = byStart.get(start) ?? [];
+    const matches = group.filter((slot) => {
+      if (needed === 1) return true;
+      return (byStart.get(slot.end) ?? []).some((next) => next.photographerId === slot.photographerId);
+    });
+    for (const slot of matches.slice(0, capacity)) {
+      if (needed === 1) {
+        published.push(slot);
+        continue;
+      }
+      const follower = (byStart.get(slot.end) ?? []).find((next) => next.photographerId === slot.photographerId);
+      published.push(follower ? { ...slot, end: follower.end } : slot);
+    }
+  }
+  return published;
+}
+const EMAIL_RE$3 = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+function text$f(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+function parseHeadshotOrder(body, options) {
+  const raw = body && typeof body === "object" ? body : {};
+  if (text$f(raw.website) || text$f(raw.companyWebsite)) {
+    return { ok: false, error: "Received.", honeypot: true };
+  }
+  const maxQuantity = options?.maxQuantity ?? HEADSHOTS_MAX_QUANTITY;
+  const quantity = clampHeadshotQuantity(raw.quantity, maxQuantity);
+  if (Number(raw.quantity) > maxQuantity) {
+    return { ok: false, error: `Choose between 1 and ${maxQuantity} headshots.` };
+  }
+  const firstName = text$f(raw.firstName);
+  const lastName = text$f(raw.lastName);
+  const email = text$f(raw.email).toLowerCase();
+  const phone = text$f(raw.phone);
+  const slotStart = text$f(raw.slotStart);
+  if (firstName.length < 2 || lastName.length < 1) return { ok: false, error: "Enter your first and last name." };
+  if (`${firstName} ${lastName}`.length > 80) return { ok: false, error: "Name is too long." };
+  if (!EMAIL_RE$3.test(email)) return { ok: false, error: "Enter an email address." };
+  const digits2 = phone.replace(/\D/g, "");
+  if (digits2.length < 10 || digits2.length > 15) return { ok: false, error: "Enter a phone number." };
+  if (!slotStart || Number.isNaN(Date.parse(slotStart))) return { ok: false, error: "Choose an open time." };
+  return {
+    ok: true,
+    value: {
+      quantity,
+      slotStart,
+      firstName,
+      lastName,
+      email,
+      phone,
+      gclid: sanitizeGclid(raw.gclid)
+    }
+  };
+}
+function headshotBookingReturnPath(orderNumber) {
+  const params = new URLSearchParams({
+    booking: "received",
+    paid: "1",
+    order: orderNumber
+  });
+  return `${HEADSHOT_PATHS.book}?${params.toString()}`;
+}
+function headshotHoldExpiresAt(created, minutes = HEADSHOTS_HOLD_MINUTES) {
+  return new Date(created.getTime() + minutes * 60 * 1e3).toISOString();
+}
+function timeValue(value) {
+  if (!value) return null;
+  if (typeof value === "string" || typeof value === "number") {
+    const parsed = new Date(value).getTime();
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === "object" && value !== null && typeof value.toDate === "function") {
+    return value.toDate().getTime();
+  }
+  return null;
+}
+function headshotHoldExpired(order, now) {
+  if (order.source !== HEADSHOTS_ORDER_SOURCE) return false;
+  if (order.status !== "awaiting_deposit") return false;
+  if ((Number(order.depositPaid) || 0) > 0) return false;
+  const explicit = timeValue(order.holdExpiresAt);
+  const created = timeValue(order.createdAt);
+  const expires = explicit ?? (created == null ? null : created + HEADSHOTS_HOLD_MINUTES * 60 * 1e3);
+  return expires != null && expires <= now.getTime();
+}
+function headshotClientMailEnabled(env = typeof process === "undefined" ? {} : process.env) {
+  return clientNotifyLive(env);
+}
+function escapeHtml$6(value) {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+function headshotConfirmationEmailHtml(input) {
+  const balance = input.quote.balanceLine ? `<p>${escapeHtml$6(input.quote.balanceLine)}. That charge is ${escapeHtml$6(money$4(input.quote.balanceTotal))}.</p>` : "<p>This booking is paid in full once the booking fee is received. Nothing further is due on delivery.</p>";
+  return `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#081228;">
+    <h1 style="font-size:24px;">${escapeHtml$6(HEADSHOTS_H1)}</h1>
+    <p>Hi ${escapeHtml$6(input.clientName)},</p>
+    <p>Your Tuesday time is reserved once the $10 booking fee is paid. The $10 counts toward your headshots.</p>
+    <p><strong>${escapeHtml$6(input.whenDate)}</strong> at <strong>${escapeHtml$6(input.whenTime)}</strong><br/>
+    ${input.quantity} headshot${input.quantity === 1 ? "" : "s"}<br/>
+    ${escapeHtml$6(input.quote.dueTodayLine)}<br/>
+    Order total ${escapeHtml$6(money$4(input.quote.total))}</p>
+    ${balance}
+    <p>${escapeHtml$6(HEADSHOTS_STUDIO_LINE)}</p>
+    <p><a href="${escapeHtml$6(input.wearUrl)}">What to wear</a></p>
+    <p>Confirmation: <strong>${escapeHtml$6(input.orderNumber)}</strong></p>
+    <p style="font-size:13px;">${escapeHtml$6(LEGAL_BUSINESS_NAME)} · ${escapeHtml$6(BUSINESS_CONTACT.line)}</p>
+    <p><a href="${escapeHtml$6(input.pageUrl)}">${escapeHtml$6(input.pageUrl)}</a></p>
+  </div>`;
 }
 const APPRENTICESHIP_HOLD_PREFIX = "HOLD · $25 fee due · ";
 function firebaseServiceAccount(env = process.env) {
@@ -8893,13 +9122,28 @@ async function readRealEstate75Availability(input) {
     cache: input.cache
   });
 }
+async function readHeadshotAvailability(input = {}) {
+  const env = input.env ?? process.env;
+  return readBookingAvailability({
+    address: HEADSHOTS_STUDIO_ADDRESS,
+    preferenceId: "no-preference",
+    now: input.now,
+    env,
+    durationMinutes: HEADSHOTS_SLOT_MINUTES,
+    schedule: { company: headshotsWeek(), photographers: {} },
+    slotFilter: (slot) => !isRealEstate75Holiday(slot.date),
+    listEvents: input.listEvents,
+    fetchImpl: input.fetchImpl,
+    cache: input.cache
+  });
+}
 async function createBookingCalendarHold(input) {
   const person = bookingPhotographerById(input.photographerId);
   if (!person) return null;
   const env = input.env ?? process.env;
   const hours = bookingScheduleFor({ env }).company;
   const body = {
-    summary: `Iconic Images: ${input.clientName}`,
+    summary: `${input.summaryPrefix || ""}Iconic Images: ${input.clientName}`,
     location: input.address,
     description: [
       `Order: ${input.orderNumber}`,
@@ -8937,6 +9181,22 @@ async function createBookingCalendarHold(input) {
     eventId: response.data.id || null,
     htmlLink: response.data.htmlLink || null
   };
+}
+async function confirmBookingCalendarHold(input) {
+  const env = input.env ?? process.env;
+  const auth = calendarAuthFromAccount(firebaseServiceAccount(env), env);
+  if (!auth || !input.eventId || !input.calendarId) return false;
+  const calendar = google.calendar({ version: "v3", auth });
+  const current = await calendar.events.get({ calendarId: input.calendarId, eventId: input.eventId });
+  const summary = String(current.data.summary || "").replace(input.summaryPrefix, "");
+  const description = String(current.data.description || "").replace(input.unpaidNote, input.paidNote);
+  await calendar.events.patch({
+    calendarId: input.calendarId,
+    eventId: input.eventId,
+    sendUpdates: "none",
+    requestBody: { summary, description }
+  });
+  return true;
 }
 async function deleteBookingCalendarHold(input) {
   const env = input.env ?? process.env;
@@ -8990,7 +9250,7 @@ async function deleteHolidayCalendarEvent(input) {
     throw err;
   }
 }
-const db$t = () => admin.firestore();
+const db$v = () => admin.firestore();
 async function backfillHolidayCalendarEvents() {
   const orders = await loadHolidayCalendarOrders();
   const { report, patches } = await runHolidayBackfill({
@@ -8999,7 +9259,7 @@ async function backfillHolidayCalendarEvents() {
     create: (plan) => createHolidayCalendarEvent(plan)
   });
   for (const item of patches) {
-    await db$t().collection("orderRequests").doc(item.id).update({
+    await db$v().collection("orderRequests").doc(item.id).update({
       ...item.patch,
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
@@ -9066,8 +9326,8 @@ function createRateLimiter(options) {
     }
   };
 }
-const router$u = Router();
-const db$s = () => admin.firestore();
+const router$v = Router();
+const db$u = () => admin.firestore();
 const BOOKING_SUBMIT_WINDOW_MS = 15 * 60 * 1e3;
 const BOOKING_SUBMIT_MAX = 10;
 const bookingSubmitLimiter = createRateLimiter({
@@ -9107,14 +9367,14 @@ function failedCalendarHoldNote(slot) {
 }
 async function loadBookingCatalog() {
   try {
-    const snap = await db$s().collection("packages").get();
+    const snap = await db$u().collection("packages").get();
     return packagesForStaffEditor(snap.docs.map((entry2) => ({ id: entry2.id, ...entry2.data() })));
   } catch (err) {
     console.error("[Bookings] Catalog read failed — using the seeded catalog", err);
     return packagesForStaffEditor([]);
   }
 }
-router$u.post("/", async (req, res) => {
+router$v.post("/", async (req, res) => {
   const limit = bookingSubmitLimiter.check(clientIp(req));
   if (!limit.allowed) {
     res.setHeader("Retry-After", String(limit.retryAfterSec));
@@ -9369,7 +9629,7 @@ router$u.post("/", async (req, res) => {
       submittedAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     };
-    const docRef = await db$s().collection("orderRequests").add(orderRequest);
+    const docRef = await db$u().collection("orderRequests").add(orderRequest);
     let orderNumber = docRef.id;
     let packageName = "";
     try {
@@ -9669,7 +9929,7 @@ router$u.post("/", async (req, res) => {
         holidayCheckout = { payment: "fallback" };
       } else {
         try {
-          const invoiceSnap = await db$s().collection("invoices").doc(invoiceId).get();
+          const invoiceSnap = await db$u().collection("invoices").doc(invoiceId).get();
           const invoiceData = invoiceSnap.data() || {};
           const invoiceNumber = typeof invoiceData.invoiceNumber === "string" ? invoiceData.invoiceNumber : void 0;
           const linked = await createHolidaySquareCheckout({
@@ -9682,7 +9942,7 @@ router$u.post("/", async (req, res) => {
             orderNumber
           });
           if (linked.payment === "square" && linked.checkoutUrl) {
-            await db$s().collection("invoices").doc(invoiceId).update({
+            await db$u().collection("invoices").doc(invoiceId).update({
               paymentProvider: "square",
               paymentUrl: linked.checkoutUrl,
               squarePaymentLinkId: linked.linkId || null,
@@ -9749,13 +10009,13 @@ async function socialRateCaller(req) {
     return { role: null, email: null };
   }
 }
-router$u.get("/social-rate", async (req, res) => {
+router$v.get("/social-rate", async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   const requested = typeof req.query.date === "string" ? req.query.date : "";
   const previewAllowed = requested ? socialRatePreviewAllowed(await socialRateCaller(req)) : false;
   return res.json(socialRateView(/* @__PURE__ */ new Date(), requested || null, previewAllowed));
 });
-router$u.post("/holiday-calendar-backfill", requireAdmin, async (_req, res) => {
+router$v.post("/holiday-calendar-backfill", requireAdmin, async (_req, res) => {
   try {
     return res.json(await backfillHolidayCalendarEvents());
   } catch (err) {
@@ -9763,7 +10023,7 @@ router$u.post("/holiday-calendar-backfill", requireAdmin, async (_req, res) => {
     return res.status(500).json({ error: "Holiday calendar backfill failed." });
   }
 });
-router$u.get("/holiday-slots", async (_req, res) => {
+router$v.get("/holiday-slots", async (_req, res) => {
   res.setHeader("Cache-Control", "no-store");
   try {
     return res.json(holidayTakenFromOrders(await loadHolidaySlotOrders()));
@@ -9772,13 +10032,13 @@ router$u.get("/holiday-slots", async (_req, res) => {
     return res.status(500).json({ error: "Holiday slots are unavailable." });
   }
 });
-router$u.get("/photographers", (_req, res) => {
+router$v.get("/photographers", (_req, res) => {
   return res.json({
     noPreference: { id: NO_PREFERENCE_ID, name: NO_PREFERENCE_NAME },
     photographers: publicBookingPhotographers()
   });
 });
-router$u.get("/realestate-75/slots", async (req, res) => {
+router$v.get("/realestate-75/slots", async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   const pkg = realEstate75Package(typeof req.query.package === "string" ? req.query.package : "");
   try {
@@ -9802,7 +10062,7 @@ function postedDurationMinutes(value) {
   if (!Number.isInteger(parsed) || parsed < 15 || parsed > 24 * 60) return void 0;
   return parsed;
 }
-router$u.get("/slots", async (req, res) => {
+router$v.get("/slots", async (req, res) => {
   const basics = typeof req.query.basics === "string" ? req.query.basics.split(",").map((id) => id.trim()).filter(Boolean) : [];
   const preferenceId = preferenceFromRequest(req.query.photographer, "");
   try {
@@ -9827,16 +10087,16 @@ router$u.get("/slots", async (req, res) => {
     return res.json({ live: false, durationMinutes: 90, slots: [], suggestions: [] });
   }
 });
-router$u.get("/catalog", async (_req, res) => {
+router$v.get("/catalog", async (_req, res) => {
   const catalog = await loadBookingCatalog();
   return res.json({
     ...publicBookingCatalogResponse(catalog),
     processingEnabled: processingEnabled()
   });
 });
-router$u.get("/", requireCoordinator, async (_req, res) => {
+router$v.get("/", requireCoordinator, async (_req, res) => {
   try {
-    const snapshot = await db$s().collection("orderRequests").orderBy("createdAt", "desc").limit(100).get();
+    const snapshot = await db$u().collection("orderRequests").orderBy("createdAt", "desc").limit(100).get();
     const requests = snapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data()
@@ -9847,9 +10107,9 @@ router$u.get("/", requireCoordinator, async (_req, res) => {
     return res.status(500).json({ error: "Failed to fetch booking requests." });
   }
 });
-router$u.get("/:id", requireCoordinator, async (req, res) => {
+router$v.get("/:id", requireCoordinator, async (req, res) => {
   try {
-    const doc = await db$s().collection("orderRequests").doc(req.params.id).get();
+    const doc = await db$u().collection("orderRequests").doc(req.params.id).get();
     if (!doc.exists) {
       return res.status(404).json({ error: "Booking request not found." });
     }
@@ -9859,9 +10119,9 @@ router$u.get("/:id", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch booking request." });
   }
 });
-router$u.post("/:id/assign-photographer", requireCoordinator, async (req, res) => {
+router$v.post("/:id/assign-photographer", requireCoordinator, async (req, res) => {
   try {
-    const requestDoc = await db$s().collection("orderRequests").doc(req.params.id).get();
+    const requestDoc = await db$u().collection("orderRequests").doc(req.params.id).get();
     if (!requestDoc.exists) return res.status(404).json({ error: "Booking request not found." });
     const request = requestDoc.data() || {};
     const posted = typeof req.body?.listingId === "string" ? req.body.listingId.trim() : "";
@@ -9874,10 +10134,10 @@ router$u.post("/:id/assign-photographer", requireCoordinator, async (req, res) =
     return res.status(500).json({ error: "Could not assign the photographer." });
   }
 });
-router$u.patch("/:id/confirm", requireCoordinator, async (req, res) => {
+router$v.patch("/:id/confirm", requireCoordinator, async (req, res) => {
   try {
     const { assignedPhotographerId, assignedPhotographerName: postedPhotographerName, scheduledDate, scheduledTime, internalNotes } = req.body;
-    const requestDoc = await db$s().collection("orderRequests").doc(req.params.id).get();
+    const requestDoc = await db$u().collection("orderRequests").doc(req.params.id).get();
     if (!requestDoc.exists) {
       return res.status(404).json({ error: "Booking request not found." });
     }
@@ -9903,7 +10163,7 @@ router$u.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       }
       const existingGalleryId = existingInvoiceId(request.galleryId);
       if (existingGalleryId && listingId2) {
-        await db$s().collection("galleries").doc(existingGalleryId).set({
+        await db$u().collection("galleries").doc(existingGalleryId).set({
           listingId: listingId2,
           updatedAt: admin.firestore.FieldValue.serverTimestamp()
         }, { merge: true });
@@ -9954,7 +10214,7 @@ router$u.patch("/:id/confirm", requireCoordinator, async (req, res) => {
     }
     let photographer = null;
     if (assignedPhotographerId) {
-      const staffDoc = await db$s().collection("staff").doc(assignedPhotographerId).get();
+      const staffDoc = await db$u().collection("staff").doc(assignedPhotographerId).get();
       photographer = staffDoc.exists ? { id: staffDoc.id, ...staffDoc.data() } : null;
       const refusal2 = await refuseQaStaffAssignment({
         staff: photographer ? [photographer] : [],
@@ -9964,7 +10224,7 @@ router$u.patch("/:id/confirm", requireCoordinator, async (req, res) => {
     }
     let clientId2;
     const attachedClientId = typeof request.clientId === "string" ? request.clientId.trim() : "";
-    const attachedClient = attachedClientId ? await db$s().collection("clients").doc(attachedClientId).get() : null;
+    const attachedClient = attachedClientId ? await db$u().collection("clients").doc(attachedClientId).get() : null;
     if (attachedClient?.exists) {
       clientId2 = attachedClient.id;
       await attachedClient.ref.update({
@@ -9973,7 +10233,7 @@ router$u.patch("/:id/confirm", requireCoordinator, async (req, res) => {
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
     } else {
-      const existingClients = await db$s().collection("clients").where("email", "==", requestEmail).limit(1).get();
+      const existingClients = await db$u().collection("clients").where("email", "==", requestEmail).limit(1).get();
       if (!existingClients.empty) {
         clientId2 = existingClients.docs[0].id;
         await existingClients.docs[0].ref.update({
@@ -9982,7 +10242,7 @@ router$u.patch("/:id/confirm", requireCoordinator, async (req, res) => {
           updatedAt: admin.firestore.FieldValue.serverTimestamp()
         });
       } else {
-        const clientRef = await db$s().collection("clients").add({
+        const clientRef = await db$u().collection("clients").add({
           firstName: requestFirstName,
           lastName: requestLastName,
           email: requestEmail,
@@ -10044,8 +10304,8 @@ router$u.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     };
-    const orderRef = await db$s().collection("orders").add(orderData);
-    const existingAppointment = await db$s().collection("appointments").where("orderRequestId", "==", req.params.id).limit(1).get();
+    const orderRef = await db$u().collection("orders").add(orderData);
+    const existingAppointment = await db$u().collection("appointments").where("orderRequestId", "==", req.params.id).limit(1).get();
     const confirmedAppointment = {
       orderId: orderRef.id,
       orderRequestId: req.params.id,
@@ -10065,7 +10325,7 @@ router$u.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       internalNotes: internalNotes || "",
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     };
-    const appointmentRef = existingAppointment.empty ? db$s().collection("appointments").doc() : existingAppointment.docs[0].ref;
+    const appointmentRef = existingAppointment.empty ? db$u().collection("appointments").doc() : existingAppointment.docs[0].ref;
     if (existingAppointment.empty) {
       await appointmentRef.set({
         ...confirmedAppointment,
@@ -10081,7 +10341,7 @@ router$u.patch("/:id/confirm", requireCoordinator, async (req, res) => {
     } catch (err) {
       console.error("[Bookings] Listing ensure failed:", err);
     }
-    const galleryRef = await db$s().collection("galleries").add({
+    const galleryRef = await db$u().collection("galleries").add({
       orderId: orderRef.id,
       clientId: clientId2,
       clientName: requestClientName,
@@ -10116,7 +10376,7 @@ router$u.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       notes: internalNotes || request.vibeNote || ""
     }).catch(async (err) => {
       console.error("[Bookings] Calendar event creation failed:", err);
-      await db$s().collection("agentLogs").add({
+      await db$u().collection("agentLogs").add({
         agent: "nora",
         action: "Calendar event failed",
         summary: `Google Calendar event was not created for order ${orderRef.id}`,
@@ -10150,7 +10410,7 @@ router$u.patch("/:id/confirm", requireCoordinator, async (req, res) => {
     let listingId = listingIdForGallery;
     let invoiceId = linkedInvoiceId;
     if (linkedInvoiceId) {
-      const existingInvoice = await db$s().collection("invoices").doc(linkedInvoiceId).get();
+      const existingInvoice = await db$u().collection("invoices").doc(linkedInvoiceId).get();
       if (existingInvoice.exists) {
         await existingInvoice.ref.update({
           orderId: orderRef.id,
@@ -10166,7 +10426,7 @@ router$u.patch("/:id/confirm", requireCoordinator, async (req, res) => {
         console.error(`[Bookings] Confirm kept invoiceId ${linkedInvoiceId} but the invoice doc is missing. Not creating a second invoice.`);
       }
     } else {
-      const invoiceRef = db$s().collection("invoices").doc();
+      const invoiceRef = db$u().collection("invoices").doc();
       const payToken = createPayToken();
       const paymentUrl = clientInvoiceUrl({ id: invoiceRef.id, status: "draft", payToken });
       const draft = buildBookingInvoiceDraft({
@@ -10277,9 +10537,9 @@ async function releaseOrderCalendar(data) {
     return calendarHoldFailureMessage(err);
   }
 }
-router$u.patch("/:id/cancel", requireCoordinator, async (req, res) => {
+router$v.patch("/:id/cancel", requireCoordinator, async (req, res) => {
   try {
-    const doc = await db$s().collection("orderRequests").doc(req.params.id).get();
+    const doc = await db$u().collection("orderRequests").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Not found." });
     const data = doc.data() || {};
     const calendarError = await releaseOrderCalendar(data);
@@ -10306,10 +10566,10 @@ router$u.patch("/:id/cancel", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to cancel booking." });
   }
 });
-router$u.patch("/:id/decline", requireCoordinator, async (req, res) => {
+router$v.patch("/:id/decline", requireCoordinator, async (req, res) => {
   try {
     const { reason } = req.body;
-    const doc = await db$s().collection("orderRequests").doc(req.params.id).get();
+    const doc = await db$u().collection("orderRequests").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Not found." });
     const data = doc.data() || {};
     const calendarError = await releaseOrderCalendar(data);
@@ -10338,16 +10598,16 @@ async function stampDurableLinks(input) {
     orderInvoiceId: input.invoiceId
   });
   const now = admin.firestore.FieldValue.serverTimestamp();
-  const invoiceRef = db$s().collection("invoices").doc(plan.createId);
+  const invoiceRef = db$u().collection("invoices").doc(plan.createId);
   const invoiceSnap = await invoiceRef.get();
   if (invoiceSnap.exists && Object.keys(plan.invoiceFields).length > 0) {
     await invoiceRef.update({ ...plan.invoiceFields, updatedAt: now });
   }
   if (plan.orderFields) {
-    await db$s().collection("orders").doc(input.orderId).update({ ...plan.orderFields, updatedAt: now });
+    await db$u().collection("orders").doc(input.orderId).update({ ...plan.orderFields, updatedAt: now });
   }
   if (input.listingId && plan.listingFields) {
-    await db$s().collection("listings").doc(input.listingId).update({ ...plan.listingFields, updatedAt: now });
+    await db$u().collection("listings").doc(input.listingId).update({ ...plan.listingFields, updatedAt: now });
   }
 }
 function linesForConfirmedOrder(request) {
@@ -10360,7 +10620,7 @@ async function linkClientIdByEmail(email) {
   try {
     const normalized = normalizeEmail$1(email);
     if (!normalized) return null;
-    const snap = await db$s().collection("clients").where("email", "==", normalized).limit(1).get();
+    const snap = await db$u().collection("clients").where("email", "==", normalized).limit(1).get();
     return snap.empty ? null : snap.docs[0].id;
   } catch (err) {
     console.error("[Bookings] Client lookup for invoice failed:", err);
@@ -10381,7 +10641,7 @@ async function createBookingInvoiceDraft(input) {
     promoDiscount: input.promoDiscount,
     travel: input.travel
   });
-  const invoiceRef = db$s().collection("invoices").doc();
+  const invoiceRef = db$u().collection("invoices").doc();
   const payToken = createPayToken();
   const paymentUrl = clientInvoiceUrl({ id: invoiceRef.id, status: "draft", payToken });
   await invoiceRef.set({
@@ -10397,7 +10657,7 @@ async function createBookingInvoiceDraft(input) {
 }
 async function generateInvoiceNumber() {
   const year = (/* @__PURE__ */ new Date()).getFullYear();
-  const snapshot = await db$s().collection("invoices").where("invoiceNumber", ">=", `INV-${year}-`).where("invoiceNumber", "<", `INV-${year + 1}`).get().catch((err) => {
+  const snapshot = await db$u().collection("invoices").where("invoiceNumber", ">=", `INV-${year}-`).where("invoiceNumber", "<", `INV-${year + 1}`).get().catch((err) => {
     console.error("[Bookings] Invoice number lookup failed:", err);
     return null;
   });
@@ -10409,6 +10669,875 @@ async function generateInvoiceNumber() {
     year
   );
 }
+const SENIOR_FACILITY_RATE_PER_SQFT = 0.1;
+const SENIOR_TOUR_PRICE = 250;
+const SENIOR_ROOM_RATES = [
+  { minCount: 1, maxCount: 10, each: 199 },
+  { minCount: 11, maxCount: 20, each: 175 }
+];
+const SENIOR_FACILITY_SQFT_CAP = 2e4;
+const SENIOR_LIVING_REQUESTS = "seniorLivingRequests";
+const SENIOR_LIVING_OPS_EMAIL = "ops@iconicimagestx.com";
+const SENIOR_LIVING_DEPOSIT_REQUIRED = true;
+const SENIOR_LIVING_DEPOSIT_PERCENT = 50;
+const SENIOR_LIVING_DEPOSIT_LINE = "Reserve your date with a 50% deposit. We'll send your deposit invoice shortly. The balance is due after the shoot.";
+const SENIOR_LIVING_DEPOSIT_LINE_ONLINE = "Reserve your date with a 50% deposit, paid securely online. The balance is due after the shoot.";
+const SENIOR_LIVING_MANUAL_DEPOSIT_NOTE = "Invoice the 50% deposit manually";
+function seniorLivingDepositCopy(live) {
+  return live ? SENIOR_LIVING_DEPOSIT_LINE_ONLINE : SENIOR_LIVING_DEPOSIT_LINE;
+}
+function seniorLivingDepositReturnPath(orderNumber) {
+  const params = new URLSearchParams({
+    deposit: "received",
+    order: orderNumber
+  });
+  return `/senior-living?${params.toString()}`;
+}
+function seniorDepositCheckoutLive(env = process.env) {
+  return env.SENIOR_DEPOSIT_CHECKOUT_LIVE === "true";
+}
+const SENIOR_LIVING_PROCESSING_RATE = 0.028;
+const SENIOR_LIVING_PROCESSING_LABEL = "Processing fee (2.8%)";
+const SENIOR_LIVING_SCHEDULE_TIMES = [
+  "9:00 AM",
+  "11:00 AM",
+  "1:00 PM",
+  "3:00 PM",
+  "5:00 PM"
+];
+const SENIOR_LIVING_ORDER_SOURCE = "senior-living";
+const SENIOR_LIVING_HOSTING_OPTIONS = [
+  { id: "monthly-hosting", label: "Monthly hosting" },
+  { id: "transfer-of-ownership", label: "Transfer of ownership" }
+];
+const SENIOR_LIVING_HOSTING_NOTE = "Pricing confirmed with your quote";
+const SENIOR_LIVING_SERVICE_IDS = [
+  "tour-3d",
+  "rooms",
+  "facility"
+];
+const SENIOR_LIVING_SERVICE_LABELS = {
+  "tour-3d": "3D tour",
+  rooms: "Rooms/units",
+  facility: "Whole-building facility"
+};
+const SERVICE_ID_SET = new Set(SENIOR_LIVING_SERVICE_IDS);
+const EMAIL_RE$2 = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+function text$e(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+function oneLine$1(value, max) {
+  return value.replace(/[\r\n\u0000]+/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
+}
+function seniorFacilityPrice(sqft) {
+  const centsPerSqft = Math.round(SENIOR_FACILITY_RATE_PER_SQFT * 100);
+  return sqft * centsPerSqft / 100;
+}
+function seniorLivingHostingLabel(id) {
+  const key = typeof id === "string" ? id.trim() : "";
+  const match = SENIOR_LIVING_HOSTING_OPTIONS.find((option) => option.id === key);
+  return match ? match.label : null;
+}
+function parseSeniorLivingRequest(body) {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return { ok: false, honeypot: false, error: "That request could not be read." };
+  }
+  const raw = body;
+  const trap = text$e(raw.companyWebsite);
+  if (trap) return { ok: false, honeypot: true };
+  const name = oneLine$1(text$e(raw.name), 80);
+  const community = oneLine$1(text$e(raw.community), 120);
+  const email = oneLine$1(text$e(raw.email), 120);
+  const phone = oneLine$1(text$e(raw.phone), 30);
+  const address = oneLine$1(text$e(raw.address), 200);
+  const preferredDates = oneLine$1(text$e(raw.preferredDates), 160);
+  const notes = text$e(raw.notes).replace(/\u0000/g, "").trim().slice(0, 2e3);
+  if (name.length < 2) return { ok: false, honeypot: false, error: "Enter your name." };
+  if (text$e(raw.name).trim().length > 80)
+    return { ok: false, honeypot: false, error: "Name is too long." };
+  if (community.length < 2)
+    return { ok: false, honeypot: false, error: "Enter the community name." };
+  if (text$e(raw.community).trim().length > 120)
+    return { ok: false, honeypot: false, error: "Community name is too long." };
+  if (!EMAIL_RE$2.test(email))
+    return { ok: false, honeypot: false, error: "Enter a valid email." };
+  const digits2 = phone.replace(/\D/g, "");
+  if (digits2.length < 10 || digits2.length > 15)
+    return { ok: false, honeypot: false, error: "Enter a phone number." };
+  if (address.length < 5)
+    return { ok: false, honeypot: false, error: "Enter the community address." };
+  if (text$e(raw.address).trim().length > 200)
+    return { ok: false, honeypot: false, error: "Address is too long." };
+  if (preferredDates.length < 2)
+    return { ok: false, honeypot: false, error: "Enter preferred dates." };
+  if (text$e(raw.preferredDates).trim().length > 160)
+    return { ok: false, honeypot: false, error: "Preferred dates are too long." };
+  if (text$e(raw.notes).trim().length > 2e3)
+    return { ok: false, honeypot: false, error: "Notes are too long." };
+  const servicesRaw = Array.isArray(raw.services) ? raw.services : [];
+  const services2 = [];
+  for (const entry2 of servicesRaw) {
+    const id = text$e(entry2);
+    if (!id) continue;
+    if (!SERVICE_ID_SET.has(id))
+      return { ok: false, honeypot: false, error: "Choose a listed service." };
+    if (!services2.includes(id))
+      services2.push(id);
+  }
+  if (services2.length === 0)
+    return { ok: false, honeypot: false, error: "Choose at least one service." };
+  return {
+    ok: true,
+    value: {
+      name,
+      community,
+      email,
+      phone,
+      address,
+      services: services2,
+      preferredDates,
+      notes
+    }
+  };
+}
+function seniorLivingServiceLabels(services2) {
+  return services2.map((id) => SENIOR_LIVING_SERVICE_LABELS[id]).join(", ");
+}
+function seniorLivingOfficeRecord(id, value) {
+  const serviceLabels = seniorLivingServiceLabels(value.services);
+  const noteLines = [
+    "Quote request. Not invoiced.",
+    `Deposit required: ${"yes"}`,
+    `Deposit percent: ${SENIOR_LIVING_DEPOSIT_PERCENT}`,
+    SENIOR_LIVING_DEPOSIT_LINE,
+    `Community: ${value.community}`,
+    `Services: ${serviceLabels}`,
+    `Preferred dates: ${value.preferredDates}`,
+    value.notes
+  ].filter(Boolean);
+  return {
+    id,
+    kind: "senior-living-request",
+    depositRequired: SENIOR_LIVING_DEPOSIT_REQUIRED,
+    depositPercent: SENIOR_LIVING_DEPOSIT_PERCENT,
+    clientName: value.name,
+    email: value.email,
+    clientEmail: value.email,
+    phone: value.phone,
+    clientPhone: value.phone,
+    community: value.community,
+    address: value.address,
+    propertyAddress: value.address,
+    services: value.services,
+    serviceLabels: value.services.map(
+      (serviceId) => SENIOR_LIVING_SERVICE_LABELS[serviceId]
+    ),
+    preferredDates: value.preferredDates,
+    requestedDate: value.preferredDates,
+    notes: value.notes,
+    vibeNote: noteLines.join("\n"),
+    selectedService: `Senior Living (${serviceLabels})`,
+    lineItems: [
+      {
+        id: "senior-living",
+        name: `Senior Living (${serviceLabels})`,
+        qty: 1,
+        price: 0
+      }
+    ],
+    leadSource: "Senior living page"
+  };
+}
+function seniorLivingOfficeEnv(env = process.env) {
+  const parts = String(env.ADMIN_EMAIL || "").split(/[,;]/).map((part) => part.trim()).filter(Boolean);
+  if (!parts.some((part) => part.toLowerCase() === SENIOR_LIVING_OPS_EMAIL)) {
+    parts.push(SENIOR_LIVING_OPS_EMAIL);
+  }
+  return { ...env, ADMIN_EMAIL: parts.join(", ") };
+}
+function cents(amount) {
+  return Math.round(amount * 100);
+}
+function dollars(amountCents) {
+  return amountCents / 100;
+}
+function seniorRoomUnitPrice(count2) {
+  if (!Number.isInteger(count2) || count2 < 1) return null;
+  const tier = SENIOR_ROOM_RATES.find(
+    (band) => count2 >= band.minCount && count2 <= band.maxCount
+  );
+  return tier ? tier.each : null;
+}
+function quoteSeniorLivingOrder(input) {
+  const lines = [];
+  if (input.tour) {
+    lines.push({
+      id: "tour-3d",
+      name: SENIOR_LIVING_SERVICE_LABELS["tour-3d"],
+      qty: 1,
+      unitPrice: SENIOR_TOUR_PRICE,
+      price: SENIOR_TOUR_PRICE
+    });
+  }
+  const roomCount = input.roomCount;
+  if (roomCount !== 0) {
+    if (!Number.isInteger(roomCount) || roomCount < 0) {
+      return { ok: false, error: "Enter a room count from 0 to 20." };
+    }
+    if (roomCount > SENIOR_ROOM_RATES[SENIOR_ROOM_RATES.length - 1].maxCount) {
+      return { ok: false, error: "Room count cannot be more than 20." };
+    }
+    const each = seniorRoomUnitPrice(roomCount);
+    if (each == null) {
+      return { ok: false, error: "Enter a room count from 0 to 20." };
+    }
+    lines.push({
+      id: "rooms",
+      name: SENIOR_LIVING_SERVICE_LABELS.rooms,
+      qty: roomCount,
+      unitPrice: each,
+      price: dollars(cents(each) * roomCount)
+    });
+  }
+  const facilitySqft = input.facilitySqft;
+  if (facilitySqft !== 0) {
+    if (!Number.isInteger(facilitySqft) || facilitySqft < 0) {
+      return { ok: false, error: "Enter a facility size up to 20,000 sq ft." };
+    }
+    if (facilitySqft > SENIOR_FACILITY_SQFT_CAP) {
+      return { ok: false, error: "Facility size cannot be more than 20,000 sq ft." };
+    }
+    const price = seniorFacilityPrice(facilitySqft);
+    lines.push({
+      id: "facility",
+      name: SENIOR_LIVING_SERVICE_LABELS.facility,
+      qty: 1,
+      unitPrice: price,
+      price
+    });
+  }
+  if (lines.length === 0) {
+    return { ok: false, error: "Choose at least one service." };
+  }
+  const serviceSubtotal = dollars(
+    lines.reduce((sum, line) => sum + cents(line.price), 0)
+  );
+  const travel = assessTravel(input.address);
+  const travelItem = travelInvoiceLine(travel);
+  const travelLine = {
+    id: travelItem.id,
+    name: travelItem.name,
+    qty: travelItem.qty,
+    unitPrice: travelItem.unitPrice,
+    price: travelItem.price
+  };
+  const priced = cents(serviceSubtotal) + cents(travelLine.price);
+  const processing = dollars(Math.round(priced * SENIOR_LIVING_PROCESSING_RATE));
+  const total = dollars(priced + cents(processing));
+  const depositAmount = dollars(
+    Math.round(cents(total) * (SENIOR_LIVING_DEPOSIT_PERCENT / 100))
+  );
+  const balanceDue = dollars(cents(total) - cents(depositAmount));
+  return {
+    ok: true,
+    quote: {
+      lines,
+      serviceSubtotal,
+      travel,
+      travelLine,
+      processing,
+      total,
+      depositAmount,
+      balanceDue
+    }
+  };
+}
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+function parseSeniorLivingOrder(body) {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return { ok: false, honeypot: false, error: "That order could not be read." };
+  }
+  const raw = body;
+  if (text$e(raw.companyWebsite)) return { ok: false, honeypot: true };
+  const roomCount = raw.roomCount == null || raw.roomCount === "" ? 0 : Number(raw.roomCount);
+  const facilitySqft = raw.facilitySqft == null || raw.facilitySqft === "" ? 0 : Number(raw.facilitySqft);
+  const quoted = quoteSeniorLivingOrder({
+    tour: raw.tour === true,
+    roomCount,
+    facilitySqft,
+    address: text$e(raw.address)
+  });
+  if (quoted.ok === false) return { ok: false, honeypot: false, error: quoted.error };
+  if (quoted.quote.travel.travelQuoted) {
+    return {
+      ok: false,
+      honeypot: false,
+      error: "We could not price travel for that address. Call us and we will quote the trip."
+    };
+  }
+  const name = oneLine$1(text$e(raw.name), 80);
+  const community = oneLine$1(text$e(raw.community), 120);
+  const title = oneLine$1(text$e(raw.title), 80);
+  const email = oneLine$1(text$e(raw.email), 120);
+  const phone = oneLine$1(text$e(raw.phone), 30);
+  const address = oneLine$1(text$e(raw.address), 200);
+  const onsiteContact = oneLine$1(text$e(raw.onsiteContact), 120);
+  const notes = text$e(raw.notes).replace(/\u0000/g, "").trim().slice(0, 2e3);
+  const scheduledDate = oneLine$1(text$e(raw.scheduledDate), 10);
+  const scheduledTime = oneLine$1(text$e(raw.scheduledTime), 20);
+  if (name.length < 2) return { ok: false, honeypot: false, error: "Enter your name." };
+  if (community.length < 2) return { ok: false, honeypot: false, error: "Enter the community name." };
+  if (title.length < 2) return { ok: false, honeypot: false, error: "Enter your title." };
+  if (!EMAIL_RE$2.test(email)) return { ok: false, honeypot: false, error: "Enter a valid email." };
+  const digits2 = phone.replace(/\D/g, "");
+  if (digits2.length < 10 || digits2.length > 15) {
+    return { ok: false, honeypot: false, error: "Enter a phone number." };
+  }
+  if (address.length < 5) return { ok: false, honeypot: false, error: "Enter the community address." };
+  if (onsiteContact.length < 2) {
+    return { ok: false, honeypot: false, error: "Enter the onsite contact." };
+  }
+  if (!DATE_RE.test(scheduledDate) || Number.isNaN(Date.parse(`${scheduledDate}T12:00:00`))) {
+    return { ok: false, honeypot: false, error: "Choose a date." };
+  }
+  const chosen = /* @__PURE__ */ new Date(`${scheduledDate}T12:00:00`);
+  const start = /* @__PURE__ */ new Date();
+  start.setHours(0, 0, 0, 0);
+  if (chosen < start) return { ok: false, honeypot: false, error: "Choose a date that has not passed." };
+  if (!SENIOR_LIVING_SCHEDULE_TIMES.includes(scheduledTime)) {
+    return { ok: false, honeypot: false, error: "Choose a time." };
+  }
+  const hostingLabel = seniorLivingHostingLabel(raw.hosting);
+  if (!hostingLabel) {
+    return {
+      ok: false,
+      honeypot: false,
+      error: "Choose monthly hosting or a transfer of ownership."
+    };
+  }
+  const hosting = text$e(raw.hosting);
+  return {
+    ok: true,
+    value: {
+      tour: raw.tour === true,
+      roomCount,
+      facilitySqft,
+      community,
+      address,
+      name,
+      title,
+      phone,
+      email,
+      onsiteContact,
+      notes,
+      scheduledDate,
+      scheduledTime,
+      hosting
+    },
+    quote: quoted.quote
+  };
+}
+const db$t = () => admin.firestore();
+async function releaseEvent$1(ref, order, deleteEvent, result) {
+  const eventId = typeof order.calendarEventId === "string" ? order.calendarEventId : "";
+  if (!eventId) {
+    await ref.update({ calendarEventReleased: true, updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+    return;
+  }
+  let deleted = false;
+  try {
+    deleted = await deleteEvent({
+      calendarId: typeof order.calendarId === "string" ? order.calendarId : null,
+      eventId
+    });
+  } catch (error) {
+    console.error("[HeadshotHolds] Calendar delete failed:", error);
+  }
+  if (deleted) result.eventsDeleted += 1;
+  else result.eventErrors += 1;
+  await ref.update({
+    calendarEventReleased: deleted,
+    ...deleted ? { holdReleasedAt: admin.firestore.FieldValue.serverTimestamp() } : {},
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+}
+async function releaseExpiredHeadshotHolds(options = {}) {
+  const result = { checked: 0, released: 0, eventsDeleted: 0, eventErrors: 0 };
+  if (!admin.apps.length) return result;
+  const now = options.now ?? /* @__PURE__ */ new Date();
+  const deleteEvent = options.deleteEvent ?? (async (input) => {
+    if (!input.calendarId || !input.eventId) return false;
+    await deleteBookingCalendarHold({ calendarId: input.calendarId, eventId: input.eventId });
+    return true;
+  });
+  const waiting = await db$t().collection("orders").where("source", "==", HEADSHOTS_ORDER_SOURCE).where("status", "==", "awaiting_deposit").get();
+  for (const snap of waiting.docs) {
+    const listed = snap.data() || {};
+    if (!headshotHoldExpired(listed, now)) continue;
+    result.checked += 1;
+    const ref = db$t().collection("orders").doc(snap.id);
+    const expired = await db$t().runTransaction(async (tx) => {
+      const orderSnap = await tx.get(ref);
+      if (!orderSnap.exists) return null;
+      const order = orderSnap.data() || {};
+      if (!headshotHoldExpired(order, now)) return null;
+      const invoiceId = typeof order.invoiceId === "string" ? order.invoiceId : "";
+      const invoiceRef = invoiceId ? db$t().collection("invoices").doc(invoiceId) : null;
+      const invoiceSnap = invoiceRef ? await tx.get(invoiceRef) : null;
+      const invoice = invoiceSnap?.exists ? invoiceSnap.data() || {} : {};
+      if ((Number(invoice.depositPaid) || 0) > 0 || invoice.depositPaidAt) return null;
+      const requestId = typeof order.orderRequestId === "string" ? order.orderRequestId : "";
+      const requestRef = requestId ? db$t().collection("orderRequests").doc(requestId) : null;
+      const requestSnap = requestRef ? await tx.get(requestRef) : null;
+      const stamp2 = admin.firestore.FieldValue.serverTimestamp();
+      const note = `Hold released: the $10 booking fee was not paid within ${HEADSHOTS_HOLD_MINUTES} minutes.`;
+      tx.update(ref, {
+        status: APPRENTICESHIP_EXPIRED_STATUS,
+        depositStatus: "expired",
+        holdExpiredAt: stamp2,
+        calendarEventReleased: false,
+        officeNote: note,
+        updatedAt: stamp2
+      });
+      if (requestRef && requestSnap?.exists) {
+        tx.update(requestRef, {
+          status: APPRENTICESHIP_EXPIRED_STATUS,
+          depositStatus: "expired",
+          officeNote: note,
+          updatedAt: stamp2
+        });
+      }
+      if (invoiceRef && invoiceSnap?.exists) {
+        tx.update(invoiceRef, { holdExpired: true, updatedAt: stamp2 });
+      }
+      return order;
+    });
+    if (!expired) continue;
+    result.released += 1;
+    await releaseEvent$1(ref, expired, deleteEvent, result);
+  }
+  return result;
+}
+let lastLazyRun$1 = 0;
+let lazyRunning$1 = null;
+const LAZY_INTERVAL_MS$1 = 60 * 1e3;
+const LAZY_TIMEOUT_MS$1 = 4e3;
+async function maybeReleaseExpiredHeadshotHolds(now = /* @__PURE__ */ new Date()) {
+  if (lazyRunning$1) {
+    await Promise.race([lazyRunning$1, new Promise((resolve) => setTimeout(resolve, LAZY_TIMEOUT_MS$1))]);
+    return;
+  }
+  if (now.getTime() - lastLazyRun$1 < LAZY_INTERVAL_MS$1) return;
+  lastLazyRun$1 = now.getTime();
+  lazyRunning$1 = releaseExpiredHeadshotHolds({ now }).catch((error) => console.error("[HeadshotHolds] Lazy release failed:", error)).finally(() => {
+    lazyRunning$1 = null;
+  });
+  await Promise.race([lazyRunning$1, new Promise((resolve) => setTimeout(resolve, LAZY_TIMEOUT_MS$1))]);
+}
+async function confirmHeadshotHold(input) {
+  if (!input.calendarId || !input.eventId) return false;
+  return confirmBookingCalendarHold({
+    calendarId: input.calendarId,
+    eventId: input.eventId,
+    summaryPrefix: HEADSHOTS_HOLD_PREFIX,
+    unpaidNote: HEADSHOTS_UNPAID_NOTE,
+    paidNote: HEADSHOTS_PAID_NOTE
+  });
+}
+async function resolveLateHeadshotPayment(orderId) {
+  const ref = db$t().collection("orders").doc(orderId);
+  const snap = await ref.get();
+  if (!snap.exists) return "skipped";
+  const order = snap.data() || {};
+  if (order.source !== HEADSHOTS_ORDER_SOURCE || order.status !== APPRENTICESHIP_EXPIRED_STATUS) return "skipped";
+  const stamp2 = admin.firestore.FieldValue.serverTimestamp();
+  const requestId = typeof order.orderRequestId === "string" ? order.orderRequestId : "";
+  const requestRef = requestId ? db$t().collection("orderRequests").doc(requestId) : null;
+  const orderNumber = String(order.orderNumber || "");
+  const slotStart = typeof order.slotStart === "string" ? order.slotStart : "";
+  const quantity = Number(order.quantity) || 1;
+  const confirm = async (extra) => {
+    await ref.update({
+      status: "confirmed",
+      depositStatus: "paid",
+      confirmedAt: stamp2,
+      reconfirmedAfterExpiry: true,
+      officeNote: "$10 booking fee paid after the hold expired. The time was still open and is booked again.",
+      updatedAt: stamp2,
+      ...extra
+    });
+    if (requestRef) {
+      await requestRef.update({ status: "new", depositStatus: "paid", updatedAt: stamp2 }).catch(() => {
+      });
+    }
+    return "confirmed";
+  };
+  if (!slotStart) return confirm({});
+  let flagReason = "the time was taken after the hold expired";
+  try {
+    const availability = await readHeadshotAvailability();
+    const open = availability.live ? publishHeadshotSlots(availability.slots, quantity).find((item) => item.start === slotStart) : void 0;
+    if (!availability.live) flagReason = "the studio calendar could not be read";
+    if (open) {
+      const event = await createBookingCalendarHold({
+        photographerId: open.photographerId,
+        orderNumber,
+        clientName: String(order.clientName || ""),
+        clientEmail: String(order.clientEmail || ""),
+        clientPhone: String(order.clientPhone || ""),
+        address: HEADSHOTS_STUDIO_ADDRESS,
+        serviceSummary: "Tuesday headshot",
+        slot: { start: open.start, end: open.end },
+        notes: HEADSHOTS_PAID_NOTE
+      });
+      if (event?.eventId) {
+        return confirm({
+          calendarEventId: event.eventId,
+          calendarId: event.calendarId,
+          calendarEventReleased: null
+        });
+      }
+      flagReason = "the calendar event could not be created";
+    }
+  } catch (error) {
+    console.error("[HeadshotHolds] Late payment re-confirm failed:", error);
+    flagReason = "the studio calendar could not be read";
+  }
+  const note = `$10 booking fee paid after the ${HEADSHOTS_HOLD_MINUTES}-minute hold expired, but ${flagReason}. Call to pick a new time or refund the $10.`;
+  await ref.update({
+    status: APPRENTICESHIP_PAID_NEEDS_RESCHEDULE_STATUS,
+    depositStatus: "paid",
+    needsOfficeReview: true,
+    officeNote: note,
+    updatedAt: stamp2
+  });
+  if (requestRef) {
+    await requestRef.update({
+      status: APPRENTICESHIP_PAID_NEEDS_RESCHEDULE_STATUS,
+      depositStatus: "paid",
+      needsOfficeReview: true,
+      officeNote: note,
+      updatedAt: stamp2
+    }).catch(() => {
+    });
+  }
+  return "flagged";
+}
+const router$u = Router();
+const limiter$2 = createRateLimiter({ windowMs: 15 * 60 * 1e3, max: 8 });
+const db$s = () => admin.firestore();
+async function nextInvoiceNumber$2() {
+  const year = (/* @__PURE__ */ new Date()).getFullYear();
+  try {
+    const snapshot = await db$s().collection("invoices").where("invoiceNumber", ">=", `INV-${year}-`).where("invoiceNumber", "<", `INV-${year + 1}`).get();
+    return nextSequentialInvoiceNumber(snapshot.docs.map((entry2) => entry2.data().invoiceNumber), year);
+  } catch (error) {
+    console.error("[Headshots] Invoice number lookup failed:", error);
+    return `INV-${year}-${String(Date.now()).slice(-6)}`;
+  }
+}
+router$u.get("/config", (_req, res) => {
+  const config = headshotConfig(process.env);
+  res.json({
+    ...config,
+    unitPrice: 10,
+    bookingFee: 10,
+    processingEnabled: processingEnabled(),
+    depositCheckoutLive: seniorDepositCheckoutLive(),
+    holdMinutes: 60
+  });
+});
+router$u.get("/slots", async (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  const config = headshotConfig(process.env);
+  const quantity = Number(req.query.quantity);
+  await maybeReleaseExpiredHeadshotHolds();
+  try {
+    const availability = await readHeadshotAvailability();
+    const slots = availability.live ? publishHeadshotSlots(availability.slots, Number.isFinite(quantity) ? quantity : 1, config) : [];
+    return res.json({
+      live: availability.live,
+      durationMinutes: availability.durationMinutes,
+      slots,
+      fallback: availability.live ? null : HEADSHOTS_CALENDAR_FALLBACK,
+      ...config
+    });
+  } catch (error) {
+    console.error("[Headshots] Slot lookup failed:", error);
+    return res.json({
+      live: false,
+      durationMinutes: 10,
+      slots: [],
+      fallback: HEADSHOTS_CALENDAR_FALLBACK,
+      ...config
+    });
+  }
+});
+router$u.post("/order", async (req, res) => {
+  const limit = limiter$2.check(clientIp(req));
+  if (!limit.allowed) {
+    res.setHeader("Retry-After", String(limit.retryAfterSec));
+    return res.status(429).json({
+      error: `Too many booking requests. Please wait and try again, or call ${BUSINESS_CONTACT.phoneDisplay}.`
+    });
+  }
+  const config = headshotConfig(process.env);
+  const parsed = parseHeadshotOrder(req.body, { maxQuantity: config.maxQuantity });
+  if (parsed.ok === false) {
+    if (parsed.honeypot === true) return res.json({ success: true });
+    return res.status(400).json({ error: parsed.error });
+  }
+  if (!admin.apps.length) {
+    return res.status(503).json({
+      error: `Orders are not available on this server yet. Please call ${BUSINESS_CONTACT.phoneDisplay}.`
+    });
+  }
+  const { value } = parsed;
+  const applyProcessing = processingEnabled();
+  const quote = quoteHeadshots(value.quantity, applyProcessing, config.maxQuantity);
+  await maybeReleaseExpiredHeadshotHolds();
+  const availability = await readHeadshotAvailability();
+  if (!availability.live) {
+    return res.status(503).json({ error: HEADSHOTS_CALENDAR_FALLBACK });
+  }
+  const slot = publishHeadshotSlots(availability.slots, quote.quantity, config).find((item) => item.start === value.slotStart) || null;
+  if (!slot) {
+    return res.status(409).json({ error: "That time was just taken. Pick another open time." });
+  }
+  let orderNumber = "";
+  try {
+    orderNumber = await nextOrderNumber();
+  } catch (error) {
+    console.error("[Headshots] Order number failed:", error);
+    return res.status(500).json({
+      error: `We could not save that order. Please call ${BUSINESS_CONTACT.phoneDisplay}.`
+    });
+  }
+  const clientName2 = `${value.firstName} ${value.lastName}`.trim();
+  let calendarEvent = null;
+  try {
+    calendarEvent = await createBookingCalendarHold({
+      photographerId: slot.photographerId,
+      orderNumber,
+      clientName: clientName2,
+      clientEmail: value.email,
+      clientPhone: value.phone,
+      address: HEADSHOTS_STUDIO_ADDRESS,
+      serviceSummary: `${quote.quantity} Tuesday headshot${quote.quantity === 1 ? "" : "s"}`,
+      slot: { start: slot.start, end: slot.end },
+      summaryPrefix: HEADSHOTS_HOLD_PREFIX,
+      notes: [
+        HEADSHOTS_UNPAID_NOTE,
+        quote.dueTodayLine,
+        quote.balanceLine || "Paid in full once the booking fee is received.",
+        `Quantity: ${quote.quantity}`
+      ].join("\n")
+    });
+    if (!calendarEvent?.eventId) {
+      return res.status(503).json({ error: HEADSHOTS_CALENDAR_FALLBACK });
+    }
+  } catch (error) {
+    console.error("[Headshots] Calendar hold failed:", error);
+    return res.status(503).json({ error: HEADSHOTS_CALENDAR_FALLBACK });
+  }
+  const traveled = applyServerTravel(headshotLineItems(quote.quantity, config.maxQuantity), HEADSHOTS_STUDIO_ADDRESS);
+  const draft = buildBookingInvoiceDraft({
+    lineItems: traveled.lineItems,
+    total: traveled.total,
+    pricing: { subtotal: traveled.total, tax: 0 },
+    clientEmail: value.email,
+    clientName: clientName2,
+    travel: traveled.travel,
+    applyProcessing
+  });
+  const location = storedServiceLocationFields(HEADSHOTS_STUDIO_ADDRESS);
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  const holdExpiresAt = headshotHoldExpiresAt(/* @__PURE__ */ new Date());
+  const note = [
+    quote.dueTodayLine,
+    quote.balanceLine || "Nothing due on delivery.",
+    "The $10 booking fee counts toward the headshots.",
+    "Not confirmed until the booking fee is paid."
+  ].join("\n");
+  const pageUrl = publicClientUrl(HEADSHOT_PATHS.home);
+  const wearUrl = publicClientUrl(HEADSHOT_PATHS.how);
+  const confirmationEmailHtml = headshotConfirmationEmailHtml({
+    clientName: clientName2,
+    whenDate: slot.date,
+    whenTime: slot.time,
+    quantity: quote.quantity,
+    quote,
+    orderNumber,
+    pageUrl,
+    wearUrl
+  });
+  try {
+    const requestRef = await db$s().collection("orderRequests").add({
+      firstName: value.firstName,
+      lastName: value.lastName,
+      clientName: clientName2,
+      email: value.email,
+      clientEmail: value.email,
+      phone: value.phone,
+      clientPhone: value.phone,
+      address: location.address,
+      ...location,
+      lineItems: draft.lineItems,
+      services: draft.lineItems,
+      quantity: quote.quantity,
+      subtotal: draft.subtotal,
+      processing: draft.processing,
+      processingPolicy: draft.processingPolicy,
+      total: draft.total,
+      pricing: { subtotal: draft.subtotal, tax: 0, processing: draft.processing, total: draft.total },
+      depositRequired: true,
+      depositAmount: quote.dueToday,
+      depositPaid: 0,
+      depositStatus: "awaiting",
+      balanceDue: quote.balanceTotal,
+      dueToday: quote.dueToday,
+      slotStart: slot.start,
+      slotEnd: slot.end,
+      holdExpiresAt,
+      scheduledDate: slot.date,
+      scheduledTime: slot.time,
+      bookingPhotographerId: slot.photographerId,
+      notes: note,
+      vibeNote: note,
+      confirmationEmailHtml,
+      confirmationEmailStatus: "disabled",
+      status: "new",
+      source: HEADSHOTS_ORDER_SOURCE,
+      leadSource: HEADSHOTS_LEAD_SOURCE,
+      ...value.gclid ? { gclid: value.gclid } : {},
+      orderNumber,
+      calendarEventId: calendarEvent.eventId,
+      calendarId: calendarEvent.calendarId,
+      createdAt: now,
+      submittedAt: now,
+      updatedAt: now
+    });
+    const orderRef = await db$s().collection("orders").add({
+      orderRequestId: requestRef.id,
+      clientName: clientName2,
+      clientEmail: value.email,
+      clientPhone: value.phone,
+      address: location.address,
+      lineItems: draft.lineItems,
+      services: draft.lineItems,
+      quantity: quote.quantity,
+      subtotal: draft.subtotal,
+      processing: draft.processing,
+      pricing: { subtotal: draft.subtotal, tax: 0, processing: draft.processing, total: draft.total },
+      total: draft.total,
+      depositRequired: true,
+      depositAmount: quote.dueToday,
+      depositPaid: 0,
+      depositStatus: "awaiting",
+      balanceDue: quote.balanceTotal,
+      dueToday: quote.dueToday,
+      slotStart: slot.start,
+      slotEnd: slot.end,
+      holdExpiresAt,
+      scheduledDate: slot.date,
+      scheduledTime: slot.time,
+      bookingPhotographerId: slot.photographerId,
+      notes: note,
+      status: APPRENTICESHIP_AWAITING_DEPOSIT_STATUS,
+      source: HEADSHOTS_ORDER_SOURCE,
+      leadSource: HEADSHOTS_LEAD_SOURCE,
+      orderNumber,
+      calendarEventId: calendarEvent.eventId,
+      calendarId: calendarEvent.calendarId,
+      createdAt: now,
+      updatedAt: now
+    });
+    const invoiceRef = db$s().collection("invoices").doc();
+    const payToken = createPayToken();
+    const invoiceNumber = await nextInvoiceNumber$2();
+    await invoiceRef.set({
+      ...draft,
+      orderId: orderRef.id,
+      orderRequestId: requestRef.id,
+      source: HEADSHOTS_ORDER_SOURCE,
+      clientName: clientName2,
+      clientEmail: value.email,
+      clientPhone: value.phone,
+      address: location.address,
+      depositRequired: true,
+      depositAmount: quote.dueToday,
+      depositPaid: 0,
+      depositReturn: "headshots-10",
+      payToken,
+      invoiceNumber,
+      orderNumber,
+      notes: note,
+      status: "draft",
+      paymentProvider: "square",
+      createdAt: now,
+      updatedAt: now
+    });
+    const stamp2 = admin.firestore.FieldValue.serverTimestamp();
+    await Promise.all([
+      orderRef.update({ invoiceId: invoiceRef.id, updatedAt: stamp2 }),
+      requestRef.update({
+        invoiceId: invoiceRef.id,
+        convertedToOrderId: orderRef.id,
+        updatedAt: stamp2
+      })
+    ]);
+    let confirmationEmailStatus = "disabled";
+    if (headshotClientMailEnabled()) {
+      confirmationEmailStatus = await sendEmail({
+        to: value.email,
+        template: "headshot_booking",
+        subject: `Your Tuesday headshot time ${orderNumber}`,
+        html: confirmationEmailHtml,
+        lockHtml: true,
+        variables: { clientName: clientName2, orderNumber }
+      }).then((result) => result.sent ? "sent" : "failed").catch((error) => {
+        console.error("[Headshots] Confirmation email failed:", error);
+        return "failed";
+      });
+      await requestRef.update({ confirmationEmailStatus, updatedAt: admin.firestore.FieldValue.serverTimestamp() }).catch(() => {
+      });
+    }
+    const checkoutLive = seniorDepositCheckoutLive();
+    return res.status(201).json({
+      success: true,
+      orderId: orderRef.id,
+      orderRequestId: requestRef.id,
+      orderNumber,
+      invoiceId: invoiceRef.id,
+      payToken,
+      depositAmount: quote.dueToday,
+      dueToday: quote.dueToday,
+      balanceDue: quote.balanceTotal,
+      balanceLine: quote.balanceLine,
+      total: draft.total,
+      quantity: quote.quantity,
+      slotStart: slot.start,
+      slotEnd: slot.end,
+      slotDate: slot.date,
+      slotTime: slot.time,
+      checkoutReady: checkoutLive,
+      status: APPRENTICESHIP_AWAITING_DEPOSIT_STATUS,
+      holdExpiresAt,
+      confirmationEmailStatus
+    });
+  } catch (error) {
+    console.error("[Headshots] Order failed:", error);
+    if (calendarEvent?.eventId) {
+      await deleteBookingCalendarHold({
+        calendarId: calendarEvent.calendarId,
+        eventId: calendarEvent.eventId
+      }).catch((deleteError) => console.error("[Headshots] Calendar hold cleanup failed:", deleteError));
+    }
+    return res.status(500).json({
+      error: `We could not save that order. Please call ${BUSINESS_CONTACT.phoneDisplay}.`
+    });
+  }
+});
 function appFirestore() {
   return admin.firestore();
 }
@@ -11029,36 +12158,36 @@ const VIDEO_FILE = /\.(mp4|m4v|mov|webm)(\?|#|$)/i;
 const BLOCKED_EXT = /\.(zip|pdf|dng|cr2|cr3|nef|nrw|arw|srf|sr2|raw|rw2|orf|raf|pef|3fr|fff|iiq|heic|heif|mp4|m4v|mov|webm)(\?|#|$)/i;
 const FILE_KEYS = ["downloadUrl", "fileUrl", "originalUrl", "fullResUrl", "mlsUrl", "zipUrl", "printUrl", "reelUrl", "mp4Url", "rawUrl", "src"];
 const DISPLAY_KEYS = ["previewUrl", "displayUrl", "webUrl", "thumbnailUrl"];
-function text$e(value) {
+function text$d(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function rowOf$2(item) {
   return item && typeof item === "object" ? item : null;
 }
 function shareableUrl$1(value) {
-  const url = text$e(value);
+  const url = text$d(value);
   if (!url || url.startsWith("//") || url.includes("\\") || url.includes("..")) return "";
   if (url.startsWith("/")) return url;
   if (url.startsWith("https://") || url.startsWith("http://")) return url;
   return "";
 }
 function mediaName$1(row, fallback) {
-  return text$e(row.deliveryName) || text$e(row.name) || text$e(row.fileName) || text$e(row.title) || fallback;
+  return text$d(row.deliveryName) || text$d(row.name) || text$d(row.fileName) || text$d(row.title) || fallback;
 }
 function labelOf(row) {
-  return `${text$e(row.fileName)} ${text$e(row.name)} ${text$e(row.title)} ${text$e(row.path)} ${text$e(row.storagePath)}`.toLowerCase();
+  return `${text$d(row.fileName)} ${text$d(row.name)} ${text$d(row.title)} ${text$d(row.path)} ${text$d(row.storagePath)}`.toLowerCase();
 }
 function isMls(row) {
-  const category = text$e(row.category).toLowerCase();
-  const type = text$e(row.type).toLowerCase();
+  const category = text$d(row.category).toLowerCase();
+  const type = text$d(row.type).toLowerCase();
   if (category === "mls" || type === "mls") return true;
   const label = labelOf(row);
   if (/(^|[^a-z0-9])mls([^a-z0-9]|$)/.test(label)) return true;
   return /\/mls\//.test(label);
 }
 function isFullRes(row) {
-  const category = text$e(row.category).toLowerCase();
-  const type = text$e(row.type).toLowerCase();
+  const category = text$d(row.category).toLowerCase();
+  const type = text$d(row.type).toLowerCase();
   if (category === "full-res" || category === "fullres" || type === "full-res" || type === "fullres") return true;
   const label = labelOf(row);
   if (/(^|[^a-z0-9])full[\s_-]?res([^a-z0-9]|$)/.test(label)) return true;
@@ -11067,7 +12196,7 @@ function isFullRes(row) {
 function isRasterUrl(url, row) {
   if (!url || BLOCKED_EXT.test(url.split("#")[0]) || VIDEO_FILE.test(url.split("#")[0])) return false;
   if (RASTER.test(url.split("#")[0])) return true;
-  const content = text$e(row.contentType).toLowerCase();
+  const content = text$d(row.contentType).toLowerCase();
   return /^image\/(jpeg|jpg|png|webp|gif)/.test(content);
 }
 function blockedFileUrls(row, includeOwnUrl) {
@@ -11096,11 +12225,11 @@ function separateDisplay(row) {
 }
 function rasterShareSource(row, legacyDropTagged = false) {
   if (legacyDropTagged && isMls(row)) return "";
-  const type = text$e(row.type).toLowerCase();
+  const type = text$d(row.type).toLowerCase();
   if (type === "video" || type === "reel" || type === "file" || type === "matterport") return "";
-  const content = text$e(row.contentType).toLowerCase();
+  const content = text$d(row.contentType).toLowerCase();
   if (content.startsWith("video/") || content === "application/pdf" || content === "application/zip") return "";
-  const path2 = `${text$e(row.path)} ${text$e(row.storagePath)}`.toLowerCase();
+  const path2 = `${text$d(row.path)} ${text$d(row.storagePath)}`.toLowerCase();
   if (/\/(raw|downloads?|print|zips?)\//.test(path2)) return "";
   const display = separateDisplay(row);
   if (legacyDropTagged && isFullRes(row)) return display;
@@ -11130,11 +12259,11 @@ function videoFileUrl(row) {
 function videoPlaceholderSource(row) {
   if (rasterPoster(row)) return "";
   const file = videoFileUrl(row);
-  const type = text$e(row.type).toLowerCase();
-  const content = text$e(row.contentType).toLowerCase();
+  const type = text$d(row.type).toLowerCase();
+  const content = text$d(row.contentType).toLowerCase();
   const named = type === "video" || type === "reel" || content.startsWith("video/");
   if (!file && !named) return "";
-  const id = text$e(row.id) || file || text$e(row.path) || text$e(row.storagePath) || text$e(row.name) || text$e(row.fileName);
+  const id = text$d(row.id) || file || text$d(row.path) || text$d(row.storagePath) || text$d(row.name) || text$d(row.fileName);
   if (!id) return "";
   return `${VIDEO_PLACEHOLDER_PREFIX}${encodeURIComponent(id)}`;
 }
@@ -11195,8 +12324,8 @@ function listingOwnerDisplayItems(listing) {
   return items;
 }
 function isGalleryFloor(row) {
-  const type = text$e(row.type).toLowerCase();
-  const category = text$e(row.category).toLowerCase();
+  const type = text$d(row.type).toLowerCase();
+  const category = text$d(row.category).toLowerCase();
   return type === "floorplan" || type === "floor-plan" || category === "floorplan" || category === "floor-plan";
 }
 function galleryOwnerDisplayItems(media) {
@@ -11204,7 +12333,7 @@ function galleryOwnerDisplayItems(media) {
   const seen = /* @__PURE__ */ new Set();
   const rows = media.map(rowOf$2).filter((row) => Boolean(row));
   for (const row of rows) {
-    const type = text$e(row.type).toLowerCase();
+    const type = text$d(row.type).toLowerCase();
     if (type === "video" || type === "reel" || type === "matterport" || type === "tour" || type === "file" || type === "pdf") continue;
     const source = rasterShareSource(row);
     if (!source) continue;
@@ -11212,7 +12341,7 @@ function galleryOwnerDisplayItems(media) {
     pushDisplay(items, seen, mediaName$1(row, floor ? "Floor plan" : "Photo"), source, floor ? "floorPlan" : "image");
   }
   for (const row of rows) {
-    const type = text$e(row.type).toLowerCase();
+    const type = text$d(row.type).toLowerCase();
     if (type !== "video" && type !== "reel") continue;
     const poster = rasterPoster(row) || videoPlaceholderSource(row);
     pushDisplay(items, seen, mediaName$1(row, "Video"), poster, "poster");
@@ -11229,24 +12358,24 @@ function posterIndex(row, items) {
   return items.findIndex((item) => item.sourceUrl === poster);
 }
 function isUnbranded(row) {
-  const category = text$e(row.category).toLowerCase();
-  const type = text$e(row.type).toLowerCase();
+  const category = text$d(row.category).toLowerCase();
+  const type = text$d(row.type).toLowerCase();
   if (category === "unbranded" || type === "unbranded") return true;
-  const name = `${text$e(row.name)} ${text$e(row.fileName)} ${text$e(row.title)}`.toLowerCase();
+  const name = `${text$d(row.name)} ${text$d(row.fileName)} ${text$d(row.title)}`.toLowerCase();
   return name.includes("unbranded");
 }
 function isBrandedPlayback(row) {
   if (isMls(row) || isUnbranded(row)) return false;
-  const category = text$e(row.category).toLowerCase();
-  const type = text$e(row.type).toLowerCase();
+  const category = text$d(row.category).toLowerCase();
+  const type = text$d(row.type).toLowerCase();
   if (category === "branded" || type === "branded") return true;
-  const name = `${text$e(row.name)} ${text$e(row.fileName)} ${text$e(row.title)}`.toLowerCase();
+  const name = `${text$d(row.name)} ${text$d(row.fileName)} ${text$d(row.title)}`.toLowerCase();
   return /(^|[^a-z])branded([^a-z]|$)/.test(name);
 }
 function isReelPlayback(row) {
   if (isMls(row) || isUnbranded(row)) return false;
-  const category = text$e(row.category).toLowerCase();
-  const type = text$e(row.type).toLowerCase();
+  const category = text$d(row.category).toLowerCase();
+  const type = text$d(row.type).toLowerCase();
   return category === "reel" || type === "reel";
 }
 function deliveredVideoUrl(row) {
@@ -11644,15 +12773,15 @@ function statusOf(doc) {
 function isReleased(doc) {
   return RELEASED_GALLERY_STATUSES.includes(statusOf(doc));
 }
-function text$d(value) {
+function text$c(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function httpUrl$1(value) {
-  const url = text$d(value);
+  const url = text$c(value);
   return url.startsWith("https://") || url.startsWith("http://") ? url : "";
 }
 function shareableUrl(value) {
-  const url = text$d(value);
+  const url = text$c(value);
   if (!url || url.startsWith("//") || url.includes("\\") || url.includes("..")) return "";
   if (url.startsWith("/")) return url;
   return httpUrl$1(url);
@@ -11694,7 +12823,7 @@ function isPrivateMedia(path2, name, url) {
   return PRIVATE_FILE.test(name) || PRIVATE_FILE.test(url);
 }
 function mediaName(row, fallback) {
-  return text$d(row.name) || text$d(row.fileName) || text$d(row.title) || fallback;
+  return text$c(row.name) || text$c(row.fileName) || text$c(row.title) || fallback;
 }
 function publicImages(listing) {
   if (!Array.isArray(listing.images)) return [];
@@ -11718,7 +12847,7 @@ function publicVideos(listing) {
     const url = httpUrl$1(row.url);
     const original = mediaName(row, "Video");
     const name = deliveryFileName(row, index);
-    const path2 = text$d(row.path) || text$d(row.storagePath);
+    const path2 = text$c(row.path) || text$c(row.storagePath);
     if (!url || isPrivateMedia(path2, original, url) || isPrivateMedia(path2, name, url)) return;
     videos.push({ url, name, downloadName: name });
   });
@@ -11732,10 +12861,10 @@ function publicTour(listing) {
   return "";
 }
 function agentNameOf$1(listing) {
-  const direct = text$d(listing.agentName) || text$d(listing.listingAgent);
+  const direct = text$c(listing.agentName) || text$c(listing.listingAgent);
   if (direct) return direct;
   const agent = listing.agent;
-  if (agent && typeof agent === "object") return text$d(agent.name);
+  if (agent && typeof agent === "object") return text$c(agent.name);
   if (typeof agent === "string") return agent.trim();
   return "";
 }
@@ -11750,7 +12879,7 @@ function publicFloorPlans(listing) {
       const url = httpUrl$1(row.url) || httpUrl$1(row.shareUrl);
       const original = mediaName(row, "Floor plan");
       const name = deliveryFileName(row, index);
-      const path2 = text$d(row.path) || text$d(row.storagePath);
+      const path2 = text$c(row.path) || text$c(row.storagePath);
       if (!url || isPrivateMedia(path2, original, url) || isPrivateMedia(path2, name, url)) return;
       plans.push({ url, name, downloadName: name });
     });
@@ -11780,7 +12909,7 @@ function ownerFiles(listing) {
       const row = rowOf(item);
       if (!row) return;
       const name = mediaName(row, `File ${index + 1}`);
-      const path2 = text$d(row.path) || text$d(row.storagePath);
+      const path2 = text$c(row.path) || text$c(row.storagePath);
       const display = httpUrl$1(row.url);
       const download = downloadUrlOf(row);
       if (download) push(download, name);
@@ -11811,12 +12940,12 @@ function ownerRevisions(listing) {
     const row = rowOf(item) || {};
     const photoIndex = typeof row.photoIndex === "number" ? row.photoIndex : null;
     return {
-      id: text$d(row.id) || `revision-${index + 1}`,
-      type: text$d(row.type) || "gallery",
+      id: text$c(row.id) || `revision-${index + 1}`,
+      type: text$c(row.type) || "gallery",
       photoIndex,
-      description: text$d(row.description),
-      status: text$d(row.status) || "pending",
-      createdAt: text$d(row.createdAt)
+      description: text$c(row.description),
+      status: text$c(row.status) || "pending",
+      createdAt: text$c(row.createdAt)
     };
   });
 }
@@ -11825,11 +12954,11 @@ function invoiceOf(listing) {
   if (nested2 && typeof nested2 === "object" && typeof nested2.status === "string") {
     return { status: nested2.status };
   }
-  const status2 = text$d(listing.invoiceStatus);
+  const status2 = text$c(listing.invoiceStatus);
   return status2 ? { status: status2 } : null;
 }
 function pickReleasedGallery(listing, related) {
-  const preferred = text$d(listing.galleryId) || text$d(listing.playtestGalleryId);
+  const preferred = text$c(listing.galleryId) || text$c(listing.playtestGalleryId);
   const released = related.filter((doc) => isReleased(doc));
   if (preferred) {
     const match = released.find((doc) => doc.id === preferred);
@@ -11920,24 +13049,24 @@ function isStreamUrl(url) {
   return /(youtube\.com|youtu\.be|vimeo\.com|player\.vimeo\.com|mux\.com|stream\.mux|cloudflarestream\.com)/i.test(url);
 }
 function isFullResOrMls(row) {
-  const category = text$d(row.category).toLowerCase();
-  const type = text$d(row.type).toLowerCase();
+  const category = text$c(row.category).toLowerCase();
+  const type = text$c(row.type).toLowerCase();
   if (category === "mls" || category === "full-res" || category === "fullres" || type === "mls") return true;
-  const label = `${text$d(row.fileName)} ${text$d(row.name)} ${text$d(row.title)} ${text$d(row.path)} ${text$d(row.storagePath)}`.toLowerCase();
+  const label = `${text$c(row.fileName)} ${text$c(row.name)} ${text$c(row.title)} ${text$c(row.path)} ${text$c(row.storagePath)}`.toLowerCase();
   if (/(^|[^a-z0-9])(full[\s_-]?res|mls)([^a-z0-9]|$)/.test(label)) return true;
   return /\/(mls|full)\//.test(label);
 }
 function rowIsDeliveryOriginal(row) {
   if (row.downloadable === true || isFullResOrMls(row)) return true;
-  const type = text$d(row.type).toLowerCase();
+  const type = text$c(row.type).toLowerCase();
   if (type === "video" || type === "reel" || type === "file") return true;
-  const content = text$d(row.contentType).toLowerCase();
+  const content = text$c(row.contentType).toLowerCase();
   if (content.startsWith("video/") || content === "application/zip" || content === "application/pdf") return true;
   const candidates = [row.url, row.shareUrl, row.embedUrl, ...FILE_URL_KEYS.map((key) => row[key])];
-  return candidates.some((value) => isOriginalFileUrl(httpUrl$1(value) || text$d(value)));
+  return candidates.some((value) => isOriginalFileUrl(httpUrl$1(value) || text$c(value)));
 }
 function pushNeedle(needles, value) {
-  const raw = text$d(value);
+  const raw = text$c(value);
   if (raw.length >= 12) needles.push(raw);
 }
 function walkOriginalNeedles(value, needles, inheritedOriginal = false) {
@@ -11952,7 +13081,7 @@ function walkOriginalNeedles(value, needles, inheritedOriginal = false) {
   if (original) {
     const fileUrls = new Set(FILE_URL_KEYS.map((key) => shareableUrl(row[key])).filter(Boolean));
     for (const key of ["url", "shareUrl", "embedUrl", "sourcePath", "storagePath", "path"]) {
-      const raw = text$d(row[key]);
+      const raw = text$c(row[key]);
       if (!raw) continue;
       const asUrl = shareableUrl(raw);
       if (asUrl && isStreamUrl(asUrl)) continue;
@@ -12059,7 +13188,7 @@ function embedTour(listing, needles) {
       for (const key of ["embedUrl", "url", "shareUrl"]) {
         const url = shareableUrl(row[key]);
         if (!url || isOriginalFileUrl(url) || containsOriginal(url, needles)) continue;
-        const type = text$d(row.type).toLowerCase();
+        const type = text$c(row.type).toLowerCase();
         if (type === "matterport" || type === "tour" || /matterport\.com/i.test(url)) return url;
       }
     }
@@ -12081,7 +13210,7 @@ function displaySafeShareMedia(listing) {
 function ownerStudioProject(listing, pub, gate2 = {}) {
   const authoritativeInvoice = Object.prototype.hasOwnProperty.call(gate2, "invoice");
   const invoiceDoc = authoritativeInvoice && gate2.invoice && typeof gate2.invoice === "object" ? gate2.invoice : null;
-  const invoiceStatus = authoritativeInvoice ? text$d(invoiceDoc?.status) : text$d(invoiceOf(listing)?.status);
+  const invoiceStatus = authoritativeInvoice ? text$c(invoiceDoc?.status) : text$c(invoiceOf(listing)?.status);
   const invoice = invoiceStatus ? { status: invoiceStatus } : null;
   const downloadsUnlocked = studioDownloadsUnlocked({
     listing: {
@@ -12100,9 +13229,9 @@ function ownerStudioProject(listing, pub, gate2 = {}) {
   const project = {
     ...source,
     view: "owner",
-    clientName: text$d(listing.clientName),
-    clientEmail: text$d(listing.clientEmail),
-    clientPhone: text$d(listing.clientPhone),
+    clientName: text$c(listing.clientName),
+    clientEmail: text$c(listing.clientEmail),
+    clientPhone: text$c(listing.clientPhone),
     revisions: ownerRevisions(listing),
     lockDownloads: lockDownloadsOn(listing.lockDownloads),
     requirePayment: requirePaymentOn(listing.requirePayment),
@@ -12148,8 +13277,8 @@ function decideClientGalleryLink(input) {
   }
   if (input.pointedListing) return listingResult(input.pointedListing, input.relatedGalleries);
   if (input.order) {
-    const galleryId = text$d(input.order.galleryId);
-    const listingId = text$d(input.order.listingId);
+    const galleryId = text$c(input.order.galleryId);
+    const listingId = text$c(input.order.listingId);
     if (galleryId || listingId) {
       return {
         ok: false,
@@ -12166,8 +13295,8 @@ function decideClientGalleryLink(input) {
     };
   }
   if (input.orderRequest) {
-    const galleryId = text$d(input.orderRequest.galleryId);
-    const listingId = text$d(input.orderRequest.listingId);
+    const galleryId = text$c(input.orderRequest.galleryId);
+    const listingId = text$c(input.orderRequest.listingId);
     if (galleryId || listingId) {
       return {
         ok: false,
@@ -12833,12 +13962,12 @@ const FILE_EXT = /* @__PURE__ */ new Set(["jpg", "png", "webp", "gif", "tif", "m
 function sectionIdOk(value) {
   return SECTION_ID.test(value);
 }
-function text$c(value, limit = 180) {
+function text$b(value, limit = 180) {
   if (typeof value !== "string") return "";
   return value.replace(/\u0000/g, "").trim().slice(0, limit);
 }
 function httpUrl(value) {
-  const url = text$c(value, 2e3);
+  const url = text$b(value, 2e3);
   return /^https?:\/\//i.test(url) ? url : "";
 }
 function arrangementFileName(index, addressOrSlug, originalName) {
@@ -12852,18 +13981,18 @@ function arrangementFileName(index, addressOrSlug, originalName) {
 }
 function rowId(row, fallback) {
   for (const key of ["id", "path", "storagePath", "url", "shareUrl"]) {
-    const value = text$c(row[key]);
+    const value = text$b(row[key]);
     if (value) return value.slice(0, 180);
   }
   return fallback.slice(0, 180);
 }
 function rowName(row, fallback) {
-  return text$c(row.name) || text$c(row.fileName) || text$c(row.title) || fallback;
+  return text$b(row.name) || text$b(row.fileName) || text$b(row.title) || fallback;
 }
 function isVideoRow(row) {
-  const content = text$c(row.contentType).toLowerCase();
+  const content = text$b(row.contentType).toLowerCase();
   if (content.startsWith("video/")) return true;
-  const name = `${rowName(row, "")} ${text$c(row.path)} ${text$c(row.url)}`;
+  const name = `${rowName(row, "")} ${text$b(row.path)} ${text$b(row.url)}`;
   return /\.(mp4|mov|m4v|webm)(\?|#|$)/i.test(name);
 }
 function pushRow(out, seen, row, kind, bucket2, index, fallbackName) {
@@ -12876,7 +14005,7 @@ function pushRow(out, seen, row, kind, bucket2, index, fallbackName) {
     id,
     kind,
     name: rowName(row, fallbackName),
-    path: text$c(row.path) || text$c(row.storagePath),
+    path: text$b(row.path) || text$b(row.storagePath),
     url,
     culled: row.culled === true,
     bucket: bucket2,
@@ -12920,14 +14049,14 @@ function collectArrangementMedia(listing) {
     pushRow(out, seen, row, "file", "files", index, `File ${index + 1}`);
   });
   rowsOf$1(source.clientPortalUploads).forEach((row, index) => {
-    const kind = text$c(row.kind);
+    const kind = text$b(row.kind);
     const arrangementKind = kind === "video" ? "video" : "file";
     pushRow(out, seen, row, arrangementKind, "clientPortalUploads", index, `File ${index + 1}`);
   });
   return out;
 }
 function sectionName(value) {
-  return text$c(value, 60);
+  return text$b(value, 60);
 }
 function readMediaArrangement(value) {
   const row = value && typeof value === "object" && !Array.isArray(value) ? value : {};
@@ -12937,7 +14066,7 @@ function readMediaArrangement(value) {
     for (const item of row.sections) {
       if (!item || typeof item !== "object") continue;
       const section = item;
-      const id = text$c(section.id, 32);
+      const id = text$b(section.id, 32);
       const name = sectionName(section.name);
       if (!sectionIdOk(id) || !name || seenSections.has(id)) continue;
       seenSections.add(id);
@@ -12963,10 +14092,10 @@ function readMediaArrangement(value) {
     for (const item of row.placements) {
       if (!item || typeof item !== "object") continue;
       const placement = item;
-      const id = text$c(placement.id);
+      const id = text$b(placement.id);
       if (!id || seenIds.has(id)) continue;
       seenIds.add(id);
-      const sectionId = text$c(placement.sectionId, 32);
+      const sectionId = text$b(placement.sectionId, 32);
       draft.push({
         id,
         sectionId: known.has(sectionId) ? sectionId : "",
@@ -13044,9 +14173,9 @@ function isHiddenFromListingSites(listing, row) {
   const arrangement = readMediaArrangement(listing?.mediaArrangement);
   const hidden = hiddenSectionIdSet(arrangement);
   if (hidden.size === 0) return false;
-  const sectionId = text$c(row.sectionId, 32);
+  const sectionId = text$b(row.sectionId, 32);
   if (sectionId && hidden.has(sectionId)) return true;
-  const id = text$c(row.id) || text$c(row.path) || text$c(row.storagePath) || text$c(row.url);
+  const id = text$b(row.id) || text$b(row.path) || text$b(row.storagePath) || text$b(row.url);
   if (!id) return false;
   return arrangement.placements.some((placement) => placement.id === id && hidden.has(placement.sectionId));
 }
@@ -13122,9 +14251,9 @@ function stampGalleryMediaItems(items, sequenced) {
     if (row.url) byUrl.set(row.url, row);
   }
   return items.map((item) => {
-    const path2 = text$c(item.storagePath) || text$c(item.path);
-    const id = text$c(item.id);
-    const url = text$c(item.url) || text$c(item.shareUrl);
+    const path2 = text$b(item.storagePath) || text$b(item.path);
+    const id = text$b(item.id);
+    const url = text$b(item.url) || text$b(item.shareUrl);
     const hit = path2 && byPath.get(path2) || id && byId.get(id) || url && byUrl.get(url) || void 0;
     if (!hit) return item;
     return {
@@ -14724,7 +15853,7 @@ async function orderIdForGallery(gallery) {
   return typeof orderId === "string" ? orderId.trim() : "";
 }
 const db$m = () => admin.firestore();
-function text$b(value) {
+function text$a(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function docRecord(snap) {
@@ -14746,7 +15875,7 @@ async function galleryById(id) {
 }
 async function relatedForListing(listing) {
   const related = await galleriesWhere("listingId", listing.id);
-  const extras = [text$b(listing.galleryId), text$b(listing.playtestGalleryId)];
+  const extras = [text$a(listing.galleryId), text$a(listing.playtestGalleryId)];
   for (const galleryId of extras) {
     if (!galleryId || related.some((doc) => doc.id === galleryId)) continue;
     const extra = await galleryById(galleryId);
@@ -14795,8 +15924,8 @@ async function resolveClientGalleryLink(id) {
   const order = docRecord(orderSnap);
   const orderRequest = docRecord(requestSnap);
   const galleriesByOrderId = order ? await galleriesWhere("orderId", id) : [];
-  const pointedGalleryId = text$b(orderRequest?.galleryId) || text$b(order?.galleryId);
-  const pointedListingId = text$b(orderRequest?.listingId) || text$b(order?.listingId);
+  const pointedGalleryId = text$a(orderRequest?.galleryId) || text$a(order?.galleryId);
+  const pointedListingId = text$a(orderRequest?.listingId) || text$a(order?.listingId);
   const pointedGallery = pointedGalleryId ? await galleryById(pointedGalleryId) : null;
   let pointedListing = null;
   let pointedRelated = relatedGalleries;
@@ -14818,7 +15947,7 @@ async function resolveClientGalleryLink(id) {
 }
 async function invoiceForListing(listing) {
   const load = (id) => db$m().collection("invoices").doc(id).get();
-  const invoiceId = text$b(listing.invoiceId);
+  const invoiceId = text$a(listing.invoiceId);
   if (invoiceId) {
     const doc = await readInvoiceDoc(load, invoiceId);
     if (doc && !invoiceRedirectTarget(doc.data)) return { id: doc.id, ...doc.data };
@@ -14830,7 +15959,7 @@ async function invoiceForListing(listing) {
     const doc = await readInvoiceDoc(load, legacyId);
     if (doc && !invoiceRedirectTarget(doc.data)) return { id: doc.id, ...doc.data };
   }
-  const orderId = text$b(listing.orderId);
+  const orderId = text$a(listing.orderId);
   if (!orderId) return null;
   try {
     const snap = await db$m().collection("invoices").where("orderId", "==", orderId).limit(1).get();
@@ -15428,11 +16557,11 @@ function buildPaymentReceipt(input) {
     fees,
     totalPaid
   });
-  const galleryId = text$a(input.galleryId) || text$a(input.invoice.galleryId);
+  const galleryId = text$9(input.galleryId) || text$9(input.invoice.galleryId);
   const galleryUrl = galleryId ? publicClientUrl(`/gallery/${encodeURIComponent(galleryId)}`, input.env) : "";
   const presentationUrl = input.presentationUrl === void 0 ? presentationLinkForReceipt(input.listing) || "" : input.presentationUrl || "";
   return renderPaymentReceipt({
-    clientName: text$a(input.invoice.clientName) || "there",
+    clientName: text$9(input.invoice.clientName) || "there",
     invoiceNumber: receiptEmailNumber({
       invoiceNumber: input.invoice.invoiceNumber,
       id: input.invoiceId,
@@ -15457,7 +16586,7 @@ function finite(value) {
   const amount = Number(value);
   return Number.isFinite(amount) ? amount : null;
 }
-function text$a(value) {
+function text$9(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function payTokenMatches(stored, presented, equal = timingSafeEqual$1) {
@@ -15770,374 +16899,6 @@ async function resolveLateApprenticeshipPayment(orderId) {
     createdAt: stamp2
   });
   return "flagged";
-}
-const SENIOR_FACILITY_RATE_PER_SQFT = 0.1;
-const SENIOR_TOUR_PRICE = 250;
-const SENIOR_ROOM_RATES = [
-  { minCount: 1, maxCount: 10, each: 199 },
-  { minCount: 11, maxCount: 20, each: 175 }
-];
-const SENIOR_FACILITY_SQFT_CAP = 2e4;
-const SENIOR_LIVING_REQUESTS = "seniorLivingRequests";
-const SENIOR_LIVING_OPS_EMAIL = "ops@iconicimagestx.com";
-const SENIOR_LIVING_DEPOSIT_REQUIRED = true;
-const SENIOR_LIVING_DEPOSIT_PERCENT = 50;
-const SENIOR_LIVING_DEPOSIT_LINE = "Reserve your date with a 50% deposit. We'll send your deposit invoice shortly. The balance is due after the shoot.";
-const SENIOR_LIVING_DEPOSIT_LINE_ONLINE = "Reserve your date with a 50% deposit, paid securely online. The balance is due after the shoot.";
-const SENIOR_LIVING_MANUAL_DEPOSIT_NOTE = "Invoice the 50% deposit manually";
-function seniorLivingDepositCopy(live) {
-  return live ? SENIOR_LIVING_DEPOSIT_LINE_ONLINE : SENIOR_LIVING_DEPOSIT_LINE;
-}
-function seniorLivingDepositReturnPath(orderNumber) {
-  const params = new URLSearchParams({
-    deposit: "received",
-    order: orderNumber
-  });
-  return `/senior-living?${params.toString()}`;
-}
-function seniorDepositCheckoutLive(env = process.env) {
-  return env.SENIOR_DEPOSIT_CHECKOUT_LIVE === "true";
-}
-const SENIOR_LIVING_PROCESSING_RATE = 0.028;
-const SENIOR_LIVING_PROCESSING_LABEL = "Processing fee (2.8%)";
-const SENIOR_LIVING_SCHEDULE_TIMES = [
-  "9:00 AM",
-  "11:00 AM",
-  "1:00 PM",
-  "3:00 PM",
-  "5:00 PM"
-];
-const SENIOR_LIVING_ORDER_SOURCE = "senior-living";
-const SENIOR_LIVING_HOSTING_OPTIONS = [
-  { id: "monthly-hosting", label: "Monthly hosting" },
-  { id: "transfer-of-ownership", label: "Transfer of ownership" }
-];
-const SENIOR_LIVING_HOSTING_NOTE = "Pricing confirmed with your quote";
-const SENIOR_LIVING_SERVICE_IDS = [
-  "tour-3d",
-  "rooms",
-  "facility"
-];
-const SENIOR_LIVING_SERVICE_LABELS = {
-  "tour-3d": "3D tour",
-  rooms: "Rooms/units",
-  facility: "Whole-building facility"
-};
-const SERVICE_ID_SET = new Set(SENIOR_LIVING_SERVICE_IDS);
-const EMAIL_RE$2 = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-function text$9(value) {
-  return typeof value === "string" ? value.trim() : "";
-}
-function oneLine$1(value, max) {
-  return value.replace(/[\r\n\u0000]+/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
-}
-function seniorFacilityPrice(sqft) {
-  const centsPerSqft = Math.round(SENIOR_FACILITY_RATE_PER_SQFT * 100);
-  return sqft * centsPerSqft / 100;
-}
-function seniorLivingHostingLabel(id) {
-  const key = typeof id === "string" ? id.trim() : "";
-  const match = SENIOR_LIVING_HOSTING_OPTIONS.find((option) => option.id === key);
-  return match ? match.label : null;
-}
-function parseSeniorLivingRequest(body) {
-  if (!body || typeof body !== "object" || Array.isArray(body)) {
-    return { ok: false, honeypot: false, error: "That request could not be read." };
-  }
-  const raw = body;
-  const trap = text$9(raw.companyWebsite);
-  if (trap) return { ok: false, honeypot: true };
-  const name = oneLine$1(text$9(raw.name), 80);
-  const community = oneLine$1(text$9(raw.community), 120);
-  const email = oneLine$1(text$9(raw.email), 120);
-  const phone = oneLine$1(text$9(raw.phone), 30);
-  const address = oneLine$1(text$9(raw.address), 200);
-  const preferredDates = oneLine$1(text$9(raw.preferredDates), 160);
-  const notes = text$9(raw.notes).replace(/\u0000/g, "").trim().slice(0, 2e3);
-  if (name.length < 2) return { ok: false, honeypot: false, error: "Enter your name." };
-  if (text$9(raw.name).trim().length > 80)
-    return { ok: false, honeypot: false, error: "Name is too long." };
-  if (community.length < 2)
-    return { ok: false, honeypot: false, error: "Enter the community name." };
-  if (text$9(raw.community).trim().length > 120)
-    return { ok: false, honeypot: false, error: "Community name is too long." };
-  if (!EMAIL_RE$2.test(email))
-    return { ok: false, honeypot: false, error: "Enter a valid email." };
-  const digits2 = phone.replace(/\D/g, "");
-  if (digits2.length < 10 || digits2.length > 15)
-    return { ok: false, honeypot: false, error: "Enter a phone number." };
-  if (address.length < 5)
-    return { ok: false, honeypot: false, error: "Enter the community address." };
-  if (text$9(raw.address).trim().length > 200)
-    return { ok: false, honeypot: false, error: "Address is too long." };
-  if (preferredDates.length < 2)
-    return { ok: false, honeypot: false, error: "Enter preferred dates." };
-  if (text$9(raw.preferredDates).trim().length > 160)
-    return { ok: false, honeypot: false, error: "Preferred dates are too long." };
-  if (text$9(raw.notes).trim().length > 2e3)
-    return { ok: false, honeypot: false, error: "Notes are too long." };
-  const servicesRaw = Array.isArray(raw.services) ? raw.services : [];
-  const services2 = [];
-  for (const entry2 of servicesRaw) {
-    const id = text$9(entry2);
-    if (!id) continue;
-    if (!SERVICE_ID_SET.has(id))
-      return { ok: false, honeypot: false, error: "Choose a listed service." };
-    if (!services2.includes(id))
-      services2.push(id);
-  }
-  if (services2.length === 0)
-    return { ok: false, honeypot: false, error: "Choose at least one service." };
-  return {
-    ok: true,
-    value: {
-      name,
-      community,
-      email,
-      phone,
-      address,
-      services: services2,
-      preferredDates,
-      notes
-    }
-  };
-}
-function seniorLivingServiceLabels(services2) {
-  return services2.map((id) => SENIOR_LIVING_SERVICE_LABELS[id]).join(", ");
-}
-function seniorLivingOfficeRecord(id, value) {
-  const serviceLabels = seniorLivingServiceLabels(value.services);
-  const noteLines = [
-    "Quote request. Not invoiced.",
-    `Deposit required: ${"yes"}`,
-    `Deposit percent: ${SENIOR_LIVING_DEPOSIT_PERCENT}`,
-    SENIOR_LIVING_DEPOSIT_LINE,
-    `Community: ${value.community}`,
-    `Services: ${serviceLabels}`,
-    `Preferred dates: ${value.preferredDates}`,
-    value.notes
-  ].filter(Boolean);
-  return {
-    id,
-    kind: "senior-living-request",
-    depositRequired: SENIOR_LIVING_DEPOSIT_REQUIRED,
-    depositPercent: SENIOR_LIVING_DEPOSIT_PERCENT,
-    clientName: value.name,
-    email: value.email,
-    clientEmail: value.email,
-    phone: value.phone,
-    clientPhone: value.phone,
-    community: value.community,
-    address: value.address,
-    propertyAddress: value.address,
-    services: value.services,
-    serviceLabels: value.services.map(
-      (serviceId) => SENIOR_LIVING_SERVICE_LABELS[serviceId]
-    ),
-    preferredDates: value.preferredDates,
-    requestedDate: value.preferredDates,
-    notes: value.notes,
-    vibeNote: noteLines.join("\n"),
-    selectedService: `Senior Living (${serviceLabels})`,
-    lineItems: [
-      {
-        id: "senior-living",
-        name: `Senior Living (${serviceLabels})`,
-        qty: 1,
-        price: 0
-      }
-    ],
-    leadSource: "Senior living page"
-  };
-}
-function seniorLivingOfficeEnv(env = process.env) {
-  const parts = String(env.ADMIN_EMAIL || "").split(/[,;]/).map((part) => part.trim()).filter(Boolean);
-  if (!parts.some((part) => part.toLowerCase() === SENIOR_LIVING_OPS_EMAIL)) {
-    parts.push(SENIOR_LIVING_OPS_EMAIL);
-  }
-  return { ...env, ADMIN_EMAIL: parts.join(", ") };
-}
-function cents(amount) {
-  return Math.round(amount * 100);
-}
-function dollars(amountCents) {
-  return amountCents / 100;
-}
-function seniorRoomUnitPrice(count2) {
-  if (!Number.isInteger(count2) || count2 < 1) return null;
-  const tier = SENIOR_ROOM_RATES.find(
-    (band) => count2 >= band.minCount && count2 <= band.maxCount
-  );
-  return tier ? tier.each : null;
-}
-function quoteSeniorLivingOrder(input) {
-  const lines = [];
-  if (input.tour) {
-    lines.push({
-      id: "tour-3d",
-      name: SENIOR_LIVING_SERVICE_LABELS["tour-3d"],
-      qty: 1,
-      unitPrice: SENIOR_TOUR_PRICE,
-      price: SENIOR_TOUR_PRICE
-    });
-  }
-  const roomCount = input.roomCount;
-  if (roomCount !== 0) {
-    if (!Number.isInteger(roomCount) || roomCount < 0) {
-      return { ok: false, error: "Enter a room count from 0 to 20." };
-    }
-    if (roomCount > SENIOR_ROOM_RATES[SENIOR_ROOM_RATES.length - 1].maxCount) {
-      return { ok: false, error: "Room count cannot be more than 20." };
-    }
-    const each = seniorRoomUnitPrice(roomCount);
-    if (each == null) {
-      return { ok: false, error: "Enter a room count from 0 to 20." };
-    }
-    lines.push({
-      id: "rooms",
-      name: SENIOR_LIVING_SERVICE_LABELS.rooms,
-      qty: roomCount,
-      unitPrice: each,
-      price: dollars(cents(each) * roomCount)
-    });
-  }
-  const facilitySqft = input.facilitySqft;
-  if (facilitySqft !== 0) {
-    if (!Number.isInteger(facilitySqft) || facilitySqft < 0) {
-      return { ok: false, error: "Enter a facility size up to 20,000 sq ft." };
-    }
-    if (facilitySqft > SENIOR_FACILITY_SQFT_CAP) {
-      return { ok: false, error: "Facility size cannot be more than 20,000 sq ft." };
-    }
-    const price = seniorFacilityPrice(facilitySqft);
-    lines.push({
-      id: "facility",
-      name: SENIOR_LIVING_SERVICE_LABELS.facility,
-      qty: 1,
-      unitPrice: price,
-      price
-    });
-  }
-  if (lines.length === 0) {
-    return { ok: false, error: "Choose at least one service." };
-  }
-  const serviceSubtotal = dollars(
-    lines.reduce((sum, line) => sum + cents(line.price), 0)
-  );
-  const travel = assessTravel(input.address);
-  const travelItem = travelInvoiceLine(travel);
-  const travelLine = {
-    id: travelItem.id,
-    name: travelItem.name,
-    qty: travelItem.qty,
-    unitPrice: travelItem.unitPrice,
-    price: travelItem.price
-  };
-  const priced = cents(serviceSubtotal) + cents(travelLine.price);
-  const processing = dollars(Math.round(priced * SENIOR_LIVING_PROCESSING_RATE));
-  const total = dollars(priced + cents(processing));
-  const depositAmount = dollars(
-    Math.round(cents(total) * (SENIOR_LIVING_DEPOSIT_PERCENT / 100))
-  );
-  const balanceDue = dollars(cents(total) - cents(depositAmount));
-  return {
-    ok: true,
-    quote: {
-      lines,
-      serviceSubtotal,
-      travel,
-      travelLine,
-      processing,
-      total,
-      depositAmount,
-      balanceDue
-    }
-  };
-}
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-function parseSeniorLivingOrder(body) {
-  if (!body || typeof body !== "object" || Array.isArray(body)) {
-    return { ok: false, honeypot: false, error: "That order could not be read." };
-  }
-  const raw = body;
-  if (text$9(raw.companyWebsite)) return { ok: false, honeypot: true };
-  const roomCount = raw.roomCount == null || raw.roomCount === "" ? 0 : Number(raw.roomCount);
-  const facilitySqft = raw.facilitySqft == null || raw.facilitySqft === "" ? 0 : Number(raw.facilitySqft);
-  const quoted = quoteSeniorLivingOrder({
-    tour: raw.tour === true,
-    roomCount,
-    facilitySqft,
-    address: text$9(raw.address)
-  });
-  if (quoted.ok === false) return { ok: false, honeypot: false, error: quoted.error };
-  if (quoted.quote.travel.travelQuoted) {
-    return {
-      ok: false,
-      honeypot: false,
-      error: "We could not price travel for that address. Call us and we will quote the trip."
-    };
-  }
-  const name = oneLine$1(text$9(raw.name), 80);
-  const community = oneLine$1(text$9(raw.community), 120);
-  const title = oneLine$1(text$9(raw.title), 80);
-  const email = oneLine$1(text$9(raw.email), 120);
-  const phone = oneLine$1(text$9(raw.phone), 30);
-  const address = oneLine$1(text$9(raw.address), 200);
-  const onsiteContact = oneLine$1(text$9(raw.onsiteContact), 120);
-  const notes = text$9(raw.notes).replace(/\u0000/g, "").trim().slice(0, 2e3);
-  const scheduledDate = oneLine$1(text$9(raw.scheduledDate), 10);
-  const scheduledTime = oneLine$1(text$9(raw.scheduledTime), 20);
-  if (name.length < 2) return { ok: false, honeypot: false, error: "Enter your name." };
-  if (community.length < 2) return { ok: false, honeypot: false, error: "Enter the community name." };
-  if (title.length < 2) return { ok: false, honeypot: false, error: "Enter your title." };
-  if (!EMAIL_RE$2.test(email)) return { ok: false, honeypot: false, error: "Enter a valid email." };
-  const digits2 = phone.replace(/\D/g, "");
-  if (digits2.length < 10 || digits2.length > 15) {
-    return { ok: false, honeypot: false, error: "Enter a phone number." };
-  }
-  if (address.length < 5) return { ok: false, honeypot: false, error: "Enter the community address." };
-  if (onsiteContact.length < 2) {
-    return { ok: false, honeypot: false, error: "Enter the onsite contact." };
-  }
-  if (!DATE_RE.test(scheduledDate) || Number.isNaN(Date.parse(`${scheduledDate}T12:00:00`))) {
-    return { ok: false, honeypot: false, error: "Choose a date." };
-  }
-  const chosen = /* @__PURE__ */ new Date(`${scheduledDate}T12:00:00`);
-  const start = /* @__PURE__ */ new Date();
-  start.setHours(0, 0, 0, 0);
-  if (chosen < start) return { ok: false, honeypot: false, error: "Choose a date that has not passed." };
-  if (!SENIOR_LIVING_SCHEDULE_TIMES.includes(scheduledTime)) {
-    return { ok: false, honeypot: false, error: "Choose a time." };
-  }
-  const hostingLabel = seniorLivingHostingLabel(raw.hosting);
-  if (!hostingLabel) {
-    return {
-      ok: false,
-      honeypot: false,
-      error: "Choose monthly hosting or a transfer of ownership."
-    };
-  }
-  const hosting = text$9(raw.hosting);
-  return {
-    ok: true,
-    value: {
-      tour: raw.tour === true,
-      roomCount,
-      facilitySqft,
-      community,
-      address,
-      name,
-      title,
-      phone,
-      email,
-      onsiteContact,
-      notes,
-      scheduledDate,
-      scheduledTime,
-      hosting
-    },
-    quote: quoted.quote
-  };
 }
 const router$r = Router();
 const db$j = () => appFirestore();
@@ -16542,7 +17303,9 @@ async function applyDepositPayment({
     paymentKey ? `square-${paymentKey}` : `deposit-${invoiceId}`
   );
   let confirmEvent = null;
+  let confirmHeadshot = null;
   let lateApprenticeOrderId = "";
+  let lateHeadshotOrderId = "";
   await db$j().runTransaction(async (tx) => {
     const invoiceSnap = await tx.get(invoiceRef);
     if (!invoiceSnap.exists) return;
@@ -16580,15 +17343,20 @@ async function applyDepositPayment({
     });
     if (orderRef && orderSnap?.exists) {
       const order = orderSnap.data() || {};
-      const confirmsBooking = order.source === APPRENTICESHIP_ORDER_SOURCE && order.status === APPRENTICESHIP_AWAITING_DEPOSIT_STATUS;
+      const awaitingFee = order.status === APPRENTICESHIP_AWAITING_DEPOSIT_STATUS;
+      const confirmsBooking = order.source === APPRENTICESHIP_ORDER_SOURCE && awaitingFee;
+      const confirmsHeadshot = order.source === HEADSHOTS_ORDER_SOURCE && awaitingFee;
       if (order.source === APPRENTICESHIP_ORDER_SOURCE && order.status === APPRENTICESHIP_EXPIRED_STATUS && orderId) {
         lateApprenticeOrderId = orderId;
+      }
+      if (order.source === HEADSHOTS_ORDER_SOURCE && order.status === APPRENTICESHIP_EXPIRED_STATUS && orderId) {
+        lateHeadshotOrderId = orderId;
       }
       tx.update(orderRef, {
         depositPaid,
         balanceDue: amountDue,
         paymentStatus: amountDue <= 0 ? "paid" : "partial",
-        ...confirmsBooking ? {
+        ...confirmsBooking || confirmsHeadshot ? {
           status: "confirmed",
           depositStatus: "paid",
           confirmedAt: admin.firestore.FieldValue.serverTimestamp()
@@ -16602,12 +17370,18 @@ async function applyDepositPayment({
           orderNumber: String(order.orderNumber || "")
         };
       }
+      if (confirmsHeadshot && typeof order.calendarEventId === "string" && order.calendarEventId) {
+        confirmHeadshot = {
+          calendarId: typeof order.calendarId === "string" ? order.calendarId : null,
+          eventId: order.calendarEventId
+        };
+      }
     }
     if (requestRef && requestSnap?.exists) {
       const request = requestSnap.data() || {};
       tx.update(requestRef, {
         depositPaid,
-        ...request.source === APPRENTICESHIP_ORDER_SOURCE ? { depositStatus: "paid" } : {},
+        ...request.source === APPRENTICESHIP_ORDER_SOURCE || request.source === HEADSHOTS_ORDER_SOURCE ? { depositStatus: "paid" } : {},
         balanceDue: amountDue,
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
@@ -16635,12 +17409,27 @@ async function applyDepositPayment({
       console.error("[Payments] Late apprenticeship payment follow-up failed:", error);
     }
   }
+  if (lateHeadshotOrderId) {
+    try {
+      await resolveLateHeadshotPayment(lateHeadshotOrderId);
+    } catch (error) {
+      console.error("[Payments] Late headshot payment follow-up failed:", error);
+    }
+  }
   const held = confirmEvent;
   if (held) {
     try {
       await confirmApprenticeshipEvent(held);
     } catch (error) {
       console.error("[Payments] Apprenticeship calendar confirm failed:", error);
+    }
+  }
+  const headshotHeld = confirmHeadshot;
+  if (headshotHeld) {
+    try {
+      await confirmHeadshotHold(headshotHeld);
+    } catch (error) {
+      console.error("[Payments] Headshot calendar confirm failed:", error);
     }
   }
 }
@@ -16994,7 +17783,7 @@ router$r.post("/invoice/:id/deposit-checkout", async (req, res) => {
     const orderSnap = orderId ? await db$j().collection("orders").doc(orderId).get() : null;
     const order = orderSnap && orderSnap.exists ? orderSnap.data() || {} : null;
     const orderSource = String(order?.source || "");
-    if (!order || orderSource !== "senior-living" && orderSource !== APPRENTICESHIP_ORDER_SOURCE) {
+    if (!order || orderSource !== "senior-living" && orderSource !== APPRENTICESHIP_ORDER_SOURCE && orderSource !== HEADSHOTS_ORDER_SOURCE) {
       return res.status(403).json({ error: "Deposits are only for senior living orders." });
     }
     const alreadyPaid = (Number(invoice.depositPaid) || 0) > 0 || Boolean(invoice.depositPaidAt);
@@ -17004,6 +17793,11 @@ router$r.post("/invoice/:id/deposit-checkout", async (req, res) => {
     if (orderSource === APPRENTICESHIP_ORDER_SOURCE && order.status === APPRENTICESHIP_EXPIRED_STATUS) {
       return res.status(409).json({
         error: `This hold expired after ${APPRENTICESHIP_HOLD_MINUTES} minutes without the $25 booking fee. Please book a new time.`
+      });
+    }
+    if (orderSource === HEADSHOTS_ORDER_SOURCE && order.status === APPRENTICESHIP_EXPIRED_STATUS) {
+      return res.status(409).json({
+        error: `This hold expired after ${APPRENTICESHIP_HOLD_MINUTES} minutes without the $10 booking fee. Please book a new time.`
       });
     }
     if (String(invoice.status || "draft") !== "draft") {
@@ -17032,7 +17826,7 @@ router$r.post("/invoice/:id/deposit-checkout", async (req, res) => {
       body: JSON.stringify({
         idempotency_key: `${invoiceDoc.id}-deposit`,
         quick_pay: {
-          name: orderSource === APPRENTICESHIP_ORDER_SOURCE ? `Iconic Images booking fee ${orderNumber || invoice.invoiceNumber || invoiceDoc.id}` : `Iconic Images deposit ${invoice.invoiceNumber || invoiceDoc.id}`,
+          name: orderSource === APPRENTICESHIP_ORDER_SOURCE || orderSource === HEADSHOTS_ORDER_SOURCE ? `Iconic Images booking fee ${orderNumber || invoice.invoiceNumber || invoiceDoc.id}` : `Iconic Images deposit ${invoice.invoiceNumber || invoiceDoc.id}`,
           price_money: {
             amount: Math.round(depositAmount * 100),
             currency: "USD"
@@ -17040,7 +17834,7 @@ router$r.post("/invoice/:id/deposit-checkout", async (req, res) => {
           location_id: process.env.SQUARE_LOCATION_ID
         },
         checkout_options: {
-          redirect_url: `${appUrl$2()}${orderSource === APPRENTICESHIP_ORDER_SOURCE ? apprenticeshipBookingReturnPath(orderNumber, invoice.depositReturn) : seniorLivingDepositReturnPath(orderNumber)}`
+          redirect_url: `${appUrl$2()}${orderSource === HEADSHOTS_ORDER_SOURCE ? headshotBookingReturnPath(orderNumber) : orderSource === APPRENTICESHIP_ORDER_SOURCE ? apprenticeshipBookingReturnPath(orderNumber, invoice.depositReturn) : seniorLivingDepositReturnPath(orderNumber)}`
         },
         pre_populated_data: squareBuyerPrefill(invoice),
         payment_note: squarePaymentNote(invoiceDoc.id, invoice.invoiceNumber)
@@ -26828,7 +27622,8 @@ async function releaseHolds(req, res) {
   if (!cronAuthorized(req)) return res.status(401).json({ error: "Unauthorized" });
   try {
     const result = await releaseExpiredApprenticeshipHolds();
-    return res.json({ ok: true, ...result });
+    const headshots = await releaseExpiredHeadshotHolds();
+    return res.json({ ok: true, ...result, headshots });
   } catch (error) {
     console.error("[Apprenticeship] Hold release failed:", error);
     return res.status(500).json({ error: "Hold release failed." });
@@ -32475,7 +33270,8 @@ function createServer() {
     res.json({ live: clientNotifyLive() });
   });
   mountOwners(app);
-  app.use("/api/bookings", router$u);
+  app.use("/api/bookings", router$v);
+  app.use("/api/headshots-10", router$u);
   app.use("/api/orders", router$t);
   app.patch("/api/admin/orders/:id/approval", handleOrderApproval);
   app.use("/api/galleries", router$s);

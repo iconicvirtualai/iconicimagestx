@@ -9,6 +9,7 @@
  */
 
 import { LEGAL_BUSINESS_NAME } from "./businessContact.ts";
+import { HEADSHOTS_SEO_DESCRIPTION, HEADSHOTS_SEO_TITLE } from "./headshots10.ts";
 
 export const DEFAULT_SITE_ORIGIN = "https://iconicimagestx.vercel.app";
 
@@ -211,6 +212,7 @@ export function ogImageUrl(origin = SITE_ORIGIN): string {
 export function isNoIndexPath(pathname: string): boolean {
   const path = normalizePath(pathname);
   if (path === "/realestate-75" || path.startsWith("/realestate-75/")) return true;
+  if (path === "/headshots-10" || path.startsWith("/headshots-10/")) return true;
   if (path === "/admin" || path.startsWith("/admin/")) return true;
   if (path === "/portal" || path.startsWith("/portal/")) return true;
   if (path === "/owners" || path.startsWith("/owners/")) return true;
@@ -234,6 +236,13 @@ export function metaPlan(pathname: string, origin = SITE_ORIGIN): MetaPlan {
       kind: "noindex",
       title: "Listing Photos From $75 | Iconic Images",
       description: "Apprentice listing photos from $75. 25 photos in 20 minutes, or 50 photos in 1 hour.",
+    };
+  }
+  if (path === "/headshots-10" || path.startsWith("/headshots-10/")) {
+    return {
+      kind: "noindex",
+      title: HEADSHOTS_SEO_TITLE,
+      description: HEADSHOTS_SEO_DESCRIPTION,
     };
   }
   if (path === "/present" || path.startsWith("/present/")) return { kind: "hands-off" };

@@ -36,12 +36,19 @@ export const TRACKING_EVENTS = [
   "call_click",
   "re75_booking",
   "re75_form_start",
+  "headshot_booking",
+  "headshot_form_start",
 ] as const;
 
 export type TrackingEventName = (typeof TRACKING_EVENTS)[number];
 
 /** Ads conversions that stay dormant unless their label env var is set. */
-const LABEL_REQUIRED_EVENTS = new Set<TrackingEventName>(["re75_booking", "re75_form_start"]);
+const LABEL_REQUIRED_EVENTS = new Set<TrackingEventName>([
+  "re75_booking",
+  "re75_form_start",
+  "headshot_booking",
+  "headshot_form_start",
+]);
 
 export type ConsentState = "granted" | "denied";
 
@@ -100,6 +107,8 @@ export type TrackingEnv = {
   VITE_GOOGLE_ADS_LABEL_CALL_CLICK?: string;
   VITE_GOOGLE_ADS_LABEL_RE75_BOOKING?: string;
   VITE_GOOGLE_ADS_LABEL_RE75_FORM_START?: string;
+  /** Conversion label for headshot_booking. Blank keeps the conversion dormant. */
+  VITE_GADS_HEADSHOT_LABEL?: string;
   VITE_UET_TAG_ID?: string;
 };
 
@@ -134,6 +143,7 @@ export type ConversionInput = {
   email?: string;
   phone?: string;
   transactionId?: string;
+  quantity?: number;
 };
 
 type GtagFn = (...args: unknown[]) => void;
@@ -169,6 +179,8 @@ export function readTrackingConfig(env: Partial<TrackingEnv> | null | undefined)
       call_click: cleanAdsLabel(source.VITE_GOOGLE_ADS_LABEL_CALL_CLICK),
       re75_booking: cleanAdsLabel(source.VITE_GOOGLE_ADS_LABEL_RE75_BOOKING),
       re75_form_start: cleanAdsLabel(source.VITE_GOOGLE_ADS_LABEL_RE75_FORM_START),
+      headshot_booking: cleanAdsLabel(source.VITE_GADS_HEADSHOT_LABEL),
+      headshot_form_start: "",
     },
   };
 }
@@ -374,6 +386,7 @@ export function planConversion(config: TrackingConfig, input: ConversionInput): 
   }
   const transactionId = input.transactionId?.trim();
   if (transactionId) params.transaction_id = transactionId;
+  if (Number.isInteger(input.quantity) && (input.quantity as number) > 0) params.quantity = input.quantity;
 
   const userData = input.name === "call_click"
     ? undefined
@@ -393,6 +406,15 @@ export function planConversion(config: TrackingConfig, input: ConversionInput): 
   }
 
   const label = config.adsLabels[input.name];
+  if (
+    config.googleAdsId
+    && (input.name === "headshot_booking" || input.name === "headshot_form_start")
+  ) {
+    calls.push({
+      target: "gtag",
+      args: ["event", input.name, { ...params, send_to: config.googleAdsId }],
+    });
+  }
   if (config.googleAdsId && label) {
     const conversion: Record<string, unknown> = {
       send_to: googleAdsSendTo(config.googleAdsId, label),

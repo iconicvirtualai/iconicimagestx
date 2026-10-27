@@ -40,6 +40,7 @@ import {
   maybeReleaseExpiredApprenticeshipHolds,
   releaseExpiredApprenticeshipHolds,
 } from "../services/apprenticeshipHolds";
+import { releaseExpiredHeadshotHolds } from "../services/headshotHolds";
 import { nextOrderNumber } from "../services/orderNumbers";
 
 const router = Router();
@@ -111,7 +112,8 @@ async function releaseHolds(req: { headers: Record<string, string | string[] | u
   if (!cronAuthorized(req)) return res.status(401).json({ error: "Unauthorized" });
   try {
     const result = await releaseExpiredApprenticeshipHolds();
-    return res.json({ ok: true, ...result });
+    const headshots = await releaseExpiredHeadshotHolds();
+    return res.json({ ok: true, ...result, headshots });
   } catch (error) {
     console.error("[Apprenticeship] Hold release failed:", error);
     return res.status(500).json({ error: "Hold release failed." });

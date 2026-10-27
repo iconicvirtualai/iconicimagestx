@@ -665,6 +665,17 @@ function parseContactLine(line) {
   };
 }
 parseContactLine(BUSINESS_CONTACT_LINE);
+const PLACES = [
+  { city: "The Woodlands", travelFee: "standard", zips: ["77380", "77381", "77382", "77384", "77385"] },
+  { city: "Spring", travelFee: "standard", zips: ["77373", "77379", "77386", "77388", "77389"] },
+  { city: "Conroe", travelFee: "standard", zips: ["77301", "77302", "77303", "77304", "77306"] },
+  { city: "Willis", travelFee: "tbd", zips: ["77318", "77378"] },
+  { city: "Cypress", travelFee: "tbd", zips: ["77410", "77429", "77433"] }
+];
+const ZIP_PLACES = /* @__PURE__ */ new Map();
+for (const place of PLACES) {
+  for (const zip of place.zips) ZIP_PLACES.set(zip, { city: place.city, travelFee: place.travelFee });
+}
 const DEFAULT_SITE_ORIGIN = "https://iconicimagestx.vercel.app";
 const PUBLIC_PAGES = [
   {

@@ -153,6 +153,14 @@ describe("public page meta", () => {
       title: "Listing Photos From $75 | Iconic Images",
       description: "Apprentice listing photos from $75. 25 photos in 20 minutes, or 50 photos in 1 hour.",
     });
+    expect(isNoIndexPath("/headshots-10")).toBe(true);
+    expect(isNoIndexPath("/headshots-10/book")).toBe(true);
+    expect(isNoIndexPath("/headshots-10/faq")).toBe(true);
+    expect(metaPlan("/headshots-10")).toEqual({
+      kind: "noindex",
+      title: "$10 Tuesdays! Headshots for $10/Ea. | Iconic Images",
+      description: "$10 Tuesdays at Iconic Studios in Spring. Headshots for $10 each, 10am-2pm. Buy as many as you like.",
+    });
     expect(metaPlan("/pricing").kind).toBe("public");
   });
 

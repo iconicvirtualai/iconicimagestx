@@ -13,6 +13,7 @@ import admin from "firebase-admin";
 
 // Route imports
 import bookingsRouter from "./routes/bookings";
+import headshotsRouter from "./routes/headshots10";
 import ordersRouter from "./routes/orders";
 import { handleOrderApproval } from "./routes/orderApproval";
 import galleriesRouter from "./routes/galleries";
@@ -245,6 +246,7 @@ export function createServer() {
 
   // ─── API Routes ────────────────────────────────────────────────────
   app.use("/api/bookings", bookingsRouter);
+  app.use("/api/headshots-10", headshotsRouter);
   app.use("/api/orders", ordersRouter);
   app.patch("/api/admin/orders/:id/approval", handleOrderApproval);
   app.use("/api/galleries", galleriesRouter);

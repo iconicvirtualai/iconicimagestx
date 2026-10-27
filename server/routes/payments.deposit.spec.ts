@@ -115,6 +115,10 @@ const resolveLate = vi.hoisted(() => vi.fn(async () => "confirmed"));
 vi.mock("../services/apprenticeshipHolds", () => ({
   resolveLateApprenticeshipPayment: resolveLate,
 }));
+vi.mock("../services/headshotHolds", () => ({
+  confirmHeadshotHold: vi.fn(async () => true),
+  resolveLateHeadshotPayment: vi.fn(async () => "confirmed"),
+}));
 
 import paymentsRouter from "./payments";
 
@@ -367,6 +371,41 @@ describe("deposit checkout", () => {
       "https://deposit.test/realestate-75/schedule?booking=received&order=%23043",
     );
     expect((store.collections.invoices.get("inv-re75") || {}).status).toBe("draft");
+  });
+
+  it("charges the $10.28 headshot booking fee on the same deposit checkout", async () => {
+    fetchMock.mockClear();
+    seed("invoices", "inv-hs", {
+      status: "draft",
+      payToken: TOKEN,
+      invoiceNumber: "INV-2026-0010",
+      clientEmail: "ada@example.com",
+      total: 30.84,
+      amountDue: 30.84,
+      amountPaid: 0,
+      depositRequired: true,
+      depositAmount: 10.28,
+      depositPaid: 0,
+      orderId: "order-hs",
+      orderNumber: "#044",
+      source: "headshots-10",
+      depositReturn: "headshots-10",
+    });
+    seed("orders", "order-hs", { source: "headshots-10", total: 30.84, orderNumber: "#044", status: "awaiting_deposit" });
+    const response = await fetch(`${baseUrl}/api/payments/invoice/inv-hs/deposit-checkout`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ t: TOKEN }),
+    });
+    expect(response.status).toBe(200);
+    const squareCall = fetchMock.mock.calls.find((call) => String(call[0]).includes("squareup.com"));
+    const sent = JSON.parse(String(squareCall?.[1].body));
+    expect(sent.quick_pay.price_money.amount).toBe(1028);
+    expect(sent.quick_pay.name).toContain("booking fee");
+    expect(sent.checkout_options.redirect_url).toBe(
+      "https://deposit.test/headshots-10/book?booking=received&paid=1&order=%23044",
+    );
+    expect((store.collections.invoices.get("inv-hs") || {}).status).toBe("draft");
   });
 
   it("returns the stored deposit link on a repeated click", async () => {

@@ -5,6 +5,7 @@
  */
 
 import { hostnameOf, PUBLIC_PAGES, wwwShellFile } from "./siteSeo";
+import { HEADSHOT_PREVIEW_SOURCES } from "./headshots10";
 import { RE75_PREVIEW_SOURCES } from "./realestate75";
 import { wixPathRedirects } from "./wixLaunch";
 
@@ -112,6 +113,9 @@ export function buildVercelRewrites(): Rewrite[] {
   for (const source of RE75_PREVIEW_SOURCES) {
     spa.push({ source, destination: PRIVATE_SHELL });
   }
+  for (const source of HEADSHOT_PREVIEW_SOURCES) {
+    spa.push({ source, destination: PRIVATE_SHELL });
+  }
   spa.push(
     { source: "/studio/:listingId", destination: PRIVATE_SHELL },
     { source: "/gallery/:galleryId", destination: PRIVATE_SHELL },
@@ -168,6 +172,7 @@ export const NOINDEX_HEADER_SOURCES = [
   "/dev/invoice-template",
   "/dev/invoice-template/",
   ...RE75_PREVIEW_SOURCES.flatMap((source) => [source, `${source}/`]),
+  ...HEADSHOT_PREVIEW_SOURCES.flatMap((source) => [source, `${source}/`]),
 ];
 
 export function buildVercelHeaders(): HeaderRule[] {

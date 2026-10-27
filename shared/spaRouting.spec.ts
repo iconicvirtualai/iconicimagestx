@@ -178,6 +178,16 @@ describe("spa rewrite coverage", () => {
       "/realestate-75/samples/",
       "/realestate-75/how-it-works",
       "/realestate-75/how-it-works/",
+      "/headshots-10",
+      "/headshots-10/",
+      "/headshots-10/book",
+      "/headshots-10/book/",
+      "/headshots-10/how-it-works",
+      "/headshots-10/how-it-works/",
+      "/headshots-10/faq",
+      "/headshots-10/faq/",
+      "/headshots-10/location",
+      "/headshots-10/location/",
     ]);
     for (const rule of vercel.headers) {
       expect(rule.headers).toEqual([{ key: "X-Robots-Tag", value: "noindex, nofollow" }]);
