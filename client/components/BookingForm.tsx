@@ -49,6 +49,7 @@ import {
 } from "@shared/lifeOfTheListingCare";
 import ServiceLocationField from "@/components/ServiceLocationField";
 import { BookingSlotPicker, type BookingSlotChoice } from "@/components/BookingSlotPicker";
+import { cleanBookingSlots, suggestedFromAvailability } from "@/components/SuggestedAppointments";
 import type { PickedServiceLocation } from "@shared/serviceLocation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -212,6 +213,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
   const [catalog, setCatalog] = useState<StaffCatalogPackage[]>(() => packagesForStaffEditor([]));
   const [photographerChoices, setPhotographerChoices] = useState<Array<{ id: string; name: string }>>([]);
   const [slotChoices, setSlotChoices] = useState<BookingSlotChoice[]>([]);
+  const [suggestions, setSuggestions] = useState<BookingSlotChoice[]>([]);
   const [slotsLive, setSlotsLive] = useState(false);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [slotsChecked, setSlotsChecked] = useState(false);
@@ -297,9 +299,10 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
       .then((data) => {
         if (cancelled) return;
         const live = Boolean(data?.live);
-        const slots = live && Array.isArray(data?.slots) ? data.slots as BookingSlotChoice[] : [];
+        const slots = live && Array.isArray(data?.slots) ? cleanBookingSlots(data.slots as BookingSlotChoice[]) : [];
         setSlotsLive(live);
-        setSlotChoices(slots.filter((slot) => slot?.start && slot?.time && !String(slot.photographerName || "").includes("@")));
+        setSlotChoices(slots);
+        setSuggestions(suggestedFromAvailability({ ...data, slots }));
         setSlotsChecked(true);
         setFormData((prev) => (
           prev.slotStart && slots.some((slot) => slot.start === prev.slotStart)
@@ -311,6 +314,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
         if (cancelled) return;
         setSlotsLive(false);
         setSlotChoices([]);
+        setSuggestions([]);
         setSlotsChecked(true);
       })
       .finally(() => {
@@ -320,6 +324,19 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
       cancelled = true;
     };
   }, [step, bookingAddress, formData.photographerId, formData.selectedService, formData.selectedBasics]);
+
+  // The site header is fixed. Keep the active step below it, or the scheduling
+  // row stays under the nav (desktop) or above the viewport (phone) after Next.
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      const card = document.querySelector<HTMLElement>("[data-testid='booking-step']");
+      if (!card || typeof window.scrollTo !== "function") return;
+      const chrome = document.querySelector("header")?.getBoundingClientRect().bottom ?? 0;
+      const top = card.getBoundingClientRect().top + window.scrollY - chrome - 16;
+      window.scrollTo({ top: Math.max(0, top) });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [step]);
 
   // Check for pre-filled service from pricing page or props
   useEffect(() => {
@@ -1370,6 +1387,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
                {(slotsLive || !slotsChecked || slotsLoading) ? (
                  <BookingSlotPicker
                    slots={slotsLive ? slotChoices : []}
+                   suggestions={slotsLive ? suggestions : []}
                    selectedStart={formData.slotStart}
                    loading={slotsLoading || !slotsChecked}
                    showPhotographer={formData.photographerId === NO_PREFERENCE.id}
@@ -1752,7 +1770,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
               })}
            </div>
 
-           <div className="min-h-[550px] bg-white text-neutral-950 rounded-[3rem] border border-gray-50 p-10 shadow-sm relative overflow-hidden">
+           <div data-testid="booking-step" className="min-h-[550px] bg-white text-neutral-950 rounded-[3rem] border border-gray-50 p-10 shadow-sm relative overflow-hidden">
               <div className="absolute top-0 right-0 p-10 opacity-[0.01] pointer-events-none">
                  <Sparkles className="w-80 h-80" />
               </div>

@@ -376,7 +376,7 @@ export default function Apprenticeship() {
             {error && <p className="text-sm font-medium text-red-700" role="alert">{error}</p>}
             {savedOrder && (
               <p data-testid="apprenticeship-saved" className="text-base font-semibold">
-                Order {savedOrder} is saved. {APPRENTICESHIP_BOOKING_FEE_LINE}. {APPRENTICESHIP_BALANCE_LINE}
+                Order {savedOrder} is held for 60 minutes until the $25 booking fee is paid. {APPRENTICESHIP_BOOKING_FEE_LINE}. {APPRENTICESHIP_BALANCE_LINE}
               </p>
             )}
 

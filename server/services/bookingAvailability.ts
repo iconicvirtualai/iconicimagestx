@@ -24,6 +24,7 @@ import {
   type PhotographerDay,
 } from "../../shared/bookingAvailability";
 import { bookingHoursFromEnv, type BookingHoursConfig } from "../../shared/bookingHours";
+import { suggestAppointmentTimes } from "../../shared/suggestedAppointments";
 import type { StaffCatalogPackage } from "../../shared/bookingCatalog";
 import {
   isRealEstate75Holiday,
@@ -45,6 +46,7 @@ const loggedUnreadable = new Set<string>();
 export interface BookingAvailabilityResult {
   live: boolean;
   slots: AssignedSlot[];
+  suggestions: AssignedSlot[];
   durationMinutes: number;
   bufferMinutes: number;
   /** routes when a Maps key is set; buffer when drive time cannot be asked. */
@@ -311,7 +313,7 @@ export async function readBookingAvailability(input: {
   const account = firebaseServiceAccount(env);
   const auth = calendarAuthFromAccount(account, env);
   if (!auth || !account) {
-    return { live: false, slots: [], durationMinutes, bufferMinutes, driveMode: apiKey ? "routes" : "buffer" };
+    return { live: false, slots: [], suggestions: [], durationMinutes, bufferMinutes, driveMode: apiKey ? "routes" : "buffer" };
   }
 
   const timeMin = new Date(now.getTime() - 18 * 60 * 60 * 1000).toISOString();
@@ -329,7 +331,7 @@ export async function readBookingAvailability(input: {
 
   const readable = days.filter((person) => person.events);
   if (!readable.length) {
-    return { live: false, slots: [], durationMinutes, bufferMinutes, driveMode: apiKey ? "routes" : "buffer" };
+    return { live: false, slots: [], suggestions: [], durationMinutes, bufferMinutes, driveMode: apiKey ? "routes" : "buffer" };
   }
 
   const preferred = preferenceId !== "no-preference"
@@ -354,6 +356,10 @@ export async function readBookingAvailability(input: {
     now: now.getTime(),
     fetchImpl: input.fetchImpl,
   });
+  const driveMinutes = (from: string, to: string, departAtMs: number) => {
+    const value = driveMap.get(driveCacheKey(from, to, departAtMs));
+    return value === undefined ? null : value;
+  };
   const assigned = assignPhotographerSlots({
     now,
     durationMinutes,
@@ -362,15 +368,26 @@ export async function readBookingAvailability(input: {
     bookingAddress: address,
     preferenceId,
     photographers: days,
-    driveMinutes: (from, to, departAtMs) => {
-      const value = driveMap.get(driveCacheKey(from, to, departAtMs));
-      return value === undefined ? null : value;
-    },
+    driveMinutes,
   });
   const slots = input.slotFilter ? assigned.slots.filter(input.slotFilter) : assigned.slots;
+  const suggestions = assigned.live
+    ? suggestAppointmentTimes({
+      now,
+      durationMinutes,
+      schedule,
+      bufferMinutes,
+      bookingAddress: address,
+      preferenceId,
+      photographers: days,
+      driveMinutes,
+      slots,
+    })
+    : [];
   return {
     live: assigned.live,
     slots,
+    suggestions,
     durationMinutes,
     bufferMinutes,
     driveMode: apiKey ? "routes" : "buffer",

@@ -38,7 +38,14 @@ export interface ApprenticeshipEventInput {
   packageName: string;
   slot: ApprenticeshipSlot;
   notes?: string;
+  /**
+   * Unpaid hold until the $25 booking fee is paid. The event stays opaque and
+   * confirmed so free/busy still blocks the slot; only the title and notes say HOLD.
+   */
+  hold?: boolean;
 }
+
+export const APPRENTICESHIP_HOLD_PREFIX = "HOLD · $25 fee due · ";
 
 interface ServiceAccount {
   client_email: string;
@@ -210,7 +217,7 @@ export async function createApprenticeshipEvent(
     calendarId: hours.calendarId,
     sendUpdates: "none",
     requestBody: {
-      summary: `Apprenticeship: ${booking.clientName}`,
+      summary: `${booking.hold ? APPRENTICESHIP_HOLD_PREFIX : ""}Apprenticeship: ${booking.clientName}`,
       location: booking.address,
       description: [
         `Order: ${booking.orderNumber}`,
@@ -218,7 +225,9 @@ export async function createApprenticeshipEvent(
         `Client: ${booking.clientName}`,
         `Email: ${booking.clientEmail}`,
         `Phone: ${booking.clientPhone}`,
-        "Booking fee: $25, credited toward the package",
+        booking.hold
+          ? "Booking fee: $25 NOT PAID YET. Hold until the Square payment lands."
+          : "Booking fee: $25, credited toward the package",
         "Balance invoiced after the shoot",
         booking.notes ? `Notes: ${booking.notes}` : "",
       ].filter(Boolean).join("\n"),
@@ -237,4 +246,60 @@ export async function createApprenticeshipEvent(
     eventId: response.data.id || null,
     htmlLink: response.data.htmlLink || null,
   };
+}
+
+/**
+ * Called after the $25 booking fee is recorded. Drops the HOLD title and marks
+ * the fee paid in the event notes. Best effort: returns false when the calendar is not reachable.
+ */
+export async function confirmApprenticeshipEvent(
+  input: { calendarId?: string | null; eventId: string; orderNumber?: string },
+  env: Record<string, string | undefined> = process.env,
+): Promise<boolean> {
+  const account = firebaseServiceAccount(env);
+  const auth = calendarAuthFromAccount(account, env);
+  if (!auth || !input.eventId) return false;
+  const hours = apprenticeshipHoursFromEnv(env);
+  const calendarId = input.calendarId || hours.calendarId;
+  const calendar = google.calendar({ version: "v3", auth });
+  const current = await calendar.events.get({ calendarId, eventId: input.eventId });
+  const summary = String(current.data.summary || "").replace(APPRENTICESHIP_HOLD_PREFIX, "");
+  const description = String(current.data.description || "").replace(
+    "Booking fee: $25 NOT PAID YET. Hold until the Square payment lands.",
+    "Booking fee: $25 PAID, credited toward the package",
+  );
+  await calendar.events.patch({
+    calendarId,
+    eventId: input.eventId,
+    sendUpdates: "none",
+    requestBody: { summary, description },
+  });
+  return true;
+}
+
+/**
+ * Deletes an unpaid HOLD so the slot opens again. A missing event counts as deleted.
+ * Returns false when the calendar is not reachable.
+ */
+export async function deleteApprenticeshipEvent(
+  input: { calendarId?: string | null; eventId: string },
+  env: Record<string, string | undefined> = process.env,
+): Promise<boolean> {
+  const account = firebaseServiceAccount(env);
+  const auth = calendarAuthFromAccount(account, env);
+  if (!auth || !input.eventId) return false;
+  const hours = apprenticeshipHoursFromEnv(env);
+  const calendar = google.calendar({ version: "v3", auth });
+  try {
+    await calendar.events.delete({
+      calendarId: input.calendarId || hours.calendarId,
+      eventId: input.eventId,
+      sendUpdates: "none",
+    });
+  } catch (error) {
+    const code = Number((error as { code?: unknown })?.code ?? (error as { status?: unknown })?.status);
+    if (code === 404 || code === 410) return true;
+    throw error;
+  }
+  return true;
 }

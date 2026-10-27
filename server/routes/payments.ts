@@ -7,7 +7,6 @@
 import { Router, type Request, type Response } from "express";
 import Stripe from "stripe";
 import admin from "firebase-admin";
-import crypto from "crypto";
 import { requireCoordinator, requireAuth, type AuthenticatedRequest } from "../middleware/auth";
 import { appFirestore } from "../lib/appFirestore";
 import { sendEmail, type EmailDelivery } from "../services/email";
@@ -37,7 +36,20 @@ import { isTempAdminEnabled, liveServerEnv } from "../../shared/tempAdmin";
 import { payTokenMatches } from "../lib/payToken";
 import { resolveClientIdentity } from "../services/clientAccounts";
 import { matchSquarePaymentInvoice } from "../services/squarePaymentMatch";
-import { APPRENTICESHIP_ORDER_SOURCE, apprenticeshipBookingReturnPath } from "../../shared/apprenticeship";
+import {
+  readSquareWebhookRawBody,
+  squareWebhookNotificationUrls,
+  squareWebhookSignatureValid,
+} from "../services/squareWebhook";
+import {
+  APPRENTICESHIP_AWAITING_DEPOSIT_STATUS,
+  APPRENTICESHIP_EXPIRED_STATUS,
+  APPRENTICESHIP_HOLD_MINUTES,
+  APPRENTICESHIP_ORDER_SOURCE,
+  apprenticeshipBookingReturnPath,
+} from "../../shared/apprenticeship";
+import { confirmApprenticeshipEvent } from "../services/apprenticeshipCalendar";
+import { resolveLateApprenticeshipPayment } from "../services/apprenticeshipHolds";
 import { seniorDepositCheckoutLive, seniorLivingDepositReturnPath } from "../../shared/seniorLiving";
 
 const router = Router();
@@ -563,6 +575,8 @@ async function applyDepositPayment({
     paymentKey ? `square-${paymentKey}` : `deposit-${invoiceId}`,
   );
 
+  let confirmEvent: { calendarId: string | null; eventId: string; orderNumber: string } | null = null;
+  let lateApprenticeOrderId = "";
   await db().runTransaction(async (tx) => {
     const invoiceSnap = await tx.get(invoiceRef);
     if (!invoiceSnap.exists) return;
@@ -601,16 +615,40 @@ async function applyDepositPayment({
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
     if (orderRef && orderSnap?.exists) {
+      const order = (orderSnap.data() || {}) as Record<string, unknown>;
+      // Apprentice bookings are only confirmed once the $25 booking fee lands.
+      const confirmsBooking = order.source === APPRENTICESHIP_ORDER_SOURCE
+        && order.status === APPRENTICESHIP_AWAITING_DEPOSIT_STATUS;
+      // Paid after the 60-minute hold expired: re-confirm only if the time is still open.
+      if (order.source === APPRENTICESHIP_ORDER_SOURCE && order.status === APPRENTICESHIP_EXPIRED_STATUS && orderId) {
+        lateApprenticeOrderId = orderId;
+      }
       tx.update(orderRef, {
         depositPaid,
         balanceDue: amountDue,
         paymentStatus: amountDue <= 0 ? "paid" : "partial",
+        ...(confirmsBooking
+          ? {
+            status: "confirmed",
+            depositStatus: "paid",
+            confirmedAt: admin.firestore.FieldValue.serverTimestamp(),
+          }
+          : {}),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
+      if (confirmsBooking && typeof order.calendarEventId === "string" && order.calendarEventId) {
+        confirmEvent = {
+          calendarId: typeof order.calendarId === "string" ? order.calendarId : null,
+          eventId: order.calendarEventId,
+          orderNumber: String(order.orderNumber || ""),
+        };
+      }
     }
     if (requestRef && requestSnap?.exists) {
+      const request = (requestSnap.data() || {}) as Record<string, unknown>;
       tx.update(requestRef, {
         depositPaid,
+        ...(request.source === APPRENTICESHIP_ORDER_SOURCE ? { depositStatus: "paid" } : {}),
         balanceDue: amountDue,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
@@ -631,6 +669,23 @@ async function applyDepositPayment({
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
   });
+
+  if (lateApprenticeOrderId) {
+    try {
+      await resolveLateApprenticeshipPayment(lateApprenticeOrderId);
+    } catch (error) {
+      console.error("[Payments] Late apprenticeship payment follow-up failed:", error);
+    }
+  }
+
+  const held = confirmEvent as { calendarId: string | null; eventId: string; orderNumber: string } | null;
+  if (held) {
+    try {
+      await confirmApprenticeshipEvent(held);
+    } catch (error) {
+      console.error("[Payments] Apprenticeship calendar confirm failed:", error);
+    }
+  }
 }
 
 // Legacy/private Stripe intent route. Keep this available for Studio Noir tools only.
@@ -1041,6 +1096,11 @@ router.post("/invoice/:id/deposit-checkout", async (req: Request, res: Response)
     if (alreadyPaid) {
       return res.status(409).json({ error: "The deposit is already paid." });
     }
+    if (orderSource === APPRENTICESHIP_ORDER_SOURCE && order.status === APPRENTICESHIP_EXPIRED_STATUS) {
+      return res.status(409).json({
+        error: `This hold expired after ${APPRENTICESHIP_HOLD_MINUTES} minutes without the $25 booking fee. Please book a new time.`,
+      });
+    }
     if (String(invoice.status || "draft") !== "draft") {
       return res.status(409).json({ error: "The deposit can only be paid while the invoice is a draft." });
     }
@@ -1086,7 +1146,7 @@ router.post("/invoice/:id/deposit-checkout", async (req: Request, res: Response)
         checkout_options: {
           redirect_url: `${appUrl()}${
             orderSource === APPRENTICESHIP_ORDER_SOURCE
-              ? apprenticeshipBookingReturnPath(orderNumber)
+              ? apprenticeshipBookingReturnPath(orderNumber, invoice.depositReturn)
               : seniorLivingDepositReturnPath(orderNumber)
           }`,
         },
@@ -1161,27 +1221,23 @@ router.post("/webhook", async (req: Request, res: Response) => {
   }
 });
 
-function squareNotificationUrls(): string[] {
-  const explicit = process.env.SQUARE_WEBHOOK_NOTIFICATION_URL;
-  const urls = [
-    explicit,
-    `${appUrl()}/api/payments/square-webhook`,
-    process.env.FRONTEND_URL
-      ? `${process.env.FRONTEND_URL.replace(/\/$/, "")}/api/payments/square-webhook`
-      : "",
-  ].filter((url): url is string => Boolean(url));
-  return [...new Set(urls)];
+function squareWebhookRequestPath(req: Request): string {
+  const raw = req.originalUrl || req.url || req.path || "";
+  return raw.split("?")[0];
 }
 
-function squareSignatureValid(rawBody: string, received: string | undefined, key: string): boolean {
-  if (!received) return false;
-  const receivedBuf = Buffer.from(received);
-  return squareNotificationUrls().some((url) => {
-    const expected = crypto.createHmac("sha256", key).update(url + rawBody).digest("base64");
-    const expectedBuf = Buffer.from(expected);
-    if (expectedBuf.length !== receivedBuf.length) return false;
-    return crypto.timingSafeEqual(expectedBuf, receivedBuf);
-  });
+function squareSignatureHeader(req: Request): string | undefined {
+  const header = req.headers["x-square-hmacsha256-signature"];
+  return Array.isArray(header) ? header[0] : header;
+}
+
+function squareSignatureValid(
+  rawBody: string,
+  received: string | undefined,
+  key: string,
+  urls: string[] = squareWebhookNotificationUrls(),
+): boolean {
+  return urls.some((url) => squareWebhookSignatureValid(rawBody, received, key, url));
 }
 
 async function findInvoiceForSquarePayment(payment: Record<string, unknown>) {
@@ -1205,19 +1261,33 @@ async function findInvoiceForSquarePayment(payment: Record<string, unknown>) {
 
 router.post("/square-webhook", async (req: Request, res: Response) => {
   try {
-    const rawBody = Buffer.isBuffer(req.body)
-      ? req.body.toString("utf8")
-      : JSON.stringify(req.body || {});
     const signatureKey = process.env.SQUARE_WEBHOOK_SIGNATURE_KEY;
     if (!signatureKey) {
       console.error("[Payments] Square webhook rejected: SQUARE_WEBHOOK_SIGNATURE_KEY is not set.");
       return res.status(401).json({ error: "Square webhook signature key is not configured." });
     }
 
-    const received = Array.isArray(req.headers["x-square-hmacsha256-signature"])
-      ? req.headers["x-square-hmacsha256-signature"][0]
-      : req.headers["x-square-hmacsha256-signature"];
-    if (!squareSignatureValid(rawBody, received, signatureKey)) {
+    const received = squareSignatureHeader(req);
+    const rawBody = await readSquareWebhookRawBody(req);
+    if (rawBody === null) {
+      console.error("[Payments] Square webhook rejected: raw request body is unavailable.", {
+        path: squareWebhookRequestPath(req),
+        signatureHeaderPresent: Boolean(received),
+        bodyIsBuffer: Buffer.isBuffer(req.body),
+        bodyType: req.body === null ? "null" : typeof req.body,
+      });
+      return res.status(400).json({ error: "Square webhook raw body is unavailable." });
+    }
+
+    const candidateUrls = squareWebhookNotificationUrls();
+    if (!squareSignatureValid(rawBody, received, signatureKey, candidateUrls)) {
+      console.warn("[Payments] Square webhook signature rejected.", {
+        path: squareWebhookRequestPath(req),
+        signatureHeaderPresent: Boolean(received),
+        bodyLength: Buffer.isBuffer(req.body) ? req.body.length : Buffer.byteLength(rawBody),
+        bodyIsBuffer: Buffer.isBuffer(req.body),
+        candidateUrls,
+      });
       return res.status(400).json({ error: "Invalid Square webhook signature." });
     }
 

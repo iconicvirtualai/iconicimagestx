@@ -2226,7 +2226,7 @@ function narrowGatedClientRecipients(input, env = process.env) {
     held
   };
 }
-const db$w = () => admin.firestore();
+const db$x = () => admin.firestore();
 class EmailNotConfiguredError extends Error {
   code = "email_not_configured";
   constructor() {
@@ -2282,7 +2282,7 @@ async function sendEmail(options) {
   let textBody = options.text;
   try {
     if (admin.apps.length) {
-      const templateDoc = await db$w().collection(EMAIL_TEMPLATES_COLLECTION).doc(template).get();
+      const templateDoc = await db$x().collection(EMAIL_TEMPLATES_COLLECTION).doc(template).get();
       const override = templateDoc.exists ? readEmailTemplateOverride(templateDoc.data()) : null;
       if (override && !(lockHtml && html)) {
         subject = fillEmailPlaceholders(override.subject, variables);
@@ -4221,17 +4221,17 @@ async function listCalendarScheduleEvents({
   const readFailures = results.filter((result) => result.status === "rejected").length;
   return { configured: true, events, readFailures };
 }
-const db$v = () => admin.firestore();
+const db$w = () => admin.firestore();
 async function upsertPortalClient(input) {
   const email = normalizeEmail$1(input.email);
   const firstName = cleanPersonName(input.firstName);
   const lastName = cleanPersonName(input.lastName);
   const phone = String(input.phone || "").trim().slice(0, 40);
   const now = admin.firestore.FieldValue.serverTimestamp();
-  const existing = email ? await db$v().collection("clients").where("email", "==", email).limit(5).get() : null;
+  const existing = email ? await db$w().collection("clients").where("email", "==", email).limit(5).get() : null;
   const linked = existing?.docs.find((doc) => doc.id !== input.uid);
   const linkedData = linked?.data() || {};
-  const uidRef = db$v().collection("clients").doc(input.uid);
+  const uidRef = db$w().collection("clients").doc(input.uid);
   const uidSnap = await uidRef.get();
   const previous = uidSnap.exists ? uidSnap.data() || {} : {};
   await uidRef.set({
@@ -4263,7 +4263,7 @@ async function upsertPortalClient(input) {
 }
 async function resolveClientIdentity(uid, email) {
   const ids = /* @__PURE__ */ new Set([uid]);
-  const direct = await db$v().collection("clients").doc(uid).get();
+  const direct = await db$w().collection("clients").doc(uid).get();
   let profile = direct.exists ? { id: direct.id, ...direct.data() } : null;
   const redirectId = typeof profile?._redirect === "string" ? profile._redirect : "";
   if (redirectId) ids.add(redirectId);
@@ -4271,14 +4271,14 @@ async function resolveClientIdentity(uid, email) {
   if (linkedId) ids.add(linkedId);
   const normalized = normalizeEmail$1(email || profile?.email);
   if (normalized) {
-    const matches = await db$v().collection("clients").where("email", "==", normalized).limit(10).get();
+    const matches = await db$w().collection("clients").where("email", "==", normalized).limit(10).get();
     for (const doc of matches.docs) {
       ids.add(doc.id);
       if (!profile) profile = { id: doc.id, ...doc.data() };
     }
   }
   if (redirectId && profile && !profile.email) {
-    const real = await db$v().collection("clients").doc(redirectId).get();
+    const real = await db$w().collection("clients").doc(redirectId).get();
     if (real.exists) profile = { id: real.id, ...real.data(), portalDocId: uid };
   }
   return { ids: [...ids], profile, email: normalized };
@@ -4307,7 +4307,7 @@ function planBookingAccount(input) {
     skipReason: null
   };
 }
-const db$u = () => admin.firestore();
+const db$v = () => admin.firestore();
 async function attachBookingClient(input) {
   const email = normalizeEmail$1(input.email);
   if (!email || !email.includes("@")) {
@@ -4316,7 +4316,7 @@ async function attachBookingClient(input) {
   const firstName = cleanPersonName(input.firstName) || "Client";
   const lastName = cleanPersonName(input.lastName);
   const phone = String(input.phone || "").trim().slice(0, 40);
-  const staffHit = await db$u().collection("staff").where("email", "==", email).limit(1).get();
+  const staffHit = await db$v().collection("staff").where("email", "==", email).limit(1).get();
   let authUid = null;
   if (staffHit.empty) {
     try {
@@ -4398,7 +4398,7 @@ async function sendFirebasePasswordEmail(email) {
 }
 async function createRequestedAppointment(input) {
   const now = admin.firestore.FieldValue.serverTimestamp();
-  await db$u().collection("appointments").add({
+  await db$v().collection("appointments").add({
     orderRequestId: input.orderRequestId,
     clientId: input.clientId,
     clientName: input.clientName,
@@ -4994,7 +4994,7 @@ function visibleToPortalClient(record2, identity) {
   if (!email) return false;
   return [record2.email, record2.clientEmail].some((value) => normalizeEmail$1(value) === email);
 }
-const db$t = () => admin.firestore();
+const db$u = () => admin.firestore();
 const LINK_COLLECTIONS = /* @__PURE__ */ new Set([
   "orderRequests",
   "orders",
@@ -5015,7 +5015,7 @@ const LOCK_FIELDS = /* @__PURE__ */ new Set(["lockDownloads", "requirePayment", 
 async function ensureBookingListingForRequest(orderRequestId) {
   const id = orderRequestId.trim();
   if (!id) return null;
-  const snap = await db$t().collection("orderRequests").doc(id).get();
+  const snap = await db$u().collection("orderRequests").doc(id).get();
   if (!snap.exists) return null;
   const request = asDoc(snap.id, snap.data());
   const bundle = await hydrateBundle({
@@ -5069,7 +5069,7 @@ async function plansFor(bundle, identity) {
 }
 async function applyBookingListingPlan(plan) {
   if (!isPortalListingId(plan.listingId)) throw new Error("Listing id is not valid.");
-  const ref = db$t().collection("listings").doc(plan.listingId);
+  const ref = db$u().collection("listings").doc(plan.listingId);
   let created = false;
   if (plan.create) {
     try {
@@ -5105,7 +5105,7 @@ async function fillListing(ref, desired) {
 }
 async function linkRecord(collectionName, id, listingId) {
   if (!LINK_COLLECTIONS.has(collectionName) || !id) return;
-  const ref = db$t().collection(collectionName).doc(id);
+  const ref = db$u().collection(collectionName).doc(id);
   const snap = await ref.get();
   if (!snap.exists) return;
   if (text$l(snap.data()?.listingId) === listingId) return;
@@ -5257,7 +5257,7 @@ async function followInvoiceRedirects(invoices) {
 async function readMissing(collectionName, ids, into) {
   const missing = [...ids].filter((id) => id && !into.has(id)).slice(0, 100);
   if (missing.length === 0) return;
-  const snaps = await db$t().getAll(...missing.map((id) => db$t().collection(collectionName).doc(id)));
+  const snaps = await db$u().getAll(...missing.map((id) => db$u().collection(collectionName).doc(id)));
   snaps.forEach((snap) => {
     if (!snap.exists || into.has(snap.id)) return;
     into.set(snap.id, asDoc(snap.id, snap.data()));
@@ -5267,14 +5267,14 @@ async function queryIn(collectionName, field, values) {
   const unique2 = [...new Set(values.map((value) => value.trim()).filter(Boolean))];
   const docs = [];
   for (const part of chunk$1(unique2, 30)) {
-    const snap = await db$t().collection(collectionName).where(field, "in", part).limit(100).get();
+    const snap = await db$u().collection(collectionName).where(field, "in", part).limit(100).get();
     snap.docs.forEach((doc) => docs.push(asDoc(doc.id, doc.data())));
   }
   return docs;
 }
 async function queryEqual(collectionName, field, value) {
   if (!value) return [];
-  const snap = await db$t().collection(collectionName).where(field, "==", value).limit(100).get();
+  const snap = await db$u().collection(collectionName).where(field, "==", value).limit(100).get();
   return snap.docs.map((doc) => asDoc(doc.id, doc.data()));
 }
 function mergeDocs(into, docs) {
@@ -5408,13 +5408,13 @@ function preferenceName(id) {
   if (id === NO_PREFERENCE_ID) return NO_PREFERENCE_NAME;
   return bookingPhotographerById(id)?.name || NO_PREFERENCE_NAME;
 }
-const db$s = () => admin.firestore();
+const db$t = () => admin.firestore();
 async function assignBookingPhotographerToListing(listingId, request) {
   const id = listingId.trim();
   const publicId = typeof request.bookingPhotographerId === "string" ? request.bookingPhotographerId.trim() : "";
   if (!id || !publicId) return { uid: null, publicId };
   const person = bookingPhotographerById(publicId);
-  const staffSnap = await db$s().collection("staff").limit(200).get();
+  const staffSnap = await db$t().collection("staff").limit(200).get();
   const staff = staffSnap.docs.map((doc) => {
     const data = doc.data() || {};
     return {
@@ -5432,7 +5432,7 @@ async function assignBookingPhotographerToListing(listingId, request) {
   });
   const patch = listingPhotographerAssignment(resolved);
   if (!patch) return { uid: null, publicId };
-  await db$s().collection("listings").doc(id).set({
+  await db$t().collection("listings").doc(id).set({
     ...patch,
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
   }, { merge: true });
@@ -6802,11 +6802,11 @@ async function createHolidaySquareCheckout(input) {
     squareOrderId: result.payment_link?.order_id
   };
 }
-const db$r = () => admin.firestore();
+const db$s = () => admin.firestore();
 async function holidayOrderSnaps() {
   const [rsvp, season] = await Promise.all([
-    db$r().collection("orderRequests").where("leadSource", "==", HOLIDAY_RSVP_LEAD).get(),
-    db$r().collection("orderRequests").where("leadSource", "==", HOLIDAY_SEASON_LEAD).get()
+    db$s().collection("orderRequests").where("leadSource", "==", HOLIDAY_RSVP_LEAD).get(),
+    db$s().collection("orderRequests").where("leadSource", "==", HOLIDAY_SEASON_LEAD).get()
   ]);
   const byId = /* @__PURE__ */ new Map();
   for (const doc of [...rsvp.docs, ...season.docs]) {
@@ -6946,15 +6946,415 @@ function refuseQaStaffPhone(input) {
   if (!match) return null;
   return refusal(qaStaffAssignmentError([match], input.record));
 }
+const STEVEN_BANDA_ID = "steven-banda";
+const SATURDAY_LATEST_START_MINUTES = 12 * 60;
+const STEVEN_FINISH_MINUTES = 17 * 60;
+function bookingHoursFromEnv(env = typeof process !== "undefined" ? process.env : {}) {
+  const base = apprenticeshipHoursFromEnv(env);
+  return bookingHoursFromWindow({
+    timeZone: base.timeZone,
+    horizonDays: base.horizonDays,
+    startMinutes: base.startMinutes,
+    endMinutes: base.endMinutes
+  });
+}
+function bookingHoursFromWindow(window) {
+  const weekday = {
+    startMinutes: window.startMinutes,
+    endMinutes: window.endMinutes
+  };
+  const saturday = {
+    ...weekday,
+    latestStartMinutes: SATURDAY_LATEST_START_MINUTES
+  };
+  const company = {
+    timeZone: window.timeZone,
+    horizonDays: window.horizonDays,
+    days: [null, weekday, weekday, weekday, weekday, weekday, saturday]
+  };
+  const stevenDay = STEVEN_FINISH_MINUTES > window.startMinutes ? { startMinutes: window.startMinutes, endMinutes: STEVEN_FINISH_MINUTES } : null;
+  return {
+    company,
+    photographers: {
+      [STEVEN_BANDA_ID]: {
+        timeZone: window.timeZone,
+        horizonDays: window.horizonDays,
+        days: [stevenDay, stevenDay, stevenDay, stevenDay, stevenDay, stevenDay, stevenDay]
+      }
+    }
+  };
+}
+function weekForPhotographer(config, photographerId) {
+  return config.photographers[photographerId] ?? config.company;
+}
+const WEEKDAY$1 = {
+  Sun: 0,
+  Mon: 1,
+  Tue: 2,
+  Wed: 3,
+  Thu: 4,
+  Fri: 5,
+  Sat: 6
+};
+function zonedParts$1(date, timeZone) {
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    weekday: "short",
+    hourCycle: "h23"
+  });
+  const parts = Object.fromEntries(fmt.formatToParts(date).map((part) => [part.type, part.value]));
+  return {
+    year: Number(parts.year),
+    month: Number(parts.month),
+    day: Number(parts.day),
+    hour: Number(parts.hour) % 24,
+    minute: Number(parts.minute),
+    weekday: WEEKDAY$1[parts.weekday] ?? 0
+  };
+}
+function addCalendarDays$1(year, month, day, add) {
+  const next = new Date(Date.UTC(year, month - 1, day + add));
+  return {
+    year: next.getUTCFullYear(),
+    month: next.getUTCMonth() + 1,
+    day: next.getUTCDate(),
+    weekday: next.getUTCDay()
+  };
+}
+function clockLabel$1(minutes) {
+  const hour24 = Math.floor(minutes / 60);
+  const minute = minutes % 60;
+  const suffix = hour24 >= 12 ? "PM" : "AM";
+  const hour12 = hour24 % 12 || 12;
+  return `${hour12}:${String(minute).padStart(2, "0")} ${suffix}`;
+}
+function dayLabel$1(year, month, day, timeZone) {
+  const instant = zonedTimeToUtc(year, month, day, 12, 0, timeZone);
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    weekday: "short",
+    month: "short",
+    day: "numeric"
+  }).format(instant);
+}
+function overlaps$1(start, end, busy) {
+  return busy.some((block2) => start < block2.end && end > block2.start);
+}
+function openBookingSlots(input) {
+  const duration = input.durationMinutes;
+  if (!Number.isFinite(duration) || duration <= 0) return [];
+  const busy = input.busy.map((block2) => ({ start: Date.parse(block2.start), end: Date.parse(block2.end) })).filter((block2) => Number.isFinite(block2.start) && Number.isFinite(block2.end) && block2.end > block2.start);
+  const today = zonedParts$1(input.now, input.week.timeZone);
+  const slots = [];
+  for (let offset = 0; offset < input.week.horizonDays; offset += 1) {
+    const date = addCalendarDays$1(today.year, today.month, today.day, offset);
+    const day = input.week.days[date.weekday] ?? null;
+    if (!day) continue;
+    const latestStart = day.latestStartMinutes ?? Number.POSITIVE_INFINITY;
+    for (let minute = day.startMinutes; minute + duration <= day.endMinutes; minute += duration) {
+      if (minute >= latestStart) continue;
+      const start = zonedTimeToUtc(
+        date.year,
+        date.month,
+        date.day,
+        Math.floor(minute / 60),
+        minute % 60,
+        input.week.timeZone
+      );
+      const end = new Date(start.getTime() + duration * 60 * 1e3);
+      if (start.getTime() <= input.now.getTime()) continue;
+      if (overlaps$1(start.getTime(), end.getTime(), busy)) continue;
+      const dateKey2 = `${date.year}-${String(date.month).padStart(2, "0")}-${String(date.day).padStart(2, "0")}`;
+      const time = clockLabel$1(minute);
+      slots.push({
+        start: start.toISOString(),
+        end: end.toISOString(),
+        date: dateKey2,
+        time,
+        label: `${dayLabel$1(date.year, date.month, date.day, input.week.timeZone)} · ${time}`
+      });
+    }
+  }
+  return slots;
+}
+const RE75_LEAD_SOURCE = "Real Estate $75 apprentice (Google Ads)";
+const RE75_PACKAGES = [
+  {
+    id: "apprentice-25",
+    name: "Apprentice 25 / $75",
+    photos: 25,
+    durationMinutes: 20,
+    subtotal: 75,
+    nudge: null
+  },
+  {
+    id: "apprentice-50",
+    name: "Apprentice 50 / $125",
+    photos: 50,
+    durationMinutes: 60,
+    subtotal: 125,
+    nudge: "More rooms? Go 50."
+  }
+];
+const RE75_DURATION_MINUTES = 20;
+const RE75_TIME_ZONE = "America/Chicago";
+const RE75_HORIZON_DAYS = 14;
+const RE75_OUTSIDE_MESSAGE = "Call us 281.356.0965";
+const RE75_TIME_MESSAGE = "Choose a weekday or Saturday morning. Sunday is closed, and Saturday shoots start before noon.";
+function isRealEstate75PackageId(value) {
+  return value === "apprentice-25" || value === "apprentice-50";
+}
+function realEstate75Package(value) {
+  return RE75_PACKAGES.find((item) => item.id === value) ?? RE75_PACKAGES[0];
+}
+const WEEKDAY_START = 8 * 60;
+const WEEKDAY_END = 17 * 60;
+const SATURDAY_START = 9 * 60;
+const SATURDAY_END = 12 * 60;
+const SATURDAY_LATEST_START = 12 * 60;
+const PLACES = [
+  { city: "The Woodlands", travelFee: "standard", zips: ["77380", "77381", "77382", "77384", "77385"] },
+  { city: "Spring", travelFee: "standard", zips: ["77373", "77379", "77386", "77388", "77389"] },
+  { city: "Conroe", travelFee: "standard", zips: ["77301", "77302", "77303", "77304", "77306"] },
+  { city: "Willis", travelFee: "tbd", zips: ["77318", "77378"] },
+  { city: "Cypress", travelFee: "tbd", zips: ["77410", "77429", "77433"] }
+];
+const ZIP_PLACES = /* @__PURE__ */ new Map();
+for (const place of PLACES) {
+  for (const zip of place.zips) ZIP_PLACES.set(zip, { city: place.city, travelFee: place.travelFee });
+}
+const CITY_PATTERNS = [
+  { pattern: /\bthe\s+woodlands\b/i, place: { city: "The Woodlands", travelFee: "standard" } },
+  { pattern: /\bcypress\b/i, place: { city: "Cypress", travelFee: "tbd" } },
+  { pattern: /\bwillis\b/i, place: { city: "Willis", travelFee: "tbd" } },
+  { pattern: /\bconroe\b/i, place: { city: "Conroe", travelFee: "standard" } },
+  { pattern: /\bspring\b/i, place: { city: "Spring", travelFee: "standard" } }
+];
+function extractZipCodes(value) {
+  return [...value.matchAll(/\b(\d{5})(?:-\d{4})?\b/g)].map((match) => match[1]);
+}
+function classifyRealEstate75Area(value) {
+  const text2 = value.trim();
+  const zips = extractZipCodes(text2);
+  if (zips.length) {
+    const zip = zips[zips.length - 1];
+    const place = ZIP_PLACES.get(zip);
+    if (!place) return { status: "outside", message: RE75_OUTSIDE_MESSAGE };
+    return { status: "inside", zip, city: place.city, travelFee: place.travelFee };
+  }
+  for (const candidate of CITY_PATTERNS) {
+    if (candidate.pattern.test(text2)) {
+      return { status: "inside", zip: null, city: candidate.place.city, travelFee: candidate.place.travelFee };
+    }
+  }
+  return { status: "outside", message: RE75_OUTSIDE_MESSAGE };
+}
+function quoteRealEstate75Travel(travel) {
+  return {
+    travelZone: null,
+    travelMiles: travel.travelMiles,
+    travelFeeCents: null,
+    travelQuoted: true
+  };
+}
+function realEstate75Week(horizonDays = RE75_HORIZON_DAYS) {
+  const weekday = { startMinutes: WEEKDAY_START, endMinutes: WEEKDAY_END };
+  const saturday = {
+    startMinutes: SATURDAY_START,
+    endMinutes: SATURDAY_END,
+    latestStartMinutes: SATURDAY_LATEST_START
+  };
+  return {
+    timeZone: RE75_TIME_ZONE,
+    horizonDays,
+    days: [null, weekday, weekday, weekday, weekday, weekday, saturday]
+  };
+}
+function isoDate(year, month, day) {
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+function shiftIso(year, month, day, delta) {
+  const next = new Date(Date.UTC(year, month - 1, day + delta));
+  return isoDate(next.getUTCFullYear(), next.getUTCMonth() + 1, next.getUTCDate());
+}
+function observedFixed(year, month, day) {
+  const dow = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+  const actual = isoDate(year, month, day);
+  if (dow === 6) return [actual, shiftIso(year, month, day, -1)];
+  if (dow === 0) return [actual, shiftIso(year, month, day, 1)];
+  return [actual];
+}
+function nthWeekday(year, month, weekday, n) {
+  const firstDow = new Date(Date.UTC(year, month - 1, 1)).getUTCDay();
+  const day = 1 + (weekday - firstDow + 7) % 7 + (n - 1) * 7;
+  return isoDate(year, month, day);
+}
+function lastWeekday(year, month, weekday) {
+  const last = new Date(Date.UTC(year, month, 0));
+  const day = last.getUTCDate() - (last.getUTCDay() - weekday + 7) % 7;
+  return isoDate(year, month, day);
+}
+const holidayYears = /* @__PURE__ */ new Map();
+function realEstate75HolidayDates(year) {
+  const cached = holidayYears.get(year);
+  if (cached) return cached;
+  const thanksgiving = nthWeekday(year, 11, 4, 4);
+  const [y, m, d] = thanksgiving.split("-").map(Number);
+  const dates = [
+    ...observedFixed(year, 1, 1),
+    nthWeekday(year, 1, 1, 3),
+    lastWeekday(year, 5, 1),
+    ...observedFixed(year, 6, 19),
+    ...observedFixed(year, 7, 4),
+    nthWeekday(year, 9, 1, 1),
+    thanksgiving,
+    shiftIso(y, m, d, 1),
+    ...observedFixed(year, 12, 25)
+  ];
+  const set = new Set(dates);
+  holidayYears.set(year, set);
+  return set;
+}
+function isRealEstate75Holiday(date) {
+  const match = date.match(/^(\d{4})-\d{2}-\d{2}$/);
+  if (!match) return false;
+  return realEstate75HolidayDates(Number(match[1])).has(date);
+}
+function openRealEstate75Slots(input) {
+  const week = realEstate75Week(input.horizonDays ?? RE75_HORIZON_DAYS);
+  const durationMinutes = input.durationMinutes && input.durationMinutes > 0 ? input.durationMinutes : RE75_DURATION_MINUTES;
+  return openBookingSlots({
+    now: input.now,
+    busy: input.busy ?? [],
+    durationMinutes,
+    week
+  }).filter((slot) => !isRealEstate75Holiday(slot.date));
+}
+function realEstate75OpenSchedule(input) {
+  const slots = openRealEstate75Slots({
+    now: input.now ?? /* @__PURE__ */ new Date(),
+    durationMinutes: input.durationMinutes,
+    horizonDays: input.horizonDays ?? RE75_HORIZON_DAYS
+  });
+  const groups = /* @__PURE__ */ new Map();
+  for (const slot of slots) {
+    const times = groups.get(slot.date) || [];
+    if (!times.includes(slot.time)) times.push(slot.time);
+    groups.set(slot.date, times);
+  }
+  return [...groups.entries()].map(([date, times]) => ({ date, times }));
+}
+const DATE_MONTHS = {
+  jan: 1,
+  january: 1,
+  feb: 2,
+  february: 2,
+  mar: 3,
+  march: 3,
+  apr: 4,
+  april: 4,
+  may: 5,
+  jun: 6,
+  june: 6,
+  jul: 7,
+  july: 7,
+  aug: 8,
+  august: 8,
+  sep: 9,
+  sept: 9,
+  september: 9,
+  oct: 10,
+  october: 10,
+  nov: 11,
+  november: 11,
+  dec: 12,
+  december: 12
+};
+function realEstate75DateKey(value) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+  const match = trimmed.match(/^(?:[A-Za-z]+,\s+)?([A-Za-z]+)\s+(\d{1,2}),\s+(\d{4})$/);
+  if (!match) return null;
+  const month = DATE_MONTHS[match[1].toLowerCase()];
+  const day = Number(match[2]);
+  const year = Number(match[3]);
+  if (!month || day < 1 || day > 31 || year < 2e3 || year > 2100) return null;
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+function realEstate75AppointmentChoice(input) {
+  const date = realEstate75DateKey(input.date);
+  if (!date || typeof input.time !== "string") return null;
+  const wanted = input.time.trim().toLowerCase().replace(/\s+/g, " ");
+  if (!wanted) return null;
+  const day = realEstate75OpenSchedule({
+    now: input.now,
+    durationMinutes: input.durationMinutes
+  }).find((entry2) => entry2.date === date);
+  const time = day?.times.find((choice) => choice.toLowerCase() === wanted) || null;
+  return time ? { date, time } : null;
+}
+function sanitizeGclid(value) {
+  if (typeof value !== "string") return "";
+  const trimmed = value.trim();
+  if (!/^[A-Za-z0-9._-]{1,200}$/.test(trimmed)) return "";
+  return trimmed;
+}
 const APPRENTICESHIP_ORDER_SOURCE = "apprenticeship";
 const APPRENTICESHIP_CALENDAR_ID = "steven@iconicimagestx.com";
 const APPRENTICESHIP_TIME_ZONE = "America/Chicago";
 const APPRENTICESHIP_BOOKING_FEE = 25;
 const APPRENTICESHIP_BOOKING_FEE_LINE = "Booking fee $25, credited toward your package";
 const APPRENTICESHIP_BALANCE_LINE = "The balance is invoiced after the shoot.";
+const APPRENTICESHIP_AWAITING_DEPOSIT_STATUS = "awaiting_deposit";
+const APPRENTICESHIP_HOLD_MINUTES = 60;
+const APPRENTICESHIP_EXPIRED_STATUS = "expired_unpaid";
+const APPRENTICESHIP_PAID_NEEDS_RESCHEDULE_STATUS = "paid_needs_reschedule";
+function apprenticeshipHoldExpiresAt(created, minutes = APPRENTICESHIP_HOLD_MINUTES) {
+  return new Date(created.getTime() + minutes * 60 * 1e3).toISOString();
+}
+function timeValue(value) {
+  if (!value) return null;
+  if (typeof value === "string" || typeof value === "number") {
+    const parsed = new Date(value).getTime();
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === "object" && value !== null && typeof value.toDate === "function") {
+    return value.toDate().getTime();
+  }
+  return null;
+}
+function apprenticeshipHoldExpired(order, now) {
+  if (order.source !== APPRENTICESHIP_ORDER_SOURCE) return false;
+  if (order.status !== APPRENTICESHIP_AWAITING_DEPOSIT_STATUS) return false;
+  if ((Number(order.depositPaid) || 0) > 0) return false;
+  const explicit = timeValue(order.holdExpiresAt);
+  const created = timeValue(order.createdAt);
+  const expires = explicit ?? (created == null ? null : created + APPRENTICESHIP_HOLD_MINUTES * 60 * 1e3);
+  return expires != null && expires <= now.getTime();
+}
+const APPRENTICESHIP_DEPOSIT_REQUIRED_LINE = "Your time is held for 60 minutes and confirmed once the $25 booking fee is paid.";
+const APPRENTICESHIP_RETURN_PAGES = ["apprenticeship", "realestate-75", "ordericonic"];
+const APPRENTICESHIP_LEAD_SOURCES = {
+  apprenticeship: "Apprenticeship page",
+  "realestate-75": RE75_LEAD_SOURCE,
+  ordericonic: "Order Now (apprentice)"
+};
+function apprenticeshipReturnPage(value) {
+  return APPRENTICESHIP_RETURN_PAGES.includes(String(value)) ? value : "apprenticeship";
+}
+function apprenticeshipLeadSource(page2) {
+  return APPRENTICESHIP_LEAD_SOURCES[apprenticeshipReturnPage(page2)];
+}
 const APPRENTICESHIP_CALENDAR_FALLBACK = "Open times are not listed right now. Call or email and we will set the appointment with you.";
 const APPRENTICESHIP_CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar";
-const WEEKDAY$1 = {
+const WEEKDAY = {
   Sun: 0,
   Mon: 1,
   Tue: 2,
@@ -7041,7 +7441,7 @@ function apprenticeshipCalendarSetupNote(input) {
   if (!input.missingCredentials) return share;
   return `Set FIREBASE_SERVICE_ACCOUNT to the Firebase service account JSON. ${share}`;
 }
-function zonedParts$1(date, timeZone) {
+function zonedParts(date, timeZone) {
   const fmt = new Intl.DateTimeFormat("en-US", {
     timeZone,
     year: "numeric",
@@ -7059,13 +7459,13 @@ function zonedParts$1(date, timeZone) {
     day: Number(parts.day),
     hour: Number(parts.hour) % 24,
     minute: Number(parts.minute),
-    weekday: WEEKDAY$1[parts.weekday] ?? 0
+    weekday: WEEKDAY[parts.weekday] ?? 0
   };
 }
 function zonedTimeToUtc(year, month, day, hour, minute, timeZone) {
   let utc = Date.UTC(year, month - 1, day, hour, minute, 0);
   for (let pass = 0; pass < 3; pass += 1) {
-    const parts = zonedParts$1(new Date(utc), timeZone);
+    const parts = zonedParts(new Date(utc), timeZone);
     const got = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, 0);
     const wanted = Date.UTC(year, month - 1, day, hour, minute, 0);
     const delta = wanted - got;
@@ -7074,7 +7474,7 @@ function zonedTimeToUtc(year, month, day, hour, minute, timeZone) {
   }
   return new Date(utc);
 }
-function addCalendarDays$1(year, month, day, add) {
+function addCalendarDays(year, month, day, add) {
   const next = new Date(Date.UTC(year, month - 1, day + add));
   return {
     year: next.getUTCFullYear(),
@@ -7083,14 +7483,14 @@ function addCalendarDays$1(year, month, day, add) {
     weekday: next.getUTCDay()
   };
 }
-function clockLabel$1(minutes) {
+function clockLabel(minutes) {
   const hour24 = Math.floor(minutes / 60);
   const minute = minutes % 60;
   const suffix = hour24 >= 12 ? "PM" : "AM";
   const hour12 = hour24 % 12 || 12;
   return `${hour12}:${String(minute).padStart(2, "0")} ${suffix}`;
 }
-function dayLabel$1(year, month, day, timeZone) {
+function dayLabel(year, month, day, timeZone) {
   const instant = zonedTimeToUtc(year, month, day, 12, 0, timeZone);
   return new Intl.DateTimeFormat("en-US", {
     timeZone,
@@ -7099,31 +7499,31 @@ function dayLabel$1(year, month, day, timeZone) {
     day: "numeric"
   }).format(instant);
 }
-function overlaps$1(start, end, busy) {
+function overlaps(start, end, busy) {
   return busy.some((block2) => start < block2.end && end > block2.start);
 }
 function openApprenticeshipSlots(input) {
   const duration = input.durationMinutes;
   if (!Number.isFinite(duration) || duration <= 0) return [];
   const busy = input.busy.map((block2) => ({ start: Date.parse(block2.start), end: Date.parse(block2.end) })).filter((block2) => Number.isFinite(block2.start) && Number.isFinite(block2.end) && block2.end > block2.start);
-  const today = zonedParts$1(input.now, input.hours.timeZone);
+  const today = zonedParts(input.now, input.hours.timeZone);
   const slots = [];
   for (let offset = 0; offset < input.hours.horizonDays; offset += 1) {
-    const date = addCalendarDays$1(today.year, today.month, today.day, offset);
+    const date = addCalendarDays(today.year, today.month, today.day, offset);
     if (!input.hours.days.includes(date.weekday)) continue;
     for (let minute = input.hours.startMinutes; minute + duration <= input.hours.endMinutes; minute += duration) {
       const start = zonedTimeToUtc(date.year, date.month, date.day, Math.floor(minute / 60), minute % 60, input.hours.timeZone);
       const end = new Date(start.getTime() + duration * 60 * 1e3);
       if (start.getTime() <= input.now.getTime()) continue;
-      if (overlaps$1(start.getTime(), end.getTime(), busy)) continue;
+      if (overlaps(start.getTime(), end.getTime(), busy)) continue;
       const dateKey2 = `${date.year}-${String(date.month).padStart(2, "0")}-${String(date.day).padStart(2, "0")}`;
-      const time = clockLabel$1(minute);
+      const time = clockLabel(minute);
       slots.push({
         start: start.toISOString(),
         end: end.toISOString(),
         date: dateKey2,
         time,
-        label: `${dayLabel$1(date.year, date.month, date.day, input.hours.timeZone)} · ${time}`
+        label: `${dayLabel(date.year, date.month, date.day, input.hours.timeZone)} · ${time}`
       });
     }
   }
@@ -7192,6 +7592,8 @@ function parseApprenticeshipOrder(body) {
   const packageId = text$d(raw.packageId);
   const slotStart = text$d(raw.slotStart);
   const preferredTime = text$d(raw.preferredTime);
+  const details = text$d(raw.details);
+  const gclid = text$d(raw.gclid);
   if (!isApprenticeshipPackage(packageId) || !findApprenticeshipPackage(packageId)) {
     return { ok: false, error: "Choose an apprenticeship package." };
   }
@@ -7204,6 +7606,7 @@ function parseApprenticeshipOrder(body) {
   if (address.length > 200) return { ok: false, error: "Address is too long." };
   if (slotStart && Number.isNaN(Date.parse(slotStart))) return { ok: false, error: "Choose an open time." };
   if (preferredTime.length > 160) return { ok: false, error: "Preferred time is too long." };
+  if (details.length > 600) return { ok: false, error: "Notes are too long." };
   return {
     ok: true,
     value: {
@@ -7214,152 +7617,22 @@ function parseApprenticeshipOrder(body) {
       phone,
       address,
       slotStart: slotStart || null,
-      preferredTime
+      preferredTime,
+      returnPage: apprenticeshipReturnPage(raw.returnPage),
+      details,
+      gclid: /^[A-Za-z0-9_-]{1,200}$/.test(gclid) ? gclid : ""
     }
   };
 }
-function apprenticeshipBookingReturnPath(orderNumber) {
+function apprenticeshipBookingReturnPath(orderNumber, page2) {
   const params = new URLSearchParams({
     booking: "received",
     order: orderNumber
   });
-  return `/apprenticeship?${params.toString()}`;
-}
-const STEVEN_BANDA_ID = "steven-banda";
-const SATURDAY_LATEST_START_MINUTES = 12 * 60;
-const STEVEN_FINISH_MINUTES = 17 * 60;
-function bookingHoursFromEnv(env = typeof process !== "undefined" ? process.env : {}) {
-  const base = apprenticeshipHoursFromEnv(env);
-  return bookingHoursFromWindow({
-    timeZone: base.timeZone,
-    horizonDays: base.horizonDays,
-    startMinutes: base.startMinutes,
-    endMinutes: base.endMinutes
-  });
-}
-function bookingHoursFromWindow(window) {
-  const weekday = {
-    startMinutes: window.startMinutes,
-    endMinutes: window.endMinutes
-  };
-  const saturday = {
-    ...weekday,
-    latestStartMinutes: SATURDAY_LATEST_START_MINUTES
-  };
-  const company = {
-    timeZone: window.timeZone,
-    horizonDays: window.horizonDays,
-    days: [null, weekday, weekday, weekday, weekday, weekday, saturday]
-  };
-  const stevenDay = STEVEN_FINISH_MINUTES > window.startMinutes ? { startMinutes: window.startMinutes, endMinutes: STEVEN_FINISH_MINUTES } : null;
-  return {
-    company,
-    photographers: {
-      [STEVEN_BANDA_ID]: {
-        timeZone: window.timeZone,
-        horizonDays: window.horizonDays,
-        days: [stevenDay, stevenDay, stevenDay, stevenDay, stevenDay, stevenDay, stevenDay]
-      }
-    }
-  };
-}
-function weekForPhotographer(config, photographerId) {
-  return config.photographers[photographerId] ?? config.company;
-}
-const WEEKDAY = {
-  Sun: 0,
-  Mon: 1,
-  Tue: 2,
-  Wed: 3,
-  Thu: 4,
-  Fri: 5,
-  Sat: 6
-};
-function zonedParts(date, timeZone) {
-  const fmt = new Intl.DateTimeFormat("en-US", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    weekday: "short",
-    hourCycle: "h23"
-  });
-  const parts = Object.fromEntries(fmt.formatToParts(date).map((part) => [part.type, part.value]));
-  return {
-    year: Number(parts.year),
-    month: Number(parts.month),
-    day: Number(parts.day),
-    hour: Number(parts.hour) % 24,
-    minute: Number(parts.minute),
-    weekday: WEEKDAY[parts.weekday] ?? 0
-  };
-}
-function addCalendarDays(year, month, day, add) {
-  const next = new Date(Date.UTC(year, month - 1, day + add));
-  return {
-    year: next.getUTCFullYear(),
-    month: next.getUTCMonth() + 1,
-    day: next.getUTCDate(),
-    weekday: next.getUTCDay()
-  };
-}
-function clockLabel(minutes) {
-  const hour24 = Math.floor(minutes / 60);
-  const minute = minutes % 60;
-  const suffix = hour24 >= 12 ? "PM" : "AM";
-  const hour12 = hour24 % 12 || 12;
-  return `${hour12}:${String(minute).padStart(2, "0")} ${suffix}`;
-}
-function dayLabel(year, month, day, timeZone) {
-  const instant = zonedTimeToUtc(year, month, day, 12, 0, timeZone);
-  return new Intl.DateTimeFormat("en-US", {
-    timeZone,
-    weekday: "short",
-    month: "short",
-    day: "numeric"
-  }).format(instant);
-}
-function overlaps(start, end, busy) {
-  return busy.some((block2) => start < block2.end && end > block2.start);
-}
-function openBookingSlots(input) {
-  const duration = input.durationMinutes;
-  if (!Number.isFinite(duration) || duration <= 0) return [];
-  const busy = input.busy.map((block2) => ({ start: Date.parse(block2.start), end: Date.parse(block2.end) })).filter((block2) => Number.isFinite(block2.start) && Number.isFinite(block2.end) && block2.end > block2.start);
-  const today = zonedParts(input.now, input.week.timeZone);
-  const slots = [];
-  for (let offset = 0; offset < input.week.horizonDays; offset += 1) {
-    const date = addCalendarDays(today.year, today.month, today.day, offset);
-    const day = input.week.days[date.weekday] ?? null;
-    if (!day) continue;
-    const latestStart = day.latestStartMinutes ?? Number.POSITIVE_INFINITY;
-    for (let minute = day.startMinutes; minute + duration <= day.endMinutes; minute += duration) {
-      if (minute >= latestStart) continue;
-      const start = zonedTimeToUtc(
-        date.year,
-        date.month,
-        date.day,
-        Math.floor(minute / 60),
-        minute % 60,
-        input.week.timeZone
-      );
-      const end = new Date(start.getTime() + duration * 60 * 1e3);
-      if (start.getTime() <= input.now.getTime()) continue;
-      if (overlaps(start.getTime(), end.getTime(), busy)) continue;
-      const dateKey2 = `${date.year}-${String(date.month).padStart(2, "0")}-${String(date.day).padStart(2, "0")}`;
-      const time = clockLabel(minute);
-      slots.push({
-        start: start.toISOString(),
-        end: end.toISOString(),
-        date: dateKey2,
-        time,
-        label: `${dayLabel(date.year, date.month, date.day, input.week.timeZone)} · ${time}`
-      });
-    }
+  if (apprenticeshipReturnPage(page2) === "realestate-75") {
+    return `/realestate-75/schedule?${params.toString()}`;
   }
-  return slots;
+  return `/apprenticeship?${params.toString()}`;
 }
 const DEFAULT_TRAVEL_BUFFER_MINUTES = 30;
 const DEFAULT_BOOKING_DURATION_MINUTES = 90;
@@ -7503,7 +7776,7 @@ function assignPhotographerSlots(input) {
   const schedule = bookingScheduleFor(input);
   const readable = input.photographers.filter((person) => person.events);
   if (!readable.length) return { live: false, slots: [] };
-  const preferred = input.preferenceId !== "no-preference" ? input.photographers.find((person) => person.id === input.preferenceId) || null : null;
+  const preferred = input.preferenceId && input.preferenceId !== "no-preference" ? input.photographers.find((person) => person.id === input.preferenceId) || null : null;
   if (preferred && !preferred.events) return { live: true, slots: [] };
   const people = preferred ? [preferred] : readable;
   const byStart = /* @__PURE__ */ new Map();
@@ -7587,153 +7860,134 @@ function parseRouteMatrixBody(body) {
     return [{ originIndex, destinationIndex, minutes }];
   });
 }
-const RE75_LEAD_SOURCE = "Real Estate $75 apprentice (Google Ads)";
-const RE75_PACKAGES = [
-  {
-    id: "apprentice-25",
-    name: "Apprentice 25 / $75",
-    photos: 25,
-    durationMinutes: 20,
-    subtotal: 75,
-    nudge: null
-  },
-  {
-    id: "apprentice-50",
-    name: "Apprentice 50 / $125",
-    photos: 50,
-    durationMinutes: 60,
-    subtotal: 125,
-    nudge: "More rooms? Go 50."
-  }
-];
-const RE75_TIME_ZONE = "America/Chicago";
-const RE75_HORIZON_DAYS = 14;
-const RE75_OUTSIDE_MESSAGE = "Call us 281.356.0965";
-function isRealEstate75PackageId(value) {
-  return value === "apprentice-25" || value === "apprentice-50";
+const SUGGESTED_APPOINTMENT_LIMIT = 3;
+const SUGGESTED_IDLE_LIMIT_MINUTES = 90;
+const GROUPING_ANCHOR_MAX_MS = 8 * 60 * 60 * 1e3;
+const NEAR_DRIVE_MINUTES = 20;
+function suggestedAppointmentsEnvOverride(env = typeof process !== "undefined" ? process.env : {}) {
+  return explicitFlag(env.SUGGESTED_APPOINTMENTS_ENABLED) ?? explicitFlag(env.SUGGESTED_APPOINTMENTS);
 }
-function realEstate75Package(value) {
-  return RE75_PACKAGES.find((item) => item.id === value) ?? RE75_PACKAGES[0];
+function suggestedAppointmentsEnabled(env = typeof process !== "undefined" ? process.env : {}, stored) {
+  const explicit = suggestedAppointmentsEnvOverride(env);
+  if (explicit !== void 0) return explicit;
+  if (typeof stored === "boolean") return stored;
+  return true;
 }
-const WEEKDAY_START = 8 * 60;
-const WEEKDAY_END = 17 * 60;
-const SATURDAY_START = 9 * 60;
-const SATURDAY_END = 12 * 60;
-const SATURDAY_LATEST_START = 12 * 60;
-const PLACES = [
-  { city: "The Woodlands", travelFee: "standard", zips: ["77380", "77381", "77382", "77384", "77385"] },
-  { city: "Spring", travelFee: "standard", zips: ["77373", "77379", "77386", "77388", "77389"] },
-  { city: "Conroe", travelFee: "standard", zips: ["77301", "77302", "77303", "77304", "77306"] },
-  { city: "Willis", travelFee: "tbd", zips: ["77318", "77378"] },
-  { city: "Cypress", travelFee: "tbd", zips: ["77410", "77429", "77433"] }
-];
-const ZIP_PLACES = /* @__PURE__ */ new Map();
-for (const place of PLACES) {
-  for (const zip of place.zips) ZIP_PLACES.set(zip, { city: place.city, travelFee: place.travelFee });
+function explicitFlag(raw) {
+  if (typeof raw !== "string" || !raw.trim()) return void 0;
+  const value = raw.trim().toLowerCase();
+  if (["0", "false", "off", "no"].includes(value)) return false;
+  if (["1", "true", "on", "yes"].includes(value)) return true;
+  return void 0;
 }
-const CITY_PATTERNS = [
-  { pattern: /\bthe\s+woodlands\b/i, place: { city: "The Woodlands", travelFee: "standard" } },
-  { pattern: /\bcypress\b/i, place: { city: "Cypress", travelFee: "tbd" } },
-  { pattern: /\bwillis\b/i, place: { city: "Willis", travelFee: "tbd" } },
-  { pattern: /\bconroe\b/i, place: { city: "Conroe", travelFee: "standard" } },
-  { pattern: /\bspring\b/i, place: { city: "Spring", travelFee: "standard" } }
-];
-function extractZipCodes(value) {
-  return [...value.matchAll(/\b(\d{5})(?:-\d{4})?\b/g)].map((match) => match[1]);
-}
-function classifyRealEstate75Area(value) {
-  const text2 = value.trim();
-  const zips = extractZipCodes(text2);
-  if (zips.length) {
-    const zip = zips[zips.length - 1];
-    const place = ZIP_PLACES.get(zip);
-    if (!place) return { status: "outside", message: RE75_OUTSIDE_MESSAGE };
-    return { status: "inside", zip, city: place.city, travelFee: place.travelFee };
-  }
-  for (const candidate of CITY_PATTERNS) {
-    if (candidate.pattern.test(text2)) {
-      return { status: "inside", zip: null, city: candidate.place.city, travelFee: candidate.place.travelFee };
+function suggestAppointmentTimes(input) {
+  const limit = input.limit ?? SUGGESTED_APPOINTMENT_LIMIT;
+  if (limit <= 0) return [];
+  const assigned = assignPhotographerSlots({
+    now: input.now,
+    durationMinutes: input.durationMinutes,
+    hours: input.hours,
+    schedule: input.schedule,
+    bufferMinutes: input.bufferMinutes,
+    bookingAddress: input.bookingAddress,
+    preferenceId: input.preferenceId,
+    photographers: input.photographers,
+    driveMinutes: input.driveMinutes
+  });
+  if (!assigned.live) return [];
+  const allowed = new Set(assigned.slots.map((slot) => slot.start));
+  const poolSource = input.slots === void 0 ? assigned.slots : input.slots;
+  const pool = uniqueByStart(poolSource.filter((slot) => allowed.has(slot.start)));
+  if (!pool.length) return [];
+  const booking = normalizePlace(input.bookingAddress);
+  const grouped = [];
+  for (const slot of pool) {
+    const startMs = Date.parse(slot.start);
+    const endMs = Date.parse(slot.end);
+    if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) continue;
+    const person = input.photographers.find((item) => item.id === slot.photographerId);
+    const events = person?.events || [];
+    let best = null;
+    for (const event of events) {
+      if (event.endMs - event.startMs >= GROUPING_ANCHOR_MAX_MS) continue;
+      if (event.endMs <= event.startMs) continue;
+      if (chicagoDate(event.startMs) !== slot.date) continue;
+      const after = startMs - event.endMs;
+      const before = event.startMs - endMs;
+      const gap = after >= 0 ? after : before >= 0 ? before : -1;
+      if (gap < 0) continue;
+      const required = requiredGapMs({
+        event,
+        bookingAddress: input.bookingAddress,
+        bufferMinutes: input.bufferMinutes,
+        driveMinutes: input.driveMinutes,
+        slotIsAfter: after >= 0,
+        departAtMs: after >= 0 ? event.endMs : endMs
+      });
+      if (gap + 1e3 < required) continue;
+      const idle = (gap - required) / 6e4;
+      if (idle > SUGGESTED_IDLE_LIMIT_MINUTES) continue;
+      const near = nearRank(booking, event.location, driveToBooking(event.location, input.bookingAddress, event.endMs, input.driveMinutes));
+      if (!best || near < best.near || near === best.near && idle < best.idle) best = { near, idle };
     }
+    if (best) grouped.push({ slot, near: best.near, idle: best.idle });
   }
-  return { status: "outside", message: RE75_OUTSIDE_MESSAGE };
+  if (grouped.length) {
+    grouped.sort((a, b) => a.near - b.near || a.slot.start.localeCompare(b.slot.start) || a.idle - b.idle);
+    return grouped.slice(0, limit).map((item) => item.slot);
+  }
+  return [...pool].sort((a, b) => a.start.localeCompare(b.start)).slice(0, limit);
 }
-function quoteRealEstate75Travel(travel) {
-  return {
-    travelZone: null,
-    travelMiles: travel.travelMiles,
-    travelFeeCents: null,
-    travelQuoted: true
-  };
+function uniqueByStart(slots) {
+  const seen = /* @__PURE__ */ new Set();
+  const unique2 = [];
+  for (const slot of slots) {
+    if (!slot.start || seen.has(slot.start)) continue;
+    seen.add(slot.start);
+    unique2.push(slot);
+  }
+  return unique2;
 }
-function realEstate75Week(horizonDays = RE75_HORIZON_DAYS) {
-  const weekday = { startMinutes: WEEKDAY_START, endMinutes: WEEKDAY_END };
-  const saturday = {
-    startMinutes: SATURDAY_START,
-    endMinutes: SATURDAY_END,
-    latestStartMinutes: SATURDAY_LATEST_START
-  };
-  return {
-    timeZone: RE75_TIME_ZONE,
-    horizonDays,
-    days: [null, weekday, weekday, weekday, weekday, weekday, saturday]
-  };
+function chicagoDate(ms) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Chicago",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(new Date(ms));
 }
-function isoDate(year, month, day) {
-  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+function requiredGapMs(input) {
+  const bufferMs = input.bufferMinutes * 60 * 1e3;
+  const location = input.event.location.trim();
+  const address = input.bookingAddress.trim();
+  if (!location || !address) return bufferMs;
+  const from = input.slotIsAfter ? location : address;
+  const to = input.slotIsAfter ? address : location;
+  const drive = input.driveMinutes(from, to, input.departAtMs);
+  if (drive == null || !Number.isFinite(drive) || drive < 0) return bufferMs;
+  return drive * 60 * 1e3;
 }
-function shiftIso(year, month, day, delta) {
-  const next = new Date(Date.UTC(year, month - 1, day + delta));
-  return isoDate(next.getUTCFullYear(), next.getUTCMonth() + 1, next.getUTCDate());
+function driveToBooking(location, bookingAddress, departAtMs, driveMinutes) {
+  if (!location.trim() || !bookingAddress.trim()) return null;
+  const drive = driveMinutes(location, bookingAddress, departAtMs);
+  if (drive == null || !Number.isFinite(drive) || drive < 0) return null;
+  return drive;
 }
-function observedFixed(year, month, day) {
-  const dow = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
-  const actual = isoDate(year, month, day);
-  if (dow === 6) return [actual, shiftIso(year, month, day, -1)];
-  if (dow === 0) return [actual, shiftIso(year, month, day, 1)];
-  return [actual];
+function nearRank(booking, location, drive) {
+  const place = normalizePlace(location);
+  if (!booking || !place) return 2;
+  if (samePlace(booking, place)) return 0;
+  if (drive != null && drive <= NEAR_DRIVE_MINUTES) return 1;
+  if (drive != null && drive > NEAR_DRIVE_MINUTES) return 3;
+  return 2;
 }
-function nthWeekday(year, month, weekday, n) {
-  const firstDow = new Date(Date.UTC(year, month - 1, 1)).getUTCDay();
-  const day = 1 + (weekday - firstDow + 7) % 7 + (n - 1) * 7;
-  return isoDate(year, month, day);
+function samePlace(booking, location) {
+  if (booking === location) return true;
+  const left = booking.split(",")[0]?.trim() || "";
+  const right = location.split(",")[0]?.trim() || "";
+  return left.length >= 8 && left === right;
 }
-function lastWeekday(year, month, weekday) {
-  const last = new Date(Date.UTC(year, month, 0));
-  const day = last.getUTCDate() - (last.getUTCDay() - weekday + 7) % 7;
-  return isoDate(year, month, day);
-}
-const holidayYears = /* @__PURE__ */ new Map();
-function realEstate75HolidayDates(year) {
-  const cached = holidayYears.get(year);
-  if (cached) return cached;
-  const thanksgiving = nthWeekday(year, 11, 4, 4);
-  const [y, m, d] = thanksgiving.split("-").map(Number);
-  const dates = [
-    ...observedFixed(year, 1, 1),
-    nthWeekday(year, 1, 1, 3),
-    lastWeekday(year, 5, 1),
-    ...observedFixed(year, 6, 19),
-    ...observedFixed(year, 7, 4),
-    nthWeekday(year, 9, 1, 1),
-    thanksgiving,
-    shiftIso(y, m, d, 1),
-    ...observedFixed(year, 12, 25)
-  ];
-  const set = new Set(dates);
-  holidayYears.set(year, set);
-  return set;
-}
-function isRealEstate75Holiday(date) {
-  const match = date.match(/^(\d{4})-\d{2}-\d{2}$/);
-  if (!match) return false;
-  return realEstate75HolidayDates(Number(match[1])).has(date);
-}
-function sanitizeGclid(value) {
-  if (typeof value !== "string") return "";
-  const trimmed = value.trim();
-  if (!/^[A-Za-z0-9._-]{1,200}$/.test(trimmed)) return "";
-  return trimmed;
-}
+const APPRENTICESHIP_HOLD_PREFIX = "HOLD · $25 fee due · ";
 function firebaseServiceAccount(env = process.env) {
   const raw = env.FIREBASE_SERVICE_ACCOUNT;
   if (!raw || !raw.trim()) return null;
@@ -7869,7 +8123,7 @@ async function createApprenticeshipEvent(booking, env = process.env) {
     calendarId: hours.calendarId,
     sendUpdates: "none",
     requestBody: {
-      summary: `Apprenticeship: ${booking.clientName}`,
+      summary: `${booking.hold ? APPRENTICESHIP_HOLD_PREFIX : ""}Apprenticeship: ${booking.clientName}`,
       location: booking.address,
       description: [
         `Order: ${booking.orderNumber}`,
@@ -7877,7 +8131,7 @@ async function createApprenticeshipEvent(booking, env = process.env) {
         `Client: ${booking.clientName}`,
         `Email: ${booking.clientEmail}`,
         `Phone: ${booking.clientPhone}`,
-        "Booking fee: $25, credited toward the package",
+        booking.hold ? "Booking fee: $25 NOT PAID YET. Hold until the Square payment lands." : "Booking fee: $25, credited toward the package",
         "Balance invoiced after the shoot",
         booking.notes ? `Notes: ${booking.notes}` : ""
       ].filter(Boolean).join("\n"),
@@ -7896,6 +8150,46 @@ async function createApprenticeshipEvent(booking, env = process.env) {
     eventId: response.data.id || null,
     htmlLink: response.data.htmlLink || null
   };
+}
+async function confirmApprenticeshipEvent(input, env = process.env) {
+  const account = firebaseServiceAccount(env);
+  const auth = calendarAuthFromAccount(account, env);
+  if (!auth || !input.eventId) return false;
+  const hours = apprenticeshipHoursFromEnv(env);
+  const calendarId = input.calendarId || hours.calendarId;
+  const calendar = google.calendar({ version: "v3", auth });
+  const current = await calendar.events.get({ calendarId, eventId: input.eventId });
+  const summary = String(current.data.summary || "").replace(APPRENTICESHIP_HOLD_PREFIX, "");
+  const description = String(current.data.description || "").replace(
+    "Booking fee: $25 NOT PAID YET. Hold until the Square payment lands.",
+    "Booking fee: $25 PAID, credited toward the package"
+  );
+  await calendar.events.patch({
+    calendarId,
+    eventId: input.eventId,
+    sendUpdates: "none",
+    requestBody: { summary, description }
+  });
+  return true;
+}
+async function deleteApprenticeshipEvent(input, env = process.env) {
+  const account = firebaseServiceAccount(env);
+  const auth = calendarAuthFromAccount(account, env);
+  if (!auth || !input.eventId) return false;
+  const hours = apprenticeshipHoursFromEnv(env);
+  const calendar = google.calendar({ version: "v3", auth });
+  try {
+    await calendar.events.delete({
+      calendarId: input.calendarId || hours.calendarId,
+      eventId: input.eventId,
+      sendUpdates: "none"
+    });
+  } catch (error) {
+    const code = Number(error?.code ?? error?.status);
+    if (code === 404 || code === 410) return true;
+    throw error;
+  }
+  return true;
 }
 const ROUTES_ENDPOINT = "https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix";
 const DRIVE_CACHE_TTL_MS = 15 * 60 * 1e3;
@@ -8094,7 +8388,7 @@ async function readBookingAvailability(input) {
   const account = firebaseServiceAccount(env);
   const auth = calendarAuthFromAccount(account, env);
   if (!auth || !account) {
-    return { live: false, slots: [], durationMinutes, bufferMinutes, driveMode: apiKey ? "routes" : "buffer" };
+    return { live: false, slots: [], suggestions: [], durationMinutes, bufferMinutes, driveMode: apiKey ? "routes" : "buffer" };
   }
   const timeMin = new Date(now.getTime() - 18 * 60 * 60 * 1e3).toISOString();
   const timeMax = new Date(now.getTime() + (hours.horizonDays + 1) * 24 * 60 * 60 * 1e3).toISOString();
@@ -8110,7 +8404,7 @@ async function readBookingAvailability(input) {
   }));
   const readable = days.filter((person) => person.events);
   if (!readable.length) {
-    return { live: false, slots: [], durationMinutes, bufferMinutes, driveMode: apiKey ? "routes" : "buffer" };
+    return { live: false, slots: [], suggestions: [], durationMinutes, bufferMinutes, driveMode: apiKey ? "routes" : "buffer" };
   }
   const preferred = preferenceId !== "no-preference" ? days.find((person) => person.id === preferenceId) || null : null;
   const considered = preferred ? preferred.events ? [preferred] : [] : readable;
@@ -8132,6 +8426,10 @@ async function readBookingAvailability(input) {
     now: now.getTime(),
     fetchImpl: input.fetchImpl
   });
+  const driveMinutes = (from, to, departAtMs) => {
+    const value = driveMap.get(driveCacheKey(from, to, departAtMs));
+    return value === void 0 ? null : value;
+  };
   const assigned = assignPhotographerSlots({
     now,
     durationMinutes,
@@ -8140,15 +8438,24 @@ async function readBookingAvailability(input) {
     bookingAddress: address,
     preferenceId,
     photographers: days,
-    driveMinutes: (from, to, departAtMs) => {
-      const value = driveMap.get(driveCacheKey(from, to, departAtMs));
-      return value === void 0 ? null : value;
-    }
+    driveMinutes
   });
   const slots = input.slotFilter ? assigned.slots.filter(input.slotFilter) : assigned.slots;
+  const suggestions = assigned.live ? suggestAppointmentTimes({
+    now,
+    durationMinutes,
+    schedule,
+    bufferMinutes,
+    bookingAddress: address,
+    preferenceId,
+    photographers: days,
+    driveMinutes,
+    slots
+  }) : [];
   return {
     live: assigned.live,
     slots,
+    suggestions,
     durationMinutes,
     bufferMinutes,
     driveMode: apiKey ? "routes" : "buffer"
@@ -8270,7 +8577,7 @@ async function deleteHolidayCalendarEvent(input) {
     throw err;
   }
 }
-const db$q = () => admin.firestore();
+const db$r = () => admin.firestore();
 async function backfillHolidayCalendarEvents() {
   const orders = await loadHolidayCalendarOrders();
   const { report, patches } = await runHolidayBackfill({
@@ -8279,12 +8586,38 @@ async function backfillHolidayCalendarEvents() {
     create: (plan) => createHolidayCalendarEvent(plan)
   });
   for (const item of patches) {
-    await db$q().collection("orderRequests").doc(item.id).update({
+    await db$r().collection("orderRequests").doc(item.id).update({
       ...item.patch,
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
   }
   return report;
+}
+const CACHE_MS$1 = 15e3;
+let cache$1 = null;
+let loggedReadFailure = false;
+async function suggestedAppointmentsAreEnabled(env = process.env, readStored = readStoredFlag, now = Date.now()) {
+  const override = suggestedAppointmentsEnvOverride(env);
+  if (override !== void 0) return override;
+  if (!cache$1 || now - cache$1.at > CACHE_MS$1) {
+    cache$1 = { at: now, stored: await readStored() };
+  }
+  return suggestedAppointmentsEnabled(env, cache$1.stored);
+}
+async function readStoredFlag() {
+  try {
+    if (!admin.apps.length) return void 0;
+    const snap = await admin.firestore().collection("settings").doc("global").get();
+    const value = snap.data()?.suggestedAppointments;
+    return typeof value === "boolean" ? value : void 0;
+  } catch (error) {
+    if (!loggedReadFailure) {
+      loggedReadFailure = true;
+      const message = error instanceof Error ? error.message : "unavailable";
+      console.error(`[Booking] Suggested appointments setting could not be read. Leaving the feature on. ${message}`);
+    }
+    return void 0;
+  }
 }
 function clientIp(req) {
   const forwarded = req.headers["x-forwarded-for"];
@@ -8321,7 +8654,7 @@ function createRateLimiter(options) {
   };
 }
 const router$r = Router();
-const db$p = () => admin.firestore();
+const db$q = () => admin.firestore();
 const BOOKING_SUBMIT_WINDOW_MS = 15 * 60 * 1e3;
 const BOOKING_SUBMIT_MAX = 10;
 const bookingSubmitLimiter = createRateLimiter({
@@ -8361,7 +8694,7 @@ function failedCalendarHoldNote(slot) {
 }
 async function loadBookingCatalog() {
   try {
-    const snap = await db$p().collection("packages").get();
+    const snap = await db$q().collection("packages").get();
     return packagesForStaffEditor(snap.docs.map((entry2) => ({ id: entry2.id, ...entry2.data() })));
   } catch (err) {
     console.error("[Bookings] Catalog read failed — using the seeded catalog", err);
@@ -8490,14 +8823,25 @@ router$r.post("/", async (req, res) => {
     const selectedAddOns = resolved.selectedAddOns;
     const preferenceId = preferenceFromRequest(req.body.photographerId, photographerPreference);
     const preferredWindow = isPreferredWindowBooking(req.body);
+    const postedSlotStart = typeof req.body.slotStart === "string" ? req.body.slotStart.trim() : "";
+    const apprenticeRequest = Boolean(realEstate75Lead && !postedSlotStart);
+    if (apprenticeRequest) {
+      const requested = realEstate75AppointmentChoice({
+        date: scheduledDate,
+        time: scheduledTime,
+        durationMinutes: realEstate75Package(resolved.selectedBasics[0]).durationMinutes
+      });
+      if (!requested) return res.status(400).json({ error: RE75_TIME_MESSAGE });
+    }
     let availability = {
       live: false,
       slots: [],
+      suggestions: [],
       durationMinutes: 90,
       bufferMinutes: 30,
       driveMode: "buffer"
     };
-    if (!preferredWindow) {
+    if (!preferredWindow && !apprenticeRequest) {
       try {
         availability = realEstate75Lead ? await readRealEstate75Availability({
           address: displayAddress,
@@ -8513,9 +8857,9 @@ router$r.post("/", async (req, res) => {
         console.error("[Bookings] Availability check failed — keeping the standard time list:", err);
       }
     }
-    const decision = resolveBookingAssignment({
+    const decision = apprenticeRequest ? { ok: true, slot: null } : resolveBookingAssignment({
       live: preferredWindow ? false : availability.live,
-      slotStart: typeof req.body.slotStart === "string" ? req.body.slotStart : "",
+      slotStart: postedSlotStart,
       slots: availability.slots
     });
     if (decision.ok === false) return res.status(decision.status).json({ error: decision.error });
@@ -8611,7 +8955,7 @@ router$r.post("/", async (req, res) => {
       submittedAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     };
-    const docRef = await db$p().collection("orderRequests").add(orderRequest);
+    const docRef = await db$q().collection("orderRequests").add(orderRequest);
     let orderNumber = docRef.id;
     let packageName = "";
     try {
@@ -8910,7 +9254,7 @@ router$r.post("/", async (req, res) => {
         holidayCheckout = { payment: "fallback" };
       } else {
         try {
-          const invoiceSnap = await db$p().collection("invoices").doc(invoiceId).get();
+          const invoiceSnap = await db$q().collection("invoices").doc(invoiceId).get();
           const invoiceData = invoiceSnap.data() || {};
           const invoiceNumber = typeof invoiceData.invoiceNumber === "string" ? invoiceData.invoiceNumber : void 0;
           const linked = await createHolidaySquareCheckout({
@@ -8923,7 +9267,7 @@ router$r.post("/", async (req, res) => {
             orderNumber
           });
           if (linked.payment === "square" && linked.checkoutUrl) {
-            await db$p().collection("invoices").doc(invoiceId).update({
+            await db$q().collection("invoices").doc(invoiceId).update({
               paymentProvider: "square",
               paymentUrl: linked.checkoutUrl,
               squarePaymentLinkId: linked.linkId || null,
@@ -9038,6 +9382,11 @@ router$r.get("/realestate-75/slots", async (req, res) => {
     return res.json({ live: false, durationMinutes: pkg.durationMinutes, packageId: pkg.id, slots: [] });
   }
 });
+function postedDurationMinutes(value) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 15 || parsed > 24 * 60) return void 0;
+  return parsed;
+}
 router$r.get("/slots", async (req, res) => {
   const basics = typeof req.query.basics === "string" ? req.query.basics.split(",").map((id) => id.trim()).filter(Boolean) : [];
   const preferenceId = preferenceFromRequest(req.query.photographer, "");
@@ -9048,16 +9397,19 @@ router$r.get("/slots", async (req, res) => {
       preferenceId,
       selectedService: typeof req.query.service === "string" ? req.query.service : null,
       selectedBasics: basics,
-      catalog
+      catalog,
+      durationMinutes: postedDurationMinutes(req.query.duration)
     });
+    const enabled = await suggestedAppointmentsAreEnabled();
     return res.json({
       live: availability.live,
       durationMinutes: availability.durationMinutes,
-      slots: availability.live ? availability.slots : []
+      slots: availability.live ? availability.slots : [],
+      suggestions: enabled && availability.live ? availability.suggestions : []
     });
   } catch (err) {
     console.error("[Bookings] Slot lookup failed — keeping the standard time list:", err);
-    return res.json({ live: false, durationMinutes: 90, slots: [] });
+    return res.json({ live: false, durationMinutes: 90, slots: [], suggestions: [] });
   }
 });
 router$r.get("/catalog", async (_req, res) => {
@@ -9069,7 +9421,7 @@ router$r.get("/catalog", async (_req, res) => {
 });
 router$r.get("/", requireCoordinator, async (_req, res) => {
   try {
-    const snapshot = await db$p().collection("orderRequests").orderBy("createdAt", "desc").limit(100).get();
+    const snapshot = await db$q().collection("orderRequests").orderBy("createdAt", "desc").limit(100).get();
     const requests = snapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data()
@@ -9082,7 +9434,7 @@ router$r.get("/", requireCoordinator, async (_req, res) => {
 });
 router$r.get("/:id", requireCoordinator, async (req, res) => {
   try {
-    const doc = await db$p().collection("orderRequests").doc(req.params.id).get();
+    const doc = await db$q().collection("orderRequests").doc(req.params.id).get();
     if (!doc.exists) {
       return res.status(404).json({ error: "Booking request not found." });
     }
@@ -9094,7 +9446,7 @@ router$r.get("/:id", requireCoordinator, async (req, res) => {
 });
 router$r.post("/:id/assign-photographer", requireCoordinator, async (req, res) => {
   try {
-    const requestDoc = await db$p().collection("orderRequests").doc(req.params.id).get();
+    const requestDoc = await db$q().collection("orderRequests").doc(req.params.id).get();
     if (!requestDoc.exists) return res.status(404).json({ error: "Booking request not found." });
     const request = requestDoc.data() || {};
     const posted = typeof req.body?.listingId === "string" ? req.body.listingId.trim() : "";
@@ -9110,7 +9462,7 @@ router$r.post("/:id/assign-photographer", requireCoordinator, async (req, res) =
 router$r.patch("/:id/confirm", requireCoordinator, async (req, res) => {
   try {
     const { assignedPhotographerId, assignedPhotographerName: postedPhotographerName, scheduledDate, scheduledTime, internalNotes } = req.body;
-    const requestDoc = await db$p().collection("orderRequests").doc(req.params.id).get();
+    const requestDoc = await db$q().collection("orderRequests").doc(req.params.id).get();
     if (!requestDoc.exists) {
       return res.status(404).json({ error: "Booking request not found." });
     }
@@ -9136,7 +9488,7 @@ router$r.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       }
       const existingGalleryId = existingInvoiceId(request.galleryId);
       if (existingGalleryId && listingId2) {
-        await db$p().collection("galleries").doc(existingGalleryId).set({
+        await db$q().collection("galleries").doc(existingGalleryId).set({
           listingId: listingId2,
           updatedAt: admin.firestore.FieldValue.serverTimestamp()
         }, { merge: true });
@@ -9187,7 +9539,7 @@ router$r.patch("/:id/confirm", requireCoordinator, async (req, res) => {
     }
     let photographer = null;
     if (assignedPhotographerId) {
-      const staffDoc = await db$p().collection("staff").doc(assignedPhotographerId).get();
+      const staffDoc = await db$q().collection("staff").doc(assignedPhotographerId).get();
       photographer = staffDoc.exists ? { id: staffDoc.id, ...staffDoc.data() } : null;
       const refusal2 = await refuseQaStaffAssignment({
         staff: photographer ? [photographer] : [],
@@ -9197,7 +9549,7 @@ router$r.patch("/:id/confirm", requireCoordinator, async (req, res) => {
     }
     let clientId2;
     const attachedClientId = typeof request.clientId === "string" ? request.clientId.trim() : "";
-    const attachedClient = attachedClientId ? await db$p().collection("clients").doc(attachedClientId).get() : null;
+    const attachedClient = attachedClientId ? await db$q().collection("clients").doc(attachedClientId).get() : null;
     if (attachedClient?.exists) {
       clientId2 = attachedClient.id;
       await attachedClient.ref.update({
@@ -9206,7 +9558,7 @@ router$r.patch("/:id/confirm", requireCoordinator, async (req, res) => {
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
     } else {
-      const existingClients = await db$p().collection("clients").where("email", "==", requestEmail).limit(1).get();
+      const existingClients = await db$q().collection("clients").where("email", "==", requestEmail).limit(1).get();
       if (!existingClients.empty) {
         clientId2 = existingClients.docs[0].id;
         await existingClients.docs[0].ref.update({
@@ -9215,7 +9567,7 @@ router$r.patch("/:id/confirm", requireCoordinator, async (req, res) => {
           updatedAt: admin.firestore.FieldValue.serverTimestamp()
         });
       } else {
-        const clientRef = await db$p().collection("clients").add({
+        const clientRef = await db$q().collection("clients").add({
           firstName: requestFirstName,
           lastName: requestLastName,
           email: requestEmail,
@@ -9277,8 +9629,8 @@ router$r.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     };
-    const orderRef = await db$p().collection("orders").add(orderData);
-    const existingAppointment = await db$p().collection("appointments").where("orderRequestId", "==", req.params.id).limit(1).get();
+    const orderRef = await db$q().collection("orders").add(orderData);
+    const existingAppointment = await db$q().collection("appointments").where("orderRequestId", "==", req.params.id).limit(1).get();
     const confirmedAppointment = {
       orderId: orderRef.id,
       orderRequestId: req.params.id,
@@ -9298,7 +9650,7 @@ router$r.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       internalNotes: internalNotes || "",
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     };
-    const appointmentRef = existingAppointment.empty ? db$p().collection("appointments").doc() : existingAppointment.docs[0].ref;
+    const appointmentRef = existingAppointment.empty ? db$q().collection("appointments").doc() : existingAppointment.docs[0].ref;
     if (existingAppointment.empty) {
       await appointmentRef.set({
         ...confirmedAppointment,
@@ -9314,7 +9666,7 @@ router$r.patch("/:id/confirm", requireCoordinator, async (req, res) => {
     } catch (err) {
       console.error("[Bookings] Listing ensure failed:", err);
     }
-    const galleryRef = await db$p().collection("galleries").add({
+    const galleryRef = await db$q().collection("galleries").add({
       orderId: orderRef.id,
       clientId: clientId2,
       clientName: requestClientName,
@@ -9349,7 +9701,7 @@ router$r.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       notes: internalNotes || request.vibeNote || ""
     }).catch(async (err) => {
       console.error("[Bookings] Calendar event creation failed:", err);
-      await db$p().collection("agentLogs").add({
+      await db$q().collection("agentLogs").add({
         agent: "nora",
         action: "Calendar event failed",
         summary: `Google Calendar event was not created for order ${orderRef.id}`,
@@ -9383,7 +9735,7 @@ router$r.patch("/:id/confirm", requireCoordinator, async (req, res) => {
     let listingId = listingIdForGallery;
     let invoiceId = linkedInvoiceId;
     if (linkedInvoiceId) {
-      const existingInvoice = await db$p().collection("invoices").doc(linkedInvoiceId).get();
+      const existingInvoice = await db$q().collection("invoices").doc(linkedInvoiceId).get();
       if (existingInvoice.exists) {
         await existingInvoice.ref.update({
           orderId: orderRef.id,
@@ -9398,7 +9750,7 @@ router$r.patch("/:id/confirm", requireCoordinator, async (req, res) => {
         console.error(`[Bookings] Confirm kept invoiceId ${linkedInvoiceId} but the invoice doc is missing. Not creating a second invoice.`);
       }
     } else {
-      const invoiceRef = db$p().collection("invoices").doc();
+      const invoiceRef = db$q().collection("invoices").doc();
       const payToken = createPayToken();
       const paymentUrl = clientInvoiceUrl({ id: invoiceRef.id, status: "draft", payToken });
       const draft = buildBookingInvoiceDraft({
@@ -9510,7 +9862,7 @@ async function releaseOrderCalendar(data) {
 }
 router$r.patch("/:id/cancel", requireCoordinator, async (req, res) => {
   try {
-    const doc = await db$p().collection("orderRequests").doc(req.params.id).get();
+    const doc = await db$q().collection("orderRequests").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Not found." });
     const data = doc.data() || {};
     const calendarError = await releaseOrderCalendar(data);
@@ -9540,7 +9892,7 @@ router$r.patch("/:id/cancel", requireCoordinator, async (req, res) => {
 router$r.patch("/:id/decline", requireCoordinator, async (req, res) => {
   try {
     const { reason } = req.body;
-    const doc = await db$p().collection("orderRequests").doc(req.params.id).get();
+    const doc = await db$q().collection("orderRequests").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Not found." });
     const data = doc.data() || {};
     const calendarError = await releaseOrderCalendar(data);
@@ -9569,16 +9921,16 @@ async function stampDurableLinks(input) {
     orderInvoiceId: input.invoiceId
   });
   const now = admin.firestore.FieldValue.serverTimestamp();
-  const invoiceRef = db$p().collection("invoices").doc(plan.createId);
+  const invoiceRef = db$q().collection("invoices").doc(plan.createId);
   const invoiceSnap = await invoiceRef.get();
   if (invoiceSnap.exists && Object.keys(plan.invoiceFields).length > 0) {
     await invoiceRef.update({ ...plan.invoiceFields, updatedAt: now });
   }
   if (plan.orderFields) {
-    await db$p().collection("orders").doc(input.orderId).update({ ...plan.orderFields, updatedAt: now });
+    await db$q().collection("orders").doc(input.orderId).update({ ...plan.orderFields, updatedAt: now });
   }
   if (input.listingId && plan.listingFields) {
-    await db$p().collection("listings").doc(input.listingId).update({ ...plan.listingFields, updatedAt: now });
+    await db$q().collection("listings").doc(input.listingId).update({ ...plan.listingFields, updatedAt: now });
   }
 }
 function linesForConfirmedOrder(request) {
@@ -9591,7 +9943,7 @@ async function linkClientIdByEmail(email) {
   try {
     const normalized = normalizeEmail$1(email);
     if (!normalized) return null;
-    const snap = await db$p().collection("clients").where("email", "==", normalized).limit(1).get();
+    const snap = await db$q().collection("clients").where("email", "==", normalized).limit(1).get();
     return snap.empty ? null : snap.docs[0].id;
   } catch (err) {
     console.error("[Bookings] Client lookup for invoice failed:", err);
@@ -9612,7 +9964,7 @@ async function createBookingInvoiceDraft(input) {
     promoDiscount: input.promoDiscount,
     travel: input.travel
   });
-  const invoiceRef = db$p().collection("invoices").doc();
+  const invoiceRef = db$q().collection("invoices").doc();
   const payToken = createPayToken();
   const paymentUrl = clientInvoiceUrl({ id: invoiceRef.id, status: "draft", payToken });
   await invoiceRef.set({
@@ -9627,7 +9979,7 @@ async function createBookingInvoiceDraft(input) {
 }
 async function generateInvoiceNumber() {
   const year = (/* @__PURE__ */ new Date()).getFullYear();
-  const snapshot = await db$p().collection("invoices").where("invoiceNumber", ">=", `INV-${year}-`).where("invoiceNumber", "<", `INV-${year + 1}`).get().catch((err) => {
+  const snapshot = await db$q().collection("invoices").where("invoiceNumber", ">=", `INV-${year}-`).where("invoiceNumber", "<", `INV-${year + 1}`).get().catch((err) => {
     console.error("[Bookings] Invoice number lookup failed:", err);
     return null;
   });
@@ -9714,7 +10066,7 @@ async function ensureDotOptInLink(invoice) {
   }
 }
 const router$q = Router();
-const db$o = () => admin.firestore();
+const db$p = () => admin.firestore();
 const dotOptInLimiter = createRateLimiter({ windowMs: 10 * 60 * 1e3, max: 30 });
 function sendDotOptInPage(res, status2, ok) {
   res.status(status2);
@@ -9745,7 +10097,7 @@ router$q.get("/dot-opt-in", async (req, res) => {
 router$q.get("/", requireStaff, async (req, res) => {
   try {
     const { status: status2, photographerId, limit = "50", startAfter } = req.query;
-    let query = db$o().collection("orders").orderBy("createdAt", "desc");
+    let query = db$p().collection("orders").orderBy("createdAt", "desc");
     if (status2) query = query.where("status", "==", status2);
     if (photographerId) {
       query = query.where("assignedPhotographerId", "==", photographerId);
@@ -9753,7 +10105,7 @@ router$q.get("/", requireStaff, async (req, res) => {
     const limitNum = Math.min(Number(limit), 200);
     query = query.limit(limitNum);
     if (startAfter) {
-      const cursorDoc = await db$o().collection("orders").doc(startAfter).get();
+      const cursorDoc = await db$p().collection("orders").doc(startAfter).get();
       if (cursorDoc.exists) {
         query = query.startAfter(cursorDoc);
       }
@@ -9776,10 +10128,10 @@ router$q.get("/dashboard", requireStaff, async (_req, res) => {
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const [allOrders, todayOrders, monthTransactions, pendingRequests] = await Promise.all([
-      db$o().collection("orders").get(),
-      db$o().collection("orders").where("createdAt", ">=", admin.firestore.Timestamp.fromDate(todayStart)).get(),
-      db$o().collection("transactions").where("createdAt", ">=", admin.firestore.Timestamp.fromDate(monthStart)).where("status", "==", "completed").get(),
-      db$o().collection("orderRequests").where("status", "==", "new").get()
+      db$p().collection("orders").get(),
+      db$p().collection("orders").where("createdAt", ">=", admin.firestore.Timestamp.fromDate(todayStart)).get(),
+      db$p().collection("transactions").where("createdAt", ">=", admin.firestore.Timestamp.fromDate(monthStart)).where("status", "==", "completed").get(),
+      db$p().collection("orderRequests").where("status", "==", "new").get()
     ]);
     const statusCounts = {};
     allOrders.docs.forEach((d) => {
@@ -9805,23 +10157,23 @@ router$q.get("/dashboard", requireStaff, async (_req, res) => {
 });
 router$q.get("/:id", requireStaff, async (req, res) => {
   try {
-    const orderDoc = await db$o().collection("orders").doc(req.params.id).get();
+    const orderDoc = await db$p().collection("orders").doc(req.params.id).get();
     if (!orderDoc.exists) return res.status(404).json({ error: "Order not found." });
     const order = { id: orderDoc.id, ...orderDoc.data() };
     const [gallery, invoice, appointment, messages] = await Promise.all([
-      db$o().collection("galleries").where("orderId", "==", req.params.id).limit(1).get().catch((err) => {
+      db$p().collection("galleries").where("orderId", "==", req.params.id).limit(1).get().catch((err) => {
         console.error("[Orders] Gallery lookup failed:", err);
         return null;
       }),
-      db$o().collection("invoices").where("orderId", "==", req.params.id).limit(1).get().catch((err) => {
+      db$p().collection("invoices").where("orderId", "==", req.params.id).limit(1).get().catch((err) => {
         console.error("[Orders] Invoice lookup failed:", err);
         return null;
       }),
-      db$o().collection("appointments").where("orderId", "==", req.params.id).limit(1).get().catch((err) => {
+      db$p().collection("appointments").where("orderId", "==", req.params.id).limit(1).get().catch((err) => {
         console.error("[Orders] Appointment lookup failed:", err);
         return null;
       }),
-      db$o().collection("messages").where("orderId", "==", req.params.id).orderBy("createdAt", "desc").limit(20).get().catch((err) => {
+      db$p().collection("messages").where("orderId", "==", req.params.id).orderBy("createdAt", "desc").limit(20).get().catch((err) => {
         console.error("[Orders] Messages lookup failed:", err);
         return null;
       })
@@ -9857,7 +10209,7 @@ router$q.patch("/:id", requireCoordinator, async (req, res) => {
     });
     const photographerId = typeof updates.assignedPhotographerId === "string" ? updates.assignedPhotographerId.trim() : "";
     if (photographerId) {
-      const orderDoc = await db$o().collection("orders").doc(req.params.id).get();
+      const orderDoc = await db$p().collection("orders").doc(req.params.id).get();
       if (!orderDoc.exists) return res.status(404).json({ error: "Order not found." });
       const refusal2 = await refuseQaStaffAssignment({
         staffIds: [photographerId],
@@ -9871,7 +10223,7 @@ router$q.patch("/:id", requireCoordinator, async (req, res) => {
         updates.scheduledDate = admin.firestore.Timestamp.fromDate(anchored);
       }
     }
-    await db$o().collection("orders").doc(req.params.id).update(updates);
+    await db$p().collection("orders").doc(req.params.id).update(updates);
     return res.json({ success: true });
   } catch (err) {
     console.error("[Orders] Update error:", err);
@@ -9892,7 +10244,7 @@ const VALID_TRANSITIONS = {
 router$q.patch("/:id/status", requireCoordinator, async (req, res) => {
   try {
     const { status: status2, note } = req.body;
-    const orderDoc = await db$o().collection("orders").doc(req.params.id).get();
+    const orderDoc = await db$p().collection("orders").doc(req.params.id).get();
     if (!orderDoc.exists) return res.status(404).json({ error: "Order not found." });
     const currentStatus = orderDoc.data().status;
     const validNext = VALID_TRANSITIONS[currentStatus] || [];
@@ -9910,14 +10262,14 @@ router$q.patch("/:id/status", requireCoordinator, async (req, res) => {
       updates.completedAt = admin.firestore.FieldValue.serverTimestamp();
     }
     await orderDoc.ref.update(updates);
-    const apptSnapshot = await db$o().collection("appointments").where("orderId", "==", req.params.id).limit(1).get();
+    const apptSnapshot = await db$p().collection("appointments").where("orderId", "==", req.params.id).limit(1).get();
     if (!apptSnapshot.empty) {
       const apptStatus = status2 === "in_progress" ? "in_progress" : status2 === "shot_complete" || status2 === "editing" ? "completed" : status2 === "cancelled" ? "cancelled" : void 0;
       if (apptStatus) {
         await apptSnapshot.docs[0].ref.update({ status: apptStatus });
       }
     }
-    await db$o().collection("agentLogs").add({
+    await db$p().collection("agentLogs").add({
       agent: "nora",
       action: `Order status changed: ${currentStatus} → ${status2}`,
       summary: `Order ${req.params.id} transitioned to ${status2}`,
@@ -9938,9 +10290,9 @@ router$q.patch("/:id/status", requireCoordinator, async (req, res) => {
 router$q.get("/:id/timeline", requireStaff, async (req, res) => {
   try {
     const [messages, editRequests, agentLogs] = await Promise.all([
-      db$o().collection("messages").where("orderId", "==", req.params.id).orderBy("createdAt", "asc").get(),
-      db$o().collection("editRequests").where("orderId", "==", req.params.id).orderBy("createdAt", "asc").get(),
-      db$o().collection("agentLogs").where("relatedId", "==", req.params.id).orderBy("createdAt", "asc").get()
+      db$p().collection("messages").where("orderId", "==", req.params.id).orderBy("createdAt", "asc").get(),
+      db$p().collection("editRequests").where("orderId", "==", req.params.id).orderBy("createdAt", "asc").get(),
+      db$p().collection("agentLogs").where("relatedId", "==", req.params.id).orderBy("createdAt", "asc").get()
     ]);
     const timeline = [
       ...messages.docs.map((d) => ({ type: "message", ...d.data(), id: d.id })),
@@ -11868,7 +12220,7 @@ function jsonSafe(value) {
   }
   return value;
 }
-const db$n = () => admin.firestore();
+const db$o = () => admin.firestore();
 const bucket$1 = () => admin.storage().bucket();
 const BROWSER_ORIGINS = [
   "https://iconicimagestx.vercel.app",
@@ -11932,7 +12284,7 @@ async function registerListingPhoto(options) {
   if (!isListingStoragePath(listingId, storagePath)) {
     throw Object.assign(new Error("Storage path is not inside this listing."), { status: 400 });
   }
-  const listingRef = db$n().collection("listings").doc(listingId);
+  const listingRef = db$o().collection("listings").doc(listingId);
   const listingSnap = await listingRef.get();
   if (!listingSnap.exists) {
     throw Object.assign(new Error("Listing not found."), { status: 404 });
@@ -12003,7 +12355,7 @@ function galleryMediaItem(image) {
 async function syncListingGallery(listing, image) {
   const galleryId = typeof listing.galleryId === "string" ? listing.galleryId.trim() : "";
   if (!galleryId) return;
-  const ref = db$n().collection("galleries").doc(galleryId);
+  const ref = db$o().collection("galleries").doc(galleryId);
   const snap = await ref.get();
   if (!snap.exists) return;
   const items = Array.isArray(snap.data()?.mediaItems) ? snap.data().mediaItems : [];
@@ -12019,7 +12371,7 @@ async function syncPlaytestGallery(listingId, listing, image) {
     galleryIds.add(listing.playtestGalleryId);
   }
   if (listing.playtest === true) {
-    const snap = await db$n().collection("galleries").where("listingId", "==", listingId).limit(5).get();
+    const snap = await db$o().collection("galleries").where("listingId", "==", listingId).limit(5).get();
     snap.docs.forEach((doc) => {
       if (doc.data().playtest === true) galleryIds.add(doc.id);
     });
@@ -12027,7 +12379,7 @@ async function syncPlaytestGallery(listingId, listing, image) {
   if (galleryIds.size === 0) return;
   const mediaItem = galleryMediaItem(image);
   for (const galleryId of galleryIds) {
-    const ref = db$n().collection("galleries").doc(galleryId);
+    const ref = db$o().collection("galleries").doc(galleryId);
     const snap = await ref.get();
     if (!snap.exists || snap.data()?.playtest !== true) continue;
     const items = Array.isArray(snap.data()?.mediaItems) ? snap.data().mediaItems : [];
@@ -12300,7 +12652,7 @@ async function inspectFinishedListingJpeg(input) {
   }
   return parseDeliveryInspection(body) || deliveryInspection("flag", [INSPECTION_FAILED_NOTE]);
 }
-const db$m = () => admin.firestore();
+const db$n = () => admin.firestore();
 const bucket = () => admin.storage().bucket();
 function httpError$3(status2, message) {
   return Object.assign(new Error(message), { status: status2 });
@@ -12312,7 +12664,7 @@ async function bumpRawIngestJob(input) {
     name: input.image.name || input.image.path.split("/").pop() || "raw",
     contentType: input.image.contentType || ""
   };
-  const ref = db$m().collection("editJobs").doc(ingestJobId(input.listingId));
+  const ref = db$n().collection("editJobs").doc(ingestJobId(input.listingId));
   const snap = await ref.get();
   if (!snap.exists) {
     await ref.set({
@@ -12344,7 +12696,7 @@ async function bumpRawIngestJob(input) {
   return { id: ref.id, created: false, fileCount: files.length + 1 };
 }
 async function loadListing$1(listingId) {
-  const snap = await db$m().collection("listings").doc(listingId).get();
+  const snap = await db$n().collection("listings").doc(listingId).get();
   if (!snap.exists) throw httpError$3(404, "Listing not found.");
   return { id: snap.id, ref: snap.ref, data: snap.data() || {} };
 }
@@ -12356,10 +12708,10 @@ async function listingDelivery(listingId, data) {
     };
     push(data.galleryId);
     push(data.playtestGalleryId);
-    const snap = await db$m().collection("galleries").where("listingId", "==", listingId).limit(5).get();
+    const snap = await db$n().collection("galleries").where("listingId", "==", listingId).limit(5).get();
     snap.docs.forEach((doc) => ids.push(doc.id));
     for (const galleryId of [...new Set(ids)]) {
-      const doc = await db$m().collection("galleries").doc(galleryId).get();
+      const doc = await db$n().collection("galleries").doc(galleryId).get();
       if (!doc.exists) continue;
       const galleryStatus = typeof doc.data()?.status === "string" ? doc.data().status : "";
       const deliveryStatus = mediaDeliveryFromGalleryStatus(galleryStatus);
@@ -12379,14 +12731,14 @@ async function listingDelivery(listingId, data) {
 async function listingsForRole(uid, role) {
   if (role === "photographer") {
     const [byUid, byIds] = await Promise.all([
-      db$m().collection("listings").where("photographerUid", "==", uid).limit(50).get(),
-      db$m().collection("listings").where("photographerIds", "array-contains", uid).limit(50).get()
+      db$n().collection("listings").where("photographerUid", "==", uid).limit(50).get(),
+      db$n().collection("listings").where("photographerIds", "array-contains", uid).limit(50).get()
     ]);
     const merged = /* @__PURE__ */ new Map();
     for (const doc of [...byUid.docs, ...byIds.docs]) merged.set(doc.id, doc);
     return [...merged.values()].map((doc) => ({ id: doc.id, data: doc.data() }));
   }
-  const snap = await db$m().collection("listings").limit(80).get();
+  const snap = await db$n().collection("listings").limit(80).get();
   return snap.docs.map((doc) => ({ id: doc.id, data: doc.data() }));
 }
 async function assertStudioAccess(uid, role, listingId) {
@@ -12458,7 +12810,7 @@ async function loadOrderEditContext(listingId) {
   let order = null;
   const orderId = typeof listing.data.orderId === "string" ? listing.data.orderId : "";
   if (orderId) {
-    const snap = await db$m().collection("orders").doc(orderId).get();
+    const snap = await db$n().collection("orders").doc(orderId).get();
     if (snap.exists) order = snap.data() || {};
   }
   const plan = planOrderEdits({
@@ -12508,7 +12860,7 @@ async function prepareOrderEditJobs(input) {
   if (input.retryFailed) settled2.delete("failed");
   let prepared = 0;
   for (const draft of drafts) {
-    const ref = db$m().collection("editJobs").doc(orderEditDocId(input.listingId, draft.slot));
+    const ref = db$n().collection("editJobs").doc(orderEditDocId(input.listingId, draft.slot));
     const snap = await ref.get();
     const current = snap.data() || {};
     if (snap.exists && settled2.has(String(current.status || ""))) continue;
@@ -12538,7 +12890,7 @@ async function prepareOrderEditJobs(input) {
     await ref.set(payload, { merge: true });
     prepared += 1;
   }
-  const jobSnap = await db$m().collection("editJobs").where("listingId", "==", input.listingId).limit(200).get();
+  const jobSnap = await db$n().collection("editJobs").where("listingId", "==", input.listingId).limit(200).get();
   const jobs = queueJobsFromSnap(jobSnap.docs);
   const advance2 = orderQueueAdvancePlan(jobs);
   const waiting = jobs.filter((job) => job.origin === "order" && job.status === "pending" && !job.sourcePath).length;
@@ -12546,7 +12898,7 @@ async function prepareOrderEditJobs(input) {
 }
 async function claimOrderEdit(ref, now = Date.now()) {
   try {
-    await db$m().runTransaction(async (tx) => {
+    await db$n().runTransaction(async (tx) => {
       const snap = await tx.get(ref);
       if (!snap.exists) throw new Error("missing");
       const data = snap.data() || {};
@@ -12573,7 +12925,7 @@ async function claimOrderEdit(ref, now = Date.now()) {
 }
 async function advanceOrderEditQueue(input) {
   const prepared = await prepareOrderEditJobs(input);
-  const jobSnap = await db$m().collection("editJobs").where("listingId", "==", input.listingId).limit(200).get();
+  const jobSnap = await db$n().collection("editJobs").where("listingId", "==", input.listingId).limit(200).get();
   const advance2 = orderQueueAdvancePlan(queueJobsFromSnap(jobSnap.docs));
   const waiting = queueJobsFromSnap(jobSnap.docs).filter((job) => job.origin === "order" && job.status === "pending" && !job.sourcePath).length;
   if (!advance2.nextId) {
@@ -12696,7 +13048,7 @@ async function enqueueOrderEditsFromUpload(input) {
   return prepareOrderEditJobs({ ...input, retryFailed: false });
 }
 async function nextOrderEditListingId() {
-  const snap = await db$m().collection("editJobs").where("status", "==", "pending").limit(40).get();
+  const snap = await db$n().collection("editJobs").where("status", "==", "pending").limit(40).get();
   for (const doc of snap.docs) {
     const data = doc.data() || {};
     if (data.origin === "order" && data.sourcePath && typeof data.listingId === "string" && data.listingId) {
@@ -12713,7 +13065,7 @@ async function enqueueAiEdit(input) {
     throw httpError$3(400, "Choose a JPEG, PNG, or WebP. RAW stays in the queue until a preview exists.");
   }
   const beforeUrl = frame.url || input.imageUrl;
-  const ref = await db$m().collection("editJobs").add({
+  const ref = await db$n().collection("editJobs").add({
     kind: "ai_edit",
     origin: "staff_override",
     type: input.type,
@@ -12781,7 +13133,7 @@ async function enqueueAiEdit(input) {
   }
 }
 async function rejectStudioJob(input) {
-  const ref = db$m().collection("editJobs").doc(input.jobId);
+  const ref = db$n().collection("editJobs").doc(input.jobId);
   const snap = await ref.get();
   if (!snap.exists) throw httpError$3(404, "Edit job not found.");
   const job = snap.data() || {};
@@ -12819,7 +13171,7 @@ async function saveAdjustedJpeg(input) {
     existingUrl: saved.url,
     extra: { studioRole: "adjusted", sourcePath: input.sourcePath }
   });
-  const job = await db$m().collection("editJobs").add({
+  const job = await db$n().collection("editJobs").add({
     kind: "adjust",
     type: "adjust",
     listingId: input.listingId,
@@ -12885,11 +13237,11 @@ async function addFinalToGalleries(listingId, listing, image) {
   const ids = /* @__PURE__ */ new Set();
   if (typeof listing.galleryId === "string" && listing.galleryId) ids.add(listing.galleryId);
   if (typeof listing.playtestGalleryId === "string" && listing.playtestGalleryId) ids.add(listing.playtestGalleryId);
-  const snap = await db$m().collection("galleries").where("listingId", "==", listingId).limit(10).get();
+  const snap = await db$n().collection("galleries").where("listingId", "==", listingId).limit(10).get();
   snap.docs.forEach((doc) => ids.add(doc.id));
   const updated = [];
   for (const galleryId of ids) {
-    const ref = db$m().collection("galleries").doc(galleryId);
+    const ref = db$n().collection("galleries").doc(galleryId);
     const gallerySnap = await ref.get();
     if (!gallerySnap.exists) continue;
     const data = gallerySnap.data() || {};
@@ -12942,7 +13294,7 @@ async function approveStudioFinal(input) {
     uploadedBy: input.uploadedBy
   });
   if (input.jobId) {
-    await db$m().collection("editJobs").doc(input.jobId).set({
+    await db$n().collection("editJobs").doc(input.jobId).set({
       status: "approved",
       resultPath: copied.storagePath,
       resultUrl: copied.url,
@@ -12961,7 +13313,7 @@ async function approveStudioFinal(input) {
 async function loadStudioWorkspace(input) {
   const listings = await listingsForRole(input.uid, input.role);
   const allowed = new Set(listings.map((item) => item.id));
-  const jobSnap = await db$m().collection("editJobs").limit(150).get();
+  const jobSnap = await db$n().collection("editJobs").limit(150).get();
   const jobs = jobSnap.docs.map((doc) => jsonSafe({ id: doc.id, ...doc.data() })).filter((job) => {
     const listingId = String(job.listingId || "");
     if (input.role === "photographer") return allowed.has(listingId);
@@ -13008,7 +13360,7 @@ async function loadStudioWorkspace(input) {
     listing
   };
 }
-const db$l = () => admin.firestore();
+const db$m = () => admin.firestore();
 function asMedia(value) {
   if (!Array.isArray(value)) return [];
   return value.flatMap((entry2) => {
@@ -13050,11 +13402,11 @@ async function galleryMediaForListing(listingId, listing, extra) {
   const ids = /* @__PURE__ */ new Set();
   if (typeof listing.galleryId === "string" && listing.galleryId) ids.add(listing.galleryId);
   if (typeof listing.playtestGalleryId === "string" && listing.playtestGalleryId) ids.add(listing.playtestGalleryId);
-  const snap = await db$l().collection("galleries").where("listingId", "==", listingId).limit(10).get();
+  const snap = await db$m().collection("galleries").where("listingId", "==", listingId).limit(10).get();
   snap.docs.forEach((doc) => ids.add(doc.id));
   for (const galleryId of ids) {
     if (extra && galleryId === extra.id) continue;
-    const doc = await db$l().collection("galleries").doc(galleryId).get();
+    const doc = await db$m().collection("galleries").doc(galleryId).get();
     if (!doc.exists) continue;
     const data = doc.data() || {};
     media.push(...asMedia(data.mediaItems), ...asMedia(data.videoLinks), ...asMedia(data.tourLinks));
@@ -13064,7 +13416,7 @@ async function galleryMediaForListing(listingId, listing, extra) {
 async function loadGalleryReleaseReport(listingId, gallery) {
   const { listing, plan } = await loadOrderEditContext(listingId);
   const files = filesFromListing(listing.data);
-  const jobSnap = await db$l().collection("editJobs").where("listingId", "==", listingId).limit(200).get();
+  const jobSnap = await db$m().collection("editJobs").where("listingId", "==", listingId).limit(200).get();
   const jobs = jobSnap.docs.map((doc) => {
     const data = doc.data() || {};
     return {
@@ -13089,7 +13441,7 @@ async function loadGalleryReleaseReport(listingId, gallery) {
   return report;
 }
 async function loadGalleryReleaseForGallery(galleryId) {
-  const snap = await db$l().collection("galleries").doc(galleryId).get();
+  const snap = await db$m().collection("galleries").doc(galleryId).get();
   if (!snap.exists) {
     throw Object.assign(new Error("Gallery not found."), { status: 404 });
   }
@@ -13098,13 +13450,13 @@ async function loadGalleryReleaseForGallery(galleryId) {
   if (playtestRelease) return playtestRelease;
   const listingId = typeof gallery.listingId === "string" ? gallery.listingId.trim() : "";
   if (listingId) {
-    const listingSnap = await db$l().collection("listings").doc(listingId).get();
+    const listingSnap = await db$m().collection("listings").doc(listingId).get();
     if (listingSnap.exists) return loadGalleryReleaseReport(listingId, gallery);
   }
   const orderId = typeof gallery.orderId === "string" ? gallery.orderId.trim() : "";
   let order = null;
   if (orderId) {
-    const orderSnap = await db$l().collection("orders").doc(orderId).get();
+    const orderSnap = await db$m().collection("orders").doc(orderId).get();
     if (orderSnap.exists) order = orderSnap.data() || {};
   }
   const plan = planOrderEdits({
@@ -13122,18 +13474,18 @@ async function loadGalleryReleaseForGallery(galleryId) {
     media: [...asMedia(gallery.mediaItems), ...asMedia(gallery.videoLinks), ...asMedia(gallery.tourLinks)]
   });
 }
-const db$k = () => admin.firestore();
+const db$l = () => admin.firestore();
 function httpError$2(status2, message, extra) {
   return Object.assign(new Error(message), { status: status2, ...extra });
 }
 async function invoiceForGallery$1(gallery) {
-  const load = (id) => db$k().collection("invoices").doc(id).get();
+  const load = (id) => db$l().collection("invoices").doc(id).get();
   if (typeof gallery.invoiceId === "string" && gallery.invoiceId) {
     const doc = await readInvoiceDoc(load, gallery.invoiceId);
     if (doc) return { id: doc.id, ...doc.data };
   }
   if (typeof gallery.orderId === "string" && gallery.orderId) {
-    const snap = await db$k().collection("invoices").where("orderId", "==", gallery.orderId).limit(1).get();
+    const snap = await db$l().collection("invoices").where("orderId", "==", gallery.orderId).limit(1).get();
     if (!snap.empty) {
       const doc = await readInvoiceDoc(load, snap.docs[0].id);
       if (doc) return { id: doc.id, ...doc.data };
@@ -13141,7 +13493,7 @@ async function invoiceForGallery$1(gallery) {
   }
   const listingId = typeof gallery.listingId === "string" ? gallery.listingId.trim() : "";
   if (listingId) {
-    const listing = await db$k().collection("listings").doc(listingId).get();
+    const listing = await db$l().collection("listings").doc(listingId).get();
     const invoiceId = listing.exists && typeof listing.data()?.invoiceId === "string" ? listing.data()?.invoiceId.trim() : "";
     if (invoiceId) {
       const doc = await readInvoiceDoc(load, invoiceId);
@@ -13153,7 +13505,7 @@ async function invoiceForGallery$1(gallery) {
 async function listingDownloadFlags$1(gallery) {
   const listingId = typeof gallery.listingId === "string" ? gallery.listingId.trim() : "";
   if (!listingId) return { lockDownloads: void 0, downloadsReleased: false };
-  const listing = await db$k().collection("listings").doc(listingId).get();
+  const listing = await db$l().collection("listings").doc(listingId).get();
   if (!listing.exists) return { lockDownloads: void 0, downloadsReleased: false };
   const data = listing.data() || {};
   return {
@@ -13172,7 +13524,7 @@ async function downloadGateForGallery$1(gallery) {
   };
 }
 async function deliverGalleryToClient(galleryId, options) {
-  const galleryDoc = await db$k().collection("galleries").doc(galleryId).get();
+  const galleryDoc = await db$l().collection("galleries").doc(galleryId).get();
   if (!galleryDoc.exists) throw httpError$2(404, "Gallery not found.");
   const report = await loadGalleryReleaseForGallery(galleryId);
   if (!report.complete) {
@@ -13195,13 +13547,13 @@ async function deliverGalleryToClient(galleryId, options) {
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
   });
   if (gallery.orderId) {
-    await db$k().collection("orders").doc(String(gallery.orderId)).update({
+    await db$l().collection("orders").doc(String(gallery.orderId)).update({
       status: "delivered",
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
   }
   const clientId2 = typeof gallery.clientId === "string" ? gallery.clientId : "";
-  const clientDoc = clientId2 ? await db$k().collection("clients").doc(clientId2).get() : null;
+  const clientDoc = clientId2 ? await db$l().collection("clients").doc(clientId2).get() : null;
   const client = clientDoc?.data();
   const address = recordAddressText(gallery) || "the property";
   const invoice = await invoiceForGallery$1(gallery);
@@ -13272,7 +13624,7 @@ async function recordGalleryDelivered(gallery, input) {
     return;
   }
   if (orderId) {
-    await db$k().collection("orders").doc(orderId).update({
+    await db$l().collection("orders").doc(orderId).update({
       history: admin.firestore.FieldValue.arrayUnion(entry2),
       updatedAt: stamp2
     });
@@ -13280,7 +13632,7 @@ async function recordGalleryDelivered(gallery, input) {
     console.warn("[Galleries] Gallery delivered with no order to attach history to.");
   }
   if (!listingId) return;
-  await db$k().collection("listings").doc(listingId).update({
+  await db$l().collection("listings").doc(listingId).update({
     auditLog: admin.firestore.FieldValue.arrayUnion(entry2),
     updatedAt: stamp2
   }).catch((err) => console.error("[Galleries] Project history was not saved:", err));
@@ -13289,11 +13641,11 @@ async function orderIdForGallery(gallery) {
   if (typeof gallery.orderId === "string" && gallery.orderId.trim()) return gallery.orderId.trim();
   const listingId = typeof gallery.listingId === "string" ? gallery.listingId.trim() : "";
   if (!listingId) return "";
-  const listing = await db$k().collection("listings").doc(listingId).get();
+  const listing = await db$l().collection("listings").doc(listingId).get();
   const orderId = listing.exists ? listing.data()?.orderId : "";
   return typeof orderId === "string" ? orderId.trim() : "";
 }
-const db$j = () => admin.firestore();
+const db$k = () => admin.firestore();
 function text$a(value) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -13303,7 +13655,7 @@ function docRecord(snap) {
 }
 async function galleriesWhere(field, id) {
   try {
-    const snap = await db$j().collection("galleries").where(field, "==", id).limit(8).get();
+    const snap = await db$k().collection("galleries").where(field, "==", id).limit(8).get();
     return snap.docs.map((doc) => docRecord(doc)).filter((doc) => Boolean(doc));
   } catch (err) {
     console.error(`[Galleries] ${field} lookup failed:`, err);
@@ -13312,7 +13664,7 @@ async function galleriesWhere(field, id) {
 }
 async function galleryById(id) {
   if (!id) return null;
-  return docRecord(await db$j().collection("galleries").doc(id).get());
+  return docRecord(await db$k().collection("galleries").doc(id).get());
 }
 async function relatedForListing(listing) {
   const related = await galleriesWhere("listingId", listing.id);
@@ -13326,8 +13678,8 @@ async function relatedForListing(listing) {
 }
 async function resolveClientGalleryLink(id) {
   const [gallerySnap, listingSnap] = await Promise.all([
-    db$j().collection("galleries").doc(id).get(),
-    db$j().collection("listings").doc(id).get()
+    db$k().collection("galleries").doc(id).get(),
+    db$k().collection("listings").doc(id).get()
   ]);
   const gallery = docRecord(gallerySnap);
   const listing = docRecord(listingSnap);
@@ -13359,8 +13711,8 @@ async function resolveClientGalleryLink(id) {
   }
   const relatedGalleries = await galleriesWhere("listingId", id);
   const [orderSnap, requestSnap] = await Promise.all([
-    db$j().collection("orders").doc(id).get(),
-    db$j().collection("orderRequests").doc(id).get()
+    db$k().collection("orders").doc(id).get(),
+    db$k().collection("orderRequests").doc(id).get()
   ]);
   const order = docRecord(orderSnap);
   const orderRequest = docRecord(requestSnap);
@@ -13371,7 +13723,7 @@ async function resolveClientGalleryLink(id) {
   let pointedListing = null;
   let pointedRelated = relatedGalleries;
   if (!pointedGallery && pointedListingId) {
-    pointedListing = docRecord(await db$j().collection("listings").doc(pointedListingId).get());
+    pointedListing = docRecord(await db$k().collection("listings").doc(pointedListingId).get());
     if (pointedListing) pointedRelated = await relatedForListing(pointedListing);
   }
   return decideClientGalleryLink({
@@ -13387,7 +13739,7 @@ async function resolveClientGalleryLink(id) {
   });
 }
 async function invoiceForListing(listing) {
-  const load = (id) => db$j().collection("invoices").doc(id).get();
+  const load = (id) => db$k().collection("invoices").doc(id).get();
   const invoiceId = text$a(listing.invoiceId);
   if (invoiceId) {
     const doc = await readInvoiceDoc(load, invoiceId);
@@ -13403,7 +13755,7 @@ async function invoiceForListing(listing) {
   const orderId = text$a(listing.orderId);
   if (!orderId) return null;
   try {
-    const snap = await db$j().collection("invoices").where("orderId", "==", orderId).limit(1).get();
+    const snap = await db$k().collection("invoices").where("orderId", "==", orderId).limit(1).get();
     if (snap.empty) return null;
     const doc = await readInvoiceDoc(load, snap.docs[0].id);
     if (!doc || invoiceRedirectTarget(doc.data)) return null;
@@ -13433,7 +13785,7 @@ async function readStudioCaller(req) {
       };
     }
     const decoded = await admin.auth().verifyIdToken(token);
-    const staffSnap = await db$j().collection("staff").doc(decoded.uid).get();
+    const staffSnap = await db$k().collection("staff").doc(decoded.uid).get();
     const staff = staffSnap.exists ? staffSnap.data() : null;
     const staffRole = isActiveStaffRecord(staff) ? String(staff?.role || "") : void 0;
     const identity = await resolveClientIdentity(decoded.uid, decoded.email);
@@ -13465,7 +13817,7 @@ function sharePlaybackOpen(listing, invoice, related) {
 }
 async function finishGalleryLink(result, caller) {
   if (!result.ok || result.kind !== "listing") return result;
-  const listing = docRecord(await db$j().collection("listings").doc(result.project.id).get());
+  const listing = docRecord(await db$k().collection("listings").doc(result.project.id).get());
   if (!listing) return result;
   const [invoice, related] = await Promise.all([
     invoiceForListing(listing),
@@ -13517,7 +13869,7 @@ const handlePublicGalleryLink = async (req, res) => {
   }
 };
 const router$p = Router();
-const db$i = () => admin.firestore();
+const db$j = () => admin.firestore();
 const storage = () => admin.storage().bucket();
 function cleanPosterUrl(value) {
   if (typeof value !== "string") return null;
@@ -13547,13 +13899,13 @@ async function holdIfOrderIncomplete(res, galleryId) {
   return true;
 }
 async function invoiceForGallery(gallery) {
-  const load = (id) => db$i().collection("invoices").doc(id).get();
+  const load = (id) => db$j().collection("invoices").doc(id).get();
   if (typeof gallery.invoiceId === "string" && gallery.invoiceId) {
     const doc = await readInvoiceDoc(load, gallery.invoiceId);
     if (doc) return { id: doc.id, ...doc.data };
   }
   if (typeof gallery.orderId === "string" && gallery.orderId) {
-    const snap = await db$i().collection("invoices").where("orderId", "==", gallery.orderId).limit(1).get();
+    const snap = await db$j().collection("invoices").where("orderId", "==", gallery.orderId).limit(1).get();
     if (!snap.empty) {
       const doc = await readInvoiceDoc(load, snap.docs[0].id);
       if (doc) return { id: doc.id, ...doc.data };
@@ -13564,7 +13916,7 @@ async function invoiceForGallery(gallery) {
 async function listingDownloadFlags(gallery) {
   const listingId = typeof gallery.listingId === "string" ? gallery.listingId.trim() : "";
   if (!listingId) return { lockDownloads: void 0, downloadsReleased: false };
-  const listing = await db$i().collection("listings").doc(listingId).get();
+  const listing = await db$j().collection("listings").doc(listingId).get();
   if (!listing.exists) return { lockDownloads: void 0, downloadsReleased: false };
   const data = listing.data() || {};
   return {
@@ -13615,7 +13967,7 @@ function clientGalleryPayload(id, gallery, gate2) {
 router$p.get("/", requireStaff, async (req, res) => {
   try {
     const { status: status2, orderId } = req.query;
-    let query = db$i().collection("galleries").orderBy("createdAt", "desc");
+    let query = db$j().collection("galleries").orderBy("createdAt", "desc");
     if (status2) query = query.where("status", "==", status2);
     if (orderId) query = query.where("orderId", "==", orderId);
     const snapshot = await query.limit(100).get();
@@ -13646,7 +13998,7 @@ router$p.get("/public/:id", async (req, res) => {
     return publicGalleryNotFound(res);
   }
   try {
-    const doc = await db$i().collection("galleries").doc(id).get();
+    const doc = await db$j().collection("galleries").doc(id).get();
     if (!doc.exists) {
       console.info("[Galleries] Public gallery not found.", id);
       return publicGalleryNotFound(res);
@@ -13666,10 +14018,10 @@ router$p.get("/public/:id", async (req, res) => {
 router$p.get("/link/:id", handlePublicGalleryLink);
 router$p.get("/:id", requireAuth, async (req, res) => {
   try {
-    const doc = await db$i().collection("galleries").doc(req.params.id).get();
+    const doc = await db$j().collection("galleries").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Gallery not found." });
     const gallery = doc.data();
-    const staffDoc = await db$i().collection("staff").doc(req.user.uid).get();
+    const staffDoc = await db$j().collection("staff").doc(req.user.uid).get();
     if (!staffDoc.exists) {
       if (gallery.clientId !== req.user.uid) {
         return res.status(403).json({ error: "Access denied." });
@@ -13694,7 +14046,7 @@ router$p.post("/:id/upload-url", requirePhotographer, async (req, res) => {
     if (!fileName2 || !fileType) {
       return res.status(400).json({ error: "fileName and fileType required." });
     }
-    const galleryDoc = await db$i().collection("galleries").doc(req.params.id).get();
+    const galleryDoc = await db$j().collection("galleries").doc(req.params.id).get();
     if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
     const folder = isRaw2 ? "raw" : "edited";
     const safeName = fileName2.replace(/[^a-zA-Z0-9._-]/g, "_");
@@ -13729,7 +14081,7 @@ router$p.post("/:id/media", requirePhotographer, async (req, res) => {
     if (!storagePath || !fileName2) {
       return res.status(400).json({ error: "storagePath and fileName required." });
     }
-    const galleryDoc = await db$i().collection("galleries").doc(req.params.id).get();
+    const galleryDoc = await db$j().collection("galleries").doc(req.params.id).get();
     if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
     const file = storage().file(storagePath);
     const [url] = await file.getSignedUrl({
@@ -13771,7 +14123,7 @@ router$p.post("/:id/media-link", requireCoordinator, async (req, res) => {
   try {
     const { url, title, type = "video", embedUrl, thumbnailUrl, downloadable = false, poster, posterUrl } = req.body;
     if (!url) return res.status(400).json({ error: "url required." });
-    const galleryDoc = await db$i().collection("galleries").doc(req.params.id).get();
+    const galleryDoc = await db$j().collection("galleries").doc(req.params.id).get();
     if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
     const item = {
       id: `${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
@@ -13826,7 +14178,7 @@ router$p.patch("/:id/status", requireCoordinator, async (req, res) => {
       if (!adminReady$5(res)) return;
       if (await holdIfOrderIncomplete(res, req.params.id)) return;
     }
-    await db$i().collection("galleries").doc(req.params.id).update({
+    await db$j().collection("galleries").doc(req.params.id).update({
       status: status2,
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
@@ -13873,7 +14225,7 @@ router$p.patch("/:id/downloads", requireCoordinator, async (req, res) => {
       return res.status(400).json({ error: "released must be true or false." });
     }
     const released = req.body.released === true;
-    const galleryDoc = await db$i().collection("galleries").doc(req.params.id).get();
+    const galleryDoc = await db$j().collection("galleries").doc(req.params.id).get();
     if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
     const gallery = galleryDoc.data() || {};
     const invoice = await invoiceForGallery(gallery);
@@ -13905,7 +14257,7 @@ router$p.patch("/:id/downloads", requireCoordinator, async (req, res) => {
 });
 router$p.delete("/:id/media/:mediaId", requireCoordinator, async (req, res) => {
   try {
-    const galleryDoc = await db$i().collection("galleries").doc(req.params.id).get();
+    const galleryDoc = await db$j().collection("galleries").doc(req.params.id).get();
     if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
     const gallery = galleryDoc.data();
     const mediaItems = (gallery.mediaItems || []).filter(
@@ -14012,6 +14364,273 @@ async function followInvoiceRedirect(hit, byId) {
     current = followed;
   }
   return current;
+}
+const WEBHOOK_PATH = "/api/payments/square-webhook";
+const SQUARE_WEBHOOK_VERCEL_URL = `https://iconicimagestx.vercel.app${WEBHOOK_PATH}`;
+const SQUARE_WEBHOOK_CUSTOM_DOMAIN_URL = `https://iconicimagestx.com${WEBHOOK_PATH}`;
+function squareWebhookNotificationUrl(env = process.env) {
+  return (env.SQUARE_WEBHOOK_NOTIFICATION_URL || "").trim();
+}
+function squareWebhookUrlFromOrigin(value) {
+  const trimmed = (value || "").trim().replace(/\/+$/, "");
+  if (!trimmed) return "";
+  if (/^https?:\/\//i.test(trimmed) && trimmed.includes(WEBHOOK_PATH)) return trimmed;
+  const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  return `${withScheme}${WEBHOOK_PATH}`;
+}
+function squareWebhookNotificationUrls(env = process.env) {
+  const appOrigin = (env.APP_URL || "").trim() || "https://iconicimagestx.com";
+  const urls = [
+    squareWebhookNotificationUrl(env),
+    squareWebhookUrlFromOrigin(env.VERCEL_PROJECT_PRODUCTION_URL),
+    SQUARE_WEBHOOK_VERCEL_URL,
+    squareWebhookUrlFromOrigin(appOrigin),
+    squareWebhookUrlFromOrigin(env.FRONTEND_URL),
+    SQUARE_WEBHOOK_CUSTOM_DOMAIN_URL
+  ];
+  return [...new Set(urls.filter((url) => url.length > 0))];
+}
+function signSquareWebhook(rawBody, key, notificationUrl) {
+  return crypto.createHmac("sha256", key).update(notificationUrl + rawBody).digest("base64");
+}
+function squareWebhookSignatureValid(rawBody, received, key, notificationUrl) {
+  if (!received || !key || !notificationUrl) return false;
+  const expected = signSquareWebhook(rawBody, key, notificationUrl);
+  const expectedBuf = Buffer.from(expected);
+  const receivedBuf = Buffer.from(received);
+  if (expectedBuf.length !== receivedBuf.length) return false;
+  return crypto.timingSafeEqual(expectedBuf, receivedBuf);
+}
+function squareWebhookRawBody(body) {
+  if (Buffer.isBuffer(body)) return body.toString("utf8");
+  if (body instanceof Uint8Array) return Buffer.from(body).toString("utf8");
+  if (typeof body === "string") return body;
+  return null;
+}
+function squareWebhookOwnedRawBody(req) {
+  const desc = Object.getOwnPropertyDescriptor(req, "body");
+  if (!desc || !("value" in desc)) return void 0;
+  return squareWebhookRawBody(desc.value);
+}
+function readSquareWebhookRawBody(req) {
+  const owned = squareWebhookOwnedRawBody(req);
+  if (owned !== void 0) return Promise.resolve(owned);
+  if (req.readable !== false) return Promise.resolve(squareWebhookRawBody(req.body));
+  return new Promise((resolve) => {
+    const chunks = [];
+    let settled2 = false;
+    const finish = () => {
+      if (settled2) return;
+      settled2 = true;
+      req.off?.("data", onData);
+      req.off?.("end", finish);
+      req.off?.("error", finish);
+      if (!chunks.length) {
+        resolve(squareWebhookRawBody(req.body));
+        return;
+      }
+      const buf = Buffer.concat(chunks);
+      req.body = buf;
+      resolve(buf.toString("utf8"));
+    };
+    const onData = (chunk2) => {
+      chunks.push(Buffer.isBuffer(chunk2) ? chunk2 : Buffer.from(chunk2));
+    };
+    req.on("data", onData);
+    req.on("end", finish);
+    req.on("error", finish);
+    setImmediate(finish);
+  });
+}
+const db$i = () => admin.firestore();
+async function releaseEvent(ref, order, deleteEvent, result) {
+  const eventId = typeof order.calendarEventId === "string" ? order.calendarEventId : "";
+  if (!eventId) {
+    await ref.update({ calendarEventReleased: true, updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+    return;
+  }
+  let deleted = false;
+  try {
+    deleted = await deleteEvent({
+      calendarId: typeof order.calendarId === "string" ? order.calendarId : null,
+      eventId
+    });
+  } catch (error) {
+    console.error("[ApprenticeshipHolds] Calendar delete failed:", error);
+  }
+  if (deleted) result.eventsDeleted += 1;
+  else result.eventErrors += 1;
+  await ref.update({
+    calendarEventReleased: deleted,
+    ...deleted ? { holdReleasedAt: admin.firestore.FieldValue.serverTimestamp() } : {},
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+}
+async function releaseExpiredApprenticeshipHolds(options = {}) {
+  const result = { checked: 0, released: 0, eventsDeleted: 0, eventErrors: 0 };
+  if (!admin.apps.length) return result;
+  const now = options.now ?? /* @__PURE__ */ new Date();
+  const deleteEvent = options.deleteEvent ?? deleteApprenticeshipEvent;
+  const handled = /* @__PURE__ */ new Set();
+  const waiting = await db$i().collection("orders").where("source", "==", APPRENTICESHIP_ORDER_SOURCE).where("status", "==", APPRENTICESHIP_AWAITING_DEPOSIT_STATUS).get();
+  for (const snap of waiting.docs) {
+    const listed = snap.data() || {};
+    if (!apprenticeshipHoldExpired(listed, now)) continue;
+    result.checked += 1;
+    const ref = db$i().collection("orders").doc(snap.id);
+    const expired = await db$i().runTransaction(async (tx) => {
+      const orderSnap = await tx.get(ref);
+      if (!orderSnap.exists) return null;
+      const order = orderSnap.data() || {};
+      if (!apprenticeshipHoldExpired(order, now)) return null;
+      const invoiceId = typeof order.invoiceId === "string" ? order.invoiceId : "";
+      const invoiceRef = invoiceId ? db$i().collection("invoices").doc(invoiceId) : null;
+      const invoiceSnap = invoiceRef ? await tx.get(invoiceRef) : null;
+      const invoice = invoiceSnap?.exists ? invoiceSnap.data() || {} : {};
+      if ((Number(invoice.depositPaid) || 0) > 0 || invoice.depositPaidAt) return null;
+      const requestId = typeof order.orderRequestId === "string" ? order.orderRequestId : "";
+      const requestRef = requestId ? db$i().collection("orderRequests").doc(requestId) : null;
+      const requestSnap = requestRef ? await tx.get(requestRef) : null;
+      const stamp2 = admin.firestore.FieldValue.serverTimestamp();
+      const note = `Hold released: the $25 booking fee was not paid within ${APPRENTICESHIP_HOLD_MINUTES} minutes.`;
+      tx.update(ref, {
+        status: APPRENTICESHIP_EXPIRED_STATUS,
+        depositStatus: "expired",
+        holdExpiredAt: stamp2,
+        calendarEventReleased: false,
+        officeNote: note,
+        updatedAt: stamp2
+      });
+      if (requestRef && requestSnap?.exists) {
+        tx.update(requestRef, {
+          status: APPRENTICESHIP_EXPIRED_STATUS,
+          depositStatus: "expired",
+          officeNote: note,
+          updatedAt: stamp2
+        });
+      }
+      if (invoiceRef && invoiceSnap?.exists) {
+        tx.update(invoiceRef, { holdExpired: true, updatedAt: stamp2 });
+      }
+      return order;
+    });
+    if (!expired) continue;
+    handled.add(snap.id);
+    result.released += 1;
+    await releaseEvent(ref, expired, deleteEvent, result);
+  }
+  const stuck = await db$i().collection("orders").where("source", "==", APPRENTICESHIP_ORDER_SOURCE).where("status", "==", APPRENTICESHIP_EXPIRED_STATUS).where("calendarEventReleased", "==", false).get();
+  for (const snap of stuck.docs) {
+    const order = snap.data() || {};
+    if (handled.has(snap.id) || order.source !== APPRENTICESHIP_ORDER_SOURCE) continue;
+    if (order.status !== APPRENTICESHIP_EXPIRED_STATUS || order.calendarEventReleased !== false) continue;
+    await releaseEvent(db$i().collection("orders").doc(snap.id), order, deleteEvent, result);
+  }
+  return result;
+}
+let lastLazyRun = 0;
+let lazyRunning = null;
+const LAZY_INTERVAL_MS = 60 * 1e3;
+const LAZY_TIMEOUT_MS = 4e3;
+async function maybeReleaseExpiredApprenticeshipHolds(now = /* @__PURE__ */ new Date()) {
+  if (lazyRunning) {
+    await Promise.race([lazyRunning, new Promise((resolve) => setTimeout(resolve, LAZY_TIMEOUT_MS))]);
+    return;
+  }
+  if (now.getTime() - lastLazyRun < LAZY_INTERVAL_MS) return;
+  lastLazyRun = now.getTime();
+  lazyRunning = releaseExpiredApprenticeshipHolds({ now }).catch((error) => console.error("[ApprenticeshipHolds] Lazy release failed:", error)).finally(() => {
+    lazyRunning = null;
+  });
+  await Promise.race([lazyRunning, new Promise((resolve) => setTimeout(resolve, LAZY_TIMEOUT_MS))]);
+}
+async function resolveLateApprenticeshipPayment(orderId) {
+  const ref = db$i().collection("orders").doc(orderId);
+  const snap = await ref.get();
+  if (!snap.exists) return "skipped";
+  const order = snap.data() || {};
+  if (order.source !== APPRENTICESHIP_ORDER_SOURCE || order.status !== APPRENTICESHIP_EXPIRED_STATUS) return "skipped";
+  const stamp2 = admin.firestore.FieldValue.serverTimestamp();
+  const requestId = typeof order.orderRequestId === "string" ? order.orderRequestId : "";
+  const requestRef = requestId ? db$i().collection("orderRequests").doc(requestId) : null;
+  const orderNumber = String(order.orderNumber || "");
+  const slotStart = typeof order.slotStart === "string" ? order.slotStart : "";
+  const packageId = typeof order.packageId === "string" ? order.packageId : "";
+  const confirm = async (extra) => {
+    await ref.update({
+      status: "confirmed",
+      depositStatus: "paid",
+      confirmedAt: stamp2,
+      reconfirmedAfterExpiry: true,
+      officeNote: "$25 booking fee paid after the hold expired. The time was still open and is booked again.",
+      updatedAt: stamp2,
+      ...extra
+    });
+    if (requestRef) {
+      await requestRef.update({ status: "new", depositStatus: "paid", updatedAt: stamp2 }).catch(() => {
+      });
+    }
+    return "confirmed";
+  };
+  if (!slotStart) return confirm({});
+  let flagReason = "the time was taken after the hold expired";
+  try {
+    const availability = await readApprenticeshipAvailability({ packageId: packageId || "apprentice-25" });
+    const slot = availability.available ? availability.slots.find((item) => item.start === slotStart) : void 0;
+    if (!availability.available) flagReason = "the apprentice calendar could not be read";
+    if (slot) {
+      const event = await createApprenticeshipEvent({
+        orderNumber,
+        clientName: String(order.clientName || ""),
+        clientEmail: String(order.clientEmail || ""),
+        clientPhone: String(order.clientPhone || ""),
+        address: String(order.address || ""),
+        packageName: String(order.packageName || ""),
+        slot
+      });
+      if (event?.eventId) {
+        return confirm({
+          calendarEventId: event.eventId,
+          calendarId: event.calendarId,
+          calendarEventReleased: null
+        });
+      }
+      flagReason = "the calendar event could not be created";
+    }
+  } catch (error) {
+    console.error("[ApprenticeshipHolds] Late payment re-confirm failed:", error);
+    flagReason = "the apprentice calendar could not be read";
+  }
+  const note = `$25 booking fee paid after the ${APPRENTICESHIP_HOLD_MINUTES}-minute hold expired, but ${flagReason}. Call the agent to pick a new time or refund the $25.`;
+  await ref.update({
+    status: APPRENTICESHIP_PAID_NEEDS_RESCHEDULE_STATUS,
+    depositStatus: "paid",
+    needsOfficeReview: true,
+    officeNote: note,
+    updatedAt: stamp2
+  });
+  if (requestRef) {
+    await requestRef.update({
+      status: APPRENTICESHIP_PAID_NEEDS_RESCHEDULE_STATUS,
+      depositStatus: "paid",
+      needsOfficeReview: true,
+      officeNote: note,
+      updatedAt: stamp2
+    }).catch(() => {
+    });
+  }
+  await db$i().collection("agentLogs").add({
+    agent: "travis",
+    action: "Apprentice fee paid after hold expired",
+    summary: `Order ${orderNumber || orderId}: ${note}`,
+    status: "flagged",
+    relatedType: "order",
+    relatedId: orderId,
+    priority: "high",
+    requiresHumanReview: true,
+    createdAt: stamp2
+  });
+  return "flagged";
 }
 const SENIOR_FACILITY_RATE_PER_SQFT = 0.1;
 const SENIOR_TOUR_PRICE = 250;
@@ -14783,6 +15402,8 @@ async function applyDepositPayment({
   const transactionRef = db$h().collection("transactions").doc(
     paymentKey ? `square-${paymentKey}` : `deposit-${invoiceId}`
   );
+  let confirmEvent = null;
+  let lateApprenticeOrderId = "";
   await db$h().runTransaction(async (tx) => {
     const invoiceSnap = await tx.get(invoiceRef);
     if (!invoiceSnap.exists) return;
@@ -14819,16 +15440,35 @@ async function applyDepositPayment({
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
     if (orderRef && orderSnap?.exists) {
+      const order = orderSnap.data() || {};
+      const confirmsBooking = order.source === APPRENTICESHIP_ORDER_SOURCE && order.status === APPRENTICESHIP_AWAITING_DEPOSIT_STATUS;
+      if (order.source === APPRENTICESHIP_ORDER_SOURCE && order.status === APPRENTICESHIP_EXPIRED_STATUS && orderId) {
+        lateApprenticeOrderId = orderId;
+      }
       tx.update(orderRef, {
         depositPaid,
         balanceDue: amountDue,
         paymentStatus: amountDue <= 0 ? "paid" : "partial",
+        ...confirmsBooking ? {
+          status: "confirmed",
+          depositStatus: "paid",
+          confirmedAt: admin.firestore.FieldValue.serverTimestamp()
+        } : {},
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
+      if (confirmsBooking && typeof order.calendarEventId === "string" && order.calendarEventId) {
+        confirmEvent = {
+          calendarId: typeof order.calendarId === "string" ? order.calendarId : null,
+          eventId: order.calendarEventId,
+          orderNumber: String(order.orderNumber || "")
+        };
+      }
     }
     if (requestRef && requestSnap?.exists) {
+      const request = requestSnap.data() || {};
       tx.update(requestRef, {
         depositPaid,
+        ...request.source === APPRENTICESHIP_ORDER_SOURCE ? { depositStatus: "paid" } : {},
         balanceDue: amountDue,
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
@@ -14849,6 +15489,21 @@ async function applyDepositPayment({
       createdAt: admin.firestore.FieldValue.serverTimestamp()
     });
   });
+  if (lateApprenticeOrderId) {
+    try {
+      await resolveLateApprenticeshipPayment(lateApprenticeOrderId);
+    } catch (error) {
+      console.error("[Payments] Late apprenticeship payment follow-up failed:", error);
+    }
+  }
+  const held = confirmEvent;
+  if (held) {
+    try {
+      await confirmApprenticeshipEvent(held);
+    } catch (error) {
+      console.error("[Payments] Apprenticeship calendar confirm failed:", error);
+    }
+  }
 }
 router$o.post("/create-intent", requireAuth, async (req, res) => {
   try {
@@ -15209,6 +15864,11 @@ router$o.post("/invoice/:id/deposit-checkout", async (req, res) => {
     if (alreadyPaid) {
       return res.status(409).json({ error: "The deposit is already paid." });
     }
+    if (orderSource === APPRENTICESHIP_ORDER_SOURCE && order.status === APPRENTICESHIP_EXPIRED_STATUS) {
+      return res.status(409).json({
+        error: `This hold expired after ${APPRENTICESHIP_HOLD_MINUTES} minutes without the $25 booking fee. Please book a new time.`
+      });
+    }
     if (String(invoice.status || "draft") !== "draft") {
       return res.status(409).json({ error: "The deposit can only be paid while the invoice is a draft." });
     }
@@ -15243,7 +15903,7 @@ router$o.post("/invoice/:id/deposit-checkout", async (req, res) => {
           location_id: process.env.SQUARE_LOCATION_ID
         },
         checkout_options: {
-          redirect_url: `${appUrl$2()}${orderSource === APPRENTICESHIP_ORDER_SOURCE ? apprenticeshipBookingReturnPath(orderNumber) : seniorLivingDepositReturnPath(orderNumber)}`
+          redirect_url: `${appUrl$2()}${orderSource === APPRENTICESHIP_ORDER_SOURCE ? apprenticeshipBookingReturnPath(orderNumber, invoice.depositReturn) : seniorLivingDepositReturnPath(orderNumber)}`
         },
         pre_populated_data: {
           buyer_email: invoice.clientEmail || void 0
@@ -15309,24 +15969,16 @@ router$o.post("/webhook", async (req, res) => {
     return res.status(500).json({ error: "Webhook handler failed." });
   }
 });
-function squareNotificationUrls() {
-  const explicit = process.env.SQUARE_WEBHOOK_NOTIFICATION_URL;
-  const urls = [
-    explicit,
-    `${appUrl$2()}/api/payments/square-webhook`,
-    process.env.FRONTEND_URL ? `${process.env.FRONTEND_URL.replace(/\/$/, "")}/api/payments/square-webhook` : ""
-  ].filter((url) => Boolean(url));
-  return [...new Set(urls)];
+function squareWebhookRequestPath(req) {
+  const raw = req.originalUrl || req.url || req.path || "";
+  return raw.split("?")[0];
 }
-function squareSignatureValid(rawBody, received, key) {
-  if (!received) return false;
-  const receivedBuf = Buffer.from(received);
-  return squareNotificationUrls().some((url) => {
-    const expected = crypto.createHmac("sha256", key).update(url + rawBody).digest("base64");
-    const expectedBuf = Buffer.from(expected);
-    if (expectedBuf.length !== receivedBuf.length) return false;
-    return crypto.timingSafeEqual(expectedBuf, receivedBuf);
-  });
+function squareSignatureHeader(req) {
+  const header = req.headers["x-square-hmacsha256-signature"];
+  return Array.isArray(header) ? header[0] : header;
+}
+function squareSignatureValid(rawBody, received, key, urls = squareWebhookNotificationUrls()) {
+  return urls.some((url) => squareWebhookSignatureValid(rawBody, received, key, url));
 }
 async function findInvoiceForSquarePayment(payment) {
   const hit = await matchSquarePaymentInvoice(payment, {
@@ -15348,14 +16000,31 @@ async function findInvoiceForSquarePayment(payment) {
 }
 router$o.post("/square-webhook", async (req, res) => {
   try {
-    const rawBody = Buffer.isBuffer(req.body) ? req.body.toString("utf8") : JSON.stringify(req.body || {});
     const signatureKey = process.env.SQUARE_WEBHOOK_SIGNATURE_KEY;
     if (!signatureKey) {
       console.error("[Payments] Square webhook rejected: SQUARE_WEBHOOK_SIGNATURE_KEY is not set.");
       return res.status(401).json({ error: "Square webhook signature key is not configured." });
     }
-    const received = Array.isArray(req.headers["x-square-hmacsha256-signature"]) ? req.headers["x-square-hmacsha256-signature"][0] : req.headers["x-square-hmacsha256-signature"];
-    if (!squareSignatureValid(rawBody, received, signatureKey)) {
+    const received = squareSignatureHeader(req);
+    const rawBody = await readSquareWebhookRawBody(req);
+    if (rawBody === null) {
+      console.error("[Payments] Square webhook rejected: raw request body is unavailable.", {
+        path: squareWebhookRequestPath(req),
+        signatureHeaderPresent: Boolean(received),
+        bodyIsBuffer: Buffer.isBuffer(req.body),
+        bodyType: req.body === null ? "null" : typeof req.body
+      });
+      return res.status(400).json({ error: "Square webhook raw body is unavailable." });
+    }
+    const candidateUrls = squareWebhookNotificationUrls();
+    if (!squareSignatureValid(rawBody, received, signatureKey, candidateUrls)) {
+      console.warn("[Payments] Square webhook signature rejected.", {
+        path: squareWebhookRequestPath(req),
+        signatureHeaderPresent: Boolean(received),
+        bodyLength: Buffer.isBuffer(req.body) ? req.body.length : Buffer.byteLength(rawBody),
+        bodyIsBuffer: Buffer.isBuffer(req.body),
+        candidateUrls
+      });
       return res.status(400).json({ error: "Invalid Square webhook signature." });
     }
     const event = JSON.parse(rawBody);
@@ -21451,12 +22120,12 @@ function adminReady$1(res) {
   });
   return false;
 }
-function cronAuthorized(req) {
+function cronAuthorized$1(req) {
   const secret = typeof process.env.CRON_SECRET === "string" ? process.env.CRON_SECRET.trim() : "";
   return Boolean(secret) && req.headers.authorization === `Bearer ${secret}`;
 }
 function requireStaffOrQueueCron(req, res, next) {
-  if (cronAuthorized(req)) {
+  if (cronAuthorized$1(req)) {
     req.user = { uid: "studio-queue" };
     req.staffRole = "admin";
     return next();
@@ -22677,11 +23346,28 @@ function publicAvailability(result, packageId) {
 router$7.get("/config", (_req, res) => {
   res.json({ depositCheckoutLive: seniorDepositCheckoutLive() });
 });
+function cronAuthorized(req) {
+  const secret = typeof process.env.CRON_SECRET === "string" ? process.env.CRON_SECRET.trim() : "";
+  return Boolean(secret) && req.headers.authorization === `Bearer ${secret}`;
+}
+async function releaseHolds(req, res) {
+  if (!cronAuthorized(req)) return res.status(401).json({ error: "Unauthorized" });
+  try {
+    const result = await releaseExpiredApprenticeshipHolds();
+    return res.json({ ok: true, ...result });
+  } catch (error) {
+    console.error("[Apprenticeship] Hold release failed:", error);
+    return res.status(500).json({ error: "Hold release failed." });
+  }
+}
+router$7.get("/release-holds", releaseHolds);
+router$7.post("/release-holds", releaseHolds);
 router$7.get("/slots", async (req, res) => {
   const packageId = typeof req.query.package === "string" ? req.query.package : "apprentice-25";
   if (!findApprenticeshipPackage(packageId)) {
     return res.status(400).json({ error: "Choose an apprenticeship package." });
   }
+  await maybeReleaseExpiredApprenticeshipHolds();
   const result = await readApprenticeshipAvailability({ packageId });
   return res.json(publicAvailability(result, packageId));
 });
@@ -22719,6 +23405,12 @@ router$7.post("/order", async (req, res) => {
       error: `Orders are not available on this server yet. Please call ${BUSINESS_CONTACT.phoneDisplay}.`
     });
   }
+  const checkoutLive = seniorDepositCheckoutLive();
+  if (!checkoutLive) {
+    return res.status(503).json({
+      error: `Online booking is paused. Call ${BUSINESS_CONTACT.phoneDisplay} to book and pay the $25 booking fee.`
+    });
+  }
   const catalog = await loadCatalog();
   const quoted = quoteApprenticeship({
     packageId: parsed.value.packageId,
@@ -22729,6 +23421,7 @@ router$7.post("/order", async (req, res) => {
   if (quoted.ok === false) return res.status(400).json({ error: quoted.error });
   const { quote } = quoted;
   const pkg = findApprenticeshipPackage(parsed.value.packageId, catalog);
+  await maybeReleaseExpiredApprenticeshipHolds();
   const availability = await readApprenticeshipAvailability({ packageId: parsed.value.packageId });
   const slot = parsed.value.slotStart ? availability.slots.find((item) => item.start === parsed.value.slotStart) || null : null;
   if (parsed.value.slotStart && !availability.available) {
@@ -22763,7 +23456,8 @@ router$7.post("/order", async (req, res) => {
         address: value.address,
         packageName: quote.packageName,
         slot,
-        notes: value.preferredTime
+        notes: value.preferredTime,
+        hold: true
       });
       if (!calendarEvent?.eventId) {
         return res.status(503).json({ error: APPRENTICESHIP_CALENDAR_FALLBACK });
@@ -22774,12 +23468,20 @@ router$7.post("/order", async (req, res) => {
     }
   }
   const now = admin.firestore.FieldValue.serverTimestamp();
-  const checkoutLive = seniorDepositCheckoutLive();
+  const leadSource = apprenticeshipLeadSource(value.returnPage);
+  const holdFields = {
+    packageId: value.packageId,
+    slotStart: slot?.start || null,
+    slotEnd: slot?.end || null,
+    holdExpiresAt: apprenticeshipHoldExpiresAt(/* @__PURE__ */ new Date())
+  };
   const note = [
     APPRENTICESHIP_BOOKING_FEE_LINE,
+    "Not confirmed until the $25 booking fee is paid.",
     APPRENTICESHIP_BALANCE_LINE,
     value.preferredTime ? `Preferred time: ${value.preferredTime}` : "",
-    pkg?.appointmentLimit || ""
+    pkg?.appointmentLimit || "",
+    value.details
   ].filter(Boolean).join("\n");
   try {
     const requestRef = await db$1().collection("orderRequests").add({
@@ -22808,6 +23510,8 @@ router$7.post("/order", async (req, res) => {
       depositRequired: true,
       depositAmount: APPRENTICESHIP_BOOKING_FEE,
       depositPaid: 0,
+      depositStatus: "awaiting",
+      ...holdFields,
       balanceDue: quote.total,
       scheduledDate: slot?.date || null,
       scheduledTime: slot?.time || value.preferredTime || null,
@@ -22815,7 +23519,8 @@ router$7.post("/order", async (req, res) => {
       vibeNote: note,
       status: "new",
       source: APPRENTICESHIP_ORDER_SOURCE,
-      leadSource: "Apprenticeship page",
+      leadSource,
+      ...value.gclid ? { gclid: value.gclid } : {},
       orderNumber,
       packageName: quote.packageName,
       calendarEventId: calendarEvent?.eventId || null,
@@ -22845,12 +23550,16 @@ router$7.post("/order", async (req, res) => {
       depositRequired: true,
       depositAmount: APPRENTICESHIP_BOOKING_FEE,
       depositPaid: 0,
+      depositStatus: "awaiting",
+      ...holdFields,
       balanceDue: quote.total,
       scheduledDate: slot?.date || null,
       scheduledTime: slot?.time || value.preferredTime || null,
       notes: note,
-      status: "confirmed",
+      // Confirmed by the Square deposit webhook once the $25 lands.
+      status: APPRENTICESHIP_AWAITING_DEPOSIT_STATUS,
       source: APPRENTICESHIP_ORDER_SOURCE,
+      leadSource,
       orderNumber,
       packageName: quote.packageName,
       calendarEventId: calendarEvent?.eventId || null,
@@ -22883,6 +23592,7 @@ router$7.post("/order", async (req, res) => {
       status: "draft",
       paymentProvider: "square",
       payToken,
+      depositReturn: value.returnPage,
       invoiceNumber,
       orderNumber,
       notes: note,
@@ -22921,7 +23631,7 @@ router$7.post("/order", async (req, res) => {
           total: quote.total,
           processing: quote.processing,
           source: APPRENTICESHIP_ORDER_SOURCE,
-          leadSource: "Apprenticeship page",
+          leadSource,
           notes: note,
           scheduledDate: slot?.date || null,
           scheduledTime: slot?.time || value.preferredTime || null
@@ -22941,7 +23651,10 @@ router$7.post("/order", async (req, res) => {
       depositAmount: APPRENTICESHIP_BOOKING_FEE,
       total: quote.total,
       balanceDue: quote.balanceDue,
-      checkoutReady: checkoutLive
+      checkoutReady: checkoutLive,
+      status: APPRENTICESHIP_AWAITING_DEPOSIT_STATUS,
+      message: APPRENTICESHIP_DEPOSIT_REQUIRED_LINE,
+      holdExpiresAt: holdFields.holdExpiresAt
     });
   } catch (error) {
     console.error("[Apprenticeship] Order failed:", error);

@@ -107,6 +107,15 @@ vi.mock("firebase-admin", () => {
   return { default: admin };
 });
 
+const confirmEvent = vi.hoisted(() => vi.fn(async () => true));
+vi.mock("../services/apprenticeshipCalendar", () => ({
+  confirmApprenticeshipEvent: confirmEvent,
+}));
+const resolveLate = vi.hoisted(() => vi.fn(async () => "confirmed"));
+vi.mock("../services/apprenticeshipHolds", () => ({
+  resolveLateApprenticeshipPayment: resolveLate,
+}));
+
 import paymentsRouter from "./payments";
 
 const envBackup = {
@@ -327,6 +336,39 @@ describe("deposit checkout", () => {
     expect((store.collections.invoices.get("inv-ap") || {}).status).toBe("draft");
   });
 
+  it("returns /realestate-75 bookings to the /realestate-75 schedule section", async () => {
+    seed("invoices", "inv-re75", {
+      status: "draft",
+      payToken: TOKEN,
+      invoiceNumber: "INV-2026-0004",
+      clientEmail: "ada@example.com",
+      total: 77.1,
+      amountDue: 77.1,
+      amountPaid: 0,
+      depositRequired: true,
+      depositAmount: 25,
+      depositPaid: 0,
+      orderId: "order-re75",
+      orderNumber: "#043",
+      source: "apprenticeship",
+      depositReturn: "realestate-75",
+    });
+    seed("orders", "order-re75", { source: "apprenticeship", total: 77.1, orderNumber: "#043" });
+    const response = await fetch(`${baseUrl}/api/payments/invoice/inv-re75/deposit-checkout`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ t: TOKEN }),
+    });
+    expect(response.status).toBe(200);
+    const squareCall = fetchMock.mock.calls.find((call) => String(call[0]).includes("squareup.com"));
+    const sent = JSON.parse(String(squareCall?.[1].body));
+    expect(sent.quick_pay.price_money.amount).toBe(2500);
+    expect(sent.checkout_options.redirect_url).toBe(
+      "https://deposit.test/realestate-75/schedule?booking=received&order=%23043",
+    );
+    expect((store.collections.invoices.get("inv-re75") || {}).status).toBe("draft");
+  });
+
   it("returns the stored deposit link on a repeated click", async () => {
     const first = await fetch(`${baseUrl}/api/payments/invoice/inv-sl/deposit-checkout`, {
       method: "POST",
@@ -496,8 +538,17 @@ describe("Square webhook deposit payment", () => {
       squareDepositPaymentLinkId: "ap-link",
       squareDepositOrderId: "ap-order",
     });
-    seed("orders", "order-ap", { source: "apprenticeship", total: 77.1, balanceDue: 77.1 });
+    seed("orders", "order-ap", {
+      source: "apprenticeship",
+      total: 77.1,
+      balanceDue: 77.1,
+      status: "awaiting_deposit",
+      orderNumber: "#042",
+      calendarEventId: "evt-1",
+      calendarId: "apprentice-calendar",
+    });
     seed("orderRequests", "req-ap", { source: "apprenticeship", balanceDue: 77.1 });
+    confirmEvent.mockClear();
     const response = await depositWebhook({
       id: "pay-ap",
       status: "COMPLETED",
@@ -513,7 +564,15 @@ describe("Square webhook deposit payment", () => {
     expect(invoice.depositPaid).toBe(25);
     expect(invoice.amountDue).toBe(52.1);
     expect((store.collections.orders.get("order-ap") || {}).balanceDue).toBe(52.1);
+    expect((store.collections.orders.get("order-ap") || {}).status).toBe("confirmed");
+    expect((store.collections.orders.get("order-ap") || {}).depositStatus).toBe("paid");
     expect((store.collections.orderRequests.get("req-ap") || {}).balanceDue).toBe(52.1);
+    expect((store.collections.orderRequests.get("req-ap") || {}).depositStatus).toBe("paid");
+    expect(confirmEvent).toHaveBeenCalledWith({
+      calendarId: "apprentice-calendar",
+      eventId: "evt-1",
+      orderNumber: "#042",
+    });
   });
 
   it("does not apply a stored deposit link twice or count it as payment in full", async () => {
@@ -597,5 +656,67 @@ describe("Square webhook deposit payment", () => {
     const invoice = store.collections.invoices.get("inv-full") || {};
     expect(invoice.status).toBe("paid");
     expect(invoice.amountDue).toBe(0);
+  });
+});
+
+describe("apprenticeship hold expired", () => {
+  function seedExpired() {
+    seed("invoices", "inv-exp", {
+      status: "draft",
+      payToken: TOKEN,
+      total: 77.1,
+      amountDue: 77.1,
+      amountPaid: 0,
+      depositRequired: true,
+      depositAmount: 25,
+      depositPaid: 0,
+      orderId: "order-exp",
+      orderNumber: "#044",
+      source: "apprenticeship",
+      holdExpired: true,
+      squareDepositPaymentLinkId: "exp-link",
+      squareDepositOrderId: "exp-order",
+      squareDepositCheckoutUrl: "https://square.test/old",
+    });
+    seed("orders", "order-exp", {
+      source: "apprenticeship",
+      status: "expired_unpaid",
+      total: 77.1,
+      balanceDue: 77.1,
+      orderNumber: "#044",
+      calendarEventId: "evt-gone",
+    });
+  }
+
+  it("will not hand out the $25 checkout after the hold expired", async () => {
+    seedExpired();
+    const response = await fetch(`${baseUrl}/api/payments/invoice/inv-exp/deposit-checkout`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ t: TOKEN }),
+    });
+    expect(response.status).toBe(409);
+    expect((await response.json()).error).toMatch(/hold expired/);
+    expect(fetchMock.mock.calls.some((call) => String(call[0]).includes("squareup.com"))).toBe(false);
+  });
+
+  it("records a late $25 and hands the expired order to the re-confirm check", async () => {
+    seedExpired();
+    resolveLate.mockClear();
+    confirmEvent.mockClear();
+    const response = await depositWebhook({
+      id: "pay-late",
+      status: "COMPLETED",
+      amount_money: { amount: 2500 },
+      payment_link_id: "exp-link",
+      order_id: "exp-order",
+      note: "invoiceId:inv-exp",
+    });
+    expect(response.status).toBe(200);
+    expect((store.collections.invoices.get("inv-exp") || {}).depositPaid).toBe(25);
+    const order = store.collections.orders.get("order-exp") || {};
+    expect(order.status).toBe("expired_unpaid");
+    expect(resolveLate).toHaveBeenCalledWith("order-exp");
+    expect(confirmEvent).not.toHaveBeenCalled();
   });
 });

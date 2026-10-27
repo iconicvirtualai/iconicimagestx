@@ -1,13 +1,18 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import Layout from "@/components/Layout";
 import { MoneyAmount } from "@/components/MoneyAmount";
-import { BookingConfirmation } from "@/components/BookingConfirmation";
-import { createOrder } from "@/lib/createOrder";
-import { readClientNotificationsLive, type BookingSubmitResult } from "@/lib/bookingFollowUp";
+import ApprenticeLiveSlotPicker, { type LiveSlotState } from "@/components/ApprenticeLiveSlotPicker";
+import PropertyAddressField from "@/components/PropertyAddressField";
 import { trackConversion } from "@/lib/tracking";
 import { BUSINESS_CONTACT, LEGAL_BUSINESS_NAME } from "@shared/businessContact";
 import { APPRENTICESHIP_OVERAGE_LABEL } from "@shared/bookingCatalog";
+import {
+  APPRENTICESHIP_BALANCE_LINE,
+  APPRENTICESHIP_BOOKING_FEE,
+  APPRENTICESHIP_BOOKING_FEE_LINE,
+  APPRENTICESHIP_DEPOSIT_REQUIRED_LINE,
+} from "@shared/apprenticeship";
+import type { PickedServiceLocation } from "@shared/serviceLocation";
 import {
   RE75_LEAD_SOURCE,
   RE75_OUTSIDE_MESSAGE,
@@ -18,7 +23,6 @@ import {
   RE75_TRAVEL_TBD_NOTE,
   classifyRealEstate75Area,
   isRealEstate75PackageId,
-  openRealEstate75Slots,
   realEstate75Package,
   realEstate75Quote,
   sanitizeGclid,
@@ -27,12 +31,15 @@ import {
   type RealEstate75Package,
   type RealEstate75PackageId,
 } from "@shared/realestate75";
-import type { ApprenticeshipSlot } from "@shared/apprenticeship";
 
 const GCLID_KEY = "re75-gclid";
 const DRAFT_KEY = "re75-booking-draft";
 const CONVERSION_PREFIX = "re75-conversion-";
 const HERO_ALT = "25 listing photos for $75, 20-minute shoot by Iconic apprentices";
+/** Where /realestate-75 is embedded. Return from Square lands on /realestate-75/schedule?booking=received. */
+const RETURN_PAGE = "realestate-75";
+/** Wix parent site. Links that leave this landing page open there, not inside the embed. */
+const MAIN_SITE = "https://www.iconicimagestx.com";
 
 /** Twelve listing photos, in file order. Cities come from the shoot notes. Unknown cities stay off the alt text. */
 const LISTING_GALLERY = [
@@ -57,16 +64,17 @@ const LISTING_GALLERY = [
   height: item.height,
 }));
 
-type LiveSlot = ApprenticeshipSlot & { photographerId?: string; photographerName?: string };
-
 interface Draft {
   packageId: RealEstate75PackageId;
   address: string;
+  servicePlace: PickedServiceLocation | null;
   sqft: string;
   occupancy: string;
-  slotStart: string;
   slotDate: string;
-  slotTime: string;
+  /** ISO start of an open slot from /api/apprenticeship/slots. */
+  slotStart: string;
+  /** Only when the apprentice calendar cannot be read. */
+  preferredTime: string;
   firstName: string;
   lastName: string;
   email: string;
@@ -77,11 +85,12 @@ interface Draft {
 const EMPTY_DRAFT: Draft = {
   packageId: "apprentice-25",
   address: "",
+  servicePlace: null,
   sqft: "",
   occupancy: "",
-  slotStart: "",
   slotDate: "",
-  slotTime: "",
+  slotStart: "",
+  preferredTime: "",
   firstName: "",
   lastName: "",
   email: "",
@@ -94,7 +103,12 @@ function readDraft(): Draft {
   try {
     const parsed = JSON.parse(sessionStorage.getItem(DRAFT_KEY) || "") as Partial<Draft>;
     const packageId = isRealEstate75PackageId(parsed.packageId) ? parsed.packageId : EMPTY_DRAFT.packageId;
-    return { ...EMPTY_DRAFT, ...parsed, packageId };
+    const servicePlace = parsed.servicePlace && parsed.servicePlace.placeId && parsed.servicePlace.formatted
+      ? parsed.servicePlace
+      : null;
+    const slotStart = typeof parsed.slotStart === "string" ? parsed.slotStart : "";
+    const preferredTime = typeof parsed.preferredTime === "string" ? parsed.preferredTime : "";
+    return { ...EMPTY_DRAFT, ...parsed, packageId, servicePlace, slotStart, preferredTime };
   } catch {
     return EMPTY_DRAFT;
   }
@@ -103,6 +117,33 @@ function readDraft(): Draft {
 function appointmentLabel(pkg: RealEstate75Package): string {
   return pkg.durationMinutes === 60 ? "1 hour" : `${pkg.durationMinutes} minutes`;
 }
+
+/** Saved order waiting on the $25 booking fee. */
+interface DepositStep {
+  orderNumber: string;
+  checkoutUrl: string;
+  error: string;
+  slotLabel: string;
+  packageId: RealEstate75PackageId;
+}
+
+/**
+ * Square checkout cannot run inside the Wix embed. Leave the frame when we
+ * are allowed to; otherwise the Pay button (new tab) is the way through.
+ */
+function openCheckout(url: string) {
+  try {
+    if (window.top && window.top !== window) {
+      window.top.location.href = url;
+      return;
+    }
+  } catch {
+    return;
+  }
+  window.location.assign(url);
+}
+
+export const re75CheckoutNavigation = { open: openCheckout };
 
 function sectionId(pathname: string): string {
   if (pathname.endsWith("/schedule")) return "schedule";
@@ -121,11 +162,15 @@ export default function RealEstate75() {
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
   const [processingOn, setProcessingOn] = useState(true);
   const [formError, setFormError] = useState("");
-  const [slots, setSlots] = useState<LiveSlot[]>([]);
-  const [slotsLive, setSlotsLive] = useState(false);
-  const [slotsReady, setSlotsReady] = useState(false);
   const [pending, setPending] = useState(false);
-  const [confirmation, setConfirmation] = useState<BookingSubmitResult | null>(null);
+  const [confirmation, setConfirmation] = useState<DepositStep | null>(null);
+  const [slotState, setSlotState] = useState<LiveSlotState>({ available: null, slots: [], fallback: "" });
+  const [slotReload, setSlotReload] = useState(0);
+  const [website, setWebsite] = useState("");
+  const feeReceived = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    return params.get("booking") === "received" ? (params.get("order") || "").slice(0, 20) || "received" : "";
+  }, [location.search]);
   const [hydrated, setHydrated] = useState(false);
   const [barHidden, setBarHidden] = useState(false);
   const [scheduleVisible, setScheduleVisible] = useState(false);
@@ -154,7 +199,7 @@ export default function RealEstate75() {
     setDraft((current) => (
       current.packageId === fromUrl
         ? current
-        : { ...current, packageId: fromUrl, slotStart: "", slotTime: "" }
+        : { ...current, packageId: fromUrl, slotStart: "" }
     ));
   }, [hydrated, location.search]);
 
@@ -186,55 +231,22 @@ export default function RealEstate75() {
   }, []);
 
   useEffect(() => {
-    if (area.status !== "inside") {
-      setSlots([]);
-      setSlotsLive(false);
-      setSlotsReady(false);
-      return;
-    }
+    if (area.status !== "inside") return;
     if (!formStarted.current && !sessionStorage.getItem("re75-form-start")) {
       formStarted.current = true;
       sessionStorage.setItem("re75-form-start", "1");
       trackConversion({ name: "re75_form_start", packageId: draft.packageId });
     }
-    setSlots([]);
-    setSlotsLive(false);
-    setSlotsReady(false);
-    const address = draft.address;
-    const packageId = draft.packageId;
-    let cancelled = false;
-    const timer = window.setTimeout(() => {
-      const params = new URLSearchParams({ address, package: packageId });
-      fetch(`/api/bookings/realestate-75/slots?${params.toString()}`)
-        .then((response) => (response.ok ? response.json() : null))
-        .then((data: { live?: boolean; slots?: LiveSlot[] } | null) => {
-          if (cancelled) return;
-          const live = data?.live === true;
-          setSlotsLive(live);
-          setSlots(live && Array.isArray(data?.slots) ? data.slots : []);
-          setSlotsReady(true);
-        })
-        .catch(() => {
-          if (cancelled) return;
-          setSlotsLive(false);
-          setSlots([]);
-          setSlotsReady(true);
-        });
-    }, 350);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, [area.status, draft.address, draft.packageId]);
+  }, [area.status, draft.packageId]);
 
   useEffect(() => {
     if (!confirmation) return;
-    const bookingId = confirmation.requestId || confirmation.orderNumber || "";
+    const bookingId = confirmation.orderNumber || "";
     if (!bookingId) return;
     const key = `${CONVERSION_PREFIX}${bookingId}`;
     if (sessionStorage.getItem(key)) return;
     sessionStorage.setItem(key, "1");
-    const booked = realEstate75Package(draft.packageId);
+    const booked = realEstate75Package(confirmation.packageId);
     trackConversion({
       name: "re75_booking",
       packageId: booked.id,
@@ -244,7 +256,23 @@ export default function RealEstate75() {
       email: draft.email,
       phone: draft.phone,
     });
-  }, [confirmation, draft.email, draft.packageId, draft.phone]);
+  }, [confirmation, draft.email, draft.phone]);
+
+  useEffect(() => {
+    if (window.parent === window) return;
+    const post = () => {
+      const height = Math.ceil(document.documentElement.scrollHeight);
+      window.parent.postMessage({ source: "realestate-75", type: "iconic-embed-height", height }, "*");
+    };
+    post();
+    const observer = new ResizeObserver(post);
+    observer.observe(document.documentElement);
+    window.addEventListener("resize", post);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", post);
+    };
+  }, [confirmation, draft.packageId]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -311,26 +339,6 @@ export default function RealEstate75() {
     setDraft((current) => ({ ...current, ...partial }));
   }
 
-  const days = useMemo(() => {
-    const source = slotsLive || !slotsReady
-      ? slots
-      : openRealEstate75Slots({ now: new Date(), durationMinutes: pkg.durationMinutes });
-    const groups = new Map<string, LiveSlot[]>();
-    for (const slot of source) {
-      const list = groups.get(slot.date) || [];
-      list.push(slot);
-      groups.set(slot.date, list);
-    }
-    return [...groups.entries()];
-  }, [slots, slotsLive, slotsReady, pkg.durationMinutes]);
-
-  const daySlots = days.find(([date]) => date === draft.slotDate)?.[1] || [];
-
-  useEffect(() => {
-    if (draft.slotDate || !days.length) return;
-    setDraft((current) => (current.slotDate ? current : { ...current, slotDate: days[0][0] }));
-  }, [draft.slotDate, days]);
-
   async function submitBooking(event: FormEvent) {
     event.preventDefault();
     const current = classifyRealEstate75Area(draft.address);
@@ -347,12 +355,18 @@ export default function RealEstate75() {
       setFormError("Tell us if the home is occupied, vacant, or a lease.");
       return;
     }
-    if (slotsLive && !draft.slotStart) {
-      setFormError("Pick an open time.");
+    const calendarOpen = slotState.available === true;
+    const slot = calendarOpen ? slotState.slots.find((item) => item.start === draft.slotStart) || null : null;
+    if (slotState.available === null) {
+      setFormError("Still checking open times. Try again in a moment.");
       return;
     }
-    if (!slotsLive && !draft.slotTime) {
-      setFormError(`Open times are not on the calendar right now. ${RE75_OUTSIDE_MESSAGE}`);
+    if (calendarOpen && !slot) {
+      setFormError("Choose an open date and time.");
+      return;
+    }
+    if (!calendarOpen && draft.preferredTime.trim().length < 3) {
+      setFormError("Tell us a preferred day and time.");
       return;
     }
     if (!draft.firstName.trim() || !draft.lastName.trim()) {
@@ -374,66 +388,76 @@ export default function RealEstate75() {
     setPending(true);
     setFormError("");
     try {
-      const [result, clientNotificationsLive] = await Promise.all([
-        createOrder({
+      const response = await fetch("/api/apprenticeship/order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          packageId: pkg.id,
           firstName: draft.firstName.trim(),
           lastName: draft.lastName.trim(),
           email: draft.email.trim(),
           phone: draft.phone.trim(),
           address: draft.address.trim(),
-          sqft: draft.sqft.replace(/,/g, ""),
-          propertyStatus: draft.occupancy,
-          furnishingStatus: draft.occupancy === "Vacant" ? "Vacant" : "Furnished",
-          accessMethod: "Not collected on this form",
-          serviceDate: draft.slotDate,
-          serviceTime: draft.slotTime,
-          slotStart: slotsLive ? draft.slotStart : "",
-          photographerId: slotsLive
-            ? slots.find((slot) => slot.start === draft.slotStart)?.photographerId || ""
-            : "",
-          leadSource: RE75_LEAD_SOURCE,
+          slotStart: slot ? slot.start : "",
+          preferredTime: slot ? "" : draft.preferredTime.trim(),
+          website,
+          returnPage: RETURN_PAGE,
           gclid,
-          brokerage: draft.brokerage.trim(),
-          selectedBasics: [pkg.id],
-          selectedAddOns: [],
-          selectedService: "",
-          lineItems: [{
-            id: pkg.id,
-            name: pkg.name,
-            unitPrice: quote.subtotal,
-            qty: 1,
-            price: quote.subtotal,
-          }],
-          total: quote.subtotal,
-          vibeNote: [
-            `Package: ${pkg.name}`,
+          details: [
+            `Page: /realestate-75`,
             `Brokerage: ${draft.brokerage.trim()}`,
             `Home: ${draft.occupancy}`,
             `Approx sq ft: ${draft.sqft.trim()}`,
             current.travelFee === "tbd" ? RE75_TRAVEL_TBD_NOTE : "",
           ].filter(Boolean).join("\n"),
         }),
-        readClientNotificationsLive(),
-      ]);
+      });
+      const data = await response.json().catch(() => null) as {
+        success?: boolean;
+        orderNumber?: string;
+        invoiceId?: string;
+        payToken?: string;
+        checkoutReady?: boolean;
+        error?: string;
+      } | null;
+      if (response.status === 409) setSlotReload((value) => value + 1);
+      if (!response.ok || !data?.success) {
+        setFormError(data?.error || `We could not save that booking. Please call ${BUSINESS_CONTACT.phoneDisplay}.`);
+        return;
+      }
+      let checkoutUrl = "";
+      let payError = "";
+      if (data.checkoutReady && data.invoiceId && data.payToken) {
+        const checkout = await fetch(`/api/payments/invoice/${encodeURIComponent(data.invoiceId)}/deposit-checkout`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ t: data.payToken }),
+        });
+        const payment = await checkout.json().catch(() => null) as { checkoutUrl?: string; error?: string } | null;
+        if (checkout.ok && payment?.checkoutUrl && /^https:\/\//.test(payment.checkoutUrl)) checkoutUrl = payment.checkoutUrl;
+        else payError = payment?.error || "";
+      }
       setConfirmation({
-        ...result,
-        selectedService: pkg.id,
-        clientNotificationsLive,
+        orderNumber: data.orderNumber || "",
+        checkoutUrl,
+        error: checkoutUrl ? "" : payError || `Call ${BUSINESS_CONTACT.phoneDisplay} to pay the $25 booking fee and lock in your time.`,
+        slotLabel: slot ? slot.label : draft.preferredTime.trim(),
+        packageId: pkg.id,
       });
       sessionStorage.removeItem(DRAFT_KEY);
-    } catch (error) {
-      setFormError(error instanceof Error ? error.message : "We could not save that booking.");
+      if (checkoutUrl) re75CheckoutNavigation.open(checkoutUrl);
+    } catch {
+      setFormError(`We could not save that booking. Please call ${BUSINESS_CONTACT.phoneDisplay}.`);
     } finally {
       setPending(false);
     }
   }
 
   return (
-    <Layout>
       <div className="overflow-x-clip bg-white text-neutral-950">
         <Hero scheduleHref={scheduleHref} processingOn={processingOn} />
         <OfferCards scheduleHref={scheduleHref} processingOn={processingOn} />
-        <NeedMore />
+        <NeedMore gclid={gclid} />
         <OfferCta scheduleHref={scheduleHref} />
         <Benefits />
         <WhatYouGet processingOn={processingOn} />
@@ -443,19 +467,20 @@ export default function RealEstate75() {
         <ListingGallery />
         <OfferCta scheduleHref={scheduleHref} />
         <Faq processingOn={processingOn} />
-        <NeedMore />
+        <NeedMore gclid={gclid} />
         <Schedule
           draft={draft}
           pkg={pkg}
           area={area}
           formError={formError}
           quote={quote}
-          days={days}
-          daySlots={daySlots}
-          slotsLive={slotsLive}
-          slotsReady={slotsReady}
           pending={pending}
           confirmation={confirmation}
+          feeReceived={feeReceived}
+          slotReload={slotReload}
+          onSlotState={setSlotState}
+          website={website}
+          onWebsite={setWebsite}
           onSubmit={submitBooking}
           onPatch={patch}
         />
@@ -464,7 +489,6 @@ export default function RealEstate75() {
         <PageContact />
         <MobileBar to={scheduleHref(draft.packageId)} hidden={barHidden || scheduleVisible} />
       </div>
-    </Layout>
   );
 }
 
@@ -499,7 +523,7 @@ function Hero({
   const starter = realEstate75Quote(processingOn, "apprentice-25");
   const upgrade = realEstate75Quote(processingOn, "apprentice-50");
   return (
-    <section className="pt-28 md:pt-36">
+    <section>
       <div className="mx-auto w-full max-w-[1200px]">
         <Link to={scheduleHref("apprentice-25")} className="block" aria-label="Schedule the $75 shoot">
           <img
@@ -591,7 +615,7 @@ function OfferCards({
   );
 }
 
-function NeedMore() {
+function NeedMore({ gclid }: { gclid: string }) {
   return (
     <section className="px-4 pb-4 md:px-8">
       <div className="mx-auto max-w-6xl rounded-2xl border border-neutral-200 bg-neutral-50 p-6 md:p-8">
@@ -600,18 +624,20 @@ function NeedMore() {
           Aerials, video, twilight, and full-service packages are the regular Iconic services. These apprentice options are photos only.
         </p>
         <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-          <Link
-            to="/pricing"
+          <a
+            href={withGclid(`${MAIN_SITE}/pricing`, gclid)}
+            target="_top"
             className="inline-flex min-h-12 items-center justify-center rounded-xl bg-black px-5 text-base font-semibold text-white hover:bg-neutral-800"
           >
             See pricing
-          </Link>
-          <Link
-            to="/book"
+          </a>
+          <a
+            href={withGclid(`${MAIN_SITE}/book`, gclid)}
+            target="_top"
             className="inline-flex min-h-12 items-center justify-center rounded-xl border border-neutral-300 bg-white px-5 text-base font-semibold text-neutral-950 hover:bg-neutral-50"
           >
             Book full service
-          </Link>
+          </a>
         </div>
       </div>
     </section>
@@ -634,7 +660,7 @@ function Benefits() {
     },
     {
       title: "25 or 50 edited photos",
-      body: "You get the edited photos in the option you schedule. We confirm the requested time within 1 business day.",
+      body: "You get the edited photos in the option you schedule. Pick an open time and the $25 booking fee locks it in.",
     },
   ];
   return (
@@ -682,12 +708,12 @@ function WhatYouGet({ processingOn }: { processingOn: boolean }) {
 
 function HowItWorks() {
   const steps = [
-    "Pick 25 photos or 50 photos, then pick a time.",
+    "Pick 25 photos or 50 photos, pick an open time, and pay the $25 booking fee to lock it in.",
     "Have the home prepped. Lights on, clutter put away, ready when we arrive.",
     "The apprentice shoots for 20 minutes (25 photos) or 1 hour (50 photos). You get the edited photos for that option.",
   ];
   return (
-    <section id="how-it-works" className="scroll-mt-28 border-t border-neutral-200 px-4 py-14 md:scroll-mt-32 md:px-8">
+    <section id="how-it-works" className="scroll-mt-4 border-t border-neutral-200 px-4 py-14 md:px-8">
       <div className="mx-auto max-w-6xl">
         <h2 className="text-3xl font-black tracking-tight sm:text-4xl">How it works</h2>
         <ol className="mt-8 grid gap-4 md:grid-cols-3">
@@ -731,7 +757,7 @@ function ListingGallery() {
   }, [index, count]);
 
   return (
-    <section id="samples" className="scroll-mt-28 border-t border-neutral-200 bg-neutral-50 px-4 py-14 md:scroll-mt-32 md:px-8">
+    <section id="samples" className="scroll-mt-4 border-t border-neutral-200 bg-neutral-50 px-4 py-14 md:px-8">
       <div className="mx-auto max-w-6xl">
         <h2 className="text-3xl font-black tracking-tight sm:text-4xl">Listing photos</h2>
         <p className="mt-3 text-lg text-neutral-700">{RE75_GALLERY_CAPTION}</p>
@@ -807,7 +833,7 @@ function Faq({ processingOn }: { processingOn: boolean }) {
     },
     {
       q: "When do I pay?",
-      a: `The card total is on this page before you schedule. ${starter.priceLine} ${upgrade.priceLine} This form saves the booking. Iconic Images invoices after the shoot, the same way our other bookings work. We confirm the requested time within 1 business day.`,
+      a: `A $25 booking fee by card when you schedule. It is credited toward your package, and your time is confirmed once it is paid. ${starter.priceLine} ${upgrade.priceLine} The balance is invoiced after the shoot.`,
     },
     {
       q: "Can I reschedule?",
@@ -843,27 +869,61 @@ function Schedule(props: {
   area: RealEstate75Area;
   formError: string;
   quote: ReturnType<typeof realEstate75Quote>;
-  days: Array<[string, LiveSlot[]]>;
-  daySlots: LiveSlot[];
-  slotsLive: boolean;
-  slotsReady: boolean;
   pending: boolean;
-  confirmation: BookingSubmitResult | null;
+  confirmation: DepositStep | null;
+  feeReceived: string;
+  slotReload: number;
+  onSlotState: (state: LiveSlotState) => void;
+  website: string;
+  onWebsite: (value: string) => void;
   onSubmit: (event: FormEvent) => void;
   onPatch: (partial: Partial<Draft>) => void;
 }) {
   const { draft, confirmation, area, pkg } = props;
+  const balance = Math.max(0, Math.round((props.quote.total - APPRENTICESHIP_BOOKING_FEE) * 100) / 100);
   return (
-    <section id="schedule" className="scroll-mt-28 border-t border-neutral-200 px-4 py-14 md:scroll-mt-32 md:px-8">
+    <section id="schedule" className="scroll-mt-4 border-t border-neutral-200 px-4 py-14 md:px-8">
       <div className="mx-auto max-w-3xl">
         <h2 className="text-3xl font-black tracking-tight sm:text-4xl">Schedule your shoot</h2>
         <p className="mt-3 text-lg text-neutral-700">{pkg.name}. {pkg.photos} photos · {appointmentLabel(pkg)}. {props.quote.priceLine}</p>
+        {props.feeReceived ? (
+          <p data-testid="re75-fee-received" className="mt-6 rounded-2xl bg-neutral-950 px-5 py-4 text-base leading-relaxed text-white">
+            Booking fee received{props.feeReceived !== "received" ? ` for order ${props.feeReceived}` : ""}. Your shoot is confirmed. {APPRENTICESHIP_BALANCE_LINE}
+          </p>
+        ) : null}
         {confirmation ? (
-          <div className="mt-8">
-            <p className="mb-4 leading-relaxed text-neutral-800">
-              We confirm the requested time within 1 business day. Iconic Images invoices after the shoot. Card total {props.quote.priceLine}
+          <div className="mt-8 rounded-2xl border-2 border-black p-6" data-testid="re75-deposit-step">
+            <p className="text-sm font-bold uppercase tracking-[0.14em] text-[#0d9488]">Step 2 of 2 · Booking fee</p>
+            <h3 className="mt-2 text-2xl font-black">
+              {confirmation.checkoutUrl ? "One step left: the $25 booking fee." : "Your time is on hold."}
+            </h3>
+            <p className="mt-3 leading-relaxed text-neutral-800">
+              {confirmation.orderNumber ? `Order ${confirmation.orderNumber}. ` : ""}
+              {realEstate75Package(confirmation.packageId).name}
+              {confirmation.slotLabel ? ` · ${confirmation.slotLabel}` : ""}. Photographed by an Iconic Images apprentice.
             </p>
-            <BookingConfirmation result={confirmation} onBookAnother={() => window.location.assign(RE75_PATHS.schedule)} />
+            <p className="mt-2 font-semibold text-neutral-950">{APPRENTICESHIP_DEPOSIT_REQUIRED_LINE}</p>
+            {confirmation.checkoutUrl ? (
+              <>
+                <a
+                  href={confirmation.checkoutUrl}
+                  target="_blank"
+                  rel="noopener"
+                  data-testid="re75-pay-fee"
+                  className="mt-5 inline-flex min-h-14 w-full items-center justify-center rounded-xl bg-black px-5 text-lg font-semibold text-white hover:bg-neutral-800"
+                >
+                  Pay $25 booking fee
+                </a>
+                <p className="mt-3 text-sm leading-relaxed text-neutral-700">
+                  Secure card checkout by Square. {APPRENTICESHIP_BOOKING_FEE_LINE}. Balance after the shoot: ${balance.toFixed(2)}.
+                </p>
+              </>
+            ) : (
+              <p className="mt-4 font-semibold text-red-700">{confirmation.error}</p>
+            )}
+            <p className="mt-4 text-sm text-neutral-700">
+              Questions? <a href={BUSINESS_CONTACT.phoneHref} className="font-semibold underline underline-offset-4">{BUSINESS_CONTACT.phoneDisplay}</a>
+            </p>
           </div>
         ) : (
           <form className="mt-8 space-y-6" onSubmit={props.onSubmit}>
@@ -883,7 +943,6 @@ function Schedule(props: {
                       onChange={() => props.onPatch({
                         packageId: item.id,
                         slotStart: "",
-                        slotTime: "",
                       })}
                       className="sr-only"
                     />
@@ -897,12 +956,11 @@ function Schedule(props: {
             </fieldset>
             <div>
               <label className="block text-sm font-semibold" htmlFor="re75-address">Property address</label>
-              <textarea
+              <PropertyAddressField
                 id="re75-address"
                 value={draft.address}
-                onChange={(event) => props.onPatch({ address: event.target.value })}
-                className={`${fieldClass()} min-h-24 scroll-mb-28`}
-                placeholder="123 Oak Dr, Spring, TX 77379"
+                onChange={({ address, place }) => props.onPatch({ address, servicePlace: place })}
+                className={`${fieldClass()} scroll-mb-28`}
               />
               {area.status === "inside" ? (
                 <p className="mt-3 text-sm text-neutral-700">
@@ -946,15 +1004,15 @@ function Schedule(props: {
                 </div>
               </fieldset>
             </div>
-            <TimePicker
-              draft={draft}
-              pkg={pkg}
-              days={props.days}
-              daySlots={props.daySlots}
-              slotsLive={props.slotsLive}
-              slotsReady={props.slotsReady}
-              checking={area.status === "inside" && !props.slotsReady}
-              onPatch={props.onPatch}
+            <ApprenticeLiveSlotPicker
+              packageId={pkg.id}
+              durationMinutes={pkg.durationMinutes}
+              date={draft.slotDate}
+              slotStart={draft.slotStart}
+              preferredTime={draft.preferredTime}
+              reloadKey={props.slotReload}
+              onState={props.onSlotState}
+              onChange={({ date, slotStart, preferredTime }) => props.onPatch({ slotDate: date, slotStart, preferredTime })}
             />
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="block text-sm font-semibold">
@@ -973,11 +1031,20 @@ function Schedule(props: {
                 Phone
                 <input type="tel" value={draft.phone} onChange={(event) => props.onPatch({ phone: event.target.value })} className={`${fieldClass()} scroll-mb-28`} autoComplete="tel" />
               </label>
-              <label className="block text-sm font-semibold">
+              <label className="block text-sm font-semibold" htmlFor="re75-brokerage">
                 Brokerage
-                <input value={draft.brokerage} onChange={(event) => props.onPatch({ brokerage: event.target.value })} className={`${fieldClass()} scroll-mb-28`} />
+                <input id="re75-brokerage" value={draft.brokerage} onChange={(event) => props.onPatch({ brokerage: event.target.value })} className={`${fieldClass()} scroll-mb-28`} />
               </label>
             </div>
+            <input
+              name="website"
+              value={props.website}
+              onChange={(event) => props.onWebsite(event.target.value)}
+              tabIndex={-1}
+              autoComplete="off"
+              aria-hidden="true"
+              className="absolute -left-[9999px] h-0 w-0"
+            />
             <div className="space-y-3 rounded-2xl border border-neutral-200 p-5" data-testid="re75-summary">
               <h3 className="text-xl font-black">{pkg.name}</h3>
               <p className="text-sm text-neutral-700">{pkg.photos} photos · {appointmentLabel(pkg)}</p>
@@ -995,87 +1062,33 @@ function Schedule(props: {
                 <span>Total by card</span>
                 <MoneyAmount>${props.quote.total.toFixed(2)}</MoneyAmount>
               </p>
-              <p className="text-sm leading-relaxed text-neutral-700">{props.quote.priceLine}</p>
+              <div className="rounded-xl bg-neutral-950 p-4 text-white" data-testid="re75-deposit-due">
+                <p className="flex items-center justify-between gap-4 text-lg font-black">
+                  <span>Due now: booking fee</span>
+                  <span>${APPRENTICESHIP_BOOKING_FEE.toFixed(2)}</span>
+                </p>
+                <p className="mt-1 flex items-center justify-between gap-4 text-sm text-white/80">
+                  <span>Balance after the shoot</span>
+                  <span>${balance.toFixed(2)}</span>
+                </p>
+                <p className="mt-2 text-sm leading-relaxed text-white/80">
+                  {APPRENTICESHIP_BOOKING_FEE_LINE}. Secure card checkout by Square. {APPRENTICESHIP_DEPOSIT_REQUIRED_LINE}
+                </p>
+              </div>
               {area.status === "inside" && area.travelFee === "tbd" ? (
                 <p className="text-sm leading-relaxed text-neutral-700">{RE75_TRAVEL_TBD_NOTE}</p>
               ) : (
                 <p className="text-sm leading-relaxed text-neutral-700">Travel is included for The Woodlands, Spring, and Conroe.</p>
               )}
             </div>
-            {props.formError ? <p className="text-sm font-semibold text-red-700">{props.formError}</p> : null}
+            {props.formError ? <p className="text-sm font-semibold text-red-700" role="alert">{props.formError}</p> : null}
             <button type="submit" disabled={props.pending} className="min-h-14 w-full rounded-xl bg-black px-5 text-lg font-semibold text-white disabled:opacity-60">
-              {props.pending ? "Saving…" : `Schedule · $${pkg.subtotal}`}
+              {props.pending ? "Booking…" : "Book & pay $25 booking fee"}
             </button>
           </form>
         )}
       </div>
     </section>
-  );
-}
-
-function TimePicker({
-  draft,
-  pkg,
-  days,
-  daySlots,
-  slotsLive,
-  slotsReady,
-  checking,
-  onPatch,
-}: {
-  draft: Draft;
-  pkg: RealEstate75Package;
-  days: Array<[string, LiveSlot[]]>;
-  daySlots: LiveSlot[];
-  slotsLive: boolean;
-  slotsReady: boolean;
-  checking: boolean;
-  onPatch: (partial: Partial<Draft>) => void;
-}) {
-  const lastWeekday = pkg.durationMinutes === 60 ? "4:00" : "4:40";
-  const lastSaturday = pkg.durationMinutes === 60 ? "11:00" : "11:40";
-  const length = pkg.durationMinutes === 60 ? "1-hour" : "20-minute";
-  return (
-    <div>
-      <p className="text-sm font-semibold">Date and time</p>
-      <p className="mt-1 text-sm leading-relaxed text-neutral-700">
-        {slotsLive
-          ? `${length} openings. Weekdays 8:00–5:00 (last start ${lastWeekday}), Saturday 9:00–12:00 (last start ${lastSaturday}), Sunday closed.`
-          : slotsReady
-            ? `The calendar is not listing openings right now. Pick a requested ${length} time and we will confirm it.`
-            : checking
-              ? "Checking open times."
-              : "Add an address in the service area to see times."}
-      </p>
-      {slotsReady ? (
-        <>
-          <div className="mt-4 flex gap-2 overflow-x-auto pb-2">
-            {days.map(([date, list]) => (
-              <button
-                key={date}
-                type="button"
-                onClick={() => onPatch({ slotDate: date, slotStart: "", slotTime: "" })}
-                className={`shrink-0 rounded-xl border px-3 py-2 text-sm font-semibold ${draft.slotDate === date ? "border-black bg-black text-white" : "border-neutral-300"}`}
-              >
-                {list[0]?.label.split(" · ")[0] || date}
-              </button>
-            ))}
-          </div>
-          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {daySlots.map((slot) => (
-              <button
-                key={slot.start}
-                type="button"
-                onClick={() => onPatch({ slotStart: slotsLive ? slot.start : "", slotDate: slot.date, slotTime: slot.time })}
-                className={`min-h-12 rounded-xl border text-sm font-semibold ${draft.slotTime === slot.time && draft.slotDate === slot.date ? "border-black bg-black text-white" : "border-neutral-300"}`}
-              >
-                {slot.time}
-              </button>
-            ))}
-          </div>
-        </>
-      ) : null}
-    </div>
   );
 }
 

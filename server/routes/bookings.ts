@@ -52,15 +52,18 @@ import {
 import {
   RE75_LEAD_SOURCE,
   RE75_OUTSIDE_MESSAGE,
+  RE75_TIME_MESSAGE,
   classifyRealEstate75Area,
   isRealEstate75PackageId,
   quoteRealEstate75Travel,
+  realEstate75AppointmentChoice,
   realEstate75Package,
   sanitizeGclid,
 } from "../../shared/realestate75";
 import { createHolidayCalendarEvent, deleteHolidayCalendarEvent } from "../services/holidayCalendar";
 import { backfillHolidayCalendarEvents } from "../services/holidayCalendarBackfill";
 import { isPreferredWindowBooking, resolveBookingAssignment } from "../../shared/bookingAvailability";
+import { suggestedAppointmentsAreEnabled } from "../services/suggestedAppointmentsFlag";
 import { BUSINESS_CONTACT } from "../../shared/businessContact";
 import { clientIp } from "../lib/clientIp";
 import { createRateLimiter } from "../lib/rateLimit";
@@ -279,14 +282,27 @@ router.post("/", async (req, res) => {
     // That is not a calendar slot. Save it for the office to confirm, and do not
     // ask Google Calendar first. /book still has to pick an open time when live.
     const preferredWindow = isPreferredWindowBooking(req.body);
+    const postedSlotStart = typeof req.body.slotStart === "string" ? req.body.slotStart.trim() : "";
+    // The apprentice order form asks for a date and time. The office confirms it
+    // and assigns the photographer. It is not a live calendar hold.
+    const apprenticeRequest = Boolean(realEstate75Lead && !postedSlotStart);
+    if (apprenticeRequest) {
+      const requested = realEstate75AppointmentChoice({
+        date: scheduledDate,
+        time: scheduledTime,
+        durationMinutes: realEstate75Package(resolved.selectedBasics[0]).durationMinutes,
+      });
+      if (!requested) return res.status(400).json({ error: RE75_TIME_MESSAGE });
+    }
     let availability: Awaited<ReturnType<typeof readBookingAvailability>> = {
       live: false,
       slots: [],
+      suggestions: [],
       durationMinutes: 90,
       bufferMinutes: 30,
       driveMode: "buffer",
     };
-    if (!preferredWindow) {
+    if (!preferredWindow && !apprenticeRequest) {
       try {
         availability = realEstate75Lead
           ? await readRealEstate75Availability({
@@ -304,11 +320,13 @@ router.post("/", async (req, res) => {
         console.error("[Bookings] Availability check failed — keeping the standard time list:", err);
       }
     }
-    const decision = resolveBookingAssignment({
-      live: preferredWindow ? false : availability.live,
-      slotStart: typeof req.body.slotStart === "string" ? req.body.slotStart : "",
-      slots: availability.slots,
-    });
+    const decision = apprenticeRequest
+      ? { ok: true as const, slot: null }
+      : resolveBookingAssignment({
+        live: preferredWindow ? false : availability.live,
+        slotStart: postedSlotStart,
+        slots: availability.slots,
+      });
     if (decision.ok === false) return res.status(decision.status).json({ error: decision.error });
 
     let reservedOrderNumber: string | null = null;
@@ -903,6 +921,12 @@ router.get("/realestate-75/slots", async (req, res) => {
   }
 });
 
+function postedDurationMinutes(value: unknown): number | undefined {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 15 || parsed > 24 * 60) return undefined;
+  return parsed;
+}
+
 router.get("/slots", async (req, res) => {
   const basics = typeof req.query.basics === "string"
     ? req.query.basics.split(",").map((id) => id.trim()).filter(Boolean)
@@ -916,15 +940,18 @@ router.get("/slots", async (req, res) => {
       selectedService: typeof req.query.service === "string" ? req.query.service : null,
       selectedBasics: basics,
       catalog,
+      durationMinutes: postedDurationMinutes(req.query.duration),
     });
+    const enabled = await suggestedAppointmentsAreEnabled();
     return res.json({
       live: availability.live,
       durationMinutes: availability.durationMinutes,
       slots: availability.live ? availability.slots : [],
+      suggestions: enabled && availability.live ? availability.suggestions : [],
     });
   } catch (err) {
     console.error("[Bookings] Slot lookup failed — keeping the standard time list:", err);
-    return res.json({ live: false, durationMinutes: 90, slots: [] });
+    return res.json({ live: false, durationMinutes: 90, slots: [], suggestions: [] });
   }
 });
 

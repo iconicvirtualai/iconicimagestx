@@ -4,7 +4,14 @@ import { X, Archive, Calendar, Layers, RefreshCw } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { collection, onSnapshot, writeBatch, doc, serverTimestamp, addDoc, getDoc, getDocs, updateDoc } from "firebase/firestore";
 import { toast } from "sonner";
-import { listingAppointmentDate, projectCarryFromOrder, stableOrderRequestListingId } from "@shared/listingWrite";
+import { listingAppointmentDate, projectCarryFromOrder, scheduleTimeInputValue, stableOrderRequestListingId } from "@shared/listingWrite";
+import { photographerPreferenceForNames } from "@shared/suggestedAppointments";
+import {
+  SuggestedAppointmentPills,
+  useBookingPhotographers,
+  useSuggestedAppointments,
+} from "@/components/SuggestedAppointments";
+import type { BookingSlotChoice } from "@/components/BookingSlotPicker";
 import { linkOrderToListing, resolvePortalClientId } from "@/lib/listingClient";
 import { assignBookingPhotographer } from "@/lib/assignBookingPhotographer";
 import { listingLinkFields } from "@shared/orderProjectInvoice";
@@ -268,10 +275,21 @@ function BulkScheduleFlow({ ids, orders, staff, onClose }: any) {
   const [saving, setSaving] = React.useState(false);
   const [date, setDate] = React.useState("");
   const [time, setTime] = React.useState("");
+  const [slotStart, setSlotStart] = React.useState("");
   const [providers, setProviders] = React.useState<string[]>([]);
-
   const orderId = ids[idx];
   const order = orders.find((o: any) => o.id === orderId);
+  const bookingPhotographers = useBookingPhotographers(true);
+  const names = providers.map((id: string) => String(staff.find((person: any) => person.id === id)?.name || ""));
+  const duration = Number(order?.appointmentDuration);
+  const suggestedTimes = useSuggestedAppointments({
+    active: Boolean(order),
+    address: recordAddressText(order) || "",
+    photographerId: photographerPreferenceForNames(names, bookingPhotographers),
+    service: typeof order?.selectedService === "string" ? order.selectedService : "",
+    basics: Array.isArray(order?.selectedBasics) ? order.selectedBasics.filter((item: unknown) => typeof item === "string").join(",") : "",
+    durationMinutes: Number.isInteger(duration) ? duration : null,
+  });
 
   React.useEffect(() => {
     if (order) {
@@ -280,6 +298,7 @@ function BulkScheduleFlow({ ids, orders, staff, onClose }: any) {
       );
       setDate(order.appointmentDate || "");
       setTime(order.appointmentTime || "");
+      setSlotStart("");
       setProviders((order.assignedProviders || []).map((p: any) => p.providerId).filter((id: string) => {
         if (staff.length === 0) return true;
         const person = staff.find((item: any) => item.id === id);
@@ -330,15 +349,30 @@ function BulkScheduleFlow({ ids, orders, staff, onClose }: any) {
             <p className="text-xs text-gray-500">{getAddr(order)}</p>
           </div>
 
+          <SuggestedAppointmentPills
+            suggestions={suggestedTimes.suggestions}
+            selectedStart={slotStart}
+            showPhotographer
+            onSelect={(slot: BookingSlotChoice) => {
+              setDate(slot.date);
+              setTime(scheduleTimeInputValue(slot.time));
+              setSlotStart(slot.start);
+              const match = staff.find((person: any) => String(person.name || "").trim().toLowerCase() === slot.photographerName.trim().toLowerCase());
+              if (match) setProviders([match.id]);
+            }}
+          />
+          {suggestedTimes.loading && suggestedTimes.suggestions.length === 0 && (
+            <p className="text-sm font-semibold text-gray-500">Checking suggested times.</p>
+          )}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-[10px] font-black uppercase text-gray-400 block mb-2">Appt Date *</label>
-              <input type="date" value={date} onChange={e => setDate(e.target.value)}
+              <input type="date" value={date} onChange={e => { setDate(e.target.value); setSlotStart(""); }}
                 className="w-full h-12 bg-gray-50 border border-gray-200 rounded-xl px-4 text-sm font-bold focus:ring-2 focus:ring-[#0d9488]/20 outline-none" />
             </div>
             <div>
-              <label className="text-[10px] font-black uppercase text-gray-400 block mb-2">Appt Time</label>
-              <input type="time" value={time} onChange={e => setTime(e.target.value)}
+              <label className="text-[10px] font-black uppercase text-gray-400 block mb-2">Appt Time (CT)</label>
+              <input type="time" value={time} onChange={e => { setTime(e.target.value); setSlotStart(""); }}
                 className="w-full h-12 bg-gray-50 border border-gray-200 rounded-xl px-4 text-sm font-bold focus:ring-2 focus:ring-[#0d9488]/20 outline-none" />
             </div>
           </div>

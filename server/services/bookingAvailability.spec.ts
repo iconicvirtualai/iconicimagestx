@@ -113,6 +113,29 @@ describe("booking calendar availability", () => {
     expect(sunday.some((slot) => slot.time === "3:00 PM")).toBe(true);
   });
 
+  it("suggests times that the same availability check already allows", async () => {
+    const result = await readBookingAvailability({
+      env: { ...accountEnv, BOOKING_TRAVEL_BUFFER_MINUTES: "25" },
+      now: new Date("2026-10-13T12:00:00.000Z"),
+      address: "200 Oak Ave, Houston, TX",
+      preferenceId: "mike-luna",
+      durationMinutes: 60,
+      listEvents: async (person) => {
+        if (person.id !== "mike-luna") return [];
+        return [{
+          start: "2026-10-13T09:00:00-05:00",
+          end: "2026-10-13T10:00:00-05:00",
+          location: "200 Oak Ave, Houston, TX",
+        }];
+      },
+    });
+    expect(result.live).toBe(true);
+    expect(result.suggestions.map((slot) => slot.time)).toEqual(["11:00 AM"]);
+    expect(result.suggestions.every((slot) => result.slots.some((item) => item.start === slot.start))).toBe(true);
+    expect(result.suggestions.some((slot) => slot.time === "10:00 AM" || slot.date === "2026-10-18")).toBe(false);
+    expect(JSON.stringify(result.suggestions)).not.toContain("@");
+  });
+
   it("asks Routes once per uncached pair and falls back when the key is missing", async () => {
     const departAtMs = Date.now() + 2 * 60 * 60 * 1000;
     const queries = [

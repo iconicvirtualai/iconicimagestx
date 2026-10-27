@@ -16,6 +16,13 @@ import {
 } from "lucide-react";
 import { recordAddressText } from "@shared/addressText";
 import { formatChicagoDate } from "@shared/clientHome";
+import { scheduleTimeInputValue } from "@shared/listingWrite";
+import {
+  SuggestedAppointmentPills,
+  useBookingPhotographers,
+  useSuggestedAppointments,
+} from "@/components/SuggestedAppointments";
+import type { BookingSlotChoice } from "@/components/BookingSlotPicker";
 import { db } from "@/lib/firebase";
 import {
   collection,
@@ -53,7 +60,9 @@ export function StatusBadge({ status }: { status: string }) {
 
 // ─── Blank new order form ──────────────────────────────────────────────────────
 const BLANK = {
-  firstName: "", lastName: "", email: "", phone: "", address: "", serviceNote: "", scheduledDate: "",
+  firstName: "", lastName: "", email: "", phone: "", address: "", serviceNote: "",
+  scheduledDate: "", scheduledTime: "", slotStart: "",
+  photographerId: "", photographerName: "",
   clientId: "", clientSearch: "",
 };
 
@@ -112,6 +121,12 @@ export default function AdminDashboard() {
 
   const [showNewOrder, setShowNewOrder] = React.useState(false);
   const [form, setForm] = React.useState(BLANK);
+  const photographers = useBookingPhotographers(showNewOrder);
+  const suggestedTimes = useSuggestedAppointments({
+    active: showNewOrder,
+    address: form.address,
+    photographerId: form.photographerId || "no-preference",
+  });
   const [saving, setSaving] = React.useState(false);
   const [clients, setClients] = React.useState<Array<{ id: string; firstName?: string; lastName?: string; email?: string; phone?: string }>>([]);
   const [showClientMatches, setShowClientMatches] = React.useState(false);
@@ -183,6 +198,14 @@ export default function AdminDashboard() {
         pricing: {},
         total: 0,
         scheduledDate: form.scheduledDate || null,
+        appointmentDate: form.scheduledDate || null,
+        scheduledTime: form.scheduledTime || null,
+        appointmentTime: form.scheduledTime || null,
+        slotStart: form.slotStart || null,
+        bookingPhotographerId: form.photographerId || null,
+        photographerPreference: form.photographerName || null,
+        preferredPhotographer: form.photographerName || null,
+        assignedPhotographerName: form.photographerName || null,
         status: "new",
         source: "admin",
         createdAt: serverTimestamp(),
@@ -217,7 +240,7 @@ export default function AdminDashboard() {
       {/* ── New Order Modal ─────────────────────────────────────────────────── */}
       {showNewOrder && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-[2rem] shadow-2xl p-8 w-full max-w-lg">
+          <div data-testid="admin-new-order" className="bg-white rounded-[2rem] shadow-2xl p-8 w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-sm font-black text-black uppercase tracking-widest">Create Order</h3>
               <button onClick={() => { setShowNewOrder(false); setForm(BLANK); }}>
@@ -306,13 +329,63 @@ export default function AdminDashboard() {
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Appointment Date (optional)</label>
-                <input
-                  type="date"
-                  value={form.scheduledDate}
-                  onChange={(e) => setForm((p) => ({ ...p, scheduledDate: e.target.value }))}
+                <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Photographer</label>
+                <select
+                  value={form.photographerId}
+                  onChange={(e) => {
+                    const choice = photographers.find((person) => person.id === e.target.value);
+                    setForm((p) => ({
+                      ...p,
+                      photographerId: choice?.id || "",
+                      photographerName: choice?.name || "",
+                      slotStart: "",
+                    }));
+                  }}
                   className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#0d9488]/30"
-                />
+                >
+                  <option value="">No preference</option>
+                  {photographers.map((person) => (
+                    <option key={person.id} value={person.id}>{person.name}</option>
+                  ))}
+                </select>
+              </div>
+              <SuggestedAppointmentPills
+                suggestions={suggestedTimes.suggestions}
+                selectedStart={form.slotStart}
+                showPhotographer={!form.photographerId}
+                onSelect={(slot: BookingSlotChoice) => {
+                  setForm((p) => ({
+                    ...p,
+                    scheduledDate: slot.date,
+                    scheduledTime: scheduleTimeInputValue(slot.time),
+                    slotStart: slot.start,
+                    photographerId: slot.photographerId,
+                    photographerName: slot.photographerName,
+                  }));
+                }}
+              />
+              {suggestedTimes.loading && suggestedTimes.suggestions.length === 0 && (
+                <p className="text-sm font-semibold text-gray-500">Checking suggested times.</p>
+              )}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Appointment Date (optional)</label>
+                  <input
+                    type="date"
+                    value={form.scheduledDate}
+                    onChange={(e) => setForm((p) => ({ ...p, scheduledDate: e.target.value, slotStart: "" }))}
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#0d9488]/30"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Appointment Time (CT)</label>
+                  <input
+                    type="time"
+                    value={form.scheduledTime}
+                    onChange={(e) => setForm((p) => ({ ...p, scheduledTime: e.target.value, slotStart: "" }))}
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#0d9488]/30"
+                  />
+                </div>
               </div>
             </div>
 

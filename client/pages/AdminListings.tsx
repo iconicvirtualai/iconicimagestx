@@ -17,7 +17,9 @@ import OperationsStatsGrid from "@/components/OperationsStatsGrid";
 import StaffActionQueue from "@/components/StaffActionQueue";
 import { recordAddressText } from "@shared/addressText";
 import { filterAssignableStaff, qaStaffAssignmentError, recordAllowsQaStaff } from "@shared/qaStaff";
-import { choosePortalClient, listingAppointmentDate } from "@shared/listingWrite";
+import { choosePortalClient, listingAppointmentDate, scheduleTimeInputValue } from "@shared/listingWrite";
+import { StaffSuggestedTimes } from "@/components/SuggestedAppointments";
+import type { BookingSlotChoice } from "@/components/BookingSlotPicker";
 import {
   LISTING_QUEUE,
   countListingQueue,
@@ -221,6 +223,7 @@ export default function AdminListings() {
 
   // Modal state
   const [showModal, setShowModal] = React.useState(false);
+  const [suggestedStart, setSuggestedStart] = React.useState("");
 
   React.useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -1088,21 +1091,53 @@ export default function AdminListings() {
               )}
 
               {/* Appointment */}
+              <StaffSuggestedTimes
+                active={showModal}
+                address={projectType === "real_estate" ? reForm.address : bizForm.shootLocation}
+                photographerNames={assignablePhotographers.filter((person) => form.photographerIds.includes(person.id)).map((person) => person.name)}
+                selectedStart={suggestedStart}
+                onSelect={(slot: BookingSlotChoice) => {
+                  const time = scheduleTimeInputValue(slot.time);
+                  const match = assignablePhotographers.find((person) => person.name.trim().toLowerCase() === slot.photographerName.trim().toLowerCase());
+                  setSuggestedStart(slot.start);
+                  if (projectType === "real_estate") {
+                    setReForm((current) => ({
+                      ...current,
+                      apptDate: slot.date,
+                      apptTime: time,
+                      photographerIds: match ? [match.id] : current.photographerIds,
+                    }));
+                  } else {
+                    setBizForm((current) => ({
+                      ...current,
+                      apptDate: slot.date,
+                      apptTime: time,
+                      photographerIds: match ? [match.id] : current.photographerIds,
+                    }));
+                  }
+                }}
+              />
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className={labelCls}>Appointment Date</label>
                   <input type="date" value={form.apptDate}
-                    onChange={e => projectType === "real_estate"
-                      ? setReForm(f => ({ ...f, apptDate: e.target.value }))
-                      : setBizForm(f => ({ ...f, apptDate: e.target.value }))}
+                    onChange={e => {
+                      setSuggestedStart("");
+                      projectType === "real_estate"
+                        ? setReForm(f => ({ ...f, apptDate: e.target.value }))
+                        : setBizForm(f => ({ ...f, apptDate: e.target.value }));
+                    }}
                     className={inputCls} />
                 </div>
                 <div>
-                  <label className={labelCls}>Appointment Time</label>
+                  <label className={labelCls}>Appointment Time (CT)</label>
                   <input type="time" value={form.apptTime}
-                    onChange={e => projectType === "real_estate"
-                      ? setReForm(f => ({ ...f, apptTime: e.target.value }))
-                      : setBizForm(f => ({ ...f, apptTime: e.target.value }))}
+                    onChange={e => {
+                      setSuggestedStart("");
+                      projectType === "real_estate"
+                        ? setReForm(f => ({ ...f, apptTime: e.target.value }))
+                        : setBizForm(f => ({ ...f, apptTime: e.target.value }));
+                    }}
                     className={inputCls} />
                 </div>
               </div>
