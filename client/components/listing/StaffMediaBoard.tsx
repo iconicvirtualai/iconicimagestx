@@ -339,7 +339,9 @@ export function StaffMediaBoard({
                       onPointerDown={(event) => onPointerDown(event, item.id)}
                     >
                       <div className="flex aspect-square items-center justify-center bg-gray-100 text-[10px] font-black uppercase tracking-widest text-gray-400">
-                        {item.kind}
+                        {item.url && (item.kind === "photo" || item.kind === "floorplan") ? (
+                          <img src={item.url} alt={item.name} draggable={false} className="h-full w-full object-cover" />
+                        ) : item.kind}
                       </div>
                       <div className="space-y-1 p-2">
                         <p className="truncate text-xs font-bold">{item.name}</p>
