@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Camera, MapPin } from "lucide-react";
 import { ShootUploader } from "@/components/ops/ShootUploader";
+import { ShootOrderPanel } from "@/components/photographer/ShootOrderPanel";
 import {
   MEDIA_DELIVERY_LABELS,
   deliveryNotice,
@@ -168,6 +170,7 @@ function OpsJobCard({
 }) {
   const card = job.card;
   const delivery = job.delivery;
+  const [orderRevision, setOrderRevision] = useState(0);
   const notice = delivery ? deliveryNotice(delivery) : null;
   const held = delivery && holdMessage?.id === delivery.id ? holdMessage.message : "";
   const studioHref = card?.studioHref || "";
@@ -235,7 +238,15 @@ function OpsJobCard({
                 iconicPolish={iconicPolish}
                 onIconicPolish={onIconicPolish}
                 getToken={getToken}
-                onUploaded={onUploaded}
+                onUploaded={async () => {
+                  await onUploaded?.();
+                  setOrderRevision((current) => current + 1);
+                }}
+              />
+              <ShootOrderPanel
+                listingId={job.listingId}
+                fallbackAddress={job.address}
+                revision={orderRevision}
               />
             </div>
           )}

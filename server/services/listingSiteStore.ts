@@ -22,11 +22,36 @@ function useMemory(): boolean {
   return !admin.apps.length || process.env.NODE_ENV === "test" || process.env.LISTING_SITE_STORE === "memory";
 }
 
+async function withClientProfile(listing: Record<string, unknown>): Promise<Record<string, unknown>> {
+  if (listing.clientHubProfile || useMemory()) return listing;
+  const clientId = typeof listing.clientId === "string" ? listing.clientId : "";
+  if (!clientId) return listing;
+  try {
+    const snap = await admin.firestore().collection("clients").doc(clientId).get();
+    if (!snap.exists) return listing;
+    const data = snap.data() || {};
+    return {
+      ...listing,
+      clientHubProfile: data.hubProfile || null,
+      clientContact: {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        phone: data.phone,
+        email: data.email,
+        company: data.company,
+      },
+    };
+  } catch (err) {
+    console.error("[Listing site] Client profile read failed", err);
+    return listing;
+  }
+}
+
 export async function readPublishedListingSite(slug: string): Promise<PublicListingSite | null> {
   if (!isListingSiteSlug(slug)) return null;
   if (useMemory()) {
     for (const listing of memory.values()) {
-      const site = buildPublicListingSite(listing);
+      const site = buildPublicListingSite(await withClientProfile(listing));
       if (site?.slug === slug) return site;
     }
     return null;
@@ -34,7 +59,7 @@ export async function readPublishedListingSite(slug: string): Promise<PublicList
   const snap = await admin.firestore().collection("listings").where("listingSiteSlug", "==", slug).limit(5).get();
   for (const doc of snap.docs) {
     const listing = jsonSafe({ id: doc.id, ...(doc.data() || {}) }) as Record<string, unknown>;
-    const site = buildPublicListingSite(listing);
+    const site = buildPublicListingSite(await withClientProfile(listing));
     if (site?.slug === slug) return site;
   }
   return null;

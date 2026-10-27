@@ -102,11 +102,18 @@ describe("client home dashboard", () => {
     expect(html).toContain("https://files.example/cover.jpg");
     expect(html).toContain("No photos yet");
     expect(html).toContain("Listings");
+    expect(html).toContain("Place Order");
+    expect(html).toContain('href="/portal/order"');
+    expect(html).toContain("lg:hidden");
+    expect(html).toContain("hidden lg:block");
+    expect(html).toContain('href="/portal/settings/profile"');
+    expect(html).toContain('href="/portal/settings/team"');
+    expect(html).toContain('href="/portal/settings/clients"');
+    expect(html).toContain('href="/portal/settings/billing"');
     expect(html).toContain("minmax(min(100%,280px),360px)");
     expect(html).toContain("items-start");
     expect(html).not.toContain("2xl:grid-cols-4");
     expect(html).not.toContain("xl:grid-cols-2");
-    expect(html).toContain("Order history");
     expect(html).toContain("Schedule");
     expect(html).not.toContain("/invoice/");
   });
@@ -224,9 +231,11 @@ describe("client home dashboard", () => {
     expect(html).not.toContain(">Pay<");
   });
 
-  it("says when no invoices are stored", () => {
+  it("sends the old order history section to billing", () => {
     const html = view({ section: "orders" });
     expect(html).toContain("No invoices are stored on this account yet");
+    expect(html).toContain('href="/portal/settings/billing"');
+    expect(html).toContain("Open billing");
   });
 
   it("colors past, submitted, accepted, and changed appointments", () => {

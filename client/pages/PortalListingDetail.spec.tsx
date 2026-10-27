@@ -36,11 +36,12 @@ function render(
   canEdit = true,
   dataEditing = false,
   website = defaultPortalWebsite(),
+  savedWebsite = website,
 ) {
   return renderToString(
     <MemoryRouter>
       <PortalListingDetailView
-        detail={detail}
+        detail={{ ...detail, website: savedWebsite }}
         tab={tab}
         editing={editing}
         saving={false}
@@ -272,7 +273,14 @@ describe("portal listing detail page", () => {
     expect(orders).not.toContain("/invoice/");
     expect(orders).not.toContain("Pay now");
     expect(render("activity")).toContain("Booking request received");
-    expect(render("website")).toContain("Save site style");
+    expect(render("website")).toContain('data-testid="listing-site-status-row"');
+    expect(render("website")).toContain('data-testid="listing-site-publish-bar"');
+    expect(render("website")).toContain("sm:justify-end");
+    expect(render("website")).toContain("w-full flex-col gap-2 sm:w-auto");
+    expect(render("website")).not.toContain("fixed right-3");
+    expect(render("website")).not.toContain("at the top right");
+    expect(render("website")).toContain(">Save style<");
+    expect(render("website")).toContain(">Publish<");
     expect(render("website")).toContain("Not published yet");
     expect(render("website")).toContain("listing-site-unpublished");
     expect(render("website")).not.toContain("listing-site-view");
@@ -292,9 +300,9 @@ describe("portal listing detail page", () => {
       expect(render("website")).toContain(`data-listing-design="${design}"`);
       expect(render("website")).toContain(`listing-style-${design}`);
     }
-    expect(render("website")).toContain("Portal tile");
-    expect(render("website")).toContain("portal-tile-skins");
-    expect(render("website")).toContain("tile-skin-showcase");
+    expect(render("website")).not.toContain("Portal tile");
+    expect(render("website")).not.toContain("portal-tile-skins");
+    expect(render("website")).not.toContain("tile-skin-");
     expect(render("marketing")).toContain("portal-upload-social");
     expect(render("marketing")).toContain("portal-upload-file");
     expect(render("video")).toContain("portal-upload-input-video");
@@ -326,6 +334,36 @@ describe("portal listing detail page", () => {
     const visitor = render("website", null, false, false, { ...defaultPortalWebsite(), published: true });
     expect(visitor).toContain('href="/l/18-oak-hollow-spring"');
     expect(visitor).not.toContain("Save site style");
+    expect(visitor).not.toContain("listing-site-publish-bar");
+    expect(visitor).not.toContain(">Publish<");
+    expect(visitor).not.toContain(">Unpublish<");
+  });
+
+  it("puts Select and Publish on the unpublished status row when the chosen style differs", () => {
+    const saved = defaultPortalWebsite();
+    const html = render("website", null, true, false, { ...saved, design: "premiere" }, saved);
+    expect(html).toContain('data-testid="listing-site-publish-bar"');
+    expect(html).toContain('data-listing-action="choose"');
+    expect(html).toContain(">Select<");
+    expect(html).toContain('data-testid="listing-site-publish"');
+    expect(html).not.toContain("Portal tile");
+  });
+
+  it("shows Published, View site, and Unpublish, or Update when the live style is unsaved", () => {
+    const live = { ...defaultPortalWebsite(), published: true };
+    const clean = render("website", null, true, false, live, live);
+    expect(clean).toContain('data-listing-action="live"');
+    expect(clean).toContain('data-testid="listing-site-published-state"');
+    expect(clean).toContain(">Unpublish<");
+    expect(clean).toContain('data-testid="listing-site-view-action"');
+    expect(clean).not.toContain('data-testid="listing-site-publish"');
+
+    const dirty = render("website", null, true, false, { ...live, design: "stories" }, live);
+    expect(dirty).toContain('data-listing-action="update"');
+    expect(dirty).toContain('data-testid="listing-site-update"');
+    expect(dirty).toContain(">Update<");
+    expect(dirty).not.toContain('data-testid="listing-site-unpublish"');
+    expect(dirty).not.toContain("Portal tile");
   });
 
   it("gives a visitor the listing without edit, hide, site save, or a pay action", () => {
@@ -368,6 +406,44 @@ describe("portal listing detail page", () => {
     expect(data).not.toContain("Download");
     expect(data).not.toContain("INV-2026-100");
     expect(data).not.toContain("View invoice");
+  });
+
+  it("lets the client request an edit on a video and a 3D tour", () => {
+    const media = buildPortalListingDetail({
+      listing: {
+        id: "listing1234",
+        address: { street: "18 Oak Hollow", city: "Spring", state: "TX", zip: "77389" },
+        videos: [{ id: "walkthrough", name: "walkthrough.mp4", url: "https://cdn.example/walkthrough.mp4", contentType: "video/mp4" }],
+        tours: [{ id: "matterport", name: "3D tour", url: "https://my.matterport.com/show/?m=abc12345", type: "tour" }],
+      },
+    });
+    const view = (tab: "video" | "tours") => renderToString(
+      <MemoryRouter>
+        <PortalListingDetailView
+          detail={media}
+          tab={tab}
+          editing={null}
+          saving={false}
+          canEdit
+          dataEditing={false}
+          dataDraft={portalFactsDraftFromDetail(media)}
+          website={defaultPortalWebsite()}
+          onTab={() => undefined}
+          onToggleEditing={() => undefined}
+          onMedia={() => undefined}
+          onWebsite={() => undefined}
+          onWebsiteSave={() => undefined}
+          onDataEditing={() => undefined}
+          onDataDraft={() => undefined}
+          onDataSave={() => undefined}
+          onRequestPhotoEdit={async () => false}
+        />
+      </MemoryRouter>,
+    );
+    expect(view("video")).toContain('data-testid="photo-edit-open-walkthrough"');
+    expect(view("video")).toContain("Request edit");
+    expect(view("tours")).toContain('data-testid="photo-edit-open-matterport"');
+    expect(view("tours")).toContain("Request edit");
   });
 
   it("plays a listing video instead of turning a mov named tour into an iframe", () => {

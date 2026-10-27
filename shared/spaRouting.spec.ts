@@ -14,7 +14,13 @@ import {
 const appSource = readFileSync(new URL("../client/App.tsx", import.meta.url), "utf8");
 const vercel = JSON.parse(readFileSync(new URL("../vercel.json", import.meta.url), "utf8")) as {
   rewrites: { source: string; destination: string }[];
-  redirects: { source: string; destination: string; permanent?: boolean; statusCode?: number }[];
+  redirects: {
+    source: string;
+    destination: string;
+    permanent?: boolean;
+    statusCode?: number;
+    has?: { type: string; value: string }[];
+  }[];
   headers: { source: string; headers: { key: string; value: string }[] }[];
 };
 const footer = readFileSync(new URL("../client/components/Footer.tsx", import.meta.url), "utf8");
@@ -200,7 +206,10 @@ describe("spa rewrite coverage", () => {
     expect(emailDollhouse.readUInt32BE(20)).toBe(560);
     for (const path of ["/email/refresher-graphic.jpg", "/email/senior-hero.png", "/email/not-a-page"]) {
       expect(firstMatchingRewrite(path, vercel.rewrites), path).toBeUndefined();
-      expect(vercel.redirects.some((rule) => compileVercelSource(rule.source).test(path)), path).toBe(false);
+      expect(
+        vercel.redirects.some((rule) => !rule.has?.length && compileVercelSource(rule.source).test(path)),
+        path,
+      ).toBe(false);
       expect(headerMatches(path), path).toBe(false);
     }
     const refresher = readFileSync(new URL("../public/email/refresher-graphic.jpg", import.meta.url));

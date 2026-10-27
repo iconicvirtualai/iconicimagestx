@@ -161,5 +161,11 @@ describe("portal listing detail routes", () => {
       body: JSON.stringify({ address: { line1: "9 Main" }, facts: { beds: "4" } }),
     });
     expect(publicData.status).toBe(404);
+    const publicWebsite = await fetch(`${baseUrl}/api/portal/listings/listing1234/website`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ published: true, tileLook: "showcase" }),
+    });
+    expect(publicWebsite.status).toBe(404);
   });
 });

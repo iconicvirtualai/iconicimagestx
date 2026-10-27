@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import AdminLayout from "@/components/AdminLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { ShootUploader } from "@/components/ops/ShootUploader";
+import { ShootOrderPanel } from "@/components/photographer/ShootOrderPanel";
 import { PhotographerJobBanner, PhotographerPortal } from "@/components/photographer/PhotographerPortal";
 import { PresentationShareButton, PresentationSharePanel } from "@/components/PresentationSharePanel";
 import { fetchAssignedListings, uploadListingFile } from "@/lib/listingUpload";
@@ -33,6 +34,7 @@ export default function AdminPhotographer() {
   const [queueNote, setQueueNote] = React.useState("");
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [selectedProject, setSelectedProject] = React.useState<string | null>(null);
+  const [orderRevision, setOrderRevision] = React.useState(0);
 
   const load = React.useCallback(async () => {
     if (!user) {
@@ -97,6 +99,7 @@ export default function AdminPhotographer() {
       }
       toast.success(`${fileArray.length} file${fileArray.length === 1 ? "" : "s"} uploaded.`);
       setQueueNote("Studio is editing the order, one photo at a time.");
+      setOrderRevision((current) => current + 1);
       await load();
       if (user) {
         try {
@@ -157,7 +160,15 @@ export default function AdminPhotographer() {
               iconicPolish={iconicPolish}
               onIconicPolish={setPolish}
               getToken={() => user?.getIdToken()}
-              onUploaded={load}
+              onUploaded={async () => {
+                setOrderRevision((current) => current + 1);
+                await load();
+              }}
+            />
+            <ShootOrderPanel
+              listingId={uploadJob.id}
+              fallbackAddress={uploadJob.address}
+              revision={orderRevision}
             />
           </div>
           <div className="mt-4 max-w-md">

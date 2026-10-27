@@ -1,14 +1,22 @@
 /**
  * Public SEO for the Vite SPA.
  *
- * iconicimagestx.com is listed on the Vercel project but is not verified, and
- * that hostname still serves the previous site. Canonical and social URLs use
- * the live app origin until VITE_SITE_ORIGIN points at the production domain.
+ * iconicimagestx.vercel.app stays the default origin, including every
+ * *.vercel.app preview host. www.iconicimagestx.com is the primary custom
+ * domain. Apex iconicimagestx.com redirects to www. Canonical, sitemap, and
+ * robots use the www origin only when the request host is one of those two
+ * custom domains.
  */
 
 import { LEGAL_BUSINESS_NAME } from "./businessContact.ts";
 
 export const DEFAULT_SITE_ORIGIN = "https://iconicimagestx.vercel.app";
+
+/** Primary custom-domain origin. Apex redirects here and must not be used as the canonical host. */
+export const CANONICAL_WWW_ORIGIN = "https://www.iconicimagestx.com";
+
+/** Hosts that receive www canonicals. vercel.app hosts are never included. */
+export const CUSTOM_DOMAIN_HOSTS = ["iconicimagestx.com", "www.iconicimagestx.com"] as const;
 
 /** Drone still already used on the public marketing pages. */
 export const OG_IMAGE_PATH = "/media/photos/drone-hero.jpg";
@@ -142,6 +150,48 @@ function readConfiguredOrigin(): string {
 }
 
 export const SITE_ORIGIN = readConfiguredOrigin() || DEFAULT_SITE_ORIGIN;
+
+/** Hostname without port. `x-forwarded-host` may be a comma-separated list. */
+export function hostnameOf(host: string | null | undefined): string {
+  const first = String(host || "").split(",")[0].trim().toLowerCase().replace(/\.$/, "");
+  if (!first) return "";
+  if (first.startsWith("[")) {
+    const end = first.indexOf("]");
+    return end >= 0 ? first.slice(1, end) : first;
+  }
+  return first.replace(/:\d+$/, "");
+}
+
+export function isCustomDomainHost(host: string | null | undefined): boolean {
+  const name = hostnameOf(host);
+  return name === "iconicimagestx.com" || name === "www.iconicimagestx.com";
+}
+
+/**
+ * Origin for canonical URLs, sitemap, and robots.
+ * Custom-domain hosts always use www. Every other host, including
+ * iconicimagestx.vercel.app and preview *.vercel.app hosts, keeps `fallback`.
+ */
+export function originForHost(host: string | null | undefined, fallback = SITE_ORIGIN): string {
+  return isCustomDomainHost(host) ? CANONICAL_WWW_ORIGIN : fallback;
+}
+
+/** Static file under dist/spa for the www canonical shell of a public page. */
+export function wwwShellFile(pageFile: string): string {
+  if (pageFile === "index.html") return "seo/www/index.html";
+  if (pageFile.startsWith("seo/")) return `seo/www/${pageFile.slice("seo/".length)}`;
+  return `seo/www/${pageFile}`;
+}
+
+/** Insert or replace the canonical link. Leaves every other tag alone. */
+export function stampCanonical(html: string, href: string): string {
+  const tag = `<link rel="canonical" href="${escapeHtml(href)}" />`;
+  if (/<link\b[^>]*rel=["']canonical["'][^>]*>/i.test(html)) {
+    return html.replace(/<link\b[^>]*rel=["']canonical["'][^>]*>/i, tag);
+  }
+  if (html.includes("</head>")) return html.replace("</head>", `    ${tag}\n  </head>`);
+  return `${tag}\n${html}`;
+}
 
 export function normalizePath(pathname: string): string {
   const path = (pathname || "/").split("?")[0].split("#")[0] || "/";

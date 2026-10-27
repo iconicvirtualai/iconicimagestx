@@ -8,6 +8,7 @@
  */
 
 import type { StudioMedia } from "./clientGalleryLink.ts";
+import { keptShots } from "./gallerySequence.ts";
 
 export interface ShareListing {
   id: string;
@@ -44,7 +45,7 @@ function shareableUrl(value: unknown): string {
 }
 
 function mediaName(row: Record<string, unknown>, fallback: string): string {
-  return text(row.name) || text(row.fileName) || text(row.title) || fallback;
+  return text(row.deliveryName) || text(row.name) || text(row.fileName) || text(row.title) || fallback;
 }
 
 function labelOf(row: Record<string, unknown>): string {
@@ -203,22 +204,23 @@ export function shareDisplayItems(listing: ShareListing, options: ShareDisplayOp
   const seen = new Set<string>();
 
   if (Array.isArray(listing.images)) {
-    listing.images.forEach((item, index) => {
+    keptShots(listing.images as Array<Record<string, unknown>>).forEach((item, index) => {
       const row = rowOf(item);
       if (!row) return;
-      pushDisplay(items, seen, mediaName(row, `Photo ${index + 1}`), rasterShareSource(row, legacy), "image");
+      const deliveryName = typeof row.deliveryName === "string" ? row.deliveryName.trim() : "";
+      pushDisplay(items, seen, deliveryName || mediaName(row, `Photo ${index + 1}`), rasterShareSource(row, legacy), "image");
     });
   }
   for (const group of [listing.floorplans, listing.floorPlans]) {
     if (!Array.isArray(group)) continue;
-    group.forEach((item, index) => {
+    keptShots(group as Array<Record<string, unknown>>).forEach((item, index) => {
       const row = rowOf(item);
       if (!row) return;
       pushDisplay(items, seen, mediaName(row, `Floor plan ${index + 1}`), floorSource(row, legacy), "floorPlan");
     });
   }
   if (Array.isArray(listing.videos)) {
-    listing.videos.forEach((item) => {
+    keptShots(listing.videos as Array<Record<string, unknown>>).forEach((item) => {
       const row = rowOf(item);
       if (!row) return;
       const poster = rasterPoster(row, legacy) || videoPlaceholderSource(row);

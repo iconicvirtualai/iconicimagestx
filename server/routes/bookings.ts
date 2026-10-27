@@ -36,6 +36,7 @@ import { createHolidaySquareCheckout } from "../services/holidaySquareCheckout";
 import { loadHolidaySlotOrders } from "../services/holidaySlots";
 import { packagesForStaffEditor, publicBookingCatalogResponse } from "../../shared/bookingCatalog";
 import { normalizeEmail } from "../../shared/listingAccess";
+import { portalBillingStamp } from "../../shared/clientHubSettings";
 import { addressText } from "../../shared/addressText";
 import { bookingDateLabel } from "../../shared/clientHome";
 import { storedServiceLocationFields } from "../../shared/serviceLocation";
@@ -421,7 +422,8 @@ router.post("/", async (req, res) => {
       dotOptIn: dotOptInSelected(req.body.dotOptIn),
       dotOptInToken: createPayToken(),
       status: "new",
-      source: "booking_form",
+      source: req.body.source === "portal" ? "portal" : "booking_form",
+      ...portalBillingStamp(req.body),
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       submittedAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -567,6 +569,7 @@ router.post("/", async (req, res) => {
         lineItems,
         pricing,
         total,
+        billing: portalBillingStamp(orderRequest),
         promoCode,
         promoDiscount,
         travel,
@@ -1343,6 +1346,7 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
           galleryId: galleryRef.id,
           clientName: requestClientName,
           clientEmail: requestEmail,
+          ...portalBillingStamp(request),
           ...(listingId ? { listingId } : {}),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
@@ -1370,6 +1374,7 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
       });
       await invoiceRef.set({
         ...draft,
+        ...portalBillingStamp(request),
         orderId: orderRef.id,
         galleryId: galleryRef.id,
         ...(listingId ? { listingId } : {}),
@@ -1602,6 +1607,7 @@ async function createBookingInvoiceDraft(input: {
   travel?: TravelAssessment | null;
   clientId?: string | null;
   prepared?: ReturnType<typeof buildBookingInvoiceDraft> | null;
+  billing?: { billingEmail?: string; billingPhone?: string; billToAddress?: string };
 }): Promise<{ invoiceId: string; clientId: string | null }> {
   const clientId = input.clientId || await linkClientIdByEmail(input.email);
   const draft = input.prepared
@@ -1623,6 +1629,7 @@ async function createBookingInvoiceDraft(input: {
   const paymentUrl = clientInvoiceUrl({ id: invoiceRef.id, status: "draft", payToken });
   await invoiceRef.set({
     ...draft,
+    ...(input.billing || {}),
     invoiceNumber: await generateInvoiceNumber(),
     payToken,
     ...(paymentUrl ? { paymentUrl } : {}),

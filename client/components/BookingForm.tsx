@@ -121,9 +121,23 @@ const consultQuestions = [
   }
 ];
 
+export interface PortalOrderPrefill {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  phone?: string;
+  brokerage?: string;
+  billingEmail?: string;
+  billingPhone?: string;
+  billToAddress?: string;
+  cardLabel?: string;
+}
+
 interface BookingFormProps {
   initialServiceId?: string;
   initialCategoryId?: string;
+  prefill?: PortalOrderPrefill;
+  source?: "portal";
 }
 
 function ProcessingEstimateLine({ amount }: { amount: number }) {
@@ -147,7 +161,7 @@ function TravelFeeLine({ travel }: { travel: TravelAssessment }) {
   );
 }
 
-export default function BookingForm({ initialServiceId, initialCategoryId }: BookingFormProps = {}) {
+export default function BookingForm({ initialServiceId, initialCategoryId, prefill, source }: BookingFormProps = {}) {
   const settings = useSiteSettings();
   const isMobile = useIsMobile();
   const [searchParams] = useSearchParams();
@@ -171,10 +185,15 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
   const [showBasics, setShowBasics] = useState(seededSelection.showBasics);
 
   const [formData, setFormData] = useState({
-    firstName: "",
-    lastName: "",
-    email: "",
-    phone: "",
+    firstName: prefill?.firstName || "",
+    lastName: prefill?.lastName || "",
+    email: prefill?.email || "",
+    phone: prefill?.phone || "",
+    brokerage: prefill?.brokerage || "",
+    billingEmail: prefill?.billingEmail || "",
+    billingPhone: prefill?.billingPhone || "",
+    billToAddress: prefill?.billToAddress || "",
+    source: source || "",
     address: "",
     servicePlace: null as PickedServiceLocation | null,
     sqft: "",
@@ -522,8 +541,20 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
       return;
     }
     if (step === 3 && !formData.servicePlace) {
-      toast.error("Choose the service location from the address list.");
-      return;
+      const typedAddress = formData.address.trim();
+      if (searchParams.get("example") === "1" && typedAddress.length >= 8) {
+        updateFormData({
+          servicePlace: {
+            placeId: "example-place",
+            formatted: typedAddress,
+            lat: 30.0799,
+            lng: -95.4172,
+          },
+        });
+      } else {
+        toast.error("Choose the service location from the address list.");
+        return;
+      }
     }
 
     // Check if we should show the Iconic Finish popup
@@ -629,6 +660,10 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
 
   const handleBookNow = async (e?: React.FormEvent) => {
   if (e) e.preventDefault();
+  if (searchParams.get("example") === "1") {
+    toast.error("Example preview — this order was not sent.");
+    return;
+  }
   const bookedService = services.find((item) => item.id === formData.selectedService);
   const skipsServiceLocation = Boolean(
     bookedService && ["branding", "business", "growth", "studio"].includes(bookedService.category),
@@ -847,22 +882,22 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
             className="space-y-8"
           >
             <div className="text-center space-y-3">
-              <h2 className="text-2xl font-black text-black tracking-tight uppercase [overflow-wrap:normal] [word-break:normal]">Select your Campaign Tier</h2>
+              <h2 className="text-xl sm:text-2xl font-black text-black tracking-tight uppercase [overflow-wrap:normal] [word-break:normal]">Select your Campaign Tier</h2>
               <p className="text-[11px] text-gray-400 font-bold uppercase tracking-wide sm:tracking-widest [overflow-wrap:normal] [word-break:normal]">Choose the level of impact for your presence</p>
             </div>
 
             {/* Basics Toggle */}
             <div className="flex flex-col items-center gap-3">
-              <div className="flex max-w-full flex-wrap items-center justify-center gap-2 rounded-3xl bg-gray-50 p-1.5 border border-gray-100 sm:flex-nowrap sm:rounded-full sm:gap-3">
+              <div className="flex w-full max-w-full flex-col items-stretch justify-center gap-2 rounded-3xl bg-gray-50 p-1.5 border border-gray-100 sm:w-auto sm:flex-row sm:flex-nowrap sm:rounded-full sm:gap-3">
                  <button 
                   onClick={() => setShowBasics(false)}
-                  className={`shrink-0 whitespace-nowrap px-4 sm:px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-wide sm:tracking-widest transition-all [overflow-wrap:normal] [word-break:normal] ${!showBasics ? 'bg-black text-white' : 'text-gray-400 hover:text-black'}`}
+                  className={`max-w-full px-4 sm:px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-wide sm:tracking-widest transition-all whitespace-normal sm:whitespace-nowrap [overflow-wrap:normal] [word-break:normal] ${!showBasics ? 'bg-black text-white' : 'text-gray-400 hover:text-black'}`}
                  >
                    Campaign Tiers
                  </button>
                  <button 
                   onClick={() => setShowBasics(true)}
-                  className={`shrink-0 whitespace-nowrap px-4 sm:px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-wide sm:tracking-widest transition-all [overflow-wrap:normal] [word-break:normal] ${showBasics ? 'bg-black text-white' : 'text-gray-400 hover:text-black'}`}
+                  className={`max-w-full px-4 sm:px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-wide sm:tracking-widest transition-all whitespace-normal sm:whitespace-nowrap [overflow-wrap:normal] [word-break:normal] ${showBasics ? 'bg-black text-white' : 'text-gray-400 hover:text-black'}`}
                  >
                    The Basics (Photos-Only)
                  </button>
@@ -920,7 +955,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
                                   <div className="w-full col-span-full">
                                      <div className="flex items-center gap-3 my-4">
                                        <div className="h-px flex-1 bg-teal-100"></div>
-                                       <span className="text-[9px] font-black uppercase tracking-[0.2em] text-teal-500 whitespace-nowrap">{s.highlights}</span>
+                                       <span className="text-[9px] font-black uppercase tracking-[0.2em] text-teal-500 text-center whitespace-normal sm:whitespace-nowrap">{s.highlights}</span>
                                        <div className="h-px flex-1 bg-teal-100"></div>
                                      </div>
                                   </div>
@@ -969,7 +1004,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
                   <div data-testid="basics-photos" className="space-y-3">
                     <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Photos-Only</p>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-1 gap-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 gap-3">
                       {photoOnlyPackages.map((b) => (
                         <button
                           key={b.id}
@@ -1218,7 +1253,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
                   />
                </div>
 
-               <div className="grid grid-cols-2 gap-6">
+               <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                   <div className="space-y-3">
                     <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-2">
                       <Maximize className="w-3 h-3" /> Square Footage
@@ -1244,7 +1279,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
                         <button
                           key={access}
                           onClick={() => updateFormData({ accessInfo: access })}
-                          className={`flex-1 py-3.5 rounded-lg text-[9px] font-black uppercase tracking-widest border-2 transition-all ${
+                          className={`flex-1 min-w-0 px-1 py-3.5 rounded-lg text-[9px] font-black uppercase tracking-wide leading-tight sm:tracking-widest border-2 transition-all ${
                             formData.accessInfo === access ? 'border-black bg-black text-white' : 'border-gray-100 bg-white text-neutral-700'
                           }`}
                         >
@@ -1282,7 +1317,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
                </AnimatePresence>
 
                {/* Property Status Options */}
-               <div className="grid grid-cols-2 gap-6 pt-2">
+               <div className="grid grid-cols-1 gap-6 pt-2 lg:grid-cols-2">
                  <div className="space-y-3">
                     <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">Property Status</label>
                     <div className="flex gap-1.5">
@@ -1559,7 +1594,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
                    )}
                  </div>
                </div>
-               <div className="grid grid-cols-2 gap-4">
+               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">First Name</label>
                     <Input
@@ -1601,6 +1636,15 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
                     />
                   </div>
                </div>
+               {source === "portal" ? (
+                 <div data-testid="portal-order-prefill" className="rounded-2xl border border-gray-100 bg-gray-50 p-4 space-y-2">
+                   <p className="text-[10px] font-black uppercase tracking-widest text-[#0d9488]">From your portal</p>
+                   <p className="text-sm text-gray-600">Profile and billing details are filled in. This is the same order form as the public booking page.</p>
+                   {prefill?.brokerage ? <p className="text-sm font-bold">Brokerage: {prefill.brokerage}</p> : null}
+                   {prefill?.billToAddress ? <p className="text-sm text-gray-600">Bill to: {prefill.billToAddress}</p> : null}
+                   {prefill?.cardLabel ? <p className="text-sm text-gray-600">Card on file: {prefill.cardLabel}</p> : null}
+                 </div>
+               ) : null}
 
                <SmsConsentField
                  checked={formData.smsConsent}
@@ -1744,7 +1788,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
   }
 
   return (
-    <div className="max-w-[1300px] mx-auto px-4 py-8 text-neutral-950">
+    <div className="max-w-[1300px] mx-auto min-w-0 overflow-x-hidden px-0 py-4 text-neutral-950 sm:px-4 sm:py-8">
       <div className="flex flex-col lg:flex-row gap-8">
         {/* Main Form Area */}
         <div className="flex-1 space-y-8">
@@ -1770,7 +1814,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
               })}
            </div>
 
-           <div data-testid="booking-step" className="min-h-[550px] bg-white text-neutral-950 rounded-[3rem] border border-gray-50 p-10 shadow-sm relative overflow-hidden">
+           <div data-testid="booking-step" className="min-h-0 bg-white text-neutral-950 rounded-2xl border border-gray-50 p-4 shadow-sm relative overflow-hidden sm:min-h-[550px] sm:rounded-[3rem] sm:p-10">
               <div className="absolute top-0 right-0 p-10 opacity-[0.01] pointer-events-none">
                  <Sparkles className="w-80 h-80" />
               </div>
@@ -1779,12 +1823,12 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
               </AnimatePresence>
            </div>
 
-           <div className="flex gap-4">
+           <div className="flex flex-col gap-3 sm:flex-row sm:gap-4">
               {step > 1 && (
                 <Button
                   variant="outline"
                   onClick={prevStep}
-                  className="h-16 px-8 rounded-2xl border-gray-100 bg-white text-gray-500 font-black uppercase tracking-widest text-[10px] hover:bg-gray-50 transition-all group"
+                  className="h-16 w-full px-8 rounded-2xl border-gray-100 bg-white text-gray-500 font-black uppercase tracking-widest text-[10px] hover:bg-gray-50 transition-all group sm:w-auto"
                 >
                   <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform mr-2" /> Back
                 </Button>
@@ -1792,7 +1836,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
               {step < 6 ? (
                 <Button
                   onClick={nextStep}
-                  className="flex-1 h-16 bg-black hover:bg-gray-800 text-white font-black uppercase tracking-[0.15em] text-[11px] rounded-2xl shadow-xl transition-all hover:scale-[1.005] group"
+                  className="h-16 w-full bg-black hover:bg-gray-800 text-white font-black uppercase tracking-[0.15em] text-[11px] rounded-2xl shadow-xl transition-all sm:flex-1 sm:hover:scale-[1.005] group"
                 >
                   Next Stage <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform ml-2" />
                 </Button>

@@ -20,6 +20,7 @@ import paymentsRouter from "./routes/payments";
 import vsaiRouter from "./routes/vsai";
 import messagingRouter from "./routes/messaging";
 import clientsRouter from "./routes/clients";
+import clientHubRouter from "./routes/clientHub";
 import staffRouter from "./routes/staff";
 import listingsRouter from "./routes/listings";
 import campaignsRouter from "./routes/campaigns";
@@ -52,6 +53,7 @@ import photoEditRequestsRouter from "./routes/photoEditRequests";
 import { mountOwners } from "./routes/owners";
 import siteContentRouter from "./routes/siteContent";
 import insightsRouter, { handleInsightShell } from "./routes/insights";
+import { originForHost, robotsTxt, sitemapXml } from "../shared/siteSeo.ts";
 
 const SETTINGS_FILE = path.join(process.cwd(), "site_settings.json");
 const API_BUILD_MARKER = "auth-square-2026-09-28";
@@ -117,6 +119,24 @@ export function createServer() {
   // Standard middleware
   app.use(express.json({ limit: "10mb" }));
   app.use(express.urlencoded({ extended: true }));
+
+  // Static public/sitemap.xml and robots.txt are the vercel.app copies and are
+  // removed from the Vercel output. This route is what both hosts receive.
+  // Custom domains get www. Every other host, including *.vercel.app, stays
+  // on the live app origin. Vary: Host so the two responses are not shared.
+  const sendPublicSeoFile = (kind: "sitemap" | "robots") => (req: express.Request, res: express.Response) => {
+    const origin = originForHost(req.get("host"));
+    res.setHeader("Vary", "Host");
+    res.setHeader("Cache-Control", "public, max-age=300");
+    if (kind === "sitemap") {
+      res.type("application/xml");
+      return res.send(sitemapXml(origin));
+    }
+    res.type("text/plain");
+    return res.send(robotsTxt(origin));
+  };
+  app.get(["/sitemap.xml", "/sitemap.xml/"], sendPublicSeoFile("sitemap"));
+  app.get(["/robots.txt", "/robots.txt/"], sendPublicSeoFile("robots"));
 
   // Two clients share this path:
   // - Admin gallery (AdminListingFile) POSTs raw image bytes. Staff token required.
@@ -232,6 +252,7 @@ export function createServer() {
   app.use("/api/vsai", vsaiRouter);
   app.use("/api/messages", messagingRouter);
   app.use("/api/communications", communicationsRouter);
+  app.use("/api/clients", clientHubRouter);
   app.use("/api/clients", clientsRouter);
   app.get("/api/portal/listings/:id", handleGetPublicPortalListing);
   app.get("/api/listing-sites/:slug", handleGetListingSite);

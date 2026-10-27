@@ -6,6 +6,7 @@ import {
   ChevronLeft, ChevronRight, X, Layers, Zap,
 } from "lucide-react";
 import { addressText } from "@shared/addressText";
+import { zipStored } from "@shared/zipStore";
 import { formatChicagoDate } from "@shared/clientHome";
 import { clientGalleryDownloadsUnlocked, studioOffersDownloads } from "@shared/paymentAccess";
 import { GalleryDownloadLockNotice } from "@/components/GalleryDownloadLock";
@@ -14,6 +15,39 @@ import { StudioGalleryTabs, type StudioGalleryTab, type StudioGalleryTabId } fro
 
 export function blockPublicVideoMenu(event: { preventDefault: () => void }) {
   event.preventDefault();
+}
+
+function photoSaveName(image: { downloadName?: string; name?: string } | null | undefined, index: number): string {
+  const raw = image?.downloadName || image?.name || `photo-${index + 1}.jpg`;
+  return /\.[a-z0-9]{2,5}$/i.test(raw) ? raw : `${raw}.jpg`;
+}
+
+function saveBytes(name: string, bytes: Uint8Array, type: string) {
+  const copy = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(copy).set(bytes);
+  const url = URL.createObjectURL(new Blob([copy], { type }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = name;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+
+async function downloadPhotoZip(images: Array<{ url?: string; downloadUrl?: string; downloadName?: string; name?: string }>) {
+  const entries: Array<{ name: string; data: Uint8Array }> = [];
+  for (let index = 0; index < images.length; index += 1) {
+    const image = images[index];
+    const href = image.downloadUrl || image.url;
+    if (!href) continue;
+    const response = await fetch(href);
+    if (!response.ok) continue;
+    entries.push({
+      name: photoSaveName(image, index),
+      data: new Uint8Array(await response.arrayBuffer()),
+    });
+  }
+  if (!entries.length) throw new Error("Those photos could not be packaged.");
+  saveBytes("photos.zip", zipStored(entries), "application/zip");
 }
 
 /**
@@ -201,7 +235,16 @@ export function ClientStudioView({
                   onClick={() => setSelectedPhoto(i)}>
                   <img src={img.url} alt={img.name || `Photo ${i+1}`} className="w-full h-full object-cover" loading="lazy" />
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
-                    {canDownloadFiles && <button className="p-2 bg-white rounded-lg"><Download className="w-4 h-4 text-black" /></button>}
+                    {canDownloadFiles && (
+                      <a
+                        href={img.downloadUrl || img.url}
+                        download={photoSaveName(img, i)}
+                        onClick={(event) => event.stopPropagation()}
+                        className="p-2 bg-white rounded-lg"
+                      >
+                        <Download className="w-4 h-4 text-black" />
+                      </a>
+                    )}
                     {canRevise && (
                       <button onClick={e => { e.stopPropagation(); setSelectedPhoto(i); setRevisionType("single"); setShowRevision(true); }}
                         className="p-2 bg-white rounded-lg"><Edit3 className="w-4 h-4 text-black" /></button>
@@ -347,7 +390,16 @@ export function ClientStudioView({
         {/* Gallery-wide actions */}
         {activeTab === "photos" && images.length > 0 && canDownloadFiles && (
           <div className="mt-8 flex justify-center gap-3">
-            <button className="flex items-center gap-2 px-6 py-3 bg-black text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-gray-800">
+            <button
+              type="button"
+              data-testid="studio-download-zip"
+              onClick={() => {
+                void downloadPhotoZip(images).catch((err: unknown) => {
+                  toast.error(err instanceof Error ? err.message : "Could not download the photos.");
+                });
+              }}
+              className="flex items-center gap-2 px-6 py-3 bg-black text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-gray-800"
+            >
               <Download className="w-4 h-4" /> Download All Photos
             </button>
             {canRevise && (
@@ -382,7 +434,7 @@ export function ClientStudioView({
           <img src={images[selectedPhoto]?.url} alt="" className="iframe-safe-media max-w-[90vw] object-contain" />
           <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3">
             <span className="text-white text-xs font-bold">{selectedPhoto + 1} / {images.length}</span>
-            {canDownloadFiles && <a href={images[selectedPhoto]?.downloadUrl || images[selectedPhoto]?.url} download className="px-3 py-1.5 bg-white text-black rounded-lg text-[10px] font-bold">Download</a>}
+            {canDownloadFiles && <a href={images[selectedPhoto]?.downloadUrl || images[selectedPhoto]?.url} download={photoSaveName(images[selectedPhoto], selectedPhoto)} className="px-3 py-1.5 bg-white text-black rounded-lg text-[10px] font-bold">Download</a>}
             {canRevise && (
               <button onClick={() => { setRevisionType("single"); setShowRevision(true); }} className="px-3 py-1.5 bg-white/20 text-white rounded-lg text-[10px] font-bold">Request Edit</button>
             )}
@@ -463,7 +515,7 @@ function OwnerStudioFileDownloads({ files }: { files: unknown }) {
   return (
     <div className="mt-8 flex flex-wrap justify-center gap-3">
       {downloads.map((file) => (
-        <a key={file.url} href={file.url} download className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-gray-800">
+        <a key={file.url} href={file.url} download={file.name} className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-gray-800">
           <Download className="w-4 h-4" /> {file.name}
         </a>
       ))}

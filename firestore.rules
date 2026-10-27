@@ -57,10 +57,90 @@ service cloud.firestore {
     // Clients: staff can read/write, client can read their own record.
     // Owner check is first so a staff-rule error cannot deny clients/{uid}
     // during portal login. Other clients' documents stay staff-only.
+    // The owner may update profile fields. Billing totals and cards stay on
+    // clientBilling, which the Admin SDK writes.
     match /clients/{clientId} {
       allow read: if isClientOwner(clientId) || isStaff();
-      allow create, update: if isCoordinator();
+      allow create: if isCoordinator();
+      allow update: if isCoordinator() || (
+        isClientOwner(clientId) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'firstName', 'lastName', 'phone', 'company', 'hubProfile', 'updatedAt'
+        ])
+      );
       allow delete: if isAdmin();
+    }
+
+    // Customer teams are shared with the admin Customer Teams tab.
+    // Publish this file in the Firebase console. Vercel does not deploy rules.
+    function hubOwner(data) {
+      return isAuthenticated() && data.ownerClientId == request.auth.uid;
+    }
+    function hubReader(data) {
+      return hubOwner(data) || (
+        isAuthenticated() &&
+        data.readerUids is list &&
+        request.auth.uid in data.readerUids
+      );
+    }
+    function hubMember(data) {
+      return hubOwner(data) || (
+        isAuthenticated() &&
+        data.memberUids is list &&
+        request.auth.uid in data.memberUids
+      );
+    }
+
+    match /customerTeams/{teamId} {
+      allow read: if isStaff() || hubMember(resource.data);
+      allow create: if isAuthenticated() && request.resource.data.ownerClientId == request.auth.uid;
+      allow update: if isCoordinator() || (
+        isAuthenticated() &&
+        resource.data.ownerClientId == request.auth.uid &&
+        request.resource.data.ownerClientId == resource.data.ownerClientId
+      ) || (
+        isAuthenticated() &&
+        resource.data.adminUids is list &&
+        request.auth.uid in resource.data.adminUids &&
+        request.resource.data.ownerClientId == resource.data.ownerClientId
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /customerTeamMembers/{memberId} {
+      allow read: if isStaff() || hubOwner(resource.data) || (
+        isAuthenticated() &&
+        resource.data.linkedClientId == request.auth.uid
+      );
+      allow create: if isAuthenticated()
+        && request.resource.data.ownerClientId == request.auth.uid;
+      allow update, delete: if isCoordinator() || (
+        isAuthenticated() && resource.data.ownerClientId == request.auth.uid
+      );
+    }
+
+    match /agentContacts/{contactId} {
+      allow read: if isStaff() || hubReader(resource.data);
+      allow create: if isAuthenticated()
+        && request.resource.data.ownerClientId == request.auth.uid
+        && !request.resource.data.keys().hasAny(['cardNumber', 'cvv', 'pan']);
+      allow update, delete: if isCoordinator() || (
+        isAuthenticated() &&
+        resource.data.ownerClientId == request.auth.uid &&
+        request.resource.data.ownerClientId == resource.data.ownerClientId
+      );
+    }
+
+    match /clientBilling/{clientId} {
+      allow read: if isCoordinator() || isClientOwner(clientId) || hubReader(resource.data);
+      allow write: if false;
+    }
+
+    match /clientCreditEntries/{entryId} {
+      allow read: if isCoordinator() || (
+        isAuthenticated() && resource.data.ownerClientId == request.auth.uid
+      ) || hubReader(resource.data);
+      allow write: if false;
     }
 
     // ─── Staff Collections ───────────────────────────────────────────────────
