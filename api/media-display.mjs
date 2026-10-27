@@ -418,8 +418,363 @@ const BOOKING_PACKAGE_CATEGORY_ORDER = [
   "addon"
 ];
 new Set(BOOKING_PACKAGE_CATEGORY_ORDER);
+const PACKAGE_SKINS = [
+  skin({
+    look: "apprenticeship",
+    ids: ["apprentice-25", "apprentice-50"],
+    category: "listing",
+    skinLabel: "Apprenticeship",
+    title: "Apprenticeship",
+    accent: "",
+    badge: "Apprenticeship",
+    features: "25 photos · 20 min · the cheap one",
+    chips: [],
+    price: "$75",
+    priceNote: "",
+    priceDisplay: "$75",
+    tier: "entry",
+    rank: 1,
+    matchPriority: 20,
+    match: /apprentice/,
+    foot: "shoot",
+    amenities: false
+  }),
+  skin({
+    look: "just-photos",
+    ids: ["photos-20", "photos-35", "photos-50"],
+    category: "listing",
+    skinLabel: "Just Photos",
+    title: "Just Photos",
+    accent: "",
+    badge: "Just Photos",
+    features: "Photo package · next-day basics",
+    chips: [],
+    price: "Basics",
+    priceNote: "",
+    priceDisplay: "Basics",
+    tier: "entry",
+    rank: 2,
+    matchPriority: 10,
+    match: /\bjust\s+photos\b|\bphotos?\s+only\b|^photos\s+\d+\b|\b\d+\s+photos?\b/,
+    foot: "shoot",
+    amenities: false
+  }),
+  skin({
+    look: "essentials",
+    ids: ["listing-essentials"],
+    category: "listing",
+    skinLabel: "Essentials",
+    title: "The Essentials",
+    accent: "",
+    badge: "Essentials",
+    features: "30 images · Snap Reel · twilight render",
+    chips: [{ label: "Same-day" }, { label: "Reel" }],
+    price: "$249",
+    priceNote: "per listing",
+    priceDisplay: "$249",
+    tier: "mid",
+    rank: 3,
+    matchPriority: 30,
+    match: /essentials\b/,
+    foot: "shoot",
+    amenities: false
+  }),
+  skin({
+    look: "showcase",
+    ids: ["listing-showcase"],
+    category: "listing",
+    skinLabel: "Showcase",
+    title: "The Showcase",
+    accent: "",
+    badge: "The Showcase",
+    features: "50 images · 5 aerials · 3D reel · floorplan",
+    chips: [{ label: "Aerials" }, { label: "3D Reel" }],
+    price: "$549",
+    priceNote: "per listing",
+    priceDisplay: "$549",
+    tier: "mid",
+    rank: 4,
+    matchPriority: 40,
+    match: /showcase/,
+    foot: "shoot",
+    amenities: true
+  }),
+  skin({
+    look: "legacy",
+    ids: ["listing-legacy"],
+    category: "listing",
+    skinLabel: "Legacy",
+    title: "The Legacy",
+    accent: "Legacy",
+    badge: "Signature",
+    features: "Full aerials · 90s 4K cinema · agent on camera",
+    chips: [{ label: "4K Cinema" }, { label: "On Camera" }],
+    price: "$899",
+    priceNote: "per listing",
+    priceDisplay: "$899",
+    tier: "top",
+    rank: 5,
+    matchPriority: 50,
+    match: /\blegacy\b/,
+    foot: "shoot",
+    amenities: true
+  }),
+  skin({
+    look: "market-leader",
+    ids: ["listing-market-leader"],
+    category: "listing",
+    skinLabel: "Market Leader",
+    title: "Market Leader",
+    accent: "Leader",
+    badge: "VIP Priority",
+    features: "Full-cycle takeover · VR · post-sale pack",
+    chips: [
+      { label: "VR / Matterport" },
+      { label: "Post-Sale", tone: "gold" },
+      { label: "Iconic Polish", tone: "gold" }
+    ],
+    price: "$1,599",
+    priceNote: "per listing",
+    priceDisplay: "$1,599",
+    tier: "top",
+    rank: 6,
+    matchPriority: 160,
+    match: /market\s+leader/,
+    foot: "shoot",
+    amenities: true
+  }),
+  skin({
+    look: "refresh",
+    ids: ["branding-refresh"],
+    category: "human-brand",
+    skinLabel: "Refresh",
+    title: "The Refresh",
+    accent: "",
+    badge: "Portrait",
+    features: "60-min session · 10 lifestyle portraits · AI Twin Lite",
+    chips: [{ label: "Lifestyle" }, { label: "Locations" }],
+    price: "$349",
+    priceNote: "per session",
+    priceDisplay: "$349",
+    tier: "entry",
+    rank: 7,
+    matchPriority: 70,
+    match: /\brefresh\b/,
+    foot: "shoot",
+    amenities: false
+  }),
+  skin({
+    look: "content-partner",
+    ids: ["branding-content-partner"],
+    category: "human-brand",
+    skinLabel: "Content Partner",
+    title: "Content Partner",
+    accent: "",
+    badge: "Monthly",
+    features: "2-hr film day · 20 custom reels · strategy & scripts",
+    chips: [{ label: "20 Reels" }, { label: "Trending Audio" }, { label: "Direction" }],
+    price: "$999",
+    priceNote: "per month",
+    priceDisplay: "$999/mo",
+    tier: "mid",
+    rank: 8,
+    matchPriority: 80,
+    match: /content\s+partner/,
+    foot: "ongoing",
+    amenities: false
+  }),
+  skin({
+    look: "local-legend",
+    ids: ["branding-local-legend"],
+    category: "human-brand",
+    skinLabel: "Local Legend",
+    title: "The Local Legend",
+    accent: "Legend",
+    badge: "Market Takeover",
+    features: "6–8 hr production · 90s 4K bio film · 5 neighborhood spotlights",
+    chips: [{ label: "Day-in-the-Life" }, { label: "Authority Spots" }, { label: "Scripted" }],
+    price: "$2,499",
+    priceNote: "per campaign",
+    priceDisplay: "$2,499",
+    tier: "top",
+    rank: 9,
+    matchPriority: 150,
+    match: /local\s+legend/,
+    foot: "campaign",
+    amenities: false
+  }),
+  skin({
+    look: "baseline",
+    ids: ["business-baseline"],
+    category: "social",
+    skinLabel: "Baseline",
+    title: "The Baseline",
+    accent: "",
+    badge: "Baseline",
+    features: "8 professionally edited reels · 2× / week",
+    chips: [{ label: "Consistency" }],
+    price: "$500",
+    priceNote: "per month",
+    priceDisplay: "$500/mo",
+    tier: "entry",
+    rank: 10,
+    matchPriority: 60,
+    match: /\bbaseline\b/,
+    foot: "none",
+    amenities: false
+  }),
+  skin({
+    look: "growth-engine",
+    ids: ["business-growth-engine"],
+    category: "social",
+    skinLabel: "Growth Engine",
+    title: "Growth Engine",
+    accent: "",
+    badge: "Growth",
+    features: "12 reels · hook suite · conversion captions",
+    chips: [{ label: "12 Reels" }, { label: "Hooks" }],
+    price: "$850",
+    priceNote: "per month",
+    priceDisplay: "$850/mo",
+    tier: "mid",
+    rank: 11,
+    matchPriority: 90,
+    match: /growth\s+engine/,
+    foot: "none",
+    amenities: false
+  }),
+  skin({
+    look: "professional-suite",
+    ids: ["business-professional-suite"],
+    category: "social",
+    skinLabel: "Professional Suite",
+    title: "Professional Suite",
+    accent: "",
+    badge: "Pro Suite",
+    features: "12 reels · full scheduling · multi-platform",
+    chips: [{ label: "IG / FB / TikTok" }, { label: "Hands-off" }],
+    price: "$1,500",
+    priceNote: "per month",
+    priceDisplay: "$1,500/mo",
+    tier: "mid",
+    rank: 12,
+    matchPriority: 100,
+    match: /professional\s+suite|\bpro\s+suite\b/,
+    foot: "none",
+    amenities: false
+  }),
+  skin({
+    look: "connected-core",
+    ids: ["business-connected-core"],
+    category: "social",
+    skinLabel: "Connected Core",
+    title: "Connected Core",
+    accent: "",
+    badge: "Connected",
+    features: "12 reels + management · SOI email · newsletter",
+    chips: [{ label: "Social" }, { label: "Database" }],
+    price: "$2,000",
+    priceNote: "per month",
+    priceDisplay: "$2,000/mo",
+    tier: "mid",
+    rank: 13,
+    matchPriority: 110,
+    match: /connected\s+core/,
+    foot: "none",
+    amenities: false
+  }),
+  skin({
+    look: "signature-tier",
+    ids: ["business-signature-tier"],
+    category: "social",
+    skinLabel: "Signature Tier",
+    title: "Signature Tier",
+    accent: "",
+    badge: "Signature",
+    features: "20 reels · monthly field shoot · lead flagging",
+    chips: [{ label: "Daily M–F" }, { label: "Field Shoot" }],
+    price: "$2,800",
+    priceNote: "per month",
+    priceDisplay: "$2,800/mo",
+    tier: "mid",
+    rank: 14,
+    matchPriority: 120,
+    match: /signature\s+tier/,
+    foot: "none",
+    amenities: false
+  }),
+  skin({
+    look: "authority-stack",
+    ids: ["business-authority-stack"],
+    category: "social",
+    skinLabel: "Authority Stack",
+    title: "Authority Stack",
+    accent: "Stack",
+    badge: "Omni",
+    features: "20+ reels · pro film · SMS + email automation",
+    chips: [
+      { label: "20+ Reels", tone: "teal" },
+      { label: "SMS / Email" },
+      { label: "Omni" }
+    ],
+    price: "$3,200",
+    priceNote: "per month",
+    priceDisplay: "$3,200/mo",
+    tier: "top",
+    rank: 15,
+    matchPriority: 130,
+    match: /authority\s+stack/,
+    foot: "none",
+    amenities: false
+  }),
+  skin({
+    look: "iconic-partnership",
+    ids: ["business-iconic-partnership"],
+    category: "social",
+    skinLabel: "Iconic Partnership",
+    title: "Iconic Partnership",
+    accent: "Partnership",
+    badge: "Agency",
+    features: "Unlimited reels · 2 field shoots · CRM + polish",
+    chips: [{ label: "Unlimited" }, { label: "CRM" }, { label: "Polish" }],
+    price: "$4,500",
+    priceNote: "per month",
+    priceDisplay: "$4,500/mo",
+    tier: "top",
+    rank: 16,
+    matchPriority: 140,
+    match: /iconic\s+partnership/,
+    foot: "none",
+    amenities: false
+  })
+];
+new Map(PACKAGE_SKINS.map((item) => [item.look, item]));
+[...PACKAGE_SKINS].sort((a, b) => b.matchPriority - a.matchPriority);
+const ID_INDEX = /* @__PURE__ */ new Map();
+for (const item of PACKAGE_SKINS) {
+  for (const id of item.ids) ID_INDEX.set(normalizePackageText(id), item.look);
+}
+function skin(item) {
+  return item;
+}
+function normalizePackageText(raw) {
+  return raw.trim().toLowerCase().replace(/[—–]/g, " ").replace(/[_-]+/g, " ").replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+}
 const PHOTO_EDIT_REPLACEMENT_TYPES = ["image/jpeg", "image/png", "image/webp"];
 new Set(PHOTO_EDIT_REPLACEMENT_TYPES);
+const PORTAL_WEBSITE_DESIGNS = [
+  "issue",
+  "premiere",
+  "product-drop",
+  "gallery-wall",
+  "field-guide",
+  "two-up",
+  "golden-hour",
+  "index",
+  "dossier",
+  "stories"
+];
+new Set(PORTAL_WEBSITE_DESIGNS);
 function hiddenPresentationKeys(listing) {
   const keys = /* @__PURE__ */ new Set();
   const photos = readMediaStore(listing?.portalMedia).photos;
@@ -435,14 +790,47 @@ function rowHiddenFromPresentation(row, hiddenKeys) {
   const url = text$1(row.url) || text$1(row.shareUrl);
   return [id, path2, url].some((key) => Boolean(key) && hiddenKeys.has(key));
 }
+function clipText(value, max) {
+  let raw = "";
+  if (typeof value === "string") raw = value;
+  else if (typeof value === "number" && Number.isFinite(value)) raw = String(value);
+  else if (typeof value === "boolean") raw = value ? "Yes" : "No";
+  else return "";
+  return raw.replace(/\u0000/g, "").trim().slice(0, max);
+}
 function readMediaStore(value) {
   const row = value && typeof value === "object" ? value : {};
   return {
     photos: readPrefs(row.photos),
     videos: readPrefs(row.videos),
     floorplans: readPrefs(row.floorplans),
-    tours: readPrefs(row.tours)
+    tours: readPrefs(row.tours),
+    photoGroups: readPhotoGroups(row.photoGroups)
   };
+}
+function groupIdText(value) {
+  if (typeof value !== "string") return "";
+  const id = value.trim();
+  return /^g[a-z0-9]{4,16}$/.test(id) ? id : "";
+}
+function readPhotoGroups(value) {
+  if (!Array.isArray(value)) return [];
+  const groups = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const item of value) {
+    const row = asRecord(item);
+    if (!row) continue;
+    const id = groupIdText(row.id);
+    const name = clipText(row.name, 60);
+    if (!id || !name || seen.has(id)) continue;
+    seen.add(id);
+    groups.push({
+      id,
+      name,
+      order: typeof row.order === "number" && Number.isFinite(row.order) ? row.order : groups.length
+    });
+  }
+  return groups.sort((a, b) => a.order - b.order || a.name.localeCompare(b.name)).slice(0, 24);
 }
 function readPrefs(value) {
   if (!value || typeof value !== "object") return {};
@@ -452,13 +840,17 @@ function readPrefs(value) {
     const row = prefs;
     out[id] = {
       hidden: row.hidden === true,
-      order: typeof row.order === "number" && Number.isFinite(row.order) ? row.order : 0
+      order: typeof row.order === "number" && Number.isFinite(row.order) ? row.order : 0,
+      groupId: groupIdText(row.groupId)
     };
   }
   return out;
 }
 function text$1(value) {
   return typeof value === "string" ? value.trim() : "";
+}
+function asRecord(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : null;
 }
 const BUSINESS_CONTACT_LINE = "26410 Oakridge Dr. Ste 105 - 108, Spring, TX 77380 | 281.356.0965 | photos@iconicimagestx.com";
 const LEGAL_BUSINESS_NAME = "Iconic Images Photography, LLC";
@@ -542,6 +934,12 @@ const PUBLIC_PAGES = [
     file: "seo/socials.html",
     title: "Socials | Iconic Images",
     description: "Instagram, Facebook, and TikTok from Iconic Images, a real estate media studio in Spring, The Woodlands, and Houston."
+  },
+  {
+    path: "/insights",
+    file: "seo/insights.html",
+    title: "Iconic Insights | Iconic Images",
+    description: "Field notes from Iconic Images on listing photography, video, and marketing in Spring, The Woodlands, and Houston."
   },
   {
     path: "/book",
@@ -1359,6 +1757,7 @@ const PAGES = [
       linkItem("pricing", "Pricing", "/pricing"),
       linkItem("studio", "Studio 105", "/studio-105"),
       linkItem("portfolio", "Portfolio", "/portfolio"),
+      linkItem("insights", "Insights", "/insights"),
       linkItem("stock", "Stock Footage", "/stock-footage"),
       linkItem("contact", "Contact Us", "/contact")
     ]),
@@ -1373,6 +1772,7 @@ const PAGES = [
       linkItem("pricing", "Pricing", "/pricing"),
       linkItem("socials", "Socials", "/socials"),
       linkItem("portfolio", "Portfolio", "/portfolio"),
+      linkItem("insights", "Insights", "/insights"),
       linkItem("studio", "Studio 105", "/studio-105"),
       linkItem("contact", "Contact Us", "/contact"),
       linkItem("login", "Client Login", "/login")
@@ -2235,14 +2635,21 @@ router.post("/:id/revert", gate("publish"), async (req, res) => {
   });
   return res.json({ page: stripPage(source) });
 });
+function mediaFolder(pageIdRaw) {
+  const pageId = String(pageIdRaw || "page");
+  if (pageId === "insights") return "insights";
+  if (pageId === "page") return "page";
+  if (defaultPage(pageId)) return pageId;
+  return null;
+}
 router.post("/media", gate("edit"), async (req, res) => {
   try {
-    const pageId = String(req.body?.pageId || "page");
-    if (!defaultPage(pageId) && pageId !== "page") return res.status(404).json({ error: "Unknown page." });
+    const folder = mediaFolder(req.body?.pageId);
+    if (!folder) return res.status(404).json({ error: "Unknown page." });
     const raw = String(req.body?.dataBase64 || "");
     const bytes = Buffer.from(raw, "base64");
     if (!bytes.length) return res.status(400).json({ error: "No file was received." });
-    const stored = await storeSiteUpload(defaultPage(pageId) ? pageId : "page", bytes);
+    const stored = await storeSiteUpload(folder, bytes);
     return res.json(stored);
   } catch (err) {
     const status = err.status || 400;
@@ -2251,9 +2658,10 @@ router.post("/media", gate("edit"), async (req, res) => {
 });
 router.post("/dropbox", gate("edit"), async (req, res) => {
   try {
-    const pageId = String(req.body?.pageId || "page");
+    const folder = mediaFolder(req.body?.pageId);
+    if (!folder) return res.status(404).json({ error: "Unknown page." });
     const imported = await importDropboxFile(String(req.body?.url || ""));
-    const stored = await storeSiteUpload(defaultPage(pageId) ? pageId : "page", imported.bytes);
+    const stored = await storeSiteUpload(folder, imported.bytes);
     return res.json(stored);
   } catch (err) {
     const status = err.status || 400;

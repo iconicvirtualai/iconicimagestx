@@ -1,8 +1,10 @@
 import * as React from "react";
+import { useSearchParams } from "react-router-dom";
 import AdminLayout from "@/components/AdminLayout";
 import { useAuth } from "@/contexts/AuthContext";
-import { PhotographerPortal } from "@/components/photographer/PhotographerPortal";
-import { PresentationShareButton } from "@/components/PresentationSharePanel";
+import { ShootUploader } from "@/components/ops/ShootUploader";
+import { PhotographerJobBanner, PhotographerPortal } from "@/components/photographer/PhotographerPortal";
+import { PresentationShareButton, PresentationSharePanel } from "@/components/PresentationSharePanel";
 import { fetchAssignedListings, uploadListingFile } from "@/lib/listingUpload";
 import { drainOrderEditQueue, fetchStudioWorkspace, postIconicPolish } from "@/lib/studioApi";
 import {
@@ -17,6 +19,8 @@ import { toast } from "sonner";
 
 export default function AdminPhotographer() {
   const { user, staffProfile } = useAuth();
+  const [params, setParams] = useSearchParams();
+  const requestedJob = params.get("job") || "";
   const [listings, setListings] = React.useState<Array<Record<string, unknown>>>([]);
   const [studioJobs, setStudioJobs] = React.useState<PhotographerStudioJob[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -24,7 +28,7 @@ export default function AdminPhotographer() {
   const [studioNote, setStudioNote] = React.useState("");
   const [tab, setTab] = React.useState<PhotographerTab>("next");
   const [uploading, setUploading] = React.useState(false);
-  const [iconicPolish, setIconicPolish] = React.useState(false);
+  const [iconicPolish, setIconicPolish] = React.useState(params.get("polish") === "1");
   const [uploadProgress, setUploadProgress] = React.useState(0);
   const [queueNote, setQueueNote] = React.useState("");
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -116,6 +120,16 @@ export default function AdminPhotographer() {
     }
   };
 
+  const setPolish = (value: boolean) => {
+    setIconicPolish(value);
+    const next = new URLSearchParams(params);
+    if (value) next.set("polish", "1");
+    else next.delete("polish");
+    setParams(next, { replace: true });
+  };
+
+  const uploadJob = jobs.find((job) => job.id === requestedJob);
+
   const payRate = typeof (staffProfile as { payRate?: unknown } | null)?.payRate === "number"
     ? (staffProfile as { payRate: number }).payRate
     : 75;
@@ -133,6 +147,24 @@ export default function AdminPhotographer() {
           if (event.target.files && selectedProject) handleUpload(selectedProject, event.target.files);
         }}
       />
+      {uploadJob && (
+        <div className="mb-6 rounded-[2rem] border border-gray-100 bg-white p-6 shadow-sm">
+          <PhotographerJobBanner job={uploadJob} />
+          <div className="mt-4">
+            <ShootUploader
+              listingId={uploadJob.id}
+              address={uploadJob.address}
+              iconicPolish={iconicPolish}
+              onIconicPolish={setPolish}
+              getToken={() => user?.getIdToken()}
+              onUploaded={load}
+            />
+          </div>
+          <div className="mt-4 max-w-md">
+            <PresentationSharePanel listingId={uploadJob.id} getToken={() => user?.getIdToken()} />
+          </div>
+        </div>
+      )}
       <PhotographerPortal
         firstName={staffProfile?.firstName || ""}
         jobs={jobs}
@@ -142,7 +174,7 @@ export default function AdminPhotographer() {
         error={error}
         studioNote={studioNote}
         iconicPolish={iconicPolish}
-        onIconicPolish={setIconicPolish}
+        onIconicPolish={setPolish}
         uploading={uploading}
         uploadProgress={uploadProgress}
         queueNote={queueNote}

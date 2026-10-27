@@ -16,7 +16,6 @@ import {
   Palette,
   Settings,
   ShoppingBag,
-  Upload,
   UserCircle,
   Users,
 } from "lucide-react";
@@ -42,11 +41,11 @@ export interface AdminNavItem {
 const ALL_STAFF = ["admin", "coordinator", "photographer", "editor"];
 const ADMIN_ONLY = ["admin"];
 const COORD_UP = ["admin", "coordinator"];
-const PHOTO_UP = ["admin", "coordinator", "photographer"];
 
 /**
  * One Studio entry. Iconic Studio and Scratch Pad are subsections of that home,
- * not separate top-level links. Delivery, photographer, booking, and invoices stay.
+ * not separate top-level links. Shoots is the one ops list. Photographers keep
+ * My jobs. Booking and invoices stay.
  */
 export const navGroups: { label: string; items: AdminNavItem[] }[] = [
   {
@@ -69,9 +68,8 @@ export const navGroups: { label: string; items: AdminNavItem[] }[] = [
   {
     label: "Photography",
     items: [
-      { label: "Delivery", href: "/admin/delivery", icon: Images, roles: ALL_STAFF },
-      { label: "Photographer", href: "/admin/photographer", icon: Camera, roles: PHOTO_UP },
-      { label: "Upload", href: "/admin/upload", icon: Upload, roles: PHOTO_UP },
+      { label: "Shoots", href: "/admin/ops", icon: Images, roles: ["admin", "coordinator", "editor"] },
+      { label: "My jobs", href: "/admin/photographer", icon: Camera, roles: ["photographer"] },
     ],
   },
   {

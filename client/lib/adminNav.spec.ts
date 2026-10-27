@@ -8,7 +8,8 @@ describe("admin nav highlight", () => {
   it("highlights the longest matching item and keeps Clients active on a client record", () => {
     expect(mostSpecificNavHref("/admin/customers/abc", hrefs)).toBe("/admin/customers");
     expect(mostSpecificNavHref("/admin/studio", hrefs)).toBe("/admin/studio");
-    expect(mostSpecificNavHref("/admin/delivery", hrefs)).toBe("/admin/delivery");
+    expect(mostSpecificNavHref("/admin/ops", hrefs)).toBe("/admin/ops");
+    expect(mostSpecificNavHref("/admin/ops/preview", hrefs)).toBe("/admin/ops");
     expect(mostSpecificNavHref("/admin/communications", hrefs)).toBe("/admin/communications");
     expect(mostSpecificNavHref("/admin/communications/email/contacts", hrefs)).toBe("/admin/communications/email");
     expect(mostSpecificNavHref("/admin/botroom", hrefs)).toBe("/admin/botroom");
@@ -17,17 +18,27 @@ describe("admin nav highlight", () => {
 });
 
 describe("studio nav", () => {
-  it("keeps one Studio entry and leaves delivery, photographer, booking, and invoices in place", () => {
+  it("keeps one Studio entry and one shoot list, with My jobs for photographers", () => {
     expect(labels.filter((label) => label === "Studio")).toEqual(["Studio"]);
     expect(hrefs.filter((href) => href === "/admin/studio")).toEqual(["/admin/studio"]);
     expect(labels).not.toContain("Iconic Studio");
     expect(labels).not.toContain("Scratch Pad");
+    expect(labels).not.toContain("Delivery");
+    expect(labels).not.toContain("Photographer");
+    expect(labels).not.toContain("Upload");
     expect(hrefs).not.toContain("/admin/iconic-studio");
     expect(hrefs).not.toContain("/admin/studio/scratch");
+    expect(hrefs).not.toContain("/admin/delivery");
+    expect(hrefs).not.toContain("/admin/upload");
+    const shoots = navGroups.flatMap((group) => group.items).find((item) => item.href === "/admin/ops");
+    const mine = navGroups.flatMap((group) => group.items).find((item) => item.href === "/admin/photographer");
+    expect(shoots?.label).toBe("Shoots");
+    expect(shoots?.roles).toEqual(["admin", "coordinator", "editor"]);
+    expect(mine?.label).toBe("My jobs");
+    expect(mine?.roles).toEqual(["photographer"]);
     expect(labels).toEqual(expect.arrayContaining([
-      "Delivery",
-      "Photographer",
-      "Upload",
+      "Shoots",
+      "My jobs",
       "Booking catalog",
       "Invoice Presets",
       "Projects",

@@ -29,6 +29,7 @@ import agentsRouter from "./routes/agents";
 import botRoomRouter from "./routes/botroom";
 import mediaJobsRouter from "./routes/mediaJobs";
 import studioRouter from "./routes/studio";
+import opsPreviewRouter from "./routes/opsPreview";
 import studioScratchRouter from "./routes/studioScratch";
 import placesRouter from "./routes/places";
 import smsRouter from "./routes/sms";
@@ -264,6 +265,7 @@ export function createServer() {
   app.use("/api/botroom", botRoomRouter);
   app.use("/api/media-jobs", mediaJobsRouter);
   app.use("/api/studio", studioRouter);
+  app.use("/api/ops", opsPreviewRouter);
   app.use("/api/studio/scratch", studioScratchRouter);
   app.use("/api/places", placesRouter);
   app.use("/api/sms", smsRouter);

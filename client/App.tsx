@@ -87,8 +87,10 @@ import CampaignBuilder from "./pages/marketing/CampaignBuilder";
 import CampaignReport from "./pages/marketing/CampaignReport";
 import AccountPage from "./pages/marketing/AccountPage";
 import Unsubscribe from "./pages/Unsubscribe";
-import AdminPhotographer from "./pages/AdminPhotographer";
-import AdminUpload from "./pages/AdminUpload";
+import AdminOps from "./pages/AdminOps";
+import AdminPhotographerPreview from "./pages/AdminPhotographerPreview";
+import LegacyOpsRedirect from "./components/ops/LegacyOpsRedirect";
+import PhotographerHome from "./components/ops/PhotographerHome";
 import AdminEditor from "./pages/AdminEditor";
 import AdminTeam from "./pages/AdminTeam";
 import AdminStudioHome from "./pages/AdminStudioHome";
@@ -96,7 +98,6 @@ import AdminStudioProjects from "./pages/AdminStudioProjects";
 import AdminStudioMarketing from "./pages/AdminStudioMarketing";
 import AdminStudioScratch from "./pages/AdminStudioScratch";
 import LegacyStudioRedirect from "./components/studio/LegacyStudioRedirect";
-import AdminDeliveryQueue from "./pages/AdminDeliveryQueue";
 import AdminInsights from "./pages/AdminInsights";
 import Login from "./pages/Login";
 import ClientPortal from "./pages/ClientPortal";
@@ -192,7 +193,9 @@ const App = () => (
             <Route path="/admin/studio/operations" element={<LegacyStudioRedirect />} />
             <Route path="/admin/iconic-studio" element={<LegacyStudioRedirect />} />
             <Route path="/admin/iconic-studio/:listingId" element={<LegacyStudioRedirect />} />
-            <Route path="/admin/delivery" element={<ProtectedRoute requiredRole="staff"><AdminDeliveryQueue /></ProtectedRoute>} />
+            <Route path="/admin/ops" element={<ProtectedRoute requiredRole="staff"><AdminOps /></ProtectedRoute>} />
+            <Route path="/admin/ops/preview" element={<ProtectedRoute requiredRole="admin"><AdminPhotographerPreview /></ProtectedRoute>} />
+            <Route path="/admin/delivery" element={<ProtectedRoute requiredRole="staff"><LegacyOpsRedirect /></ProtectedRoute>} />
             <Route path="/admin/listings" element={<ProtectedRoute requiredRole="coordinator"><AdminListings /></ProtectedRoute>} />
             <Route path="/admin/listing/:id" element={<ProtectedRoute requiredRole="staff"><AdminListingFile /></ProtectedRoute>} />
             <Route path="/admin/customers" element={<ProtectedRoute requiredRole="coordinator"><AdminCustomerCenter /></ProtectedRoute>} />
@@ -218,8 +221,8 @@ const App = () => (
             <Route path="/admin/communications/email/campaigns/:id" element={<ProtectedRoute requiredRole="admin"><CampaignBuilder /></ProtectedRoute>} />
             <Route path="/admin/communications/email/campaigns" element={<ProtectedRoute requiredRole="admin"><CampaignsPage /></ProtectedRoute>} />
             <Route path="/admin/communications/email/account" element={<ProtectedRoute requiredRole="admin"><AccountPage /></ProtectedRoute>} />
-            <Route path="/admin/photographer" element={<ProtectedRoute requiredRole="photographer"><AdminPhotographer /></ProtectedRoute>} />
-            <Route path="/admin/upload" element={<ProtectedRoute requiredRole="photographer"><AdminUpload /></ProtectedRoute>} />
+            <Route path="/admin/photographer" element={<ProtectedRoute requiredRole="photographer"><PhotographerHome /></ProtectedRoute>} />
+            <Route path="/admin/upload" element={<ProtectedRoute requiredRole="photographer"><LegacyOpsRedirect /></ProtectedRoute>} />
             <Route path="/admin/editor" element={<ProtectedRoute requiredRole="editor"><AdminEditor /></ProtectedRoute>} />
             <Route path="/admin/team" element={<ProtectedRoute requiredRole="admin"><AdminTeam /></ProtectedRoute>} />
             <Route path="/admin/edit-site" element={<ProtectedRoute requiredRole="staff"><AdminSiteEditor /></ProtectedRoute>} />
