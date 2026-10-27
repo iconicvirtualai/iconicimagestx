@@ -99,6 +99,31 @@ export const PRIMARY_SUITE_STILL: MarketingStill = {
   category: "Virtual Staging",
 };
 
+/** Grandma, the matching empty room, the pasture animals, and the grilling scene stay out of the homepage reel. */
+const HIDDEN_FROM_HOMEPAGE_SHOWCASE = new Set([
+  "pavilion-lifestyle",
+  "pasture-lifestyle",
+  "living-declutter",
+]);
+
+export const HIDDEN_SHOWCASE_MEDIA = new Set([
+  "/media/before-after/pavilion-empty.jpg",
+  "/media/before-after/pavilion-lifestyle.jpg",
+  "/media/before-after/pasture-animals.jpg",
+  "/media/before-after/pasture-lifestyle.jpg",
+  "/media/before-after/living-occupied.jpg",
+  "/media/before-after/living-declutter.jpg",
+]);
+
+export const HOMEPAGE_BEFORE_AFTER = AI_BEFORE_AFTER.filter(
+  (pair) => !HIDDEN_FROM_HOMEPAGE_SHOWCASE.has(pair.id),
+);
+
+export function isHiddenShowcaseMedia(src: string): boolean {
+  const path = src.split("?")[0];
+  return HIDDEN_SHOWCASE_MEDIA.has(path);
+}
+
 export function beforeAfterById(id: string): BeforeAfterPair {
   const pair = AI_BEFORE_AFTER.find((item) => item.id === id);
   if (!pair) {

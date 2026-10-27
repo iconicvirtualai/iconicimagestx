@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
-import { AI_BEFORE_AFTER } from "@/lib/beforeAfter";
+import { HOMEPAGE_BEFORE_AFTER, isHiddenShowcaseMedia } from "@/lib/beforeAfter";
 import { itemText, useSiteItems, useSiteText } from "@/content/siteContent";
 import BeforeAfterTile from "./BeforeAfterTile";
 
@@ -41,7 +41,7 @@ export default function MediaCarousel() {
         },
       ];
 
-  const stillPairs = AI_BEFORE_AFTER.map((pair) => ({
+  const stillPairs = HOMEPAGE_BEFORE_AFTER.map((pair) => ({
     id: pair.id,
     before: { type: "image" as const, url: pair.before.src, alt: pair.before.alt },
     after: { type: "image" as const, url: pair.after.src, alt: pair.after.alt },
@@ -56,9 +56,10 @@ export default function MediaCarousel() {
       url: itemText(item, "after"),
     },
     aspect: "16/9" as const,
-  }));
+  })).filter((pair) => !isHiddenShowcaseMedia(pair.before.url) && !isHiddenShowcaseMedia(pair.after.url));
 
-  const carouselPairs = contentPairs ?? [...stillPairs, ...mediaPairs];
+  const publishedPairs = contentPairs?.filter((pair) => pair.before.url || pair.after.url);
+  const carouselPairs = publishedPairs && publishedPairs.length > 0 ? publishedPairs : [...stillPairs, ...mediaPairs];
 
   // Double the items for seamless loop
   const displayPairs = [...carouselPairs, ...carouselPairs, ...carouselPairs];
