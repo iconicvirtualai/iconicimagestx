@@ -327,11 +327,11 @@ export function PortalPhotoGallery({
                 value={note}
                 maxLength={PHOTO_EDIT_NOTE_LIMIT}
                 rows={3}
-                placeholder="What should change on this photo?"
+                placeholder="What should change?"
                 onChange={(event) => setNote(event.target.value)}
                 className="mt-1 w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm"
               />
-              <p className="mt-1 text-[10px] text-gray-400">The note is saved on this photo. It does not send a message or create a charge.</p>
+              <p className="mt-1 text-[10px] text-gray-400">The note is saved on this file. It does not send a message or create a charge.</p>
               <div className="mt-2 flex gap-2">
                 <Button type="button" size="sm" variant="outline" onClick={() => { setNoteOpen(false); setNote(""); }}>Cancel</Button>
                 <Button
@@ -534,6 +534,17 @@ function PhotoTile({
           </>
         )}
       </div>
+      {item.downloadName && (
+        <a
+          href={item.url}
+          download={item.downloadName}
+          data-testid={`photo-download-name-${item.id}`}
+          className="mt-1 block truncate text-[10px] font-bold text-gray-500"
+          onClick={(event) => event.stopPropagation()}
+        >
+          {item.downloadName}
+        </a>
+      )}
       {carousel && (
         <div className={frame.revised ? "mt-1 grid grid-cols-1 gap-1" : "hidden"}>
           <a
@@ -581,7 +592,7 @@ function TileImage({ frames, index }: { frames: Slide[]; index: number }) {
 
 function slidesFor(item: PortalMediaItem, requests: PhotoEditRequest[]): Slide[] {
   const original = galleryHttpUrl(item.url);
-  const frames: Slide[] = original ? [{ src: original, alt: item.name, revised: false, downloadName: item.name }] : [];
+  const frames: Slide[] = original ? [{ src: original, alt: item.name, revised: false, downloadName: item.downloadName || item.name }] : [];
   const revisions = requests
     .filter((request) => request.photoId === item.id && request.replacement)
     .sort((a, b) => (a.replacement?.attachedAt || "").localeCompare(b.replacement?.attachedAt || ""));

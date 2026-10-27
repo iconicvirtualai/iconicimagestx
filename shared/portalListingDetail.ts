@@ -7,6 +7,7 @@
  */
 
 import { addressText } from "./addressText.ts";
+import { arrangementActive, isHiddenFromListingSites, readMediaArrangement } from "./mediaArrangement.ts";
 import { orderHistoryInvoiceNumber } from "./orderProjectInvoice.ts";
 import type { ListingCardLook } from "./packageSkins.ts";
 import { readPhotoEditRequests, type PhotoEditRequest } from "./photoEditRequest";
@@ -79,6 +80,8 @@ export interface PortalMediaItem {
   /** Photo group id. Empty means the photo sits outside a named group. */
   groupId: string;
   uploadedAt: string;
+  /** Sequence filename from the saved arrangement, when one has been saved. */
+  downloadName?: string;
 }
 
 export interface PortalPhotoGroup {
@@ -362,11 +365,30 @@ export function hiddenPresentationKeys(listing: Record<string, unknown> | null |
   for (const [id, prefs] of Object.entries(photos)) {
     if (prefs.hidden && id) keys.add(id);
   }
+  const arrangement = readMediaArrangement(listing?.mediaArrangement);
+  for (const section of arrangement.sections) {
+    if (section.hideFromListingSites) keys.add(`section:${section.id}`);
+  }
+  const buckets = [listing?.images, listing?.videos, listing?.floorplans, listing?.floorPlans, listing?.files, listing?.tours];
+  for (const bucket of buckets) {
+    if (!Array.isArray(bucket)) continue;
+    for (const item of bucket) {
+      if (!item || typeof item !== "object") continue;
+      const row = item as Record<string, unknown>;
+      if (!isHiddenFromListingSites(listing, row)) continue;
+      for (const key of [row.id, row.path, row.storagePath, row.url, row.shareUrl]) {
+        if (typeof key === "string" && key.trim()) keys.add(key.trim());
+      }
+    }
+  }
   return keys;
 }
 
 export function rowHiddenFromPresentation(row: Record<string, unknown>, hiddenKeys: Set<string>): boolean {
+  if (row.culled === true) return true;
   if (row.hiddenFromPresentation === true || row.portalHidden === true) return true;
+  const sectionId = text(row.sectionId);
+  if (sectionId && hiddenKeys.has(`section:${sectionId}`)) return true;
   const id = text(row.id);
   const path = text(row.path) || text(row.storagePath);
   const url = text(row.url) || text(row.shareUrl);
@@ -379,13 +401,14 @@ export function buildPortalListingDetail(sources: PortalListingSources): PortalL
   const records = [listing, sources.order, sources.orderRequest].filter(Boolean) as Array<Record<string, unknown>>;
   const address = readAddress(records);
   const store = readMediaStore(listing.portalMedia);
+  const savedOrder = arrangementActive(readMediaArrangement(listing.mediaArrangement));
   const galleries = sources.galleries || [];
-  const photos = collectPhotos(listing, galleries, store);
-  const videos = collectVideos(listing, galleries, store);
-  const tours = collectTours(listing, galleries, store);
-  const floorplans = collectFloorplans(listing, galleries, store);
-  const socialAssets = collectClientUploads(listing, "social");
-  const clientFiles = collectClientUploads(listing, "file");
+  const photos = collectPhotos(listing, galleries, store, savedOrder);
+  const videos = collectVideos(listing, galleries, store, savedOrder);
+  const tours = collectTours(listing, galleries, store, savedOrder);
+  const floorplans = collectFloorplans(listing, galleries, store, savedOrder);
+  const socialAssets = collectClientUploads(listing, "social", savedOrder);
+  const clientFiles = collectClientUploads(listing, "file", savedOrder);
   const website = readWebsite(listing.portalWebsite);
   const invoices = readInvoices(sources.invoices || []);
   const activity = buildActivity(sources, photos, videos, floorplans, tours, invoices);
@@ -404,7 +427,11 @@ export function buildPortalListingDetail(sources: PortalListingSources): PortalL
     videos,
     tours,
     floorplans,
-    photoGroups: store.photoGroups,
+    photoGroups: savedOrder
+      ? readMediaArrangement(listing.mediaArrangement).sections
+        .filter((section) => photos.some((photo) => photo.groupId === section.id))
+        .map((section) => ({ id: section.id, name: section.name, order: section.order }))
+      : store.photoGroups,
     socialAssets,
     clientFiles,
     marketing: PORTAL_MARKETING_KIT,
@@ -751,7 +778,7 @@ function storeKey(kind: PortalMediaKind): keyof PortalMediaStore {
 function groupIdText(value: unknown): string {
   if (typeof value !== "string") return "";
   const id = value.trim();
-  return /^g[a-z0-9]{4,16}$/.test(id) ? id : "";
+  return /^(?:g|s)[a-z0-9]{4,16}$/.test(id) ? id : "";
 }
 
 function readPhotoGroups(value: unknown): PortalPhotoGroup[] {
@@ -968,35 +995,36 @@ export function mapEmbedUrl(lat: number, lng: number): string {
   return `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat.toFixed(6)}%2C${lng.toFixed(6)}`;
 }
 
-function collectPhotos(listing: Record<string, unknown>, galleries: Array<Record<string, unknown>>, store: PortalMediaStore): PortalMediaItem[] {
-  return finishMedia("photo", [...rowsFrom(listing.images), ...galleryRows(galleries)], store.photos, (row) => isPhoto(row));
+function collectPhotos(listing: Record<string, unknown>, galleries: Array<Record<string, unknown>>, store: PortalMediaStore, savedOrder = false): PortalMediaItem[] {
+  return finishMedia("photo", [...rowsFrom(listing.images), ...galleryRows(galleries)], store.photos, (row) => isPhoto(row), savedOrder);
 }
 
-function collectVideos(listing: Record<string, unknown>, galleries: Array<Record<string, unknown>>, store: PortalMediaStore): PortalMediaItem[] {
+function collectVideos(listing: Record<string, unknown>, galleries: Array<Record<string, unknown>>, store: PortalMediaStore, savedOrder = false): PortalMediaItem[] {
   return finishMedia(
     "video",
     [...rowsFrom(listing.videos), ...rowsFrom(listing.images), ...clientUploadRows(listing, "video"), ...galleryRows(galleries)],
     store.videos,
     (row) => isVideo(row),
+    savedOrder,
   );
 }
 
-function collectClientUploads(listing: Record<string, unknown>, kind: "social" | "file"): PortalMediaItem[] {
-  return finishMedia(kind === "social" ? "photo" : "floorplan", clientUploadRows(listing, kind), {}, () => true)
+function collectClientUploads(listing: Record<string, unknown>, kind: "social" | "file", savedOrder = false): PortalMediaItem[] {
+  return finishMedia(kind === "social" ? "photo" : "floorplan", clientUploadRows(listing, kind), {}, () => true, savedOrder)
     .map((item) => ({ ...item, kind: kind === "social" ? "photo" as const : "floorplan" as const }));
 }
 
-function collectFloorplans(listing: Record<string, unknown>, galleries: Array<Record<string, unknown>>, store: PortalMediaStore): PortalMediaItem[] {
+function collectFloorplans(listing: Record<string, unknown>, galleries: Array<Record<string, unknown>>, store: PortalMediaStore, savedOrder = false): PortalMediaItem[] {
   const rows = [
     ...rowsFrom(listing.floorplans).filter(isRasterFloorplan),
     ...rowsFrom(listing.designAssets).filter(isFloorplan),
     ...rowsFrom(listing.cubiCasaImports).filter(isFloorplan),
     ...galleryRows(galleries).filter(isFloorplan),
   ];
-  return finishMedia("floorplan", rows, store.floorplans, () => true);
+  return finishMedia("floorplan", rows, store.floorplans, () => true, savedOrder);
 }
 
-function collectTours(listing: Record<string, unknown>, galleries: Array<Record<string, unknown>>, store: PortalMediaStore): PortalTourItem[] {
+function collectTours(listing: Record<string, unknown>, galleries: Array<Record<string, unknown>>, store: PortalMediaStore, savedOrder = false): PortalTourItem[] {
   const rows: Record<string, unknown>[] = [];
   for (const key of ["tourUrl", "matterportUrl", "virtualTourUrl", "virtualTour", "threeDTourUrl", "tourLink"]) {
     const url = safeHttpUrl(listing[key]);
@@ -1008,6 +1036,7 @@ function collectTours(listing: Record<string, unknown>, galleries: Array<Record<
   const seen = new Set<string>();
   const drafts: PortalTourItem[] = [];
   rows.forEach((row, index) => {
+    if (row.culled === true) return;
     const url = safeHttpUrl(row.url) || safeHttpUrl(row.shareUrl) || safeHttpUrl(row.href);
     if (!url || seen.has(url)) return;
     const provider = providerFor(url, row);
@@ -1016,6 +1045,8 @@ function collectTours(listing: Record<string, unknown>, galleries: Array<Record<
     seen.add(url);
     const id = mediaId("tour", row, index);
     const prefs = store.tours[id];
+    const deliveryName = text(row.deliveryName);
+    const storedOrder = typeof row.sortOrder === "number" && Number.isFinite(row.sortOrder) ? row.sortOrder : null;
     drafts.push({
       id,
       kind: "tour",
@@ -1023,9 +1054,10 @@ function collectTours(listing: Record<string, unknown>, galleries: Array<Record<
       url,
       contentType: text(row.contentType),
       hidden: prefs?.hidden === true || row.hiddenFromPresentation === true,
-      order: prefs?.order ?? index,
+      order: savedOrder ? (storedOrder ?? index + 100000) : (prefs?.order ?? index),
       groupId: "",
       uploadedAt: portalTimestamp(row.uploadedAt || row.createdAt),
+      ...(deliveryName ? { downloadName: deliveryName } : {}),
       provider: provider || "Virtual tour",
       embedUrl: provider === "Matterport" ? url : null,
     });
@@ -1042,11 +1074,12 @@ function finishMedia(
   rows: Array<Record<string, unknown>>,
   prefs: Record<string, PortalMediaPrefs>,
   include: (row: Record<string, unknown>) => boolean,
+  savedOrder = false,
 ): PortalMediaItem[] {
   const seen = new Set<string>();
   const items: PortalMediaItem[] = [];
   rows.forEach((row, index) => {
-    if (!include(row)) return;
+    if (row.culled === true || !include(row)) return;
     const url = safeHttpUrl(row.url) || safeHttpUrl(row.shareUrl);
     if (!url) return;
     const id = mediaId(kind, row, index);
@@ -1056,6 +1089,9 @@ function finishMedia(
     seen.add(key);
     seen.add(url);
     const pref = prefs[id];
+    const deliveryName = text(row.deliveryName);
+    const storedOrder = typeof row.sortOrder === "number" && Number.isFinite(row.sortOrder) ? row.sortOrder : null;
+    const sectionId = groupIdText(row.sectionId);
     items.push({
       id,
       kind,
@@ -1063,9 +1099,10 @@ function finishMedia(
       url,
       contentType: text(row.contentType).toLowerCase(),
       hidden: pref?.hidden === true || row.hiddenFromPresentation === true || row.portalHidden === true,
-      order: pref?.order ?? index,
-      groupId: kind === "photo" ? groupIdText(pref?.groupId) : "",
+      order: savedOrder ? (storedOrder ?? index + 100000) : (pref?.order ?? index),
+      groupId: kind === "photo" ? (savedOrder ? sectionId : groupIdText(pref?.groupId)) : "",
       uploadedAt: portalTimestamp(row.uploadedAt || row.createdAt),
+      ...(deliveryName ? { downloadName: deliveryName } : {}),
     });
   });
   return items.sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));

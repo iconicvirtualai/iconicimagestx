@@ -35,9 +35,11 @@ function publicInvoiceHref(gallery: PublicGalleryModel): string {
 
 export function PublicGalleryView({
   gallery,
+  galleryId,
   onCopyLink,
 }: {
   gallery: PublicGalleryModel;
+  galleryId?: string;
   onCopyLink?: (url: string) => void;
 }) {
   const media = Array.isArray(gallery.mediaItems) ? gallery.mediaItems : [];
@@ -103,7 +105,11 @@ export function PublicGalleryView({
             </p>
           </div>
         ) : (
-          <ClientGalleryBoard items={media} onCopyLink={onCopyLink} />
+          <ClientGalleryBoard
+            items={media}
+            onCopyLink={onCopyLink}
+            zipHref={galleryId && !needsPayment ? `/api/galleries/public/${encodeURIComponent(galleryId)}/photos.zip` : undefined}
+          />
         )}
       </main>
       <Footer />
@@ -206,5 +212,5 @@ export default function PublicGallery() {
 
   if (unavailable || !gallery) return <PublicGalleryMissing />;
 
-  return <PublicGalleryView gallery={gallery} onCopyLink={copyLink} />;
+  return <PublicGalleryView gallery={gallery} galleryId={galleryId} onCopyLink={copyLink} />;
 }

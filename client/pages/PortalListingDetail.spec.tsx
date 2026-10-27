@@ -408,6 +408,44 @@ describe("portal listing detail page", () => {
     expect(data).not.toContain("View invoice");
   });
 
+  it("lets the client request an edit on a video and a 3D tour", () => {
+    const media = buildPortalListingDetail({
+      listing: {
+        id: "listing1234",
+        address: { street: "18 Oak Hollow", city: "Spring", state: "TX", zip: "77389" },
+        videos: [{ id: "walkthrough", name: "walkthrough.mp4", url: "https://cdn.example/walkthrough.mp4", contentType: "video/mp4" }],
+        tours: [{ id: "matterport", name: "3D tour", url: "https://my.matterport.com/show/?m=abc12345", type: "tour" }],
+      },
+    });
+    const view = (tab: "video" | "tours") => renderToString(
+      <MemoryRouter>
+        <PortalListingDetailView
+          detail={media}
+          tab={tab}
+          editing={null}
+          saving={false}
+          canEdit
+          dataEditing={false}
+          dataDraft={portalFactsDraftFromDetail(media)}
+          website={defaultPortalWebsite()}
+          onTab={() => undefined}
+          onToggleEditing={() => undefined}
+          onMedia={() => undefined}
+          onWebsite={() => undefined}
+          onWebsiteSave={() => undefined}
+          onDataEditing={() => undefined}
+          onDataDraft={() => undefined}
+          onDataSave={() => undefined}
+          onRequestPhotoEdit={async () => false}
+        />
+      </MemoryRouter>,
+    );
+    expect(view("video")).toContain('data-testid="photo-edit-open-walkthrough"');
+    expect(view("video")).toContain("Request edit");
+    expect(view("tours")).toContain('data-testid="photo-edit-open-matterport"');
+    expect(view("tours")).toContain("Request edit");
+  });
+
   it("plays a listing video instead of turning a mov named tour into an iframe", () => {
     const html = render("video");
     expect(html).toContain("tour.mov");

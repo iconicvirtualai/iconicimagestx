@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   advancePhotoEditRequest,
@@ -83,7 +84,7 @@ describe("photo edit requests", () => {
       at,
       knownPhotoIds: ["front"],
       existing: [],
-    })).toMatchObject({ ok: false, error: "That photo is not on this listing." });
+    })).toMatchObject({ ok: false, error: "That file is not on this listing." });
 
     const again = createPhotoEditRequest({
       id: "req-front2",
@@ -98,6 +99,49 @@ describe("photo edit requests", () => {
     });
     expect(again).toMatchObject({ ok: false, status: 409 });
     expect(openPhotoEditForPhoto([filed()], "front")?.id).toBe("req-front1");
+  });
+
+  it("files a video and a 3D tour into the same queue as a photo", () => {
+    const known = ["front", "walkthrough", "matterport"];
+    const video = createPhotoEditRequest({
+      id: "req-video1",
+      listingId,
+      photoId: "walkthrough",
+      photoName: "walkthrough.mp4",
+      photoUrl: "https://cdn.example/walkthrough.mp4",
+      note: "Trim the opening pan.",
+      clientId: "client123",
+      at,
+      knownPhotoIds: known,
+      existing: [filed()],
+    });
+    expect(video.ok).toBe(true);
+    if (video.ok === false) return;
+    const tour = createPhotoEditRequest({
+      id: "req-tour01",
+      listingId,
+      photoId: "matterport",
+      photoName: "3D tour",
+      photoUrl: "https://my.matterport.com/show/?m=abc12345",
+      note: "Start the tour in the kitchen.",
+      clientId: "client123",
+      at: later,
+      knownPhotoIds: known,
+      existing: video.requests,
+    });
+    expect(tour.ok).toBe(true);
+    if (tour.ok === false) return;
+    expect(tour.requests.map((request) => request.photoId).sort()).toEqual(["front", "matterport", "walkthrough"]);
+  });
+
+  it("reuses the photo edit route for video, tours, floor plans, and files", () => {
+    const source = readFileSync(new URL("../server/routes/portalListing.ts", import.meta.url), "utf8");
+    const handler = source.slice(source.indexOf("export const handleCreatePhotoEditRequest"));
+    expect(handler).toContain("detail.videos");
+    expect(handler).toContain("detail.tours");
+    expect(handler).toContain("detail.floorplans");
+    expect(handler).toContain("detail.clientFiles");
+    expect(handler).not.toMatch(/sendMail|sendSms|twilio|CLIENT_NOTIFY|BOOKING_NOTIFY/);
   });
 
   it("marks sent out and then received back, in that order", () => {

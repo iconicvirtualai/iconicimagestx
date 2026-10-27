@@ -1,4 +1,5 @@
 import { contentTypeForUpload } from "@shared/listingAccess";
+import type { MediaArrangement } from "@shared/mediaArrangement";
 import { auth } from "./firebase";
 
 const DIRECT_UPLOAD_LIMIT = 3_000_000;
@@ -113,4 +114,48 @@ export async function uploadListingFile(options: {
     console.warn("[Upload] Signed upload failed, retrying through the API.", err);
     return saveDirect();
   }
+}
+
+export async function saveListingMediaArrangement(listingId: string, arrangement: MediaArrangement) {
+  const headers = await authorizedJsonHeaders();
+  const res = await fetch(`/api/listings/${listingId}/media-arrangement`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify(arrangement),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Could not save the media order.");
+  const names = Array.isArray(data.names) ? data.names.filter((name: unknown) => typeof name === "string") : [];
+  return { names: names as string[], note: typeof data.note === "string" ? data.note : "" };
+}
+
+export async function saveListingPhotoOrder(
+  listingId: string,
+  order: Array<{ key: string; culled: boolean }>,
+) {
+  const headers = await authorizedJsonHeaders();
+  const res = await fetch(`/api/listings/${listingId}/photo-order`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify({ order }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Could not save the photo order.");
+  return data as { images?: unknown };
+}
+
+export async function publishGallerySequence(listingId: string, address: string) {
+  const headers = await authorizedJsonHeaders();
+  const res = await fetch(`/api/listings/${listingId}/gallery-sequence`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ address }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Could not upload the gallery in order.");
+  const names = Array.isArray(data.names) ? data.names.filter((name: unknown) => typeof name === "string") : [];
+  return {
+    names: names as string[],
+    note: typeof data.note === "string" ? data.note : "",
+  };
 }

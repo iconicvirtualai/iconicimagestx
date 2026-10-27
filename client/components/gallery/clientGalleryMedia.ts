@@ -27,6 +27,9 @@ export interface ClientGalleryItem {
   height?: number | string | null;
   canDownload?: boolean;
   locked?: boolean;
+  sortOrder?: number | null;
+  culled?: boolean;
+  deliveryName?: string | null;
 }
 
 export type ClientGalleryKind =

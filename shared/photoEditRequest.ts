@@ -210,7 +210,7 @@ export function createPhotoEditRequest(input: {
   if (!id) return { ok: false, status: 400, error: "Could not save that edit request." };
   if (!/^[A-Za-z0-9_-]{4,128}$/.test(listingId)) return { ok: false, status: 400, error: "Listing id is not valid." };
   if (!photoId || !input.knownPhotoIds.includes(photoId)) {
-    return { ok: false, status: 400, error: "That photo is not on this listing." };
+    return { ok: false, status: 400, error: "That file is not on this listing." };
   }
   if (!note) return { ok: false, status: 400, error: "Add a note for the change you want." };
   if (!clientId) return { ok: false, status: 400, error: "Sign in again before requesting an edit." };
@@ -219,7 +219,7 @@ export function createPhotoEditRequest(input: {
     return { ok: false, status: 409, error: "This listing already has the maximum number of photo edit requests." };
   }
   if (openPhotoEditForPhoto(input.existing, photoId)) {
-    return { ok: false, status: 409, error: "This photo already has an open edit request." };
+    return { ok: false, status: 409, error: "This file already has an open edit request." };
   }
 
   const request: PhotoEditRequest = {

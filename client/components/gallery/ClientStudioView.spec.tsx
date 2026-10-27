@@ -156,7 +156,7 @@ describe("owner studio view", () => {
     expect(videos).toContain("Listing file");
 
     expect(downloadAttributes(photos).length).toBeGreaterThan(0);
-    expect(photos).toContain('download=""');
+    expect(photos).toContain('download="Front.jpg"');
     expect(photos).toContain("Download All Photos");
     expect(photos).toContain("https://cdn.example/front-full.jpg");
 
