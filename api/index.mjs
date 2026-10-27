@@ -3183,24 +3183,6 @@ function invoiceEmailNumber(source, now = /* @__PURE__ */ new Date()) {
 function receiptEmailNumber(source, now = /* @__PURE__ */ new Date()) {
   return shownInvoiceNumber(source, now);
 }
-const LISTING_CARD_LOOKS = [
-  "apprenticeship",
-  "just-photos",
-  "essentials",
-  "showcase",
-  "legacy",
-  "market-leader",
-  "refresh",
-  "content-partner",
-  "local-legend",
-  "baseline",
-  "growth-engine",
-  "professional-suite",
-  "connected-core",
-  "signature-tier",
-  "authority-stack",
-  "iconic-partnership"
-];
 const DIRECT_PACKAGE_KEYS = ["package", "packageName", "packageId", "selectedPackage", "selectedService", "serviceId"];
 const PACKAGE_SKINS = [
   skin({
@@ -3611,13 +3593,6 @@ function normalizePackageText(raw) {
   return raw.trim().toLowerCase().replace(/[—–]/g, " ").replace(/[_-]+/g, " ").replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
 }
 function resolveListingCardLook(data) {
-  const website = data.portalWebsite;
-  if (website && typeof website === "object") {
-    const chosen = website.tileLook;
-    if (typeof chosen === "string" && LISTING_CARD_LOOKS.includes(chosen)) {
-      return chosen;
-    }
-  }
   return resolvePackageSkinFromOrder(data)?.look ?? null;
 }
 function listingCardAddress(data) {
@@ -17336,11 +17311,8 @@ function sanitizeWebsiteSettings(value, base = defaultPortalWebsite()) {
     showVideo: boolOr(row.showVideo, base.showVideo),
     showTours: boolOr(row.showTours, base.showTours),
     showFloorplans: boolOr(row.showFloorplans, base.showFloorplans),
-    tileLook: isListingCardLook(row.tileLook) ? row.tileLook : base.tileLook
+    tileLook: ""
   };
-}
-function isListingCardLook(value) {
-  return typeof value === "string" && LISTING_CARD_LOOKS.includes(value);
 }
 function readMediaStore(value) {
   const row = value && typeof value === "object" ? value : {};
@@ -18665,6 +18637,11 @@ const handleCreatePhotoEditRequest = async (req, res) => {
     return sendKnownError$3(res, err, "Could not save that edit request.");
   }
 };
+function storedTileLook(value) {
+  if (!value || typeof value !== "object") return "";
+  const tile = value.tileLook;
+  return typeof tile === "string" ? tile.trim() : "";
+}
 const handlePatchPortalWebsite = async (req, res) => {
   if (!adminReady$4(res)) return;
   const listingId = listingIdFrom(req.params.id);
@@ -18673,9 +18650,11 @@ const handlePatchPortalWebsite = async (req, res) => {
     const listing = await authorizedListing(req, listingId);
     const current = sanitizeWebsiteSettings(listing.portalWebsite);
     const next = sanitizeWebsiteSettings(req.body, current);
-    const changed = JSON.stringify(next) !== JSON.stringify(current);
+    const leftoverTile = storedTileLook(listing.portalWebsite);
+    const changed = JSON.stringify(next) !== JSON.stringify(current) || leftoverTile !== "";
     if (changed) {
       const detail = buildPortalListingDetail({ listing });
+      const summary = next.published && !current.published ? "Listing site published" : !next.published && current.published ? "Listing site unpublished" : "Listing site style updated";
       await appendPortalWrite(listingId, {
         portalWebsite: next,
         listingSiteSlug: listingSiteSlug({ line1: detail.address.line1, city: detail.address.city }),
@@ -18683,7 +18662,7 @@ const handlePatchPortalWebsite = async (req, res) => {
           id: `portal-website-${(/* @__PURE__ */ new Date()).toISOString()}`,
           at: (/* @__PURE__ */ new Date()).toISOString(),
           kind: "website",
-          summary: "Listing site style updated"
+          summary
         }
       });
     }
