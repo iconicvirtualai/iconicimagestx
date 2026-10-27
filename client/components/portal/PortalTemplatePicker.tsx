@@ -48,12 +48,15 @@ export function PortalTemplatePicker({
         <p className="mt-1 text-xs text-gray-500">
           Classic, Editorial, and Minimal. Each card is that style on this listing’s photos. Pick one, open the full preview, then save.
         </p>
-        {slug ? (
-          <a href={listingSitePath(slug)} className="mt-3 inline-flex min-h-12 items-center text-sm font-black underline">View site</a>
+        {slug && website.published ? (
+          <a href={listingSitePath(slug)} className="mt-3 inline-flex min-h-12 items-center text-sm font-black underline" data-testid="listing-site-view">View site</a>
+        ) : slug ? (
+          <p className="mt-3 flex min-h-12 items-center text-sm font-black text-gray-400" data-testid="listing-site-unpublished">Not published yet</p>
         ) : (
           <p className="mt-3 text-xs text-gray-500">Add a street and city on the Data tab to open the public site. The preview below still works.</p>
         )}
-        <p className="mt-2 text-xs text-gray-500">{styleLabel(website.style)} · {fontLabel(website.font)} · {website.published ? "Published" : "Not published yet. Preview stays on this page until you publish."}</p>
+        <p className="mt-2 text-xs text-gray-500">{styleLabel(website.style)} · {fontLabel(website.font)} · {website.published ? "Published" : "Preview stays on this page until you publish."}</p>
+        <style>{STYLE_CARD_THUMB_CSS}</style>
         <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
           {SITE_STYLES.map((style) => {
             const selected = website.style === style.id && website.design === style.design;
@@ -64,9 +67,17 @@ export function PortalTemplatePicker({
                 className={`min-w-0 overflow-hidden rounded-2xl border bg-white ${selected ? "border-black" : "border-gray-200"}`}
                 data-testid={`listing-style-${style.id}`}
               >
-                <div className="h-44 overflow-hidden bg-gray-50" aria-hidden="true">
-                  <div className="pointer-events-none">
-                    <ListingSiteView inquiry={false} site={previewSite(detail, preset)} />
+                <div
+                  className="style-card-thumb"
+                  style={{ background: THUMB_BG[style.id] }}
+                  aria-hidden="true"
+                  ref={markThumbInert}
+                  data-testid={`listing-style-thumb-${style.id}`}
+                >
+                  <div className="style-card-thumb-scale">
+                    <div className="style-card-thumb-page">
+                      <ListingSiteView inquiry={false} site={previewSite(detail, preset)} />
+                    </div>
                   </div>
                 </div>
                 <button
@@ -202,6 +213,54 @@ function skinCard(detail: PortalListingDetail, look: ListingCardLook): ClientLis
     pool: pool && !pool.empty ? pool.value : "",
   };
 }
+
+function markThumbInert(node: HTMLDivElement | null) {
+  node?.setAttribute("inert", "");
+}
+
+/** Page-sized sample scaled into the card so header, title, photos, and type all show. */
+const THUMB_PAGE_WIDTH = 960;
+const THUMB_PAGE_HEIGHT = 1000;
+
+const THUMB_BG: Record<PortalWebsiteSettings["style"], string> = {
+  classic: "#F7F7F5",
+  editorial: "#0B0B0C",
+  minimal: "#F2EFEA",
+};
+
+const STYLE_CARD_THUMB_CSS = `
+.style-card-thumb{
+  container-type:inline-size;
+  overflow:hidden;
+  --iframe-hero:560px;
+  --iframe-hero-max:560px;
+}
+.style-card-thumb-scale{
+  height:calc(100cqw * ${THUMB_PAGE_HEIGHT} / ${THUMB_PAGE_WIDTH});
+  overflow:hidden;
+}
+.style-card-thumb-page{
+  width:${THUMB_PAGE_WIDTH}px;
+  height:${THUMB_PAGE_HEIGHT}px;
+  overflow:hidden;
+  transform-origin:top left;
+  transform:scale(calc(100cqw / ${THUMB_PAGE_WIDTH}px));
+  pointer-events:none;
+}
+.style-card-thumb .ls-index,
+.style-card-thumb .ls-two,
+.style-card-thumb .ls-premiere{min-height:0}
+.style-card-thumb .ls-index-hero h1,
+.style-card-thumb .ls-story h1,
+.style-card-thumb .ls-premiere .ls-letterbox h1{
+  line-height:1;
+  overflow-wrap:anywhere;
+  display:-webkit-box;
+  -webkit-box-orient:vertical;
+  -webkit-line-clamp:4;
+  overflow:hidden;
+}
+`;
 
 function styleLabel(style: PortalWebsiteSettings["style"]): string {
   if (style === "editorial") return "Editorial";

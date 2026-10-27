@@ -35,6 +35,7 @@ function render(
   editing: "photo" | null = null,
   canEdit = true,
   dataEditing = false,
+  website = defaultPortalWebsite(),
 ) {
   return renderToString(
     <MemoryRouter>
@@ -46,7 +47,7 @@ function render(
         canEdit={canEdit}
         dataEditing={dataEditing}
         dataDraft={portalFactsDraftFromDetail(detail)}
-        website={defaultPortalWebsite()}
+        website={website}
         onTab={() => undefined}
         onToggleEditing={() => undefined}
         onMedia={() => undefined}
@@ -272,22 +273,45 @@ describe("portal listing detail page", () => {
     expect(orders).not.toContain("Pay now");
     expect(render("activity")).toContain("Booking request received");
     expect(render("website")).toContain("Save site style");
-    expect(render("website")).toContain("View site");
+    expect(render("website")).toContain("Not published yet");
+    expect(render("website")).toContain("listing-site-unpublished");
+    expect(render("website")).not.toContain("listing-site-view");
+    expect(render("website")).not.toContain('href="/l/18-oak-hollow-spring"');
     expect(render("website")).toContain("listing-site-preview");
     expect(render("website")).toContain("listing-style-classic");
     expect(render("website")).toContain("listing-style-editorial");
     expect(render("website")).toContain("listing-style-minimal");
+    expect(render("website")).toContain("listing-style-thumb-classic");
+    expect(render("website")).toContain("style-card-thumb-page");
+    expect(render("website")).toContain("100cqw / 960px");
+    expect(render("website")).toContain('data-listing-design="index"');
+    expect(render("website")).toContain('data-listing-design="premiere"');
+    expect(render("website")).toContain('data-listing-design="two-up"');
     expect(render("website")).toContain("Portal tile");
     expect(render("website")).toContain("portal-tile-skins");
     expect(render("website")).toContain("tile-skin-showcase");
     expect(render("marketing")).toContain("portal-upload-social");
     expect(render("marketing")).toContain("portal-upload-file");
     expect(render("video")).toContain("portal-upload-input-video");
-    expect(render("website")).toContain("/l/18-oak-hollow-spring");
+    expect(render("website")).not.toContain("/l/18-oak-hollow-spring");
     expect(render("website")).toContain("Classic");
     expect(render("website")).toContain("Editorial");
     expect(render("website")).toContain("Minimal");
     expect(render("website")).not.toContain("not generated");
+  });
+
+  it("links View site only after the listing site is published", () => {
+    const published = render("website", null, true, false, { ...defaultPortalWebsite(), published: true });
+    expect(published).toContain('data-testid="listing-site-view"');
+    expect(published).toContain('href="/l/18-oak-hollow-spring"');
+    expect(published).toContain(">View site<");
+    expect(published).toContain("Published");
+    expect(published).not.toContain("listing-site-unpublished");
+    expect(published).not.toContain("Not published yet");
+
+    const visitor = render("website", null, false, false, { ...defaultPortalWebsite(), published: true });
+    expect(visitor).toContain('href="/l/18-oak-hollow-spring"');
+    expect(visitor).not.toContain("Save site style");
   });
 
   it("gives a visitor the listing without edit, hide, site save, or a pay action", () => {
@@ -301,6 +325,8 @@ describe("portal listing detail page", () => {
 
     const website = render("website", null, false);
     expect(website).toContain("Sans");
+    expect(website).toContain("Not published yet");
+    expect(website).not.toContain('href="/l/18-oak-hollow-spring"');
     expect(website).not.toContain("Save site style");
     expect(website).not.toContain("<select");
 
