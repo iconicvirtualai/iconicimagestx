@@ -89,6 +89,18 @@ describe("photographer portal view", () => {
     expect(html).not.toContain("No jobs are assigned to this login.");
   });
 
+  it("keeps a preview from uploading, opening Studio, or loading messages", () => {
+    const html = renderPortal({ readOnly: true, tab: "all" });
+    expect(html).toContain("Photographer portal");
+    expect(html).toContain("disabled");
+    expect(html).not.toContain('href="/admin/studio/editing?listingId=editing-job"');
+    expect(html).not.toContain('href="/admin/upload');
+    expect(html).not.toContain('data-testid="portal-messages"');
+    const messages = renderPortal({ readOnly: true, tab: "messages" });
+    expect(messages).toContain("does not load or send");
+    expect(messages).not.toContain('data-testid="portal-messages"');
+  });
+
   it("labels pay as an estimate", () => {
     const html = renderPortal({ tab: "pay" });
     expect(html).toContain("Pay estimate");
