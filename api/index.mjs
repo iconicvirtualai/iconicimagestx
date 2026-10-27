@@ -3183,6 +3183,24 @@ function invoiceEmailNumber(source, now = /* @__PURE__ */ new Date()) {
 function receiptEmailNumber(source, now = /* @__PURE__ */ new Date()) {
   return shownInvoiceNumber(source, now);
 }
+const LISTING_CARD_LOOKS = [
+  "apprenticeship",
+  "just-photos",
+  "essentials",
+  "showcase",
+  "legacy",
+  "market-leader",
+  "refresh",
+  "content-partner",
+  "local-legend",
+  "baseline",
+  "growth-engine",
+  "professional-suite",
+  "connected-core",
+  "signature-tier",
+  "authority-stack",
+  "iconic-partnership"
+];
 const DIRECT_PACKAGE_KEYS = ["package", "packageName", "packageId", "selectedPackage", "selectedService", "serviceId"];
 const PACKAGE_SKINS = [
   skin({
@@ -3593,6 +3611,13 @@ function normalizePackageText(raw) {
   return raw.trim().toLowerCase().replace(/[—–]/g, " ").replace(/[_-]+/g, " ").replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
 }
 function resolveListingCardLook(data) {
+  const website = data.portalWebsite;
+  if (website && typeof website === "object") {
+    const chosen = website.tileLook;
+    if (typeof chosen === "string" && LISTING_CARD_LOOKS.includes(chosen)) {
+      return chosen;
+    }
+  }
   return resolvePackageSkinFromOrder(data)?.look ?? null;
 }
 function listingCardAddress(data) {
@@ -12221,7 +12246,7 @@ function jsonSafe(value) {
   return value;
 }
 const db$o = () => admin.firestore();
-const bucket$1 = () => admin.storage().bucket();
+const bucket$2 = () => admin.storage().bucket();
 const BROWSER_ORIGINS = [
   "https://iconicimagestx.vercel.app",
   "https://iconicimagestx.com",
@@ -12232,7 +12257,7 @@ const BROWSER_ORIGINS = [
 let corsAttempt = null;
 function ensureBucketCors() {
   if (!corsAttempt) {
-    corsAttempt = bucket$1().setCorsConfiguration([{
+    corsAttempt = bucket$2().setCorsConfiguration([{
       origin: BROWSER_ORIGINS,
       method: ["GET", "HEAD", "PUT", "POST", "DELETE", "OPTIONS"],
       responseHeader: ["Content-Type", "Authorization", "Content-Length", "x-goog-resumable"],
@@ -12254,7 +12279,7 @@ async function createListingUploadUrl(listingId, fileName2, contentType, folder)
   const safeName = safeStorageFileName(fileName2);
   const resolvedType = contentTypeForUpload(safeName, contentType);
   const storagePath = `listings/${listingId}/${folder}/${Date.now()}_${safeName}`;
-  const file = bucket$1().file(storagePath);
+  const file = bucket$2().file(storagePath);
   const [uploadUrl] = await file.getSignedUrl({
     version: "v4",
     action: "write",
@@ -12268,7 +12293,7 @@ async function saveListingBytes(listingId, fileName2, contentType, folder, bytes
   const resolvedType = contentTypeForUpload(safeName, contentType);
   const storagePath = `listings/${listingId}/${folder}/${Date.now()}_${safeName}`;
   const token = randomUUID();
-  const file = bucket$1().file(storagePath);
+  const file = bucket$2().file(storagePath);
   await file.save(bytes, {
     resumable: false,
     metadata: {
@@ -12276,7 +12301,7 @@ async function saveListingBytes(listingId, fileName2, contentType, folder, bytes
       metadata: { firebaseStorageDownloadTokens: token }
     }
   });
-  const url = firebaseDownloadUrl(bucket$1().name, storagePath, token);
+  const url = firebaseDownloadUrl(bucket$2().name, storagePath, token);
   return { storagePath, contentType: resolvedType, url, token };
 }
 async function registerListingPhoto(options) {
@@ -12289,7 +12314,7 @@ async function registerListingPhoto(options) {
   if (!listingSnap.exists) {
     throw Object.assign(new Error("Listing not found."), { status: 404 });
   }
-  const file = bucket$1().file(storagePath);
+  const file = bucket$2().file(storagePath);
   const [exists] = await file.exists();
   if (!exists) {
     throw Object.assign(new Error("Uploaded file was not found in storage."), { status: 400 });
@@ -12305,7 +12330,7 @@ async function registerListingPhoto(options) {
         contentType: contentTypeForUpload(fileName2, options.contentType || metadata.contentType)
       });
     }
-    url = firebaseDownloadUrl(bucket$1().name, storagePath, token);
+    url = firebaseDownloadUrl(bucket$2().name, storagePath, token);
   }
   const image = {
     url,
@@ -12466,10 +12491,10 @@ function editSizeForImage(bytes) {
 }
 function imagePart(bytes, contentType, filename) {
   const type = contentType.includes("png") ? "image/png" : contentType.includes("webp") ? "image/webp" : "image/jpeg";
-  const extension = type === "image/png" ? "png" : type === "image/webp" ? "webp" : "jpg";
+  const extension2 = type === "image/png" ? "png" : type === "image/webp" ? "webp" : "jpg";
   return {
     blob: new Blob([new Uint8Array(bytes)], { type }),
-    filename: filename || `source.${extension}`
+    filename: filename || `source.${extension2}`
   };
 }
 function isTimeoutError(err) {
@@ -12653,7 +12678,7 @@ async function inspectFinishedListingJpeg(input) {
   return parseDeliveryInspection(body) || deliveryInspection("flag", [INSPECTION_FAILED_NOTE]);
 }
 const db$n = () => admin.firestore();
-const bucket = () => admin.storage().bucket();
+const bucket$1 = () => admin.storage().bucket();
 function httpError$3(status2, message) {
   return Object.assign(new Error(message), { status: status2 });
 }
@@ -12761,7 +12786,7 @@ async function downloadListingImage(listingId, sourcePath, fileName2, contentTyp
   if (!isStudioPreviewable(fileName2, contentType)) {
     throw new OpenAiEditError("OpenAI can edit a JPEG, PNG, or WebP. RAW files stay in the queue until a preview exists.");
   }
-  const file = bucket().file(sourcePath);
+  const file = bucket$1().file(sourcePath);
   const [exists] = await file.exists();
   if (!exists) throw new OpenAiEditError("Source photo was not found in storage.");
   const [metadata] = await file.getMetadata();
@@ -13194,7 +13219,7 @@ async function copyToFinals(listingId, sourcePath, fileName2) {
     throw httpError$3(400, "That file is not stored on this listing.");
   }
   if (sourcePath.includes("/finals/")) {
-    const file = bucket().file(sourcePath);
+    const file = bucket$1().file(sourcePath);
     const [exists2] = await file.exists();
     if (!exists2) throw httpError$3(400, "Final file was not found in storage.");
     const [metadata2] = await file.getMetadata();
@@ -13202,7 +13227,7 @@ async function copyToFinals(listingId, sourcePath, fileName2) {
     const token2 = typeof current === "string" && current ? current.split(",")[0] : randomUUID();
     return {
       storagePath: sourcePath,
-      url: firebaseDownloadUrl(bucket().name, sourcePath, token2),
+      url: firebaseDownloadUrl(bucket$1().name, sourcePath, token2),
       contentType: metadata2.contentType || "image/jpeg",
       copied: false
     };
@@ -13214,10 +13239,10 @@ async function copyToFinals(listingId, sourcePath, fileName2) {
     throw httpError$3(400, "Approve a JPEG, PNG, or WebP. RAW stays in the AI queue.");
   }
   const destPath = finalsObjectPath(listingId, fileName2);
-  const source = bucket().file(sourcePath);
+  const source = bucket$1().file(sourcePath);
   const [exists] = await source.exists();
   if (!exists) throw httpError$3(400, "Source file was not found in storage.");
-  const dest = bucket().file(destPath);
+  const dest = bucket$1().file(destPath);
   await source.copy(dest);
   const [metadata] = await source.getMetadata();
   const token = randomUUID();
@@ -13228,7 +13253,7 @@ async function copyToFinals(listingId, sourcePath, fileName2) {
   });
   return {
     storagePath: destPath,
-    url: firebaseDownloadUrl(bucket().name, destPath, token),
+    url: firebaseDownloadUrl(bucket$1().name, destPath, token),
     contentType,
     copied: true
   };
@@ -16913,6 +16938,18 @@ const PORTAL_ADDRESS_LIMITS = {
   zip: 20
 };
 const PORTAL_FACT_TEXT_LIMIT = 1e3;
+const PORTAL_WEBSITE_DESIGNS = [
+  "issue",
+  "premiere",
+  "product-drop",
+  "gallery-wall",
+  "field-guide",
+  "two-up",
+  "golden-hour",
+  "index",
+  "dossier",
+  "stories"
+];
 const EMPTY = "Not on file yet";
 const FACT_DEFS = [
   { id: "beds", label: "Beds", keys: ["bedrooms", "beds"] },
@@ -16948,7 +16985,7 @@ const PORTAL_MARKETING_KIT = [
     note: "Design tools are not connected yet. Reels and shorts for this listing will be chosen here."
   }
 ];
-const WEBSITE_DESIGNS = /* @__PURE__ */ new Set(["index", "two-up", "premiere"]);
+const WEBSITE_DESIGNS = new Set(PORTAL_WEBSITE_DESIGNS);
 const WEBSITE_FONTS = /* @__PURE__ */ new Set(["sans", "serif", "modern"]);
 const WEBSITE_COLORS = /* @__PURE__ */ new Set(["ink", "teal", "warm"]);
 const WEBSITE_STYLES = /* @__PURE__ */ new Set(["classic", "editorial", "minimal"]);
@@ -16968,6 +17005,8 @@ function visitorPortalListingDetail(detail) {
     videos: detail.videos.filter((item) => !item.hidden),
     tours: detail.tours.filter((item) => !item.hidden),
     floorplans: detail.floorplans.filter((item) => !item.hidden),
+    socialAssets: [],
+    clientFiles: [],
     invoices: [],
     activity: detail.activity.filter((event) => !isInvoiceOrPaymentActivity(event)),
     photoEditRequests: []
@@ -16983,7 +17022,8 @@ function defaultPortalWebsite() {
     showPhotos: true,
     showVideo: true,
     showTours: true,
-    showFloorplans: true
+    showFloorplans: true,
+    tileLook: ""
   };
 }
 function hiddenPresentationKeys(listing) {
@@ -17012,6 +17052,8 @@ function buildPortalListingDetail(sources) {
   const videos = collectVideos(listing, galleries, store);
   const tours = collectTours(listing, galleries, store);
   const floorplans = collectFloorplans(listing, galleries, store);
+  const socialAssets = collectClientUploads(listing, "social");
+  const clientFiles = collectClientUploads(listing, "file");
   const website = readWebsite(listing.portalWebsite);
   const invoices = readInvoices(sources.invoices || []);
   const activity = buildActivity(sources, photos, videos, floorplans, tours);
@@ -17029,6 +17071,9 @@ function buildPortalListingDetail(sources) {
     videos,
     tours,
     floorplans,
+    photoGroups: store.photoGroups,
+    socialAssets,
+    clientFiles,
     marketing: PORTAL_MARKETING_KIT,
     website,
     invoices,
@@ -17138,6 +17183,8 @@ function clipText(value, max) {
   return raw.replace(/\u0000/g, "").trim().slice(0, max);
 }
 function applyPortalMediaChange(store, items, change, nowIso) {
+  if ("layout" in change) return applyPhotoLayout(store, items, change.layout, nowIso);
+  if ("group" in change) return applyPhotoGroup(store, items, change.group, nowIso);
   const bucket2 = items.filter((item) => item.kind === change.kind).sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
   const index = bucket2.findIndex((item) => item.id === change.id);
   if (index < 0) return { ok: false, error: "That file is not on this listing." };
@@ -17158,10 +17205,6 @@ function applyPortalMediaChange(store, items, change, nowIso) {
     }
   }
   if (!summary) return { ok: true, store, activity: null };
-  const prefs = {};
-  next.forEach((item, order) => {
-    prefs[item.id] = { hidden: item.hidden, order };
-  });
   const activity = {
     id: `portal-${change.kind}-${change.id}-${nowIso}`,
     at: nowIso,
@@ -17170,9 +17213,112 @@ function applyPortalMediaChange(store, items, change, nowIso) {
   };
   return {
     ok: true,
-    store: { ...store, [storeKey(change.kind)]: prefs },
+    store: { ...store, [storeKey(change.kind)]: prefsFrom(next) },
     activity
   };
+}
+function applyPhotoLayout(store, items, layout, nowIso) {
+  const bucket2 = items.filter((item) => item.kind === "photo");
+  const known = new Map(bucket2.map((item) => [item.id, item]));
+  const groupIds = new Set(store.photoGroups.map((group) => group.id));
+  const seen = /* @__PURE__ */ new Set();
+  const next = [];
+  for (const entry2 of layout) {
+    const item = known.get(entry2.id);
+    if (!item || seen.has(entry2.id)) continue;
+    if (entry2.groupId && !groupIds.has(entry2.groupId)) return { ok: false, error: "That group is not on this listing." };
+    seen.add(entry2.id);
+    next.push({ ...item, groupId: entry2.groupId });
+  }
+  if (next.length === 0) return { ok: false, error: "Choose photos to arrange." };
+  for (const item of bucket2) {
+    if (!seen.has(item.id)) next.push(item);
+  }
+  return {
+    ok: true,
+    store: { ...store, photos: prefsFrom(next) },
+    activity: {
+      id: `portal-photo-layout-${nowIso}`,
+      at: nowIso,
+      kind: "photo",
+      summary: "Updated photo order"
+    }
+  };
+}
+function applyPhotoGroup(store, items, change, nowIso) {
+  const photos = items.filter((item) => item.kind === "photo").map((item) => ({ ...item }));
+  const groups = store.photoGroups.map((group) => ({ ...group }));
+  let summary = "";
+  if (change.action === "create") {
+    const name = change.name.trim().slice(0, 60);
+    if (!name) return { ok: false, error: "Name the group." };
+    if (groups.length >= 24) return { ok: false, error: "This listing already has 24 groups." };
+    const chosen = new Set(change.photoIds);
+    if (!photos.some((photo) => chosen.has(photo.id))) return { ok: false, error: "Choose photos for this group." };
+    const id = nextGroupId(groups.map((group) => group.id));
+    groups.push({ id, name, order: groups.length });
+    photos.forEach((photo) => {
+      if (chosen.has(photo.id)) photo.groupId = id;
+    });
+    summary = `Created photo group ${name}`;
+  }
+  if (change.action === "rename") {
+    const group = groups.find((item) => item.id === change.id);
+    const name = change.name.trim().slice(0, 60);
+    if (!group) return { ok: false, error: "That group is not on this listing." };
+    if (!name) return { ok: false, error: "Name the group." };
+    group.name = name;
+    summary = `Renamed photo group to ${name}`;
+  }
+  if (change.action === "remove") {
+    const group = groups.find((item) => item.id === change.id);
+    if (!group) return { ok: false, error: "That group is not on this listing." };
+    photos.forEach((photo) => {
+      if (photo.groupId === group.id) photo.groupId = "";
+    });
+    const remaining = groups.filter((item) => item.id !== group.id);
+    remaining.forEach((item, order) => {
+      item.order = order;
+    });
+    summary = `Removed photo group ${group.name}`;
+    return {
+      ok: true,
+      store: { ...store, photos: prefsFrom(photos), photoGroups: remaining },
+      activity: {
+        id: `portal-photo-group-${nowIso}`,
+        at: nowIso,
+        kind: "photo",
+        summary
+      }
+    };
+  }
+  if (!summary) return { ok: false, error: "That group change is not supported." };
+  return {
+    ok: true,
+    store: { ...store, photos: prefsFrom(photos), photoGroups: groups },
+    activity: {
+      id: `portal-photo-group-${nowIso}`,
+      at: nowIso,
+      kind: "photo",
+      summary
+    }
+  };
+}
+function prefsFrom(items) {
+  const prefs = {};
+  items.forEach((item, order) => {
+    prefs[item.id] = { hidden: item.hidden, order, groupId: item.groupId || "" };
+  });
+  return prefs;
+}
+function nextGroupId(existing) {
+  const taken = new Set(existing);
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const id = `g${Math.random().toString(36).slice(2, 10)}`;
+    if (/^g[a-z0-9]{4,16}$/.test(id) && !taken.has(id)) return id;
+  }
+  const fallback = `g${Date.now().toString(36).slice(-8)}`;
+  return taken.has(fallback) ? `${fallback}a` : fallback;
 }
 function sanitizeWebsiteSettings(value, base = defaultPortalWebsite()) {
   const row = value && typeof value === "object" ? value : {};
@@ -17189,8 +17335,12 @@ function sanitizeWebsiteSettings(value, base = defaultPortalWebsite()) {
     showPhotos: boolOr(row.showPhotos, base.showPhotos),
     showVideo: boolOr(row.showVideo, base.showVideo),
     showTours: boolOr(row.showTours, base.showTours),
-    showFloorplans: boolOr(row.showFloorplans, base.showFloorplans)
+    showFloorplans: boolOr(row.showFloorplans, base.showFloorplans),
+    tileLook: isListingCardLook(row.tileLook) ? row.tileLook : base.tileLook
   };
+}
+function isListingCardLook(value) {
+  return typeof value === "string" && LISTING_CARD_LOOKS.includes(value);
 }
 function readMediaStore(value) {
   const row = value && typeof value === "object" ? value : {};
@@ -17198,7 +17348,8 @@ function readMediaStore(value) {
     photos: readPrefs(row.photos),
     videos: readPrefs(row.videos),
     floorplans: readPrefs(row.floorplans),
-    tours: readPrefs(row.tours)
+    tours: readPrefs(row.tours),
+    photoGroups: readPhotoGroups(row.photoGroups)
   };
 }
 function storeKey(kind) {
@@ -17206,6 +17357,30 @@ function storeKey(kind) {
   if (kind === "video") return "videos";
   if (kind === "floorplan") return "floorplans";
   return "tours";
+}
+function groupIdText(value) {
+  if (typeof value !== "string") return "";
+  const id = value.trim();
+  return /^g[a-z0-9]{4,16}$/.test(id) ? id : "";
+}
+function readPhotoGroups(value) {
+  if (!Array.isArray(value)) return [];
+  const groups = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const item of value) {
+    const row = asRecord$3(item);
+    if (!row) continue;
+    const id = groupIdText(row.id);
+    const name = clipText(row.name, 60);
+    if (!id || !name || seen.has(id)) continue;
+    seen.add(id);
+    groups.push({
+      id,
+      name,
+      order: typeof row.order === "number" && Number.isFinite(row.order) ? row.order : groups.length
+    });
+  }
+  return groups.sort((a, b) => a.order - b.order || a.name.localeCompare(b.name)).slice(0, 24);
 }
 function readPrefs(value) {
   if (!value || typeof value !== "object") return {};
@@ -17215,7 +17390,8 @@ function readPrefs(value) {
     const row = prefs;
     out[id] = {
       hidden: row.hidden === true,
-      order: typeof row.order === "number" && Number.isFinite(row.order) ? row.order : 0
+      order: typeof row.order === "number" && Number.isFinite(row.order) ? row.order : 0,
+      groupId: groupIdText(row.groupId)
     };
   }
   return out;
@@ -17368,7 +17544,15 @@ function collectPhotos(listing, galleries, store) {
   return finishMedia("photo", [...rowsFrom(listing.images), ...galleryRows(galleries)], store.photos, (row) => isPhoto(row));
 }
 function collectVideos(listing, galleries, store) {
-  return finishMedia("video", [...rowsFrom(listing.videos), ...rowsFrom(listing.images), ...galleryRows(galleries)], store.videos, (row) => isVideo(row));
+  return finishMedia(
+    "video",
+    [...rowsFrom(listing.videos), ...rowsFrom(listing.images), ...clientUploadRows(listing, "video"), ...galleryRows(galleries)],
+    store.videos,
+    (row) => isVideo(row)
+  );
+}
+function collectClientUploads(listing, kind) {
+  return finishMedia(kind === "social" ? "photo" : "floorplan", clientUploadRows(listing, kind), {}, () => true).map((item) => ({ ...item, kind: kind === "social" ? "photo" : "floorplan" }));
 }
 function collectFloorplans(listing, galleries, store) {
   const rows = [
@@ -17406,6 +17590,7 @@ function collectTours(listing, galleries, store) {
       contentType: text$6(row.contentType),
       hidden: prefs?.hidden === true || row.hiddenFromPresentation === true,
       order: prefs?.order ?? index,
+      groupId: "",
       uploadedAt: portalTimestamp(row.uploadedAt || row.createdAt),
       provider: provider || "Virtual tour",
       embedUrl: provider === "Matterport" ? url : null
@@ -17438,10 +17623,14 @@ function finishMedia(kind, rows, prefs, include) {
       contentType: text$6(row.contentType).toLowerCase(),
       hidden: pref?.hidden === true || row.hiddenFromPresentation === true || row.portalHidden === true,
       order: pref?.order ?? index,
+      groupId: kind === "photo" ? groupIdText(pref?.groupId) : "",
       uploadedAt: portalTimestamp(row.uploadedAt || row.createdAt)
     });
   });
   return items.sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
+}
+function clientUploadRows(listing, kind) {
+  return rowsFrom(listing.clientPortalUploads).filter((row) => text$6(row.kind) === kind);
 }
 function rowsFrom(value) {
   if (!Array.isArray(value)) return [];
@@ -17693,7 +17882,7 @@ function portalTimestamp(value) {
 function mediaLabel(item) {
   return item.name || item.kind;
 }
-const LISTING_SITE_DESIGNS = ["index", "two-up", "premiere"];
+const LISTING_SITE_DESIGNS = PORTAL_WEBSITE_DESIGNS;
 new Set(LISTING_SITE_DESIGNS);
 const SLUG$1 = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 function listingSiteSlug(input) {
@@ -17978,6 +18167,185 @@ async function savePhotoEditReplacement(input) {
     }
   }));
 }
+const PORTAL_UPLOAD_KINDS = ["video", "social", "file"];
+const PORTAL_UPLOAD_LIMITS = {
+  video: 2 * 1024 * 1024 * 1024,
+  social: 80 * 1024 * 1024,
+  file: 40 * 1024 * 1024
+};
+const VIDEO_TYPES = /* @__PURE__ */ new Set(["video/mp4", "video/quicktime"]);
+const SOCIAL_TYPES = /* @__PURE__ */ new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+  "image/heic",
+  "image/heif",
+  "image/svg+xml",
+  "video/mp4",
+  "video/quicktime"
+]);
+const FILE_TYPES = /* @__PURE__ */ new Set([
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "text/plain"
+]);
+const EXT_TYPE = {
+  ".mp4": "video/mp4",
+  ".mov": "video/quicktime",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".png": "image/png",
+  ".webp": "image/webp",
+  ".gif": "image/gif",
+  ".heic": "image/heic",
+  ".heif": "image/heif",
+  ".svg": "image/svg+xml",
+  ".pdf": "application/pdf",
+  ".doc": "application/msword",
+  ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ".txt": "text/plain"
+};
+function isPortalUploadKind(value) {
+  return typeof value === "string" && PORTAL_UPLOAD_KINDS.includes(value);
+}
+function portalUploadDecision(kind, fileName2, providedType, byteSize) {
+  if (!isPortalUploadKind(kind)) return { ok: false, error: "Choose video, social, or a document." };
+  const safeName = safeStorageFileName(fileName2);
+  if (safeName === "upload") return { ok: false, error: "That file needs a name." };
+  const size = typeof byteSize === "number" && Number.isFinite(byteSize) ? byteSize : Number.NaN;
+  if (!Number.isFinite(size) || size <= 0) return { ok: false, error: "That file is empty." };
+  if (size > PORTAL_UPLOAD_LIMITS[kind]) {
+    const limit = kind === "video" ? "2 GB" : kind === "social" ? "80 MB" : "40 MB";
+    return { ok: false, error: `That file is over the ${limit} limit.` };
+  }
+  const contentType = allowedContentType(kind, safeName, providedType);
+  if (!contentType) return { ok: false, error: rejectionCopy(kind) };
+  return { ok: true, kind, contentType, fileName: safeName };
+}
+function portalUploadStoragePath(listingId, kind, fileName2, now = Date.now()) {
+  return `listings/${listingId}/client-uploads/${kind}/${now}_${safeStorageFileName(fileName2)}`;
+}
+function isPortalUploadStoragePath(listingId, kind, storagePath) {
+  if (!listingId || typeof storagePath !== "string") return false;
+  if (storagePath.includes("..") || storagePath.includes("\\") || storagePath.startsWith("/")) return false;
+  const prefix = `listings/${listingId}/client-uploads/${kind}/`;
+  if (!storagePath.startsWith(prefix)) return false;
+  const rest = storagePath.slice(prefix.length);
+  return rest.length > 0 && !rest.includes("/");
+}
+function allowedContentType(kind, fileName2, providedType) {
+  const provided = typeof providedType === "string" ? providedType : "";
+  const resolved = contentTypeForUpload(fileName2, provided);
+  const fromExt = EXT_TYPE[extension(fileName2)] || "";
+  const candidate = fromExt || (resolved !== "application/octet-stream" ? resolved : "");
+  const allow = kind === "video" ? VIDEO_TYPES : kind === "social" ? SOCIAL_TYPES : FILE_TYPES;
+  return allow.has(candidate) ? candidate : "";
+}
+function extension(fileName2) {
+  const match = /\.[a-z0-9]+$/i.exec(fileName2.trim().toLowerCase());
+  return match ? match[0] : "";
+}
+function rejectionCopy(kind) {
+  if (kind === "video") return "Upload an MP4 or MOV video.";
+  if (kind === "social") return "Upload an image, reel, or graphic (JPG, PNG, WebP, GIF, HEIC, SVG, MP4, or MOV).";
+  return "Upload a PDF, Word document, or text file.";
+}
+const bucket = () => admin.storage().bucket();
+class PortalUploadError extends Error {
+  status;
+  constructor(status2, message) {
+    super(message);
+    this.status = status2;
+  }
+}
+async function createPortalClientUploadUrl(input) {
+  const decision = portalUploadDecision(input.kind, input.fileName, input.contentType, input.byteSize);
+  if (decision.ok === false) throw new PortalUploadError(400, decision.error);
+  await ensureBucketCors();
+  const storagePath = portalUploadStoragePath(input.listingId, decision.kind, decision.fileName);
+  const file = bucket().file(storagePath);
+  const [uploadUrl] = await file.getSignedUrl({
+    version: "v4",
+    action: "write",
+    expires: Date.now() + 30 * 60 * 1e3,
+    contentType: decision.contentType
+  });
+  return { uploadUrl, storagePath, contentType: decision.contentType, kind: decision.kind };
+}
+async function registerPortalClientUpload(input) {
+  if (!isPortalUploadKind(input.kind)) throw new PortalUploadError(400, "Choose video, social, or a document.");
+  const kind = input.kind;
+  if (!isPortalUploadStoragePath(input.listingId, kind, input.storagePath)) {
+    throw new PortalUploadError(400, "That file is not in this listing's upload folder.");
+  }
+  const storagePath = input.storagePath;
+  const file = bucket().file(storagePath);
+  const [exists] = await file.exists();
+  if (!exists) throw new PortalUploadError(400, "The upload did not finish. Try that file again.");
+  const [metadata] = await file.getMetadata();
+  const size = Number(metadata.size || 0);
+  const decision = portalUploadDecision(kind, input.fileName, input.contentType || metadata.contentType, size);
+  if (decision.ok === false) {
+    await file.delete({ ignoreNotFound: true }).catch(() => void 0);
+    throw new PortalUploadError(400, decision.error);
+  }
+  const token = randomUUID();
+  await file.setMetadata({
+    contentType: decision.contentType,
+    metadata: { firebaseStorageDownloadTokens: token }
+  });
+  const url = firebaseDownloadUrl(bucket().name, storagePath, token);
+  const uploadedAt = (/* @__PURE__ */ new Date()).toISOString();
+  const record2 = {
+    id: randomUUID(),
+    kind,
+    name: decision.fileName,
+    url,
+    path: storagePath,
+    contentType: decision.contentType,
+    byteSize: size,
+    uploadedAt,
+    uploadedBy: input.uploadedBy
+  };
+  const ref = admin.firestore().collection("listings").doc(input.listingId);
+  await admin.firestore().runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const data = snap.data() || {};
+    const existing = Array.isArray(data.clientPortalUploads) ? data.clientPortalUploads : [];
+    const activity = Array.isArray(data.portalActivity) ? data.portalActivity : [];
+    const update = {
+      clientPortalUploads: [...existing, record2].slice(-200),
+      portalActivity: [...activity, {
+        id: `portal-upload-${record2.id}`,
+        at: uploadedAt,
+        kind,
+        summary: uploadSummary(kind, decision.fileName)
+      }].slice(-200),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+    if (kind === "video") {
+      const videos = Array.isArray(data.videos) ? data.videos : [];
+      update.videos = [...videos, {
+        id: record2.id,
+        name: record2.name,
+        url: record2.url,
+        path: record2.path,
+        contentType: record2.contentType,
+        type: "video",
+        uploadedAt
+      }];
+    }
+    tx.update(ref, update);
+  });
+  return record2;
+}
+function uploadSummary(kind, fileName2) {
+  if (kind === "video") return `Client uploaded video ${fileName2}`;
+  if (kind === "social") return `Client uploaded social file ${fileName2}`;
+  return `Client uploaded file ${fileName2}`;
+}
 const db$d = () => admin.firestore();
 const KINDS = /* @__PURE__ */ new Set(["photo", "video", "floorplan", "tour"]);
 function adminReady$4(res) {
@@ -17992,7 +18360,7 @@ function text$4(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function sendKnownError$3(res, err, fallback) {
-  const status2 = err instanceof PhotoEditRequestError ? err.status : err.status;
+  const status2 = err instanceof PhotoEditRequestError || err instanceof PortalUploadError ? err.status : err.status;
   if (status2 && status2 >= 400 && status2 < 500) {
     return res.status(status2).json({ error: err instanceof Error ? err.message : fallback });
   }
@@ -18106,6 +18474,27 @@ async function authorizedListing(req, listingId) {
 function mediaChange(body) {
   const row = body && typeof body === "object" ? body : {};
   const kind = text$4(row.kind);
+  if (kind === "photo" && Array.isArray(row.layout)) {
+    const layout = row.layout.flatMap((entry2) => {
+      const item = entry2 && typeof entry2 === "object" ? entry2 : null;
+      const id2 = text$4(item?.id);
+      if (!id2) return [];
+      const groupId = text$4(item?.groupId);
+      return [{ id: id2, groupId }];
+    });
+    if (layout.length) return { kind: "photo", layout };
+  }
+  if (kind === "photo" && row.group && typeof row.group === "object") {
+    const group = row.group;
+    const action = text$4(group.action);
+    const name = text$4(group.name).slice(0, 60);
+    const id2 = text$4(group.id);
+    const photoIds = Array.isArray(group.photoIds) ? group.photoIds.map((item) => text$4(item)).filter(Boolean).slice(0, 200) : [];
+    if (action === "create" && name && photoIds.length) return { kind: "photo", group: { action: "create", name, photoIds } };
+    if (action === "rename" && id2 && name) return { kind: "photo", group: { action: "rename", id: id2, name } };
+    if (action === "remove" && id2) return { kind: "photo", group: { action: "remove", id: id2 } };
+    return null;
+  }
   const id = text$4(row.id);
   if (!KINDS.has(kind) || !id) return null;
   if (typeof row.hidden === "boolean") return { kind, id, hidden: row.hidden };
@@ -18199,6 +18588,52 @@ const handlePatchPortalData = async (req, res) => {
     return res.json(buildPortalListingDetail(await loadSources(listingId, refreshed)));
   } catch (err) {
     return sendKnownError$3(res, err, "Could not save listing facts.");
+  }
+};
+const handleCreatePortalUploadUrl = async (req, res) => {
+  if (!adminReady$4(res)) return;
+  const listingId = listingIdFrom(req.params.id);
+  if (!listingId) return res.status(400).json({ error: "Listing id is not valid." });
+  const body = req.body && typeof req.body === "object" ? req.body : {};
+  if (typeof body.dataBase64 === "string" && body.dataBase64) {
+    return res.status(400).json({ error: "Send this file directly to storage. The portal does not accept the file in the request body." });
+  }
+  try {
+    await authorizedListing(req, listingId);
+    const ticket = await createPortalClientUploadUrl({
+      listingId,
+      kind: body.kind,
+      fileName: body.fileName,
+      contentType: body.contentType,
+      byteSize: body.byteSize
+    });
+    return res.json(ticket);
+  } catch (err) {
+    return sendKnownError$3(res, err, "Could not start that upload.");
+  }
+};
+const handleRegisterPortalUpload = async (req, res) => {
+  if (!adminReady$4(res)) return;
+  const listingId = listingIdFrom(req.params.id);
+  if (!listingId) return res.status(400).json({ error: "Listing id is not valid." });
+  const body = req.body && typeof req.body === "object" ? req.body : {};
+  if (typeof body.dataBase64 === "string" && body.dataBase64) {
+    return res.status(400).json({ error: "Send this file directly to storage. The portal does not accept the file in the request body." });
+  }
+  try {
+    await authorizedListing(req, listingId);
+    await registerPortalClientUpload({
+      listingId,
+      kind: body.kind,
+      fileName: body.fileName,
+      contentType: body.contentType,
+      storagePath: body.storagePath,
+      uploadedBy: req.user.uid
+    });
+    const refreshed = await authorizedListing(req, listingId);
+    return res.status(201).json(buildPortalListingDetail(await loadSources(listingId, refreshed)));
+  } catch (err) {
+    return sendKnownError$3(res, err, "Could not save that upload.");
   }
 };
 const handleCreatePhotoEditRequest = async (req, res) => {
@@ -18507,6 +18942,8 @@ router$l.patch("/me/listings/:id/data", requireAuth, handlePatchPortalData);
 router$l.patch("/me/listings/:id/media", requireAuth, handlePatchPortalMedia);
 router$l.patch("/me/listings/:id/website", requireAuth, handlePatchPortalWebsite);
 router$l.post("/me/listings/:id/photo-edit-requests", requireAuth, handleCreatePhotoEditRequest);
+router$l.post("/me/listings/:id/uploads/url", requireAuth, handleCreatePortalUploadUrl);
+router$l.post("/me/listings/:id/uploads", requireAuth, handleRegisterPortalUpload);
 router$l.get("/me", requireAuth, async (req, res) => {
   try {
     const directDoc = await db$c().collection("clients").doc(req.user.uid).get();
