@@ -8,6 +8,7 @@
 
 import { addressText } from "./addressText.ts";
 import { orderHistoryInvoiceNumber } from "./orderProjectInvoice.ts";
+import { LISTING_CARD_LOOKS, type ListingCardLook } from "./packageSkins.ts";
 import { readPhotoEditRequests, type PhotoEditRequest } from "./photoEditRequest";
 
 export const PORTAL_LISTING_TABS = [
@@ -75,7 +76,15 @@ export interface PortalMediaItem {
   contentType: string;
   hidden: boolean;
   order: number;
+  /** Photo group id. Empty means the photo sits outside a named group. */
+  groupId: string;
   uploadedAt: string;
+}
+
+export interface PortalPhotoGroup {
+  id: string;
+  name: string;
+  order: number;
 }
 
 export interface PortalTourItem extends PortalMediaItem {
@@ -87,6 +96,7 @@ export interface PortalTourItem extends PortalMediaItem {
 export interface PortalMediaPrefs {
   hidden: boolean;
   order: number;
+  groupId: string;
 }
 
 export interface PortalMediaStore {
@@ -94,10 +104,26 @@ export interface PortalMediaStore {
   videos: Record<string, PortalMediaPrefs>;
   floorplans: Record<string, PortalMediaPrefs>;
   tours: Record<string, PortalMediaPrefs>;
+  photoGroups: PortalPhotoGroup[];
 }
 
+export const PORTAL_WEBSITE_DESIGNS = [
+  "issue",
+  "premiere",
+  "product-drop",
+  "gallery-wall",
+  "field-guide",
+  "two-up",
+  "golden-hour",
+  "index",
+  "dossier",
+  "stories",
+] as const;
+
+export type PortalWebsiteDesign = (typeof PORTAL_WEBSITE_DESIGNS)[number];
+
 export interface PortalWebsiteSettings {
-  design: "index" | "two-up" | "premiere";
+  design: PortalWebsiteDesign;
   font: "sans" | "serif" | "modern";
   color: "ink" | "teal" | "warm";
   style: "classic" | "editorial" | "minimal";
@@ -106,6 +132,8 @@ export interface PortalWebsiteSettings {
   showVideo: boolean;
   showTours: boolean;
   showFloorplans: boolean;
+  /** Client-chosen project tile. Empty keeps the package skin. */
+  tileLook: ListingCardLook | "";
 }
 
 export interface PortalInvoiceSummary {
@@ -140,6 +168,9 @@ export interface PortalListingDetail {
   videos: PortalMediaItem[];
   tours: PortalTourItem[];
   floorplans: PortalMediaItem[];
+  photoGroups: PortalPhotoGroup[];
+  socialAssets: PortalMediaItem[];
+  clientFiles: PortalMediaItem[];
   marketing: PortalMarketingCard[];
   website: PortalWebsiteSettings;
   invoices: PortalInvoiceSummary[];
@@ -156,9 +187,21 @@ export interface PortalListingSources {
   appointments?: Array<Record<string, unknown>>;
 }
 
+export interface PortalPhotoLayoutEntry {
+  id: string;
+  groupId: string;
+}
+
+export type PortalPhotoGroupChange =
+  | { action: "create"; name: string; photoIds: string[] }
+  | { action: "rename"; id: string; name: string }
+  | { action: "remove"; id: string };
+
 export type PortalMediaChange =
   | { kind: PortalMediaKind; id: string; hidden: boolean }
-  | { kind: PortalMediaKind; id: string; move: "earlier" | "later" };
+  | { kind: PortalMediaKind; id: string; move: "earlier" | "later" }
+  | { kind: "photo"; layout: PortalPhotoLayoutEntry[] }
+  | { kind: "photo"; group: PortalPhotoGroupChange };
 
 const EMPTY = "Not on file yet";
 
@@ -198,7 +241,7 @@ export const PORTAL_MARKETING_KIT: PortalMarketingCard[] = [
   },
 ];
 
-const WEBSITE_DESIGNS = new Set(["index", "two-up", "premiere"]);
+const WEBSITE_DESIGNS = new Set<string>(PORTAL_WEBSITE_DESIGNS);
 const WEBSITE_FONTS = new Set(["sans", "serif", "modern"]);
 const WEBSITE_COLORS = new Set(["ink", "teal", "warm"]);
 const WEBSITE_STYLES = new Set(["classic", "editorial", "minimal"]);
@@ -258,6 +301,8 @@ export function visitorPortalListingDetail(detail: PortalListingDetail): PortalL
     videos: detail.videos.filter((item) => !item.hidden),
     tours: detail.tours.filter((item) => !item.hidden),
     floorplans: detail.floorplans.filter((item) => !item.hidden),
+    socialAssets: [],
+    clientFiles: [],
     invoices: [],
     activity: detail.activity.filter((event) => !isInvoiceOrPaymentActivity(event)),
     photoEditRequests: [],
@@ -270,7 +315,7 @@ export function portalListingTab(value: unknown): PortalListingTabId {
 }
 
 export function emptyPortalMediaStore(): PortalMediaStore {
-  return { photos: {}, videos: {}, floorplans: {}, tours: {} };
+  return { photos: {}, videos: {}, floorplans: {}, tours: {}, photoGroups: [] };
 }
 
 export function defaultPortalWebsite(): PortalWebsiteSettings {
@@ -284,6 +329,7 @@ export function defaultPortalWebsite(): PortalWebsiteSettings {
     showVideo: true,
     showTours: true,
     showFloorplans: true,
+    tileLook: "",
   };
 }
 
@@ -315,6 +361,8 @@ export function buildPortalListingDetail(sources: PortalListingSources): PortalL
   const videos = collectVideos(listing, galleries, store);
   const tours = collectTours(listing, galleries, store);
   const floorplans = collectFloorplans(listing, galleries, store);
+  const socialAssets = collectClientUploads(listing, "social");
+  const clientFiles = collectClientUploads(listing, "file");
   const website = readWebsite(listing.portalWebsite);
   const invoices = readInvoices(sources.invoices || []);
   const activity = buildActivity(sources, photos, videos, floorplans, tours, invoices);
@@ -333,6 +381,9 @@ export function buildPortalListingDetail(sources: PortalListingSources): PortalL
     videos,
     tours,
     floorplans,
+    photoGroups: store.photoGroups,
+    socialAssets,
+    clientFiles,
     marketing: PORTAL_MARKETING_KIT,
     website,
     invoices,
@@ -469,6 +520,9 @@ export function applyPortalMediaChange(
   change: PortalMediaChange,
   nowIso: string,
 ): { ok: true; store: PortalMediaStore; activity: PortalActivityEvent | null } | { ok: false; error: string } {
+  if ("layout" in change) return applyPhotoLayout(store, items, change.layout, nowIso);
+  if ("group" in change) return applyPhotoGroup(store, items, change.group, nowIso);
+
   const bucket = items
     .filter((item) => item.kind === change.kind)
     .sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
@@ -498,11 +552,6 @@ export function applyPortalMediaChange(
 
   if (!summary) return { ok: true, store, activity: null };
 
-  const prefs: Record<string, PortalMediaPrefs> = {};
-  next.forEach((item, order) => {
-    prefs[item.id] = { hidden: item.hidden, order };
-  });
-
   const activity: PortalActivityEvent = {
     id: `portal-${change.kind}-${change.id}-${nowIso}`,
     at: nowIso,
@@ -512,9 +561,130 @@ export function applyPortalMediaChange(
 
   return {
     ok: true,
-    store: { ...store, [storeKey(change.kind)]: prefs },
+    store: { ...store, [storeKey(change.kind)]: prefsFrom(next) },
     activity,
   };
+}
+
+function applyPhotoLayout(
+  store: PortalMediaStore,
+  items: PortalMediaItem[],
+  layout: PortalPhotoLayoutEntry[],
+  nowIso: string,
+): { ok: true; store: PortalMediaStore; activity: PortalActivityEvent | null } | { ok: false; error: string } {
+  const bucket = items.filter((item) => item.kind === "photo");
+  const known = new Map(bucket.map((item) => [item.id, item]));
+  const groupIds = new Set(store.photoGroups.map((group) => group.id));
+  const seen = new Set<string>();
+  const next: PortalMediaItem[] = [];
+  for (const entry of layout) {
+    const item = known.get(entry.id);
+    if (!item || seen.has(entry.id)) continue;
+    if (entry.groupId && !groupIds.has(entry.groupId)) return { ok: false, error: "That group is not on this listing." };
+    seen.add(entry.id);
+    next.push({ ...item, groupId: entry.groupId });
+  }
+  if (next.length === 0) return { ok: false, error: "Choose photos to arrange." };
+  for (const item of bucket) {
+    if (!seen.has(item.id)) next.push(item);
+  }
+  return {
+    ok: true,
+    store: { ...store, photos: prefsFrom(next) },
+    activity: {
+      id: `portal-photo-layout-${nowIso}`,
+      at: nowIso,
+      kind: "photo",
+      summary: "Updated photo order",
+    },
+  };
+}
+
+function applyPhotoGroup(
+  store: PortalMediaStore,
+  items: PortalMediaItem[],
+  change: PortalPhotoGroupChange,
+  nowIso: string,
+): { ok: true; store: PortalMediaStore; activity: PortalActivityEvent | null } | { ok: false; error: string } {
+  const photos = items.filter((item) => item.kind === "photo").map((item) => ({ ...item }));
+  const groups = store.photoGroups.map((group) => ({ ...group }));
+  let summary = "";
+
+  if (change.action === "create") {
+    const name = change.name.trim().slice(0, 60);
+    if (!name) return { ok: false, error: "Name the group." };
+    if (groups.length >= 24) return { ok: false, error: "This listing already has 24 groups." };
+    const chosen = new Set(change.photoIds);
+    if (!photos.some((photo) => chosen.has(photo.id))) return { ok: false, error: "Choose photos for this group." };
+    const id = nextGroupId(groups.map((group) => group.id));
+    groups.push({ id, name, order: groups.length });
+    photos.forEach((photo) => {
+      if (chosen.has(photo.id)) photo.groupId = id;
+    });
+    summary = `Created photo group ${name}`;
+  }
+
+  if (change.action === "rename") {
+    const group = groups.find((item) => item.id === change.id);
+    const name = change.name.trim().slice(0, 60);
+    if (!group) return { ok: false, error: "That group is not on this listing." };
+    if (!name) return { ok: false, error: "Name the group." };
+    group.name = name;
+    summary = `Renamed photo group to ${name}`;
+  }
+
+  if (change.action === "remove") {
+    const group = groups.find((item) => item.id === change.id);
+    if (!group) return { ok: false, error: "That group is not on this listing." };
+    photos.forEach((photo) => {
+      if (photo.groupId === group.id) photo.groupId = "";
+    });
+    const remaining = groups.filter((item) => item.id !== group.id);
+    remaining.forEach((item, order) => {
+      item.order = order;
+    });
+    summary = `Removed photo group ${group.name}`;
+    return {
+      ok: true,
+      store: { ...store, photos: prefsFrom(photos), photoGroups: remaining },
+      activity: {
+        id: `portal-photo-group-${nowIso}`,
+        at: nowIso,
+        kind: "photo",
+        summary,
+      },
+    };
+  }
+
+  if (!summary) return { ok: false, error: "That group change is not supported." };
+  return {
+    ok: true,
+    store: { ...store, photos: prefsFrom(photos), photoGroups: groups },
+    activity: {
+      id: `portal-photo-group-${nowIso}`,
+      at: nowIso,
+      kind: "photo",
+      summary,
+    },
+  };
+}
+
+function prefsFrom(items: PortalMediaItem[]): Record<string, PortalMediaPrefs> {
+  const prefs: Record<string, PortalMediaPrefs> = {};
+  items.forEach((item, order) => {
+    prefs[item.id] = { hidden: item.hidden, order, groupId: item.groupId || "" };
+  });
+  return prefs;
+}
+
+function nextGroupId(existing: string[]): string {
+  const taken = new Set(existing);
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const id = `g${Math.random().toString(36).slice(2, 10)}`;
+    if (/^g[a-z0-9]{4,16}$/.test(id) && !taken.has(id)) return id;
+  }
+  const fallback = `g${Date.now().toString(36).slice(-8)}`;
+  return taken.has(fallback) ? `${fallback}a` : fallback;
 }
 
 export function sanitizeWebsiteSettings(value: unknown, base = defaultPortalWebsite()): PortalWebsiteSettings {
@@ -533,7 +703,12 @@ export function sanitizeWebsiteSettings(value: unknown, base = defaultPortalWebs
     showVideo: boolOr(row.showVideo, base.showVideo),
     showTours: boolOr(row.showTours, base.showTours),
     showFloorplans: boolOr(row.showFloorplans, base.showFloorplans),
+    tileLook: isListingCardLook(row.tileLook) ? row.tileLook : base.tileLook,
   };
+}
+
+function isListingCardLook(value: unknown): value is ListingCardLook {
+  return typeof value === "string" && (LISTING_CARD_LOOKS as readonly string[]).includes(value);
 }
 
 export function readMediaStore(value: unknown): PortalMediaStore {
@@ -543,6 +718,7 @@ export function readMediaStore(value: unknown): PortalMediaStore {
     videos: readPrefs(row.videos),
     floorplans: readPrefs(row.floorplans),
     tours: readPrefs(row.tours),
+    photoGroups: readPhotoGroups(row.photoGroups),
   };
 }
 
@@ -551,6 +727,32 @@ function storeKey(kind: PortalMediaKind): keyof PortalMediaStore {
   if (kind === "video") return "videos";
   if (kind === "floorplan") return "floorplans";
   return "tours";
+}
+
+function groupIdText(value: unknown): string {
+  if (typeof value !== "string") return "";
+  const id = value.trim();
+  return /^g[a-z0-9]{4,16}$/.test(id) ? id : "";
+}
+
+function readPhotoGroups(value: unknown): PortalPhotoGroup[] {
+  if (!Array.isArray(value)) return [];
+  const groups: PortalPhotoGroup[] = [];
+  const seen = new Set<string>();
+  for (const item of value) {
+    const row = asRecord(item);
+    if (!row) continue;
+    const id = groupIdText(row.id);
+    const name = clipText(row.name, 60);
+    if (!id || !name || seen.has(id)) continue;
+    seen.add(id);
+    groups.push({
+      id,
+      name,
+      order: typeof row.order === "number" && Number.isFinite(row.order) ? row.order : groups.length,
+    });
+  }
+  return groups.sort((a, b) => a.order - b.order || a.name.localeCompare(b.name)).slice(0, 24);
 }
 
 function readPrefs(value: unknown): Record<string, PortalMediaPrefs> {
@@ -562,6 +764,7 @@ function readPrefs(value: unknown): Record<string, PortalMediaPrefs> {
     out[id] = {
       hidden: row.hidden === true,
       order: typeof row.order === "number" && Number.isFinite(row.order) ? row.order : 0,
+      groupId: groupIdText(row.groupId),
     };
   }
   return out;
@@ -751,7 +954,17 @@ function collectPhotos(listing: Record<string, unknown>, galleries: Array<Record
 }
 
 function collectVideos(listing: Record<string, unknown>, galleries: Array<Record<string, unknown>>, store: PortalMediaStore): PortalMediaItem[] {
-  return finishMedia("video", [...rowsFrom(listing.videos), ...rowsFrom(listing.images), ...galleryRows(galleries)], store.videos, (row) => isVideo(row));
+  return finishMedia(
+    "video",
+    [...rowsFrom(listing.videos), ...rowsFrom(listing.images), ...clientUploadRows(listing, "video"), ...galleryRows(galleries)],
+    store.videos,
+    (row) => isVideo(row),
+  );
+}
+
+function collectClientUploads(listing: Record<string, unknown>, kind: "social" | "file"): PortalMediaItem[] {
+  return finishMedia(kind === "social" ? "photo" : "floorplan", clientUploadRows(listing, kind), {}, () => true)
+    .map((item) => ({ ...item, kind: kind === "social" ? "photo" as const : "floorplan" as const }));
 }
 
 function collectFloorplans(listing: Record<string, unknown>, galleries: Array<Record<string, unknown>>, store: PortalMediaStore): PortalMediaItem[] {
@@ -792,6 +1005,7 @@ function collectTours(listing: Record<string, unknown>, galleries: Array<Record<
       contentType: text(row.contentType),
       hidden: prefs?.hidden === true || row.hiddenFromPresentation === true,
       order: prefs?.order ?? index,
+      groupId: "",
       uploadedAt: portalTimestamp(row.uploadedAt || row.createdAt),
       provider: provider || "Virtual tour",
       embedUrl: provider === "Matterport" ? url : null,
@@ -831,10 +1045,15 @@ function finishMedia(
       contentType: text(row.contentType).toLowerCase(),
       hidden: pref?.hidden === true || row.hiddenFromPresentation === true || row.portalHidden === true,
       order: pref?.order ?? index,
+      groupId: kind === "photo" ? groupIdText(pref?.groupId) : "",
       uploadedAt: portalTimestamp(row.uploadedAt || row.createdAt),
     });
   });
   return items.sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
+}
+
+function clientUploadRows(listing: Record<string, unknown>, kind: "video" | "social" | "file"): Array<Record<string, unknown>> {
+  return rowsFrom(listing.clientPortalUploads).filter((row) => text(row.kind) === kind);
 }
 
 function rowsFrom(value: unknown): Array<Record<string, unknown>> {

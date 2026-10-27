@@ -186,6 +186,29 @@ describe("portal listing detail", () => {
     if (!moved.ok) return;
     expect(moved.store.photos.kitchen.order).toBeGreaterThan(moved.store.photos.living.order);
     expect(applyPortalMediaChange(shown.store, detail.photos, { kind: "photo", id: "missing", hidden: true }, "2026-04-06T17:00:00.000Z").ok).toBe(false);
+
+    const grouped = applyPortalMediaChange(shown.store, detail.photos, {
+      kind: "photo",
+      group: { action: "create", name: "Kitchen", photoIds: ["kitchen"] },
+    }, "2026-04-06T18:00:00.000Z");
+    expect(grouped.ok).toBe(true);
+    if (!grouped.ok) return;
+    const kitchenGroup = grouped.store.photoGroups.find((group) => group.name === "Kitchen");
+    expect(kitchenGroup?.id).toMatch(/^g[a-z0-9]+$/);
+    expect(grouped.store.photos.kitchen.groupId).toBe(kitchenGroup?.id);
+
+    const laid = applyPortalMediaChange(grouped.store, detail.photos.map((photo) => (
+      photo.id === "kitchen" ? { ...photo, groupId: kitchenGroup?.id || "" } : photo
+    )), {
+      kind: "photo",
+      layout: [
+        { id: "kitchen", groupId: kitchenGroup?.id || "" },
+        { id: "living", groupId: "" },
+      ],
+    }, "2026-04-06T19:00:00.000Z");
+    expect(laid.ok).toBe(true);
+    if (!laid.ok) return;
+    expect(laid.store.photos.kitchen.order).toBeLessThan(laid.store.photos.living.order);
   });
 
   it("collects mp4 video, Matterport, and jpg floorplans only", () => {
@@ -225,6 +248,11 @@ describe("portal listing detail", () => {
       showPhotos: false,
       showVideo: true,
     });
+    expect(sanitizeWebsiteSettings({ design: "golden-hour" }).design).toBe("golden-hour");
+    expect(sanitizeWebsiteSettings({ design: "stories" }).design).toBe("stories");
+    expect(sanitizeWebsiteSettings({ design: "issue" }).design).toBe("issue");
+    expect(sanitizeWebsiteSettings({ design: "index" }).design).toBe("index");
+    expect(sanitizeWebsiteSettings({ design: "not-a-design" }).design).toBe("index");
     expect(portalListingTab("photos")).toBe("photos");
     expect(portalListingTab("har")).toBe("data");
   });
@@ -365,5 +393,25 @@ describe("portal listing detail", () => {
     const visitor = visitorPortalListingDetail(detail);
     expect(visitor.photoEditRequests).toEqual([]);
     expect(JSON.stringify(visitor)).not.toContain("Warm the sky on the left.");
+  });
+
+  it("shows client video, social, and document uploads, and keeps documents off the public link", () => {
+    const detail = buildPortalListingDetail({
+      listing: {
+        id: listingId,
+        clientPortalUploads: [
+          { id: "vid1", kind: "video", name: "tour.mp4", url: "https://cdn.example/tour.mp4", contentType: "video/mp4" },
+          { id: "soc1", kind: "social", name: "reel.mov", url: "https://cdn.example/reel.mov", contentType: "video/quicktime" },
+          { id: "doc1", kind: "file", name: "plan.pdf", url: "https://cdn.example/plan.pdf", contentType: "application/pdf" },
+        ],
+      },
+    });
+    expect(detail.videos.map((item) => item.name)).toContain("tour.mp4");
+    expect(detail.socialAssets.map((item) => item.name)).toEqual(["reel.mov"]);
+    expect(detail.clientFiles.map((item) => item.name)).toEqual(["plan.pdf"]);
+    const visitor = visitorPortalListingDetail(detail);
+    expect(visitor.socialAssets).toEqual([]);
+    expect(visitor.clientFiles).toEqual([]);
+    expect(visitor.videos.map((item) => item.name)).toContain("tour.mp4");
   });
 });
