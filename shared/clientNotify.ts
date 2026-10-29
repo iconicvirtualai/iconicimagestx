@@ -29,9 +29,11 @@
  * To, Cc, Bcc, and Reply-To are filtered together. A non-matching address is
  * never left on the message, so a test send cannot fan out to a client.
  * When the switch is on, the allowlist is not consulted.
- * The booking_received and staff carve-outs are unchanged and are not
- * narrowed to the allowlist.
+ * The booking_received, Thankful RSVP confirm (when THANKFUL_RSVP_CONFIRM_LIVE=true),
+ * and staff carve-outs are unchanged and are not narrowed to the allowlist.
  */
+
+
 export const ORDER_RECEIVED_EMAIL_TEMPLATE = "booking_received";
 export const ORDER_RECEIVED_SMS_KIND = "booking_confirmation";
 
@@ -60,6 +62,8 @@ export function emailAllowed(
   audience?: "client" | "staff",
 ): boolean {
   if (template === ORDER_RECEIVED_EMAIL_TEMPLATE) return true;
+  // Thankful RSVP appointment confirm. Own flag; ignores CLIENT_NOTIFY_LIVE / RED.
+  if (template === "thankful_rsvp_confirm" && env.THANKFUL_RSVP_CONFIRM_LIVE === "true") return true;
   if (audience === "staff" && template === STAFF_INBOUND_EMAIL_TEMPLATE) return true;
   if (audience === "staff" && template === OFFICE_NEW_ORDER_EMAIL_TEMPLATE) return true;
   return clientNotifyLive(env);

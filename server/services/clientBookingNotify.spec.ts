@@ -29,7 +29,7 @@ import { clientOrderReceivedSubject, sendEmail } from "./email";
 const bookings = readFileSync(new URL("../routes/bookings.ts", import.meta.url), "utf8");
 const envExample = readFileSync(new URL("../../.env.example", import.meta.url), "utf8");
 
-const ENV_KEYS = ["CLIENT_NOTIFY_LIVE", "CLIENT_COMMS_ZONE", "SMTP_USER", "SMTP_PASS", "SMTP_HOST", "SMTP_PORT", "EMAIL_FROM"] as const;
+const ENV_KEYS = ["CLIENT_NOTIFY_LIVE", "CLIENT_COMMS_ZONE", "THANKFUL_RSVP_CONFIRM_LIVE", "SMTP_USER", "SMTP_PASS", "SMTP_HOST", "SMTP_PORT", "EMAIL_FROM"] as const;
 const savedEnv = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
 
 function useNotifyEnv(overrides: Record<string, string | undefined>) {
@@ -59,6 +59,8 @@ describe("client booking mail and the notify switch", () => {
   it("does not turn client notifications on", () => {
     expect(envExample).toMatch(/^CLIENT_NOTIFY_LIVE=$/m);
     expect(envExample).not.toMatch(/^CLIENT_NOTIFY_LIVE=true/m);
+    expect(envExample).toMatch(/^THANKFUL_RSVP_CONFIRM_LIVE=$/m);
+    expect(envExample).not.toMatch(/^THANKFUL_RSVP_CONFIRM_LIVE=true/m);
     expect(bookings).not.toContain('to: "photos@iconicimagestx.com"');
     expect(bookings.match(/template: "booking_received"/g)).toHaveLength(1);
     expect(bookings).toContain("to: email");

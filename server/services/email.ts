@@ -74,7 +74,7 @@ interface SendEmailOptions {
   lockHtml?: boolean;
   /** Plain-text part. Receipts always send one. */
   text?: string;
-  attachments?: Array<{ filename: string; path: string }>;
+  attachments?: Array<{ filename: string; path?: string; content?: string | Buffer; contentType?: string }>;
 }
 
 type EmailDeliveryOverride = (message: {
