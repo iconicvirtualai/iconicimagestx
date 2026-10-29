@@ -28,6 +28,15 @@ import { planOrderPackageRepair } from "../../shared/orderPackageRepair";
 import { notifyOfficeOfOrder } from "../services/officeOrderNotify";
 import { HOLIDAY_RSVP_LEAD, HOLIDAY_SEASON_LEAD, HOLIDAY_SOCIAL_SAVES_LEAD, holidayCheckoutKind, holidayOrderReceivedHtml } from "../../shared/holidayCheckout";
 import { THANKFUL_RSVP_CLOSED, quoteThankfulSocialSave, socialRatePreviewAllowed, socialRateView, thankfulRsvpOpen } from "../../shared/thankfulEvent";
+import {
+  THANKFUL_RSVP_CONFIRM_TEMPLATE,
+  thankfulRsvpConfirmFieldsFromOrder,
+  thankfulRsvpConfirmHtml,
+  thankfulRsvpConfirmIcs,
+  thankfulRsvpConfirmLive,
+  thankfulRsvpConfirmSubject,
+  thankfulRsvpConfirmText,
+} from "../../shared/thankfulRsvpConfirm";
 import { isActiveStaffRecord } from "../../shared/staffAccess";
 import { isTempAdminEnabled } from "../../shared/tempAdmin";
 import { HOLIDAY_SLOT_TAKEN_MESSAGE, holidaySlotClaim, holidaySlotIsFull, holidayTakenFromOrders } from "../../shared/holidaySlots";
@@ -606,12 +615,13 @@ router.post("/", async (req, res) => {
       ? `${accessMethod}${lockboxCode ? ` — Code: ${lockboxCode}` : ""}`
       : "Not specified";
 
-    let clientEmailStatus: "sent" | "failed" = "failed";
+    let clientEmailStatus: "sent" | "failed" | "gated" = "failed";
     let passwordSetupStatus: "sent" | "failed" | "not_needed" | "gated" = account.createdAccount ? "gated" : "not_needed";
-    let smsStatus: "sent" | "failed" | "skipped" | "not_configured" = phone ? "failed" : "skipped";
+    let smsStatus: "sent" | "failed" | "skipped" | "not_configured" | "gated" = phone ? "failed" : "skipped";
     const shownTime = requestedTimeLabel || (typeof scheduledTime === "string" ? scheduledTime : "");
+    const isThankfulRsvp = leadSource === HOLIDAY_RSVP_LEAD;
     const holidayMailKind = holidayCheckoutKind(leadSource, total);
-    const holidayHtml = holidayMailKind === "none" ? "" : holidayOrderReceivedHtml({
+    const holidayHtml = holidayMailKind === "none" || isThankfulRsvp ? "" : holidayOrderReceivedHtml({
       clientName,
       serviceName: typeof selectedService === "string" && selectedService.trim() ? selectedService : "Holiday order",
       whenDate: bookingDateLabel(scheduledDate, "TBD — we'll confirm shortly"),
@@ -622,53 +632,106 @@ router.post("/", async (req, res) => {
       complimentary: holidayMailKind === "free",
     });
 
-    // Order-received confirmation to the client. booking_received is excluded from the
-    // RED blast kill and sends even when CLIENT_NOTIFY_LIVE is unset.
-    // Holiday orders send their own HTML so a stored real-estate template cannot replace it.
-    clientEmailStatus = await sendEmail({
-      to: email,
-      template: "booking_received",
-      subject: clientOrderReceivedSubject(displayAddress, orderNumber),
-      html: holidayHtml || undefined,
-      lockHtml: Boolean(holidayHtml),
-      variables: {
-        clientName,
-        address: displayAddress,
-        orderNumber,
-        processing: money(sale.processing ?? 0),
-        total: money(total),
-        requestId: docRef.id,
-        scheduledDate: bookingDateLabel(scheduledDate, "TBD — we'll confirm shortly"),
-        scheduledTime: shownTime,
-        propertyStatus: propertyStatus || "Not specified",
-        furnishingStatus: furnishingStatus || "Not specified",
-        accessMethod: accessLine,
-        squareFootage: squareFootage ? `${squareFootage} sq ft` : "",
-        travelFee: travelSummaryText(travel),
-        dashboardUrl: orderRequestAdminUrl(docRef.id),
-      },
-    }).then((result) => (result.sent ? "sent" as const : "failed" as const)).catch((err) => {
-      console.error("[Bookings] Confirmation email failed:", err);
-      return "failed" as const;
-    });
-
-    // Order-received SMS to the client. Same carve-out as booking_received:
-    // not blocked by RED or a missing CLIENT_NOTIFY_LIVE.
-    if (phone) {
-      smsStatus = await sendSMS({
-        to: phone,
-        kind: "booking_confirmation",
-        body: SMS_TEMPLATES.bookingConfirmation(
-          firstName,
-          bookingDateLabel(scheduledDate, "TBD — we'll confirm shortly"),
-          displayAddress,
-          money(total)
-        ),
-      }).then((result) => ("suppressed" in result && result.suppressed ? "failed" as const : "sent" as const)).catch((err) => {
-        console.error("[Bookings] Confirmation SMS failed:", err);
-        const message = err instanceof Error ? err.message : String(err);
-        return /TWILIO_|not configured|not set/i.test(message) ? "not_configured" as const : "failed" as const;
+    if (isThankfulRsvp) {
+      // Warm appointment confirm for Thankful RSVPs. Own flag only —
+      // does not require CLIENT_NOTIFY_LIVE and does not flip it.
+      if (!thankfulRsvpConfirmLive()) {
+        clientEmailStatus = "gated";
+        smsStatus = phone ? "gated" : "skipped";
+        console.info(
+          `[Bookings] Thankful RSVP confirm not sent for request ${docRef.id}. THANKFUL_RSVP_CONFIRM_LIVE is not exactly true.`,
+        );
+      } else {
+        const rsvpFields = thankfulRsvpConfirmFieldsFromOrder({
+          vibeNote: typeof vibeNote === "string" ? vibeNote : "",
+          notes: typeof vibeNote === "string" ? vibeNote : "",
+        });
+        const confirmInput = {
+          clientName,
+          photoTime: shownTime,
+          headcount: rsvpFields.headcount,
+          menuVote: rsvpFields.menuVote,
+          santa: rsvpFields.santa,
+          requestId: docRef.id,
+        };
+        clientEmailStatus = await sendEmail({
+          to: email,
+          template: THANKFUL_RSVP_CONFIRM_TEMPLATE,
+          subject: thankfulRsvpConfirmSubject(clientName, shownTime),
+          html: thankfulRsvpConfirmHtml(confirmInput),
+          text: thankfulRsvpConfirmText(confirmInput),
+          lockHtml: true,
+          attachments: [
+            {
+              filename: "iconic-thankful-nov7.ics",
+              content: thankfulRsvpConfirmIcs(confirmInput),
+              contentType: "text/calendar; charset=utf-8; method=PUBLISH",
+            },
+          ],
+          variables: {
+            clientName,
+            address: displayAddress,
+            orderNumber,
+            requestId: docRef.id,
+            scheduledDate: bookingDateLabel(scheduledDate, "Sat, Nov 7, 2026"),
+            scheduledTime: shownTime,
+          },
+        }).then((result) => (result.sent ? "sent" as const : "failed" as const)).catch((err) => {
+          console.error("[Bookings] Thankful RSVP confirm email failed:", err);
+          return "failed" as const;
+        });
+        // No booking_confirmation SMS for Thankful RSVPs — the email is the appointment confirm.
+        smsStatus = phone ? "gated" : "skipped";
+      }
+    } else {
+      // Order-received confirmation to the client. booking_received is excluded from the
+      // RED blast kill and sends even when CLIENT_NOTIFY_LIVE is unset.
+      // Holiday paid/season orders send their own HTML so a stored real-estate template cannot replace it.
+      clientEmailStatus = await sendEmail({
+        to: email,
+        template: "booking_received",
+        subject: clientOrderReceivedSubject(displayAddress, orderNumber),
+        html: holidayHtml || undefined,
+        lockHtml: Boolean(holidayHtml),
+        variables: {
+          clientName,
+          address: displayAddress,
+          orderNumber,
+          processing: money(sale.processing ?? 0),
+          total: money(total),
+          requestId: docRef.id,
+          scheduledDate: bookingDateLabel(scheduledDate, "TBD — we'll confirm shortly"),
+          scheduledTime: shownTime,
+          propertyStatus: propertyStatus || "Not specified",
+          furnishingStatus: furnishingStatus || "Not specified",
+          accessMethod: accessLine,
+          squareFootage: squareFootage ? `${squareFootage} sq ft` : "",
+          travelFee: travelSummaryText(travel),
+          dashboardUrl: orderRequestAdminUrl(docRef.id),
+        },
+      }).then((result) => (result.sent ? "sent" as const : "failed" as const)).catch((err) => {
+        console.error("[Bookings] Confirmation email failed:", err);
+        return "failed" as const;
       });
+
+      // Order-received SMS to the client. Same carve-out as booking_received:
+      // not blocked by RED or a missing CLIENT_NOTIFY_LIVE.
+      if (phone) {
+        smsStatus = await sendSMS({
+          to: phone,
+          kind: "booking_confirmation",
+          body: SMS_TEMPLATES.bookingConfirmation(
+            firstName,
+            bookingDateLabel(scheduledDate, "TBD — we'll confirm shortly"),
+            displayAddress,
+            money(total)
+          ),
+        }).then((result) => ("suppressed" in result && result.suppressed ? "failed" as const : "sent" as const)).catch((err) => {
+          console.error("[Bookings] Confirmation SMS failed:", err);
+          const message = err instanceof Error ? err.message : String(err);
+          return /TWILIO_|not configured|not set/i.test(message) ? "not_configured" as const : "failed" as const;
+        });
+      }
     }
 
     // Send SMS alert to coordinator/admin if ADMIN_PHONE is set
