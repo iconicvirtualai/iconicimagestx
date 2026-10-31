@@ -9,7 +9,9 @@ import {
   HEADSHOTS_CALENDAR_FALLBACK,
   HEADSHOTS_DATE_COUNT,
   HEADSHOTS_DOUBLE_SLOT_AT,
+  HEADSHOTS_CITY,
   HEADSHOTS_FACTS,
+  HEADSHOTS_FOOTER_ADDRESS,
   HEADSHOTS_FULL_LINE,
   HEADSHOTS_H1,
   HEADSHOTS_HOLD_MINUTES,
@@ -20,6 +22,7 @@ import {
   HEADSHOTS_STUDIO_LINE,
   HEADSHOTS_STUDIO_NAME,
   headshotHeroGroup,
+  headshotPlaceJsonLd,
   headshotPhotoStrip,
   headshotCalendarIcs,
   headshotConversionKey,
@@ -436,6 +439,7 @@ export default function Headshots10() {
 
   return (
     <div className="min-h-screen bg-[#F5F2EA] text-[#081228]">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(headshotPlaceJsonLd()) }} />
       <a href="#book" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:bg-white focus:px-3 focus:py-2">
         Skip to booking
       </a>
@@ -459,7 +463,7 @@ export default function Headshots10() {
               {HEADSHOTS_H1}
             </h1>
             <p className="mt-4 max-w-xl text-lg leading-snug">
-              Tuesdays 10am-2pm at Iconic Studios in Spring. Buy as many headshots as you like.
+              Tuesdays 10am-2pm at Iconic Studios in {HEADSHOTS_CITY}. Buy as many headshots as you like.
             </p>
             <div className="mt-5 flex flex-col items-start gap-3 sm:flex-row sm:items-center">
               <a
@@ -601,7 +605,7 @@ export default function Headshots10() {
             {([
               { title: "Book a Tuesday slot.", body: "Pick a time between 10am and 2pm.", Icon: Calendar },
               { title: "Choose your quantity.", body: "$10 per headshot. Buy as many as you like.", Icon: Plus },
-              { title: "Show up.", body: "Iconic Studios, 26410 Oakridge Dr. Ste 105, Spring.", Icon: MapPin },
+              { title: "Show up.", body: `Iconic Studios, 26410 Oakridge Dr. Ste 105, ${HEADSHOTS_CITY}.`, Icon: MapPin },
               { title: "Pick your favorites.", body: "Choose the headshots you want to keep.", Icon: Check },
             ] as const).map(({ title, body, Icon }, index) => (
               <li key={title} className="bg-white p-5">
@@ -844,7 +848,7 @@ export default function Headshots10() {
 
       <footer className="border-t border-[#081228]/15 px-4 py-8 text-sm">
         <p className="mx-auto max-w-6xl leading-relaxed">
-          {LEGAL_BUSINESS_NAME} · {BUSINESS_CONTACT.address} · {BUSINESS_CONTACT.phoneDisplay} · {BUSINESS_CONTACT.email}
+          {LEGAL_BUSINESS_NAME} · {HEADSHOTS_FOOTER_ADDRESS} · {BUSINESS_CONTACT.phoneDisplay} · {BUSINESS_CONTACT.email}
         </p>
       </footer>
     </div>

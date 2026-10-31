@@ -224,7 +224,7 @@ export function isNoIndexPath(pathname: string): boolean {
 
 export type MetaPlan =
   | { kind: "public"; title: string; description: string; canonical: string; image: string }
-  | { kind: "noindex"; title: string; description?: string }
+  | { kind: "noindex"; title: string; description?: string; openGraph?: boolean }
   | { kind: "generic"; title: string }
   | { kind: "preserve-title" }
   | { kind: "hands-off" };
@@ -243,6 +243,7 @@ export function metaPlan(pathname: string, origin = SITE_ORIGIN): MetaPlan {
       kind: "noindex",
       title: HEADSHOTS_SEO_TITLE,
       description: HEADSHOTS_SEO_DESCRIPTION,
+      openGraph: true,
     };
   }
   if (path === "/present" || path.startsWith("/present/")) return { kind: "hands-off" };

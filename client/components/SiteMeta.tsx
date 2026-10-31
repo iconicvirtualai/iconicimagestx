@@ -34,6 +34,10 @@ export function applyMetaPlan(doc: Document, plan: MetaPlan) {
   if (plan.kind === "noindex") {
     upsertMeta(doc, "name", "robots", "noindex, nofollow");
     if (plan.description) upsertMeta(doc, "name", "description", plan.description);
+    if (plan.openGraph && plan.description) {
+      upsertMeta(doc, "property", "og:title", plan.title);
+      upsertMeta(doc, "property", "og:description", plan.description);
+    }
     return;
   }
   if (plan.kind === "generic") return;

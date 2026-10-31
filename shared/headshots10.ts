@@ -39,18 +39,24 @@ export const HEADSHOTS_UNPAID_NOTE = "Booking fee NOT PAID YET. Hold until the S
 export const HEADSHOTS_PAID_NOTE = "Booking fee PAID. The $10 counts toward the headshots.";
 
 export const HEADSHOTS_STUDIO_NAME = "Iconic Studios";
-export const HEADSHOTS_STUDIO_ADDRESS = "26410 Oakridge Dr. Ste 105, Spring, TX 77380";
+export const HEADSHOTS_CITY = "The Woodlands";
+export const HEADSHOTS_LOCALITY = `${HEADSHOTS_CITY}, TX`;
+export const HEADSHOTS_STREET = "26410 Oakridge Dr. Ste 105";
+export const HEADSHOTS_ZIP = "77380";
+export const HEADSHOTS_STUDIO_ADDRESS = `${HEADSHOTS_STREET}, ${HEADSHOTS_LOCALITY} ${HEADSHOTS_ZIP}`;
 export const HEADSHOTS_STUDIO_LINE = `${HEADSHOTS_STUDIO_NAME}, ${HEADSHOTS_STUDIO_ADDRESS}`;
+/** Legal suite line from the public contact record, with this page's city. */
+export const HEADSHOTS_FOOTER_ADDRESS = `${BUSINESS_CONTACT.streetAddress}, ${HEADSHOTS_LOCALITY} ${BUSINESS_CONTACT.postalCode}`;
 export const HEADSHOTS_H1 = "$10 Tuesdays! Headshots for $10/Ea.";
 export const HEADSHOTS_SEO_TITLE = `${HEADSHOTS_H1} | Iconic Images`;
 export const HEADSHOTS_SEO_DESCRIPTION =
-  "$10 Tuesdays at Iconic Studios in Spring. Headshots for $10 each, 10am-2pm. Buy as many as you like.";
+  `$10 Tuesdays at Iconic Studios in ${HEADSHOTS_CITY}. Headshots for $10 each, 10am-2pm. Buy as many as you like.`;
 export const HEADSHOTS_FACTS = [
   "$10 Tuesdays",
   "Headshots $10/Ea.",
   "10am-2pm",
   "Buy as many as you like",
-  "Spring, TX",
+  HEADSHOTS_LOCALITY,
 ] as const;
 /** Kept for the quote object. The page prints the fee only inside Due today and Balance on delivery. */
 export const HEADSHOTS_PRICE_LINE = "$10 per headshot + 2.8% processing fee.";
@@ -58,7 +64,7 @@ export const HEADSHOTS_RESERVE_LINE = "Reserve a time to hold your spot.";
 export const HEADSHOTS_FULL_LINE = "This Tuesday is full. Pick the next one.";
 export const HEADSHOTS_CALENDAR_FALLBACK =
   "Open times are not listed right now. Call or email and we will set the time with you.";
-export const HEADSHOTS_MAPS_QUERY = "26410 Oakridge Dr Ste 105, Spring, TX 77380";
+export const HEADSHOTS_MAPS_QUERY = `26410 Oakridge Dr Ste 105, ${HEADSHOTS_LOCALITY} ${HEADSHOTS_ZIP}`;
 
 export const HEADSHOT_PATHS = {
   home: "/headshots-10",
@@ -508,7 +514,7 @@ export function headshotConfirmationEmailHtml(input: {
     <p>${escapeHtml(HEADSHOTS_STUDIO_LINE)}</p>
     <p><a href="${escapeHtml(input.wearUrl)}">What to wear</a></p>
     <p>Confirmation: <strong>${escapeHtml(input.orderNumber)}</strong></p>
-    <p style="font-size:13px;">${escapeHtml(LEGAL_BUSINESS_NAME)} · ${escapeHtml(BUSINESS_CONTACT.line)}</p>
+    <p style="font-size:13px;">${escapeHtml(LEGAL_BUSINESS_NAME)} · ${escapeHtml(HEADSHOTS_FOOTER_ADDRESS)} · ${escapeHtml(BUSINESS_CONTACT.phoneDisplay)} · ${escapeHtml(BUSINESS_CONTACT.email)}</p>
     <p><a href="${escapeHtml(input.pageUrl)}">${escapeHtml(input.pageUrl)}</a></p>
   </div>`;
 }
@@ -549,3 +555,24 @@ export function headshotCalendarIcs(input: {
 
 export const HEADSHOT_PAY_FAQ =
   "A $10 booking fee is due when you book. That charge is $10.28. The $10 counts toward your headshots. One headshot is paid in full. If you buy more, the balance is due on delivery.";
+
+/** schema.org for this page only. The site-wide LocalBusiness record stays unchanged. */
+export function headshotPlaceJsonLd() {
+  return {
+    "@context": "https://schema.org",
+    "@type": "LocalBusiness",
+    name: "Iconic Images",
+    legalName: LEGAL_BUSINESS_NAME,
+    url: "https://iconicimagestx.com/headshots-10",
+    email: BUSINESS_CONTACT.email,
+    telephone: BUSINESS_CONTACT.phoneDisplay,
+    address: {
+      "@type": "PostalAddress",
+      streetAddress: HEADSHOTS_STREET,
+      addressLocality: HEADSHOTS_CITY,
+      addressRegion: "TX",
+      postalCode: HEADSHOTS_ZIP,
+      addressCountry: "US",
+    },
+  };
+}

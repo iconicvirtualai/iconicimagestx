@@ -8538,8 +8538,13 @@ const HEADSHOTS_HOLD_PREFIX = "HOLD · $10 fee due · ";
 const HEADSHOTS_UNPAID_NOTE = "Booking fee NOT PAID YET. Hold until the Square payment lands.";
 const HEADSHOTS_PAID_NOTE = "Booking fee PAID. The $10 counts toward the headshots.";
 const HEADSHOTS_STUDIO_NAME = "Iconic Studios";
-const HEADSHOTS_STUDIO_ADDRESS = "26410 Oakridge Dr. Ste 105, Spring, TX 77380";
+const HEADSHOTS_CITY = "The Woodlands";
+const HEADSHOTS_LOCALITY = `${HEADSHOTS_CITY}, TX`;
+const HEADSHOTS_STREET = "26410 Oakridge Dr. Ste 105";
+const HEADSHOTS_ZIP = "77380";
+const HEADSHOTS_STUDIO_ADDRESS = `${HEADSHOTS_STREET}, ${HEADSHOTS_LOCALITY} ${HEADSHOTS_ZIP}`;
 const HEADSHOTS_STUDIO_LINE = `${HEADSHOTS_STUDIO_NAME}, ${HEADSHOTS_STUDIO_ADDRESS}`;
+const HEADSHOTS_FOOTER_ADDRESS = `${BUSINESS_CONTACT.streetAddress}, ${HEADSHOTS_LOCALITY} ${BUSINESS_CONTACT.postalCode}`;
 const HEADSHOTS_H1 = "$10 Tuesdays! Headshots for $10/Ea.";
 const HEADSHOTS_PRICE_LINE = "$10 per headshot + 2.8% processing fee.";
 const HEADSHOTS_CALENDAR_FALLBACK = "Open times are not listed right now. Call or email and we will set the time with you.";
@@ -8746,7 +8751,7 @@ function headshotConfirmationEmailHtml(input) {
     <p>${escapeHtml$6(HEADSHOTS_STUDIO_LINE)}</p>
     <p><a href="${escapeHtml$6(input.wearUrl)}">What to wear</a></p>
     <p>Confirmation: <strong>${escapeHtml$6(input.orderNumber)}</strong></p>
-    <p style="font-size:13px;">${escapeHtml$6(LEGAL_BUSINESS_NAME)} · ${escapeHtml$6(BUSINESS_CONTACT.line)}</p>
+    <p style="font-size:13px;">${escapeHtml$6(LEGAL_BUSINESS_NAME)} · ${escapeHtml$6(HEADSHOTS_FOOTER_ADDRESS)} · ${escapeHtml$6(BUSINESS_CONTACT.phoneDisplay)} · ${escapeHtml$6(BUSINESS_CONTACT.email)}</p>
     <p><a href="${escapeHtml$6(input.pageUrl)}">${escapeHtml$6(input.pageUrl)}</a></p>
   </div>`;
 }
