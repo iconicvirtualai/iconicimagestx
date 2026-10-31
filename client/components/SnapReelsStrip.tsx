@@ -1,4 +1,4 @@
-import { SNAP_REEL_STRIP } from "@/lib/snapReels";
+import { SNAP_REEL_STRIP, scrubSnapCopy } from "@/lib/snapReels";
 import { itemText, useSiteItems, useSiteText } from "@/content/siteContent";
 
 export default function SnapReelsStrip() {
@@ -6,9 +6,10 @@ export default function SnapReelsStrip() {
   const title = useSiteText("home", "snapReels", "title", "Snap Reels");
   const body = useSiteText("home", "snapReels", "body", "Listing stills, turned into a 9:16 Snap Reel. Same-day vertical video from the photos we already shoot.");
   const items = useSiteItems("home", "snapReels");
-  const reels = items
+  const reels = (items
     ? items.map((item) => ({ id: item.id, src: itemText(item, "video"), title: itemText(item, "title"), vibe: itemText(item, "vibe") }))
-    : SNAP_REEL_STRIP.map((reel) => ({ id: reel.src, src: reel.src, title: reel.title, vibe: reel.vibe }));
+    : SNAP_REEL_STRIP.map((reel) => ({ id: reel.src, src: reel.src, title: reel.title, vibe: reel.vibe }))
+  ).map((reel) => ({ ...reel, ...scrubSnapCopy(reel.title, reel.vibe) }));
   return (
     <section className="bg-[#f6f8f8] py-20 md:py-24">
       <div className="container mx-auto px-4 max-w-6xl">
