@@ -51,6 +51,13 @@ export const onOrderCreated = functions.firestore
     const order = snap.data();
     const orderId = context.params.orderId;
 
+    // Playtest and qa orders stay out of this Gmail path. Keep in sync with
+    // shouldRunOrderCreated in shared/revenueCount.ts.
+    if (order?.playtest === true || order?.qaOnly === true) {
+      console.warn(`[onOrderCreated] Suppressed email for playtest/qa order ${orderId}.`);
+      return;
+    }
+
     // Not the booking_received order-ack. This Gmail path is a non-order-form
     // client/owner blast and stays off unless CLIENT_NOTIFY_LIVE is exactly
     // "true" and CLIENT_COMMS_ZONE is not RED. Keep in sync with shared/clientNotify.ts.
