@@ -37,7 +37,7 @@ const INVOICE: CleanupRecord = {
 const JOB: CleanupRecord = {
   collection: "editJobs",
   id: "job-1",
-  data: { listingId: "listing-149", status: "pending" },
+  data: { orderId: "order-149", listingId: "listing-149", status: "pending" },
 };
 
 const LISTING: CleanupRecord = {
@@ -75,8 +75,8 @@ describe("test data cleanup", () => {
     expect(ids).toContain("orders/order-149");
     expect(ids).toContain("orders/playtest-delivery-qa-order");
     expect(ids).toContain("invoices/inv-149");
-    expect(ids).toContain("listings/listing-149");
     expect(ids).toContain("editJobs/job-1");
+    expect(ids).not.toContain("listings/listing-149");
     expect(ids).not.toContain("orders/real-1");
     expect(ids).not.toContain("orders/maybe");
     expect(ids).not.toContain("clients/client-real");
@@ -114,6 +114,50 @@ describe("test data cleanup", () => {
     expect(matched).toEqual(["a", "b", "c", "d", "e", "example", "f", "g", "h", "qa-mail", "seed-delivery-qa"]);
     expect(report.matched.map((row) => row.id)).not.toContain("near");
     expect(report.matched.map((row) => row.id)).not.toContain("phone");
+  });
+
+  it("matches known orders only by #NNN or ORD-L- orderNumber, then orderId children", () => {
+    const report = classifyTestData([
+      { collection: "orders", id: "real-order", data: { orderNumber: "#149", clientName: "QA" } },
+      { collection: "orders", id: "ord-l", data: { orderNumber: "ORD-L-74499" } },
+      { collection: "orders", id: "149", data: { orderNumber: "#180", clientName: "Real buyer" } },
+      { collection: "orders", id: "155", data: { orderNumber: "155", clientName: "Also real" } },
+      { collection: "orders", id: "bare-hash-missing", data: { orderNumber: "149" } },
+      { collection: "clients", id: "149", data: { number: "149", clientName: "Pat Client" } },
+      { collection: "customers", id: "155", data: { orderNumber: "#155", invoiceNumber: "155" } },
+      { collection: "listings", id: "149", data: { number: "155", orderNumber: "#149", orderId: "real-order" } },
+      { collection: "galleries", id: "155", data: { invoiceNumber: "149", orderId: "real-order" } },
+      { collection: "invoices", id: "149", data: { invoiceNumber: "155", number: "149", orderNumber: "#149" } },
+      { collection: "invoices", id: "155", data: { invoiceNumber: "#155", id: "155" } },
+      { collection: "invoices", id: "linked-invoice", data: { orderId: "real-order", invoiceNumber: "INV-9" } },
+      { collection: "appointments", id: "hold-1", data: { orderId: "real-order", calendarEventId: "evt-hold" } },
+      { collection: "editJobs", id: "queue-1", data: { orderId: "real-order", status: "pending" } },
+      { collection: "mediaJobs", id: "queue-by-listing", data: { listingId: "149", status: "pending" } },
+    ]);
+    const matched = report.matched.map((row) => `${row.collection}/${row.id}`).sort();
+    expect(matched).toEqual([
+      "appointments/hold-1",
+      "editJobs/queue-1",
+      "invoices/linked-invoice",
+      "orders/ord-l",
+      "orders/real-order",
+    ]);
+    const matchedKeys = new Set(report.matched.map((row) => `${row.collection}/${row.id}`));
+    for (const key of [
+      "orders/149",
+      "orders/155",
+      "orders/bare-hash-missing",
+      "clients/149",
+      "customers/155",
+      "listings/149",
+      "galleries/155",
+      "invoices/149",
+      "invoices/155",
+      "mediaJobs/queue-by-listing",
+    ]) {
+      expect(matchedKeys.has(key)).toBe(false);
+    }
+    expect(report.matched.some((row) => row.collection !== "orders" && row.reason.startsWith("known test order"))).toBe(false);
   });
 
   it("refuses to archive when the backup write fails", async () => {
@@ -158,7 +202,7 @@ describe("test data cleanup", () => {
     });
     expect(result.applied).toBe(true);
     expect(backups).toHaveLength(1);
-    expect(updates.map((row) => row.id).sort()).toEqual(["inv-149", "job-1", "listing-149", "order-149", "playtest-delivery-qa-order"]);
+    expect(updates.map((row) => row.id).sort()).toEqual(["inv-149", "job-1", "order-149", "playtest-delivery-qa-order"]);
     expect(updates.find((row) => row.id === "order-149")?.patch).toMatchObject({
       status: "cancelled",
       archivedAt: "2026-11-02T23:30:00.000Z",
@@ -166,7 +210,8 @@ describe("test data cleanup", () => {
       testData: true,
       calendarHold: "cancelled",
     });
-    expect(updates.find((row) => row.id === "listing-149")?.patch.status).toBe("archived");
+    expect(updates.find((row) => row.id === "job-1")?.patch.status).toBe("cancelled");
+    expect(updates.map((row) => row.id)).not.toContain("listing-149");
     expect(holds).toEqual([{ calendarId: "cal-1", eventId: "evt-149", sendUpdates: "none" }]);
     expect(result.squareInvoices[0].squareInvoiceId).toBe("sq-inv-149");
     expect(result.notificationsSent).toEqual([]);

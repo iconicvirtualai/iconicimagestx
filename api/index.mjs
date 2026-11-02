@@ -33565,24 +33565,9 @@ const CANCEL_STATUS = /* @__PURE__ */ new Set([
   "mediaJobs",
   "vsaiJobs"
 ]);
-const KNOWN_ORDER_TOKENS = /* @__PURE__ */ new Set([
-  "#149",
-  "149",
-  "ord-l-74499",
-  "ord-l-00000",
-  "#155",
-  "155",
-  "#160",
-  "160",
-  "#161",
-  "161",
-  "#162",
-  "162",
-  "#169",
-  "169",
-  "#170",
-  "170"
-]);
+const KNOWN_HASH_ORDER_NUMBERS = /* @__PURE__ */ new Set(["#149", "#155", "#160", "#161", "#162", "#169", "#170"]);
+const KNOWN_ORD_L_ORDER_NUMBERS = /* @__PURE__ */ new Set(["ord-l-74499", "ord-l-00000"]);
+const KNOWN_ORDER_CHILDREN = /* @__PURE__ */ new Set(["invoices", "appointments", "editJobs", "mediaJobs", "vsaiJobs"]);
 const TEST_EMAIL_DOMAINS = /* @__PURE__ */ new Set([
   "example.com",
   "example.org",
@@ -33597,7 +33582,6 @@ const TEST_EMAIL_DOMAINS = /* @__PURE__ */ new Set([
   "iconic.test",
   "playtest.invalid"
 ]);
-const NUMBER_FIELDS = ["orderNumber", "invoiceNumber", "orderCode", "number"];
 const LINK_FIELDS = ["orderId", "orderRequestId", "invoiceId", "listingId", "galleryId", "clientId", "customerId"];
 const HOLD_EVENT_FIELDS = ["calendarEventId", "googleCalendarEventId"];
 const HOLD_CALENDAR_FIELDS = ["calendarId", "googleCalendarId"];
@@ -33608,7 +33592,10 @@ function classifyTestData(records) {
     const key = recordKey(record2);
     const reason = clearReason(record2);
     if (reason) {
-      clear.set(key, rowFrom(record2, reason, true));
+      clear.set(key, {
+        ...rowFrom(record2, reason, true),
+        ...reason.startsWith("known test order") ? { linkScope: "known-order" } : {}
+      });
       continue;
     }
     const soft = borderlineReason(record2);
@@ -33624,9 +33611,14 @@ function classifyTestData(records) {
       if (clear.has(key) || !LINKED_ARCHIVE.has(record2.collection)) continue;
       const parent = linkedParent(record2, matchedIds);
       if (!parent) continue;
+      if (parent.linkScope === "known-order") {
+        if (parent.collection !== "orders" || text(record2.data.orderId) !== parent.id) continue;
+        if (!KNOWN_ORDER_CHILDREN.has(record2.collection)) continue;
+      }
       const reason = `linked to ${parent.collection}/${parent.id} (${parent.label})`;
       clear.set(key, {
         ...rowFrom(record2, reason, true),
+        ...parent.linkScope === "known-order" ? { linkScope: "known-order" } : {},
         links: [{ collection: parent.collection, id: parent.id, label: parent.label }]
       });
       borderline.delete(key);
@@ -33839,14 +33831,11 @@ function borderlineReason(record2) {
   return null;
 }
 function knownOrderReason(record2) {
-  if (KNOWN_ORDER_TOKENS.has(normalizeToken(record2.id))) {
-    return `known test order ${record2.id}`;
-  }
-  for (const field of NUMBER_FIELDS) {
-    const value = text(record2.data[field]);
-    if (!value) continue;
-    if (KNOWN_ORDER_TOKENS.has(normalizeToken(value))) return `known test order ${value}`;
-  }
+  if (record2.collection !== "orders") return null;
+  const orderNumber = text(record2.data.orderNumber);
+  if (!orderNumber) return null;
+  if (KNOWN_HASH_ORDER_NUMBERS.has(orderNumber)) return `known test order ${orderNumber}`;
+  if (KNOWN_ORD_L_ORDER_NUMBERS.has(orderNumber.toLowerCase())) return `known test order ${orderNumber}`;
   return null;
 }
 function linkedParent(record2, matchedIds) {
@@ -33947,9 +33936,6 @@ function holdCalendarId(data) {
     if (value) return value;
   }
   return "";
-}
-function normalizeToken(value) {
-  return value.trim().toLowerCase();
 }
 function text(value) {
   return typeof value === "string" ? value.trim() : "";

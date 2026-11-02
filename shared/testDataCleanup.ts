@@ -46,24 +46,12 @@ const CANCEL_STATUS = new Set<string>([
   "vsaiJobs",
 ]);
 
-const KNOWN_ORDER_TOKENS = new Set([
-  "#149",
-  "149",
-  "ord-l-74499",
-  "ord-l-00000",
-  "#155",
-  "155",
-  "#160",
-  "160",
-  "#161",
-  "161",
-  "#162",
-  "162",
-  "#169",
-  "169",
-  "#170",
-  "170",
-]);
+/** Hash form only. A bare 149 or 155 is not an order number. */
+const KNOWN_HASH_ORDER_NUMBERS = new Set(["#149", "#155", "#160", "#161", "#162", "#169", "#170"]);
+/** ORD-L- order numbers. Compared case-insensitively. Not a document id. */
+const KNOWN_ORD_L_ORDER_NUMBERS = new Set(["ord-l-74499", "ord-l-00000"]);
+/** Children of a known test order, and only when their orderId is that order. */
+const KNOWN_ORDER_CHILDREN = new Set(["invoices", "appointments", "editJobs", "mediaJobs", "vsaiJobs"]);
 
 const TEST_EMAIL_DOMAINS = new Set([
   "example.com",
@@ -80,7 +68,6 @@ const TEST_EMAIL_DOMAINS = new Set([
   "playtest.invalid",
 ]);
 
-const NUMBER_FIELDS = ["orderNumber", "invoiceNumber", "orderCode", "number"] as const;
 const LINK_FIELDS = ["orderId", "orderRequestId", "invoiceId", "listingId", "galleryId", "clientId", "customerId"] as const;
 const HOLD_EVENT_FIELDS = ["calendarEventId", "googleCalendarEventId"] as const;
 const HOLD_CALENDAR_FIELDS = ["calendarId", "googleCalendarId"] as const;
@@ -105,6 +92,11 @@ export interface CleanupMatch {
   links: CleanupLink[];
   /** Included in apply. Borderline rows are never included. */
   archive: boolean;
+  /**
+   * Set on a known test order and the invoice, hold, or queue job pulled in
+   * by that order's id. Those children do not pull listings or other records.
+   */
+  linkScope?: "known-order";
 }
 
 export interface SquareInvoiceNote {
@@ -187,7 +179,10 @@ export function classifyTestData(records: readonly CleanupRecord[]): CleanupRepo
     const key = recordKey(record);
     const reason = clearReason(record);
     if (reason) {
-      clear.set(key, rowFrom(record, reason, true));
+      clear.set(key, {
+        ...rowFrom(record, reason, true),
+        ...(reason.startsWith("known test order") ? { linkScope: "known-order" as const } : {}),
+      });
       continue;
     }
     const soft = borderlineReason(record);
@@ -204,9 +199,14 @@ export function classifyTestData(records: readonly CleanupRecord[]): CleanupRepo
       if (clear.has(key) || !LINKED_ARCHIVE.has(record.collection)) continue;
       const parent = linkedParent(record, matchedIds);
       if (!parent) continue;
+      if (parent.linkScope === "known-order") {
+        if (parent.collection !== "orders" || text(record.data.orderId) !== parent.id) continue;
+        if (!KNOWN_ORDER_CHILDREN.has(record.collection)) continue;
+      }
       const reason = `linked to ${parent.collection}/${parent.id} (${parent.label})`;
       clear.set(key, {
         ...rowFrom(record, reason, true),
+        ...(parent.linkScope === "known-order" ? { linkScope: "known-order" as const } : {}),
         links: [{ collection: parent.collection, id: parent.id, label: parent.label }],
       });
       borderline.delete(key);
@@ -449,15 +449,17 @@ function borderlineReason(record: CleanupRecord): string | null {
   return null;
 }
 
+/**
+ * Known test orders are orders only. The signal is orderNumber, either
+ * "#149" or "ORD-L-74499". A bare "149", a document id, an invoice number,
+ * or the same value on a customer, listing, gallery, or invoice does not match.
+ */
 function knownOrderReason(record: CleanupRecord): string | null {
-  if (KNOWN_ORDER_TOKENS.has(normalizeToken(record.id))) {
-    return `known test order ${record.id}`;
-  }
-  for (const field of NUMBER_FIELDS) {
-    const value = text(record.data[field]);
-    if (!value) continue;
-    if (KNOWN_ORDER_TOKENS.has(normalizeToken(value))) return `known test order ${value}`;
-  }
+  if (record.collection !== "orders") return null;
+  const orderNumber = text(record.data.orderNumber);
+  if (!orderNumber) return null;
+  if (KNOWN_HASH_ORDER_NUMBERS.has(orderNumber)) return `known test order ${orderNumber}`;
+  if (KNOWN_ORD_L_ORDER_NUMBERS.has(orderNumber.toLowerCase())) return `known test order ${orderNumber}`;
   return null;
 }
 
@@ -580,10 +582,6 @@ function holdCalendarId(data: Record<string, unknown>): string {
     if (value) return value;
   }
   return "";
-}
-
-function normalizeToken(value: string): string {
-  return value.trim().toLowerCase();
 }
 
 function text(value: unknown): string {
