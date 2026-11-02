@@ -1743,6 +1743,22 @@
       "destination": "/seo/private.html"
     },
     {
+      "source": "/forgot-password",
+      "destination": "/seo/private.html"
+    },
+    {
+      "source": "/forgot-password/",
+      "destination": "/seo/private.html"
+    },
+    {
+      "source": "/change-password",
+      "destination": "/seo/private.html"
+    },
+    {
+      "source": "/change-password/",
+      "destination": "/seo/private.html"
+    },
+    {
       "source": "/studio/:listingId",
       "destination": "/seo/private.html"
     },
@@ -1912,6 +1928,42 @@
     },
     {
       "source": "/dev/invoice-template/",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/forgot-password",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/forgot-password/",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/change-password",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/change-password/",
       "headers": [
         {
           "key": "X-Robots-Tag",

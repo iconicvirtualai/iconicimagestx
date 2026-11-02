@@ -9447,7 +9447,7 @@ function createRateLimiter(options) {
     }
   };
 }
-const router$v = Router();
+const router$w = Router();
 const db$u = () => admin.firestore();
 const BOOKING_SUBMIT_WINDOW_MS = 15 * 60 * 1e3;
 const BOOKING_SUBMIT_MAX = 10;
@@ -9495,7 +9495,7 @@ async function loadBookingCatalog() {
     return packagesForStaffEditor([]);
   }
 }
-router$v.post("/", async (req, res) => {
+router$w.post("/", async (req, res) => {
   const limit = bookingSubmitLimiter.check(clientIp(req));
   if (!limit.allowed) {
     res.setHeader("Retry-After", String(limit.retryAfterSec));
@@ -10181,13 +10181,13 @@ async function socialRateCaller(req) {
     return { role: null, email: null };
   }
 }
-router$v.get("/social-rate", async (req, res) => {
+router$w.get("/social-rate", async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   const requested = typeof req.query.date === "string" ? req.query.date : "";
   const previewAllowed = requested ? socialRatePreviewAllowed(await socialRateCaller(req)) : false;
   return res.json(socialRateView(/* @__PURE__ */ new Date(), requested || null, previewAllowed));
 });
-router$v.post("/holiday-calendar-backfill", requireAdmin, async (_req, res) => {
+router$w.post("/holiday-calendar-backfill", requireAdmin, async (_req, res) => {
   try {
     return res.json(await backfillHolidayCalendarEvents());
   } catch (err) {
@@ -10195,7 +10195,7 @@ router$v.post("/holiday-calendar-backfill", requireAdmin, async (_req, res) => {
     return res.status(500).json({ error: "Holiday calendar backfill failed." });
   }
 });
-router$v.get("/holiday-slots", async (_req, res) => {
+router$w.get("/holiday-slots", async (_req, res) => {
   res.setHeader("Cache-Control", "no-store");
   try {
     return res.json(holidayTakenFromOrders(await loadHolidaySlotOrders()));
@@ -10204,13 +10204,13 @@ router$v.get("/holiday-slots", async (_req, res) => {
     return res.status(500).json({ error: "Holiday slots are unavailable." });
   }
 });
-router$v.get("/photographers", (_req, res) => {
+router$w.get("/photographers", (_req, res) => {
   return res.json({
     noPreference: { id: NO_PREFERENCE_ID, name: NO_PREFERENCE_NAME },
     photographers: publicBookingPhotographers()
   });
 });
-router$v.get("/realestate-75/slots", async (req, res) => {
+router$w.get("/realestate-75/slots", async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   const pkg = realEstate75Package(typeof req.query.package === "string" ? req.query.package : "");
   try {
@@ -10234,7 +10234,7 @@ function postedDurationMinutes(value) {
   if (!Number.isInteger(parsed) || parsed < 15 || parsed > 24 * 60) return void 0;
   return parsed;
 }
-router$v.get("/slots", async (req, res) => {
+router$w.get("/slots", async (req, res) => {
   const basics = typeof req.query.basics === "string" ? req.query.basics.split(",").map((id) => id.trim()).filter(Boolean) : [];
   const preferenceId = preferenceFromRequest(req.query.photographer, "");
   try {
@@ -10259,14 +10259,14 @@ router$v.get("/slots", async (req, res) => {
     return res.json({ live: false, durationMinutes: 90, slots: [], suggestions: [] });
   }
 });
-router$v.get("/catalog", async (_req, res) => {
+router$w.get("/catalog", async (_req, res) => {
   const catalog = await loadBookingCatalog();
   return res.json({
     ...publicBookingCatalogResponse(catalog),
     processingEnabled: processingEnabled()
   });
 });
-router$v.get("/", requireCoordinator, async (_req, res) => {
+router$w.get("/", requireCoordinator, async (_req, res) => {
   try {
     const snapshot = await db$u().collection("orderRequests").orderBy("createdAt", "desc").limit(100).get();
     const requests = snapshot.docs.map((doc) => ({
@@ -10279,7 +10279,7 @@ router$v.get("/", requireCoordinator, async (_req, res) => {
     return res.status(500).json({ error: "Failed to fetch booking requests." });
   }
 });
-router$v.get("/:id", requireCoordinator, async (req, res) => {
+router$w.get("/:id", requireCoordinator, async (req, res) => {
   try {
     const doc = await db$u().collection("orderRequests").doc(req.params.id).get();
     if (!doc.exists) {
@@ -10291,7 +10291,7 @@ router$v.get("/:id", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch booking request." });
   }
 });
-router$v.post("/:id/assign-photographer", requireCoordinator, async (req, res) => {
+router$w.post("/:id/assign-photographer", requireCoordinator, async (req, res) => {
   try {
     const requestDoc = await db$u().collection("orderRequests").doc(req.params.id).get();
     if (!requestDoc.exists) return res.status(404).json({ error: "Booking request not found." });
@@ -10306,7 +10306,7 @@ router$v.post("/:id/assign-photographer", requireCoordinator, async (req, res) =
     return res.status(500).json({ error: "Could not assign the photographer." });
   }
 });
-router$v.patch("/:id/confirm", requireCoordinator, async (req, res) => {
+router$w.patch("/:id/confirm", requireCoordinator, async (req, res) => {
   try {
     const { assignedPhotographerId, assignedPhotographerName: postedPhotographerName, scheduledDate, scheduledTime, internalNotes } = req.body;
     const requestDoc = await db$u().collection("orderRequests").doc(req.params.id).get();
@@ -10709,7 +10709,7 @@ async function releaseOrderCalendar(data) {
     return calendarHoldFailureMessage(err);
   }
 }
-router$v.patch("/:id/cancel", requireCoordinator, async (req, res) => {
+router$w.patch("/:id/cancel", requireCoordinator, async (req, res) => {
   try {
     const doc = await db$u().collection("orderRequests").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Not found." });
@@ -10738,7 +10738,7 @@ router$v.patch("/:id/cancel", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to cancel booking." });
   }
 });
-router$v.patch("/:id/decline", requireCoordinator, async (req, res) => {
+router$w.patch("/:id/decline", requireCoordinator, async (req, res) => {
   try {
     const { reason } = req.body;
     const doc = await db$u().collection("orderRequests").doc(req.params.id).get();
@@ -11395,7 +11395,7 @@ async function resolveLateHeadshotPayment(orderId) {
   }
   return "flagged";
 }
-const router$u = Router();
+const router$v = Router();
 const limiter$2 = createRateLimiter({ windowMs: 15 * 60 * 1e3, max: 8 });
 const db$s = () => admin.firestore();
 async function nextInvoiceNumber$2() {
@@ -11408,7 +11408,7 @@ async function nextInvoiceNumber$2() {
     return `INV-${year}-${String(Date.now()).slice(-6)}`;
   }
 }
-router$u.get("/config", (_req, res) => {
+router$v.get("/config", (_req, res) => {
   const config = headshotConfig(process.env);
   res.json({
     ...config,
@@ -11419,7 +11419,7 @@ router$u.get("/config", (_req, res) => {
     holdMinutes: 60
   });
 });
-router$u.get("/slots", async (req, res) => {
+router$v.get("/slots", async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   const config = headshotConfig(process.env);
   const quantity = Number(req.query.quantity);
@@ -11445,7 +11445,7 @@ router$u.get("/slots", async (req, res) => {
     });
   }
 });
-router$u.post("/order", async (req, res) => {
+router$v.post("/order", async (req, res) => {
   const limit = limiter$2.check(clientIp(req));
   if (!limit.allowed) {
     res.setHeader("Retry-After", String(limit.retryAfterSec));
@@ -11784,7 +11784,7 @@ async function ensureDotOptInLink(invoice) {
     return { dotOptIn: false, url: null };
   }
 }
-const router$t = Router();
+const router$u = Router();
 const db$r = () => admin.firestore();
 const dotOptInLimiter = createRateLimiter({ windowMs: 10 * 60 * 1e3, max: 30 });
 function sendDotOptInPage(res, status2, ok) {
@@ -11797,7 +11797,7 @@ function sendDotOptInPage(res, status2, ok) {
   });
   res.send(dotOptInResultHtml(ok));
 }
-router$t.get("/dot-opt-in", async (req, res) => {
+router$u.get("/dot-opt-in", async (req, res) => {
   const limit = dotOptInLimiter.check(clientIp(req));
   if (!limit.allowed) {
     res.set("Retry-After", String(limit.retryAfterSec));
@@ -11813,7 +11813,7 @@ router$t.get("/dot-opt-in", async (req, res) => {
     sendDotOptInPage(res, 500, false);
   }
 });
-router$t.get("/", requireStaff, async (req, res) => {
+router$u.get("/", requireStaff, async (req, res) => {
   try {
     const { status: status2, photographerId, limit = "50", startAfter } = req.query;
     let query = db$r().collection("orders").orderBy("createdAt", "desc");
@@ -11841,7 +11841,7 @@ router$t.get("/", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch orders." });
   }
 });
-router$t.get("/dashboard", requireStaff, async (_req, res) => {
+router$u.get("/dashboard", requireStaff, async (_req, res) => {
   try {
     const now = /* @__PURE__ */ new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -11874,7 +11874,7 @@ router$t.get("/dashboard", requireStaff, async (_req, res) => {
     return res.status(500).json({ error: "Failed to fetch dashboard stats." });
   }
 });
-router$t.get("/:id", requireStaff, async (req, res) => {
+router$u.get("/:id", requireStaff, async (req, res) => {
   try {
     const orderDoc = await db$r().collection("orders").doc(req.params.id).get();
     if (!orderDoc.exists) return res.status(404).json({ error: "Order not found." });
@@ -11909,7 +11909,7 @@ router$t.get("/:id", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch order." });
   }
 });
-router$t.patch("/:id", requireCoordinator, async (req, res) => {
+router$u.patch("/:id", requireCoordinator, async (req, res) => {
   try {
     const allowed = [
       "status",
@@ -11960,7 +11960,7 @@ const VALID_TRANSITIONS = {
   completed: [],
   cancelled: []
 };
-router$t.patch("/:id/status", requireCoordinator, async (req, res) => {
+router$u.patch("/:id/status", requireCoordinator, async (req, res) => {
   try {
     const { status: status2, note } = req.body;
     const orderDoc = await db$r().collection("orders").doc(req.params.id).get();
@@ -12006,7 +12006,7 @@ router$t.patch("/:id/status", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to update order status." });
   }
 });
-router$t.get("/:id/timeline", requireStaff, async (req, res) => {
+router$u.get("/:id/timeline", requireStaff, async (req, res) => {
   try {
     const [messages, editRequests, agentLogs] = await Promise.all([
       db$r().collection("messages").where("orderId", "==", req.params.id).orderBy("createdAt", "asc").get(),
@@ -15020,7 +15020,7 @@ async function inspectFinishedListingJpeg(input) {
 }
 const db$p = () => admin.firestore();
 const bucket$1 = () => admin.storage().bucket();
-function httpError$4(status2, message) {
+function httpError$5(status2, message) {
   return Object.assign(new Error(message), { status: status2 });
 }
 async function bumpRawIngestJob(input) {
@@ -15063,7 +15063,7 @@ async function bumpRawIngestJob(input) {
 }
 async function loadListing$1(listingId) {
   const snap = await db$p().collection("listings").doc(listingId).get();
-  if (!snap.exists) throw httpError$4(404, "Listing not found.");
+  if (!snap.exists) throw httpError$5(404, "Listing not found.");
   return { id: snap.id, ref: snap.ref, data: snap.data() || {} };
 }
 async function listingDelivery(listingId, data) {
@@ -15114,7 +15114,7 @@ async function assertStudioAccess(uid, role, listingId) {
   }
   const mine = await listingsForRole(uid, "photographer");
   if (!mine.some((item) => item.id === listingId)) {
-    throw httpError$4(403, "This job is not assigned to you.");
+    throw httpError$5(403, "This job is not assigned to you.");
   }
 }
 function listingFrames(data) {
@@ -15426,9 +15426,9 @@ async function nextOrderEditListingId() {
 async function enqueueAiEdit(input) {
   const listing = await loadListing$1(input.listingId);
   const frame = listingFrames(listing.data).find((item) => item.path === input.sourcePath);
-  if (!frame) throw httpError$4(404, "That file is not on this listing.");
+  if (!frame) throw httpError$5(404, "That file is not on this listing.");
   if (!isStudioPreviewable(frame.name, frame.contentType)) {
-    throw httpError$4(400, "Choose a JPEG, PNG, or WebP. RAW stays in the queue until a preview exists.");
+    throw httpError$5(400, "Choose a JPEG, PNG, or WebP. RAW stays in the queue until a preview exists.");
   }
   const beforeUrl = frame.url || input.imageUrl;
   const ref = await db$p().collection("editJobs").add({
@@ -15501,10 +15501,10 @@ async function enqueueAiEdit(input) {
 async function rejectStudioJob(input) {
   const ref = db$p().collection("editJobs").doc(input.jobId);
   const snap = await ref.get();
-  if (!snap.exists) throw httpError$4(404, "Edit job not found.");
+  if (!snap.exists) throw httpError$5(404, "Edit job not found.");
   const job = snap.data() || {};
-  if (job.listingId !== input.listingId) throw httpError$4(400, "That job is for a different listing.");
-  if (job.status === "approved") throw httpError$4(400, "Approved finals stay on the listing.");
+  if (job.listingId !== input.listingId) throw httpError$5(400, "That job is for a different listing.");
+  if (job.status === "approved") throw httpError$5(400, "Approved finals stay on the listing.");
   const note = job.status === "failed" ? String(job.note || "Rejected.") : "Rejected before approval. The edited image was not added to the gallery.";
   await ref.set({
     status: "rejected",
@@ -15515,10 +15515,10 @@ async function rejectStudioJob(input) {
   return { id: input.jobId, status: "rejected", note };
 }
 async function saveAdjustedJpeg(input) {
-  if (!input.bytes.length) throw httpError$4(400, "Adjusted JPEG was empty.");
-  if (input.bytes.length > 45e5) throw httpError$4(413, "Adjusted JPEG is too large.");
+  if (!input.bytes.length) throw httpError$5(400, "Adjusted JPEG was empty.");
+  if (input.bytes.length > 45e5) throw httpError$5(413, "Adjusted JPEG is too large.");
   if (!isListingStoragePath(input.listingId, input.sourcePath)) {
-    throw httpError$4(400, "sourcePath must belong to this listing.");
+    throw httpError$5(400, "sourcePath must belong to this listing.");
   }
   const adjustments = clampAdjustments(input.adjustments);
   const saved = await saveListingBytes(
@@ -15557,12 +15557,12 @@ async function saveAdjustedJpeg(input) {
 }
 async function copyToFinals(listingId, sourcePath, fileName2) {
   if (!isListingStoragePath(listingId, sourcePath)) {
-    throw httpError$4(400, "That file is not stored on this listing.");
+    throw httpError$5(400, "That file is not stored on this listing.");
   }
   if (sourcePath.includes("/finals/")) {
     const file = bucket$1().file(sourcePath);
     const [exists2] = await file.exists();
-    if (!exists2) throw httpError$4(400, "Final file was not found in storage.");
+    if (!exists2) throw httpError$5(400, "Final file was not found in storage.");
     const [metadata2] = await file.getMetadata();
     const current = metadata2.metadata?.firebaseStorageDownloadTokens;
     const token2 = typeof current === "string" && current ? current.split(",")[0] : randomUUID();
@@ -15574,15 +15574,15 @@ async function copyToFinals(listingId, sourcePath, fileName2) {
     };
   }
   if (isRawStudioFile(fileName2, "")) {
-    throw httpError$4(400, `${fileName2} is RAW. Import it for the AI queue, then approve a JPEG, PNG, or WebP final.`);
+    throw httpError$5(400, `${fileName2} is RAW. Import it for the AI queue, then approve a JPEG, PNG, or WebP final.`);
   }
   if (!isStudioPreviewable(fileName2)) {
-    throw httpError$4(400, "Approve a JPEG, PNG, or WebP. RAW stays in the AI queue.");
+    throw httpError$5(400, "Approve a JPEG, PNG, or WebP. RAW stays in the AI queue.");
   }
   const destPath = finalsObjectPath(listingId, fileName2);
   const source = bucket$1().file(sourcePath);
   const [exists] = await source.exists();
-  if (!exists) throw httpError$4(400, "Source file was not found in storage.");
+  if (!exists) throw httpError$5(400, "Source file was not found in storage.");
   const dest = bucket$1().file(destPath);
   await source.copy(dest);
   const [metadata] = await source.getMetadata();
@@ -15647,7 +15647,7 @@ async function approveStudioFinal(input) {
   const listingImages = Array.isArray(listing.data.images) ? listing.data.images : [];
   const source = listingImages.find((image) => image.path === input.sourcePath);
   if (source?.culled === true) {
-    throw httpError$4(400, "That shot was culled. It stays off the gallery.");
+    throw httpError$5(400, "That shot was culled. It stays off the gallery.");
   }
   const address = recordAddressText(listing.data);
   const sequenced = address ? sequenceKeptShots(listingImages, address).find((row) => shotKey(row.shot) === shotKey(source || { path: input.sourcePath })) : void 0;
@@ -15701,7 +15701,7 @@ async function loadStudioWorkspace(input) {
   let listing = null;
   if (input.listingId) {
     if (input.role === "photographer" && !allowed.has(input.listingId)) {
-      throw httpError$4(403, "This job is not assigned to you.");
+      throw httpError$5(403, "This job is not assigned to you.");
     }
     const loaded = await loadListing$1(input.listingId);
     const images = listingFrames(loaded.data);
@@ -15854,7 +15854,7 @@ async function loadGalleryReleaseForGallery(galleryId) {
   });
 }
 const db$n = () => admin.firestore();
-function httpError$3(status2, message, extra) {
+function httpError$4(status2, message, extra) {
   return Object.assign(new Error(message), { status: status2, ...extra });
 }
 async function invoiceForGallery$1(gallery) {
@@ -15904,10 +15904,10 @@ async function downloadGateForGallery$1(gallery) {
 }
 async function deliverGalleryToClient(galleryId, options) {
   const galleryDoc = await db$n().collection("galleries").doc(galleryId).get();
-  if (!galleryDoc.exists) throw httpError$3(404, "Gallery not found.");
+  if (!galleryDoc.exists) throw httpError$4(404, "Gallery not found.");
   const report = await loadGalleryReleaseForGallery(galleryId);
   if (!report.complete) {
-    throw httpError$3(409, report.message, { report });
+    throw httpError$4(409, report.message, { report });
   }
   const gallery = galleryDoc.data() || {};
   const gate2 = await downloadGateForGallery$1(gallery);
@@ -16247,7 +16247,7 @@ const handlePublicGalleryLink = async (req, res) => {
     return res.status(500).json({ code: "lookup_failed", error: message, message });
   }
 };
-const router$s = Router();
+const router$t = Router();
 const db$l = () => admin.firestore();
 const storage = () => admin.storage().bucket();
 function cleanPosterUrl(value) {
@@ -16343,7 +16343,7 @@ function clientGalleryPayload(id, gallery, gate2) {
     mediaItems: showMedia ? lockedClientGalleryMedia(id, media, unlocked) : []
   };
 }
-router$s.get("/", requireStaff, async (req, res) => {
+router$t.get("/", requireStaff, async (req, res) => {
   try {
     const { status: status2, orderId } = req.query;
     let query = db$l().collection("galleries").orderBy("createdAt", "desc");
@@ -16389,7 +16389,7 @@ async function readGalleryPhotoBytes(item) {
     return null;
   }
 }
-router$s.get("/public/:id/photos.zip", async (req, res) => {
+router$t.get("/public/:id/photos.zip", async (req, res) => {
   const id = typeof req.params.id === "string" ? req.params.id : "";
   if (malformedPublicGalleryId(id)) return publicGalleryNotFound(res);
   if (!admin.apps.length) return publicGalleryNotFound(res);
@@ -16427,7 +16427,7 @@ router$s.get("/public/:id/photos.zip", async (req, res) => {
     return res.status(500).json({ error: "We couldn't build that download." });
   }
 });
-router$s.get("/public/:id", async (req, res) => {
+router$t.get("/public/:id", async (req, res) => {
   const id = typeof req.params.id === "string" ? req.params.id : "";
   if (malformedPublicGalleryId(id)) {
     console.warn("[Galleries] Public gallery id rejected.");
@@ -16455,8 +16455,8 @@ router$s.get("/public/:id", async (req, res) => {
     return res.status(500).json({ error: "We couldn't open this gallery." });
   }
 });
-router$s.get("/link/:id", handlePublicGalleryLink);
-router$s.get("/:id", requireAuth, async (req, res) => {
+router$t.get("/link/:id", handlePublicGalleryLink);
+router$t.get("/:id", requireAuth, async (req, res) => {
   try {
     const doc = await db$l().collection("galleries").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Gallery not found." });
@@ -16480,7 +16480,7 @@ router$s.get("/:id", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch gallery." });
   }
 });
-router$s.post("/:id/upload-url", requirePhotographer, async (req, res) => {
+router$t.post("/:id/upload-url", requirePhotographer, async (req, res) => {
   try {
     const { fileName: fileName2, fileType, isRaw: isRaw2 = false } = req.body;
     if (!fileName2 || !fileType) {
@@ -16505,7 +16505,7 @@ router$s.post("/:id/upload-url", requirePhotographer, async (req, res) => {
     return res.status(500).json({ error: "Failed to generate upload URL." });
   }
 });
-router$s.post("/:id/media", requirePhotographer, async (req, res) => {
+router$t.post("/:id/media", requirePhotographer, async (req, res) => {
   try {
     const {
       storagePath,
@@ -16559,7 +16559,7 @@ router$s.post("/:id/media", requirePhotographer, async (req, res) => {
     return res.status(500).json({ error: "Failed to register media." });
   }
 });
-router$s.post("/:id/media-link", requireCoordinator, async (req, res) => {
+router$t.post("/:id/media-link", requireCoordinator, async (req, res) => {
   try {
     const { url, title, type = "video", embedUrl, thumbnailUrl, downloadable = false, poster, posterUrl } = req.body;
     if (!url) return res.status(400).json({ error: "url required." });
@@ -16595,7 +16595,7 @@ router$s.post("/:id/media-link", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to register media link." });
   }
 });
-router$s.get("/:id/release", requireCoordinator, async (req, res) => {
+router$t.get("/:id/release", requireCoordinator, async (req, res) => {
   if (!adminReady$5(res)) return;
   try {
     const report = await loadGalleryReleaseForGallery(req.params.id);
@@ -16607,7 +16607,7 @@ router$s.get("/:id/release", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to check gallery release." });
   }
 });
-router$s.patch("/:id/status", requireCoordinator, async (req, res) => {
+router$t.patch("/:id/status", requireCoordinator, async (req, res) => {
   try {
     const { status: status2 } = req.body;
     const validStatuses = ["pending_upload", "raw_uploaded", "editing", "ready_for_review", "approved", "delivered"];
@@ -16629,7 +16629,7 @@ router$s.patch("/:id/status", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to update gallery status." });
   }
 });
-router$s.post("/:id/deliver", requireCoordinator, async (req, res) => {
+router$t.post("/:id/deliver", requireCoordinator, async (req, res) => {
   try {
     if (!adminReady$5(res)) return;
     const result = await deliverGalleryToClient(req.params.id, {
@@ -16658,7 +16658,7 @@ router$s.post("/:id/deliver", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to deliver gallery." });
   }
 });
-router$s.patch("/:id/downloads", requireCoordinator, async (req, res) => {
+router$t.patch("/:id/downloads", requireCoordinator, async (req, res) => {
   if (!adminReady$5(res)) return;
   try {
     if (typeof req.body?.released !== "boolean") {
@@ -16695,7 +16695,7 @@ router$s.patch("/:id/downloads", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to update gallery downloads." });
   }
 });
-router$s.delete("/:id/media/:mediaId", requireCoordinator, async (req, res) => {
+router$t.delete("/:id/media/:mediaId", requireCoordinator, async (req, res) => {
   try {
     const galleryDoc = await db$l().collection("galleries").doc(req.params.id).get();
     if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
@@ -17072,7 +17072,7 @@ async function resolveLateApprenticeshipPayment(orderId) {
   });
   return "flagged";
 }
-const router$r = Router();
+const router$s = Router();
 const db$j = () => appFirestore();
 const stripe$1 = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
   apiVersion: "2024-06-20"
@@ -17605,7 +17605,7 @@ async function applyDepositPayment({
     }
   }
 }
-router$r.post("/create-intent", requireAuth, async (req, res) => {
+router$s.post("/create-intent", requireAuth, async (req, res) => {
   try {
     if (!stripeReady()) {
       return res.status(503).json({ error: "Studio Noir Stripe payments are not configured yet." });
@@ -17643,7 +17643,7 @@ router$r.post("/create-intent", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to create payment intent." });
   }
 });
-router$r.post("/send-invoice", requireCoordinator, async (req, res) => {
+router$s.post("/send-invoice", requireCoordinator, async (req, res) => {
   try {
     const { invoiceId } = req.body;
     if (!invoiceId) return res.status(400).json({ error: "invoiceId required." });
@@ -17686,7 +17686,7 @@ router$r.post("/send-invoice", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to send invoice." });
   }
 });
-router$r.post("/send-receipt", requireCoordinator, async (req, res) => {
+router$s.post("/send-receipt", requireCoordinator, async (req, res) => {
   try {
     const { invoiceId } = req.body;
     if (!invoiceId) return res.status(400).json({ error: "invoiceId required." });
@@ -17709,7 +17709,7 @@ router$r.post("/send-receipt", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to send receipt." });
   }
 });
-router$r.get("/invoice/:id", async (req, res) => {
+router$s.get("/invoice/:id", async (req, res) => {
   try {
     const invoiceDoc = await loadInvoice(req.params.id);
     if (!invoiceDoc) return invoiceNotFound(res);
@@ -17778,7 +17778,7 @@ router$r.get("/invoice/:id", async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch invoice." });
   }
 });
-router$r.post("/invoice/:id/checkout", async (req, res) => {
+router$s.post("/invoice/:id/checkout", async (req, res) => {
   try {
     const invoiceDoc = await loadInvoice(req.params.id);
     if (!invoiceDoc) return invoiceNotFound(res);
@@ -17933,7 +17933,7 @@ router$r.post("/invoice/:id/checkout", async (req, res) => {
     return res.status(500).json({ error: "Failed to start checkout." });
   }
 });
-router$r.post("/invoice/:id/deposit-checkout", async (req, res) => {
+router$s.post("/invoice/:id/deposit-checkout", async (req, res) => {
   try {
     if (!seniorDepositCheckoutLive()) return invoiceNotFound(res);
     const invoiceDoc = await loadInvoice(req.params.id);
@@ -18032,7 +18032,7 @@ router$r.post("/invoice/:id/deposit-checkout", async (req, res) => {
     return res.status(500).json({ error: "Failed to start the deposit checkout." });
   }
 });
-router$r.post("/webhook", async (req, res) => {
+router$s.post("/webhook", async (req, res) => {
   const sig = req.headers["stripe-signature"];
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || "";
   let event;
@@ -18099,7 +18099,7 @@ async function findInvoiceForSquarePayment(payment) {
   const snap = await db$j().collection("invoices").doc(hit.id).get();
   return snap.exists ? snap : null;
 }
-router$r.post("/square-webhook", async (req, res) => {
+router$s.post("/square-webhook", async (req, res) => {
   try {
     const signatureKey = process.env.SQUARE_WEBHOOK_SIGNATURE_KEY;
     if (!signatureKey) {
@@ -18176,7 +18176,7 @@ router$r.post("/square-webhook", async (req, res) => {
     return res.status(500).json({ error: "Square webhook handler failed." });
   }
 });
-router$r.get("/transactions", requireCoordinator, async (req, res) => {
+router$s.get("/transactions", requireCoordinator, async (req, res) => {
   try {
     const { startDate, endDate, limit = "50" } = req.query;
     let query = db$j().collection("transactions").orderBy("createdAt", "desc");
@@ -18259,7 +18259,7 @@ async function handleStripeRefund(charge) {
     createdAt: admin.firestore.FieldValue.serverTimestamp()
   });
 }
-const router$q = Router();
+const router$r = Router();
 const db$i = () => admin.firestore();
 const VSAI_API_BASE = "https://api.virtualstagingai.app/v1";
 const VSAI_API_KEY = process.env.VSAI_API_KEY || process.env.VIRTUAL_STAGING_AI_API_KEY || "";
@@ -18267,7 +18267,7 @@ const VSAI_PRICE_CENTS = parseInt(process.env.VSAI_PRICE_CENTS || "1500", 10);
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
   apiVersion: "2024-06-20"
 });
-router$q.post("/create", requireAuth, async (req, res) => {
+router$r.post("/create", requireAuth, async (req, res) => {
   try {
     if (!VSAI_API_KEY) {
       console.error("[VSAI] VSAI_API_KEY is not set");
@@ -18342,7 +18342,7 @@ router$q.post("/create", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$q.get("/result/:jobId", requireAuth, async (req, res) => {
+router$r.get("/result/:jobId", requireAuth, async (req, res) => {
   try {
     const jobDoc = await db$i().collection("vsaiJobs").doc(req.params.jobId).get();
     if (!jobDoc.exists) return res.status(404).json({ error: "Job not found." });
@@ -18417,7 +18417,7 @@ router$q.get("/result/:jobId", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$q.get("/result/:jobId/file", requireAuth, async (req, res) => {
+router$r.get("/result/:jobId/file", requireAuth, async (req, res) => {
   try {
     const jobDoc = await db$i().collection("vsaiJobs").doc(req.params.jobId).get();
     if (!jobDoc.exists) return res.status(404).json({ error: "Job not found." });
@@ -18439,7 +18439,7 @@ router$q.get("/result/:jobId/file", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$q.post("/variation", requireAuth, async (req, res) => {
+router$r.post("/variation", requireAuth, async (req, res) => {
   try {
     const { jobId, style: newStyle, roomType: newRoomType } = req.body;
     if (!jobId) {
@@ -18523,7 +18523,7 @@ router$q.post("/variation", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$q.post("/checkout", requireAuth, async (req, res) => {
+router$r.post("/checkout", requireAuth, async (req, res) => {
   try {
     const { jobIds, successUrl, cancelUrl } = req.body;
     if (!jobIds || !Array.isArray(jobIds) || jobIds.length === 0) {
@@ -18592,7 +18592,7 @@ router$q.post("/checkout", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$q.post(
+router$r.post(
   "/webhook/stripe",
   // Raw body needed — mount before express.json() parses it
   async (req, res) => {
@@ -18630,7 +18630,7 @@ router$q.post(
     res.json({ received: true });
   }
 );
-router$q.get("/options", (_req, res) => {
+router$r.get("/options", (_req, res) => {
   return res.json({
     roomTypes: [
       { value: "living", label: "Living Room" },
@@ -18660,9 +18660,9 @@ router$q.get("/options", (_req, res) => {
 function capitalize(s) {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : "";
 }
-const router$p = Router();
+const router$q = Router();
 const db$h = () => admin.firestore();
-router$p.post("/email", requireStaff, async (req, res) => {
+router$q.post("/email", requireStaff, async (req, res) => {
   try {
     const { to, subject, body, orderId, clientId: clientId2 } = req.body;
     if (!to || !body?.trim()) {
@@ -18702,7 +18702,7 @@ router$p.post("/email", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to send email." });
   }
 });
-router$p.get("/:orderId", requireAuth, async (req, res) => {
+router$q.get("/:orderId", requireAuth, async (req, res) => {
   try {
     const orderDoc = await db$h().collection("orders").doc(req.params.orderId).get();
     if (!orderDoc.exists) return res.status(404).json({ error: "Order not found." });
@@ -18731,7 +18731,7 @@ router$p.get("/:orderId", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch messages." });
   }
 });
-router$p.post("/:orderId", requireAuth, async (req, res) => {
+router$q.post("/:orderId", requireAuth, async (req, res) => {
   try {
     const { content, attachments } = req.body;
     if (!content?.trim()) {
@@ -18786,7 +18786,7 @@ router$p.post("/:orderId", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to send message." });
   }
 });
-router$p.get("/unread/count", requireStaff, async (_req, res) => {
+router$q.get("/unread/count", requireStaff, async (_req, res) => {
   try {
     const snapshot = await db$h().collection("messages").where("isRead", "==", false).where("senderType", "==", "client").get();
     return res.json({ unreadCount: snapshot.size });
@@ -20823,13 +20823,13 @@ const handlePatchPortalWebsite = async (req, res) => {
     return sendKnownError$3(res, err, "Could not save the listing site.");
   }
 };
-const router$o = Router();
+const router$p = Router();
 const db$e = () => admin.firestore();
 const HOME_LIMIT = 100;
 function asRecord$3(value) {
   return value && typeof value === "object" ? value : {};
 }
-router$o.get("/", requireStaff, async (req, res) => {
+router$p.get("/", requireStaff, async (req, res) => {
   try {
     const { status: status2, search, limit = "50" } = req.query;
     let query = db$e().collection("clients").orderBy("createdAt", "desc");
@@ -20856,7 +20856,7 @@ function adminReady$3(res) {
   });
   return false;
 }
-router$o.post("/register", async (req, res) => {
+router$p.post("/register", async (req, res) => {
   if (!adminReady$3(res)) return;
   const firstName = cleanPersonName(req.body?.firstName);
   const lastName = cleanPersonName(req.body?.lastName);
@@ -20918,7 +20918,7 @@ router$o.post("/register", async (req, res) => {
     return res.status(500).json({ error: "Could not create the client account." });
   }
 });
-router$o.get("/me/home", requireAuth, async (req, res) => {
+router$p.get("/me/home", requireAuth, async (req, res) => {
   if (!adminReady$3(res)) return;
   try {
     const identity = await resolveClientIdentity(req.user.uid, req.user.email);
@@ -21067,14 +21067,14 @@ router$o.get("/me/home", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to load your portal." });
   }
 });
-router$o.get("/me/listings/:id", requireAuth, handleGetPortalListing);
-router$o.patch("/me/listings/:id/data", requireAuth, handlePatchPortalData);
-router$o.patch("/me/listings/:id/media", requireAuth, handlePatchPortalMedia);
-router$o.patch("/me/listings/:id/website", requireAuth, handlePatchPortalWebsite);
-router$o.post("/me/listings/:id/photo-edit-requests", requireAuth, handleCreatePhotoEditRequest);
-router$o.post("/me/listings/:id/uploads/url", requireAuth, handleCreatePortalUploadUrl);
-router$o.post("/me/listings/:id/uploads", requireAuth, handleRegisterPortalUpload);
-router$o.get("/me", requireAuth, async (req, res) => {
+router$p.get("/me/listings/:id", requireAuth, handleGetPortalListing);
+router$p.patch("/me/listings/:id/data", requireAuth, handlePatchPortalData);
+router$p.patch("/me/listings/:id/media", requireAuth, handlePatchPortalMedia);
+router$p.patch("/me/listings/:id/website", requireAuth, handlePatchPortalWebsite);
+router$p.post("/me/listings/:id/photo-edit-requests", requireAuth, handleCreatePhotoEditRequest);
+router$p.post("/me/listings/:id/uploads/url", requireAuth, handleCreatePortalUploadUrl);
+router$p.post("/me/listings/:id/uploads", requireAuth, handleRegisterPortalUpload);
+router$p.get("/me", requireAuth, async (req, res) => {
   try {
     const directDoc = await db$e().collection("clients").doc(req.user.uid).get();
     if (directDoc.exists) {
@@ -21090,7 +21090,7 @@ router$o.get("/me", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch profile." });
   }
 });
-router$o.get("/:id", requireStaff, async (req, res) => {
+router$p.get("/:id", requireStaff, async (req, res) => {
   try {
     const doc = await db$e().collection("clients").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Client not found." });
@@ -21107,7 +21107,7 @@ router$o.get("/:id", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch client." });
   }
 });
-router$o.post("/", requireCoordinator, async (req, res) => {
+router$p.post("/", requireCoordinator, async (req, res) => {
   try {
     const { firstName, lastName, email, phone, address, notes, tags } = req.body;
     if (!firstName || !lastName || !email) {
@@ -21137,7 +21137,7 @@ router$o.post("/", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to create client." });
   }
 });
-router$o.patch("/:id", requireCoordinator, async (req, res) => {
+router$p.patch("/:id", requireCoordinator, async (req, res) => {
   try {
     const allowed = ["firstName", "lastName", "phone", "address", "status", "notes", "tags", "company"];
     const updates = { updatedAt: admin.firestore.FieldValue.serverTimestamp() };
@@ -21821,7 +21821,7 @@ async function saveCard(actor2, requestedOwner, card) {
   });
   return getBilling(actor2, ownerClientId === actor2.clientId ? "" : ownerClientId);
 }
-const router$n = Router();
+const router$o = Router();
 function guard(handler) {
   return async (req, res) => {
     try {
@@ -21833,7 +21833,7 @@ function guard(handler) {
     }
   };
 }
-router$n.use((req, res, next) => {
+router$o.use((req, res, next) => {
   if (!req.path.startsWith("/me/hub")) return next();
   if (process.env.CLIENT_HUB_TEST_AUTH === "1" && typeof req.headers["x-client-hub-uid"] === "string") {
     req.user = {
@@ -21844,60 +21844,60 @@ router$n.use((req, res, next) => {
   }
   return requireAuth(req, res, next);
 });
-router$n.get("/me/hub/profile", guard(async (req, res) => {
+router$o.get("/me/hub/profile", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   res.json(await getProfile(await loadActor(req.user.uid, req.user.email || "")));
 }));
-router$n.patch("/me/hub/profile", guard(async (req, res) => {
+router$o.patch("/me/hub/profile", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   res.json(await saveProfile(await loadActor(req.user.uid, req.user.email || ""), req.body));
 }));
-router$n.post("/me/hub/profile/asset", guard(async (req, res) => {
+router$o.post("/me/hub/profile/asset", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   const kind = typeof req.body?.kind === "string" ? req.body.kind : "";
   const dataUrl = typeof req.body?.dataUrl === "string" ? req.body.dataUrl : "";
   res.json(await saveProfileAsset(await loadActor(req.user.uid, req.user.email || ""), kind, dataUrl));
 }));
-router$n.get("/me/hub/team", guard(async (req, res) => {
+router$o.get("/me/hub/team", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   res.json(await getTeam(await loadActor(req.user.uid, req.user.email || "")));
 }));
-router$n.post("/me/hub/team", guard(async (req, res) => {
+router$o.post("/me/hub/team", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   res.json(await saveTeam(await loadActor(req.user.uid, req.user.email || ""), req.body));
 }));
-router$n.patch("/me/hub/team", guard(async (req, res) => {
+router$o.patch("/me/hub/team", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   res.json(await saveTeam(await loadActor(req.user.uid, req.user.email || ""), req.body));
 }));
-router$n.post("/me/hub/team/members", guard(async (req, res) => {
+router$o.post("/me/hub/team/members", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   res.status(201).json(await addTeamMember(await loadActor(req.user.uid, req.user.email || ""), req.body, req.body?.invite === true));
 }));
-router$n.patch("/me/hub/team/members/:id", guard(async (req, res) => {
+router$o.patch("/me/hub/team/members/:id", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   res.json(await updateTeamMember(await loadActor(req.user.uid, req.user.email || ""), req.params.id, req.body));
 }));
-router$n.delete("/me/hub/team/members/:id", guard(async (req, res) => {
+router$o.delete("/me/hub/team/members/:id", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   res.json(await removeTeamMember(await loadActor(req.user.uid, req.user.email || ""), req.params.id));
 }));
-router$n.post("/me/hub/team/members/:id/invite", guard(async (req, res) => {
+router$o.post("/me/hub/team/members/:id/invite", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   res.json(await sendTeamInvite(await loadActor(req.user.uid, req.user.email || ""), req.params.id));
 }));
-router$n.get("/me/hub/clients.csv", guard(async (req, res) => {
+router$o.get("/me/hub/clients.csv", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   const { contacts } = await listContacts(await loadActor(req.user.uid, req.user.email || ""));
   res.setHeader("Content-Type", "text/csv; charset=utf-8");
   res.setHeader("Content-Disposition", 'attachment; filename="example-clients.csv"');
   res.send(contactsToCsv(contacts));
 }));
-router$n.get("/me/hub/clients", guard(async (req, res) => {
+router$o.get("/me/hub/clients", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   res.json(await listContacts(await loadActor(req.user.uid, req.user.email || "")));
 }));
-router$n.post("/me/hub/clients/import", guard(async (req, res) => {
+router$o.post("/me/hub/clients/import", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   const csv = typeof req.body?.csv === "string" ? req.body.csv : "";
   const parsed = parseContactsCsv(csv);
@@ -21906,29 +21906,29 @@ router$n.post("/me/hub/clients/import", guard(async (req, res) => {
   const saved = await importContacts(actor2, parsed.contacts.map((contact) => ({ ...contact, ownerClientId: actor2.clientId, teamId: "" })));
   res.status(201).json({ ...saved, errors: parsed.errors });
 }));
-router$n.post("/me/hub/clients", guard(async (req, res) => {
+router$o.post("/me/hub/clients", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   res.status(201).json(await saveContact(await loadActor(req.user.uid, req.user.email || ""), null, req.body));
 }));
-router$n.patch("/me/hub/clients/:id", guard(async (req, res) => {
+router$o.patch("/me/hub/clients/:id", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   res.json(await saveContact(await loadActor(req.user.uid, req.user.email || ""), req.params.id, req.body));
 }));
-router$n.delete("/me/hub/clients/:id", guard(async (req, res) => {
+router$o.delete("/me/hub/clients/:id", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   res.json(await deleteContact(await loadActor(req.user.uid, req.user.email || ""), req.params.id));
 }));
-router$n.get("/me/hub/billing", guard(async (req, res) => {
+router$o.get("/me/hub/billing", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   const owner = typeof req.query.account === "string" ? req.query.account : "";
   res.json(await getBilling(await loadActor(req.user.uid, req.user.email || ""), owner));
 }));
-router$n.patch("/me/hub/billing", guard(async (req, res) => {
+router$o.patch("/me/hub/billing", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   const owner = typeof req.query.account === "string" ? req.query.account : "";
   res.json(await saveBilling(await loadActor(req.user.uid, req.user.email || ""), owner, req.body));
 }));
-router$n.post("/me/hub/billing/card", guard(async (req, res) => {
+router$o.post("/me/hub/billing/card", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   if (containsRawCard(req.body)) throw new HubError(400, "Card numbers are not stored. Use the Square card form.");
   const sourceId = typeof req.body?.sourceId === "string" ? req.body.sourceId : "";
@@ -21947,7 +21947,7 @@ router$n.post("/me/hub/billing/card", guard(async (req, res) => {
   if ("error" in saved) throw new HubError(502, saved.error);
   res.json(await saveCard(actor2, owner, saved.card));
 }));
-router$n.use((req, res, next) => {
+router$o.use((req, res, next) => {
   if (req.path.startsWith("/me/hub")) return res.status(404).json({ error: "Settings path not found." });
   return next();
 });
@@ -22115,7 +22115,7 @@ function readSetupSecret(headerValue2) {
   return "";
 }
 const db$c = () => admin.firestore();
-function httpError$2(status2, error) {
+function httpError$3(status2, error) {
   return Object.assign(new Error(error), { status: status2 });
 }
 async function bootstrapPlaytest(input) {
@@ -22128,9 +22128,9 @@ async function bootstrapPlaytest(input) {
   const seedListing = input.seedListing !== false;
   const seedGallery = input.seedGallery !== false;
   const clientEmail2 = normalizeEmail$1(input.clientEmail);
-  if (!email || !email.includes("@")) throw httpError$2(400, "Photographer email is required.");
-  if (password.length < 6) throw httpError$2(400, "Photographer password must be at least 6 characters.");
-  if (!isStaffRole(role)) throw httpError$2(400, "Role must be admin, coordinator, photographer, or editor.");
+  if (!email || !email.includes("@")) throw httpError$3(400, "Photographer email is required.");
+  if (password.length < 6) throw httpError$3(400, "Photographer password must be at least 6 characters.");
+  if (!isStaffRole(role)) throw httpError$3(400, "Role must be admin, coordinator, photographer, or editor.");
   const photographer = await ensurePlaytestStaff({
     email,
     password,
@@ -22195,7 +22195,7 @@ async function ensurePlaytestStaff(input) {
     user = await admin.auth().getUserByEmail(input.email);
     const existing = await db$c().collection("staff").doc(user.uid).get();
     if (existing.exists && existing.data()?.playtest !== true) {
-      throw httpError$2(409, "That email already belongs to a staff account that is not a playtest login. Use a different email.");
+      throw httpError$3(409, "That email already belongs to a staff account that is not a playtest login. Use a different email.");
     }
     await admin.auth().updateUser(user.uid, {
       password: input.password,
@@ -22355,9 +22355,147 @@ async function playtestInvoiceRecord(id) {
   }
   return null;
 }
-const router$m = Router();
+const MIN_ACCOUNT_PASSWORD_LENGTH = 8;
+const MAX_ACCOUNT_PASSWORD_LENGTH = 128;
+function passwordPolicyError(password) {
+  if (password.length < MIN_ACCOUNT_PASSWORD_LENGTH) {
+    return `Password must be at least ${MIN_ACCOUNT_PASSWORD_LENGTH} characters.`;
+  }
+  if (password.length > MAX_ACCOUNT_PASSWORD_LENGTH) {
+    return `Password must be at most ${MAX_ACCOUNT_PASSWORD_LENGTH} characters.`;
+  }
+  return null;
+}
+class StaffLoginError extends Error {
+  status;
+  constructor(status2, message) {
+    super(message);
+    this.status = status2;
+  }
+}
+function passwordFrom(input) {
+  if (typeof input.password === "string" && input.password) return input.password;
+  if (typeof input.tempPassword === "string") return input.tempPassword;
+  return "";
+}
+function httpError$2(status2, message) {
+  return new StaffLoginError(status2, message);
+}
+async function ensureAuthUser(email, password, displayName) {
+  try {
+    const existing = await admin.auth().getUserByEmail(email);
+    await admin.auth().updateUser(existing.uid, { password, displayName, email });
+    return { uid: existing.uid, created: false };
+  } catch (err) {
+    const code = err.code;
+    if (code !== "auth/user-not-found") throw err;
+  }
+  try {
+    const created = await admin.auth().createUser({ email, password, displayName });
+    return { uid: created.uid, created: true };
+  } catch (err) {
+    const code = err.code;
+    if (code === "auth/email-already-exists") {
+      const existing = await admin.auth().getUserByEmail(email);
+      await admin.auth().updateUser(existing.uid, { password, displayName, email });
+      return { uid: existing.uid, created: false };
+    }
+    if (code === "auth/invalid-password" || code === "auth/weak-password") {
+      throw httpError$2(400, "Password must be at least 8 characters.");
+    }
+    throw err;
+  }
+}
+async function deleteManualDuplicates(email, authUid) {
+  const dupes = await admin.firestore().collection("staff").where("email", "==", email).get();
+  await Promise.all(dupes.docs.filter((entry2) => entry2.id !== authUid && entry2.id.startsWith("manual_")).map((entry2) => entry2.ref.delete()));
+}
+function editorFlags(role, email, flags) {
+  const access = siteEditorAccess({
+    role,
+    email,
+    flags: flags && typeof flags === "object" ? flags : void 0,
+    ownerEmails: ownerAllowlist(process.env.OWNER_EMAILS)
+  });
+  return { view: access.view, edit: access.edit, publish: access.publish };
+}
+async function provisionStaffLogin(input) {
+  const firstName = cleanPersonName(input.firstName);
+  const lastName = cleanPersonName(input.lastName);
+  const email = normalizeEmail$1(input.email);
+  const phone = String(input.phone || "").trim().slice(0, 40);
+  const role = input.role;
+  const password = passwordFrom(input);
+  if (!firstName || !email || !email.includes("@") || !role) {
+    throw httpError$2(400, "First name, email, role, and password are required.");
+  }
+  if (!isStaffRole$1(role)) throw httpError$2(400, "Choose a staff role.");
+  const policy = passwordPolicyError(password);
+  if (policy) throw httpError$2(400, policy);
+  const displayName = `${firstName} ${lastName}`.trim();
+  const { uid, created } = await ensureAuthUser(email, password, displayName);
+  const db2 = admin.firestore();
+  const ref = db2.collection("staff").doc(uid);
+  const existing = await ref.get();
+  const prev = existing.exists ? existing.data() || {} : {};
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  await ref.set({
+    firebaseUid: uid,
+    firstName,
+    lastName,
+    email,
+    phone: phone || prev.phone || "",
+    role,
+    isActive: true,
+    mustChangePassword: true,
+    siteEditor: editorFlags(role, email, input.siteEditor),
+    assignedOrders: Array.isArray(prev.assignedOrders) ? prev.assignedOrders : [],
+    createdAt: prev.createdAt || now,
+    updatedAt: now
+  }, { merge: true });
+  await deleteManualDuplicates(email, uid);
+  return { uid, created, role, mustChangePassword: true };
+}
+async function setStaffPassword(staffId, password) {
+  const nextPassword = String(password || "");
+  const policy = passwordPolicyError(nextPassword);
+  if (policy) throw httpError$2(400, policy);
+  const db2 = admin.firestore();
+  const snap = await db2.collection("staff").doc(staffId).get();
+  if (!snap.exists) throw httpError$2(404, "Staff member not found.");
+  const data = snap.data() || {};
+  const email = normalizeEmail$1(data.email);
+  if (!email || !email.includes("@")) {
+    throw httpError$2(400, "This team member needs an email before a password can be set.");
+  }
+  const firstName = cleanPersonName(data.firstName) || "Staff";
+  const lastName = cleanPersonName(data.lastName);
+  const { uid } = await ensureAuthUser(email, nextPassword, `${firstName} ${lastName}`.trim());
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  if (uid === staffId) {
+    await db2.collection("staff").doc(uid).update({
+      firebaseUid: uid,
+      mustChangePassword: true,
+      updatedAt: now
+    });
+  } else {
+    const prev = snap.data() || {};
+    await db2.collection("staff").doc(uid).set({
+      ...prev,
+      firebaseUid: uid,
+      email,
+      mustChangePassword: true,
+      updatedAt: now,
+      createdAt: prev.createdAt || now
+    }, { merge: true });
+    if (staffId.startsWith("manual_")) await snap.ref.delete();
+  }
+  await deleteManualDuplicates(email, uid);
+  return { uid, mustChangePassword: true };
+}
+const router$n = Router();
 const db$b = () => admin.firestore();
-router$m.get("/", requireStaff, async (_req, res) => {
+router$n.get("/", requireStaff, async (_req, res) => {
   try {
     const snapshot = await db$b().collection("staff").where("isActive", "==", true).orderBy("firstName").get();
     return res.json(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
@@ -22365,43 +22503,36 @@ router$m.get("/", requireStaff, async (_req, res) => {
     return res.status(500).json({ error: "Failed to fetch staff." });
   }
 });
-router$m.post("/", requireAdmin, async (req, res) => {
+function staffLoginFailure(err, res, fallback) {
+  if (err instanceof StaffLoginError) {
+    return res.status(err.status).json({ error: err.message });
+  }
+  console.error("[Staff] Login provision error.");
+  return res.status(500).json({ error: fallback });
+}
+router$n.post("/", requireAdmin, async (req, res) => {
   try {
-    const { firstName, lastName, email, phone, role, tempPassword } = req.body;
-    if (!firstName || !lastName || !email || !role || !tempPassword) {
-      return res.status(400).json({ error: "All fields required." });
-    }
-    const userRecord = await admin.auth().createUser({
-      email: email.toLowerCase().trim(),
-      password: tempPassword,
-      displayName: `${firstName} ${lastName}`
-    });
-    await db$b().collection("staff").doc(userRecord.uid).set({
-      firebaseUid: userRecord.uid,
-      firstName,
-      lastName,
-      email: email.toLowerCase().trim(),
-      phone: phone || "",
-      role,
-      isActive: true,
-      assignedOrders: [],
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
-    });
-    return res.status(201).json({
-      id: userRecord.uid,
+    const result = await provisionStaffLogin(req.body || {});
+    return res.status(result.created ? 201 : 200).json({
+      id: result.uid,
+      created: result.created,
+      role: result.role,
+      mustChangePassword: true,
       message: "Staff member created. They must change their password on first login."
     });
   } catch (err) {
-    const code = err.code;
-    if (code === "auth/email-already-exists") {
-      return res.status(409).json({ error: "Email already in use." });
-    }
-    console.error("[Staff] Create error:", err);
-    return res.status(500).json({ error: "Failed to create staff member." });
+    return staffLoginFailure(err, res, "Failed to create staff member.");
   }
 });
-router$m.patch("/:id", requireAdmin, async (req, res) => {
+router$n.post("/:id/password", requireAdmin, async (req, res) => {
+  try {
+    const result = await setStaffPassword(String(req.params.id || ""), req.body?.password);
+    return res.json({ id: result.uid, mustChangePassword: true });
+  } catch (err) {
+    return staffLoginFailure(err, res, "Failed to set the password.");
+  }
+});
+router$n.patch("/:id", requireAdmin, async (req, res) => {
   try {
     const allowed = ["firstName", "lastName", "phone", "role", "isActive"];
     const updates = { updatedAt: admin.firestore.FieldValue.serverTimestamp() };
@@ -22441,7 +22572,7 @@ function requireSetupSecret(req, res) {
   }
   return true;
 }
-router$m.post("/playtest", async (req, res) => {
+router$n.post("/playtest", async (req, res) => {
   if (!requireSetupSecret(req, res)) return;
   if (!admin.apps.length) {
     return res.status(503).json({
@@ -22460,7 +22591,7 @@ router$m.post("/playtest", async (req, res) => {
     return res.status(500).json({ error: "Playtest setup failed." });
   }
 });
-router$m.post("/setup", async (req, res) => {
+router$n.post("/setup", async (req, res) => {
   try {
     if (isHostedDeployment(liveServerEnv())) {
       const secret = process.env.STAFF_SETUP_SECRET;
@@ -22501,6 +22632,31 @@ router$m.post("/setup", async (req, res) => {
   } catch (err) {
     console.error("[Staff] Setup error:", err);
     return res.status(500).json({ error: "Setup failed." });
+  }
+});
+const router$m = Router();
+async function clearMustChangeFlag(uid) {
+  const db2 = admin.firestore();
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  for (const name of ["staff", "clients"]) {
+    const ref = db2.collection(name).doc(uid);
+    const snap = await ref.get();
+    if (!snap.exists) continue;
+    await ref.update({ mustChangePassword: false, updatedAt: now });
+  }
+}
+router$m.post("/password", requireAuth, async (req, res) => {
+  const password = String(req.body?.password || "");
+  const problem = passwordPolicyError(password);
+  if (problem) return res.status(400).json({ error: problem });
+  const uid = req.user.uid;
+  try {
+    await admin.auth().updateUser(uid, { password });
+    await clearMustChangeFlag(uid);
+    return res.json({ ok: true, mustChangePassword: false });
+  } catch {
+    console.error("[Account] Password change failed.");
+    return res.status(500).json({ error: "Could not change the password." });
   }
 });
 function uploadQueueKickDecision(input) {
@@ -33442,21 +33598,22 @@ function createServer() {
     res.json({ live: clientNotifyLive() });
   });
   mountOwners(app);
-  app.use("/api/bookings", router$v);
-  app.use("/api/headshots-10", router$u);
-  app.use("/api/orders", router$t);
+  app.use("/api/bookings", router$w);
+  app.use("/api/headshots-10", router$v);
+  app.use("/api/orders", router$u);
   app.patch("/api/admin/orders/:id/approval", handleOrderApproval);
-  app.use("/api/galleries", router$s);
-  app.use("/api/payments", router$r);
-  app.use("/api/vsai", router$q);
-  app.use("/api/messages", router$p);
+  app.use("/api/galleries", router$t);
+  app.use("/api/payments", router$s);
+  app.use("/api/vsai", router$r);
+  app.use("/api/messages", router$q);
   app.use("/api/communications", router$4);
-  app.use("/api/clients", router$n);
   app.use("/api/clients", router$o);
+  app.use("/api/clients", router$p);
   app.get("/api/portal/listings/:id", handleGetPublicPortalListing);
   app.get("/api/listing-sites/:slug", handleGetListingSite);
   app.post("/api/listing-sites/:slug/inquiry", handleListingSiteInquiry);
-  app.use("/api/staff", router$m);
+  app.use("/api/staff", router$n);
+  app.use("/api/account", router$m);
   app.use("/api/site-content", router$1);
   app.use("/api/insights", router);
   app.get("/present/:token", (req, res, next) => {

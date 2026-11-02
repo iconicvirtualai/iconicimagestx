@@ -101,6 +101,8 @@ import AdminStudioScratch from "./pages/AdminStudioScratch";
 import LegacyStudioRedirect from "./components/studio/LegacyStudioRedirect";
 import AdminInsights from "./pages/AdminInsights";
 import Login from "./pages/Login";
+import ForgotPassword from "./pages/ForgotPassword";
+import ChangePassword from "./pages/ChangePassword";
 import ClientPortal from "./pages/ClientPortal";
 import PortalListingDetail from "./pages/PortalListingDetail";
 import PortalSettings from "./pages/PortalSettings";
@@ -202,6 +204,8 @@ const App = () => (
 
             {/* ─── Login Routes ─────────────────────────────────────────── */}
             <Route path="/login" element={<Login />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/change-password" element={<ChangePassword />} />
             <Route path="/portal" element={<Login />} />
             <Route path="/portal/home" element={<ClientPortal />} />
             <Route path="/portal/order" element={<PortalOrder />} />

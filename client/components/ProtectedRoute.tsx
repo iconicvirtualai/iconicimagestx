@@ -11,6 +11,7 @@
 
 import { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
+import { CHANGE_PASSWORD_PATH } from "@shared/passwordAccount";
 import { useAuth } from "@/contexts/AuthContext";
 import { ShieldOff } from "lucide-react";
 
@@ -58,7 +59,7 @@ export default function ProtectedRoute({
   children,
   requiredRole = "staff",
 }: ProtectedRouteProps) {
-  const { user, staffProfile, loading, isStaff } = useAuth();
+  const { user, staffProfile, loading, isStaff, mustChangePassword } = useAuth();
   const location = useLocation();
 
   // Still loading auth state — show spinner
@@ -75,14 +76,16 @@ export default function ProtectedRoute({
     );
   }
 
-  // Not logged in — send to login with redirect
   if (!user || !isStaff) {
     return (
       <Navigate to="/admin/login" state={{ from: location }} replace />
     );
   }
 
-  // Logged in but wrong role — show 403
+  if (mustChangePassword) {
+    return <Navigate to={CHANGE_PASSWORD_PATH} replace />;
+  }
+
   const role = staffProfile?.role;
   if (!hasAccess(role, requiredRole)) {
     return (

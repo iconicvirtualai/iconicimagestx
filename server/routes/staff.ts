@@ -12,6 +12,7 @@ import { ownerAllowlist } from "../../shared/ownerAccess";
 import { normalizeSiteEditorFlags, siteEditorAccess } from "../../shared/siteEditor";
 import { readSetupSecret, secretsMatch } from "../lib/playtestPolicy";
 import { bootstrapPlaytest } from "../services/playtestBootstrap";
+import { provisionStaffLogin, setStaffPassword, StaffLoginError } from "../services/staffLogin";
 
 const router = Router();
 const db = () => admin.firestore();
@@ -28,45 +29,37 @@ router.get("/", requireStaff, async (_req, res) => {
   }
 });
 
+function staffLoginFailure(err: unknown, res: { status: (code: number) => { json: (body: unknown) => unknown } }, fallback: string) {
+  if (err instanceof StaffLoginError) {
+    return res.status(err.status).json({ error: err.message });
+  }
+  console.error("[Staff] Login provision error.");
+  return res.status(500).json({ error: fallback });
+}
+
 // POST /api/staff — create staff member + Firebase Auth account
 router.post("/", requireAdmin, async (req, res) => {
   try {
-    const { firstName, lastName, email, phone, role, tempPassword } = req.body;
-    if (!firstName || !lastName || !email || !role || !tempPassword) {
-      return res.status(400).json({ error: "All fields required." });
-    }
-
-    // Create Firebase Auth account
-    const userRecord = await admin.auth().createUser({
-      email: email.toLowerCase().trim(),
-      password: tempPassword,
-      displayName: `${firstName} ${lastName}`,
-    });
-
-    // Create staff document using UID as document ID
-    await db().collection("staff").doc(userRecord.uid).set({
-      firebaseUid: userRecord.uid,
-      firstName, lastName,
-      email: email.toLowerCase().trim(),
-      phone: phone || "",
-      role,
-      isActive: true,
-      assignedOrders: [],
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-
-    return res.status(201).json({
-      id: userRecord.uid,
+    const result = await provisionStaffLogin(req.body || {});
+    return res.status(result.created ? 201 : 200).json({
+      id: result.uid,
+      created: result.created,
+      role: result.role,
+      mustChangePassword: true,
       message: "Staff member created. They must change their password on first login.",
     });
   } catch (err: unknown) {
-    const code = (err as { code?: string }).code;
-    if (code === "auth/email-already-exists") {
-      return res.status(409).json({ error: "Email already in use." });
-    }
-    console.error("[Staff] Create error:", err);
-    return res.status(500).json({ error: "Failed to create staff member." });
+    return staffLoginFailure(err, res, "Failed to create staff member.");
+  }
+});
+
+// POST /api/staff/:id/password — set a new password for an existing member
+router.post("/:id/password", requireAdmin, async (req, res) => {
+  try {
+    const result = await setStaffPassword(String(req.params.id || ""), req.body?.password);
+    return res.json({ id: result.uid, mustChangePassword: true });
+  } catch (err: unknown) {
+    return staffLoginFailure(err, res, "Failed to set the password.");
   }
 });
 

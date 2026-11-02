@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { clientLoginAction, clientReturnPath, staffHomePath } from "@shared/staffAccess";
+import { CHANGE_PASSWORD_PATH } from "@shared/passwordAccount";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -26,11 +27,11 @@ export function accountCreationDestination(session: {
 
 export default function Login() {
   const wordmark = useSiteText("login", "hero", "title", "ICONIC");
-  const { signIn, user, userType, staffProfile, loading, resetPassword, registerClient } = useAuth();
+  const { signIn, user, userType, staffProfile, loading, mustChangePassword, registerClient } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [mode, setMode] = useState<"signin" | "signup" | "reset">("signin");
+  const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -38,7 +39,6 @@ export default function Login() {
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [resetEmail, setResetEmail] = useState("");
   const submittingRef = useRef(false);
   const sessionRef = useRef({ user, userType, staffProfile, loading });
   sessionRef.current = { user, userType, staffProfile, loading };
@@ -46,6 +46,10 @@ export default function Login() {
   useEffect(() => {
     // Staff home is a different gate. Client home waits until clients/{uid}
     // resolves to an active portal profile; a missing profile stays here.
+    if (!loading && user && mustChangePassword) {
+      navigate(CHANGE_PASSWORD_PATH, { replace: true });
+      return;
+    }
     if (!loading && user && userType === "staff") {
       navigate(staffHomePath(staffProfile?.role));
       return;
@@ -58,9 +62,9 @@ export default function Login() {
       destination: clientReturnPath(from ? `${from.pathname || ""}${from.search || ""}` : ""),
     });
     if (action.type === "redirect") {
-      navigate(action.path);
+      navigate(mustChangePassword ? CHANGE_PASSWORD_PATH : action.path);
     }
-  }, [user, userType, staffProfile, loading, navigate, location]);
+  }, [user, userType, staffProfile, loading, mustChangePassword, navigate, location]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -116,24 +120,6 @@ export default function Login() {
     }
   };
 
-  const handleResetPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!resetEmail) return;
-    try {
-      const gate = await fetch("/api/client-notify");
-      const gateData = await gate.json().catch(() => ({ live: false }));
-      if (!gate.ok || gateData?.live !== true) {
-        toast.error("Failed to send reset email.");
-        return;
-      }
-      await resetPassword(resetEmail);
-      toast.success("Reset email sent. Check your inbox.");
-      setMode("signin");
-    } catch {
-      toast.error("Failed to send reset email.");
-    }
-  };
-
   if (loading) {
     return (
       <div className="iframe-safe-page bg-black flex items-center justify-center">
@@ -165,28 +151,6 @@ export default function Login() {
             <Button type="submit" disabled={submitting} className="w-full bg-white text-black hover:bg-gray-100 font-semibold">
               {submitting ? "Saving..." : "Finish client profile"}
             </Button>
-          </form>
-        ) : mode === "reset" ? (
-          <form onSubmit={handleResetPassword} className="space-y-4">
-            <p className="text-zinc-400 text-sm text-center">
-              Enter your email to receive a password reset link.
-            </p>
-            <Input
-              type="email"
-              placeholder="Email address"
-              value={resetEmail}
-              onChange={(e) => setResetEmail(e.target.value)}
-              className={inputClass}
-              required
-            />
-            <Button type="submit" className="w-full bg-white text-black hover:bg-gray-100">
-              Send Reset Link
-            </Button>
-            <div className="text-center">
-              <button type="button" onClick={() => setMode("signin")} className="text-zinc-500 hover:text-zinc-300 text-sm">
-                Back to sign in
-              </button>
-            </div>
           </form>
         ) : mode === "signup" ? (
           <form onSubmit={handleSignup} className="space-y-4">
@@ -231,9 +195,9 @@ export default function Login() {
               {submitting ? "Signing in..." : "Sign In"}
             </Button>
             <div className="text-center">
-              <button type="button" onClick={() => setMode("reset")} className="text-zinc-500 hover:text-zinc-300 text-sm transition-colors">
+              <Link to="/forgot-password" className="text-zinc-500 hover:text-zinc-300 text-sm transition-colors">
                 Forgot password?
-              </button>
+              </Link>
             </div>
           </form>
         )}

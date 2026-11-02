@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
+import { CHANGE_PASSWORD_PATH } from "@shared/passwordAccount";
 import { CalendarClock, LayoutGrid, LogOut, Menu, MessageSquare, Receipt, Settings, UserRound, Users, Wallet, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -157,13 +158,18 @@ export function PortalShell({
             <h1 className="text-2xl sm:text-3xl font-black mt-2 truncate">Hello, {firstName}</h1>
           </div>
           {onSignOut ? (
-            <Button
-              variant="outline"
-              className="border-zinc-700 bg-transparent text-white hover:bg-zinc-900 shrink-0"
-              onClick={onSignOut}
-            >
-              <LogOut className="w-4 h-4 mr-2" /> Sign out
-            </Button>
+            <div className="flex shrink-0 items-center gap-2">
+              <Button asChild variant="outline" className="border-zinc-700 bg-transparent text-white hover:bg-zinc-900">
+                <Link to={CHANGE_PASSWORD_PATH}>Change password</Link>
+              </Button>
+              <Button
+                variant="outline"
+                className="border-zinc-700 bg-transparent text-white hover:bg-zinc-900"
+                onClick={onSignOut}
+              >
+                <LogOut className="w-4 h-4 mr-2" /> Sign out
+              </Button>
+            </div>
           ) : null}
         </div>
       </header>

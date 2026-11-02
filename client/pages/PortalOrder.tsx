@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { clientPortalAction, staffHomePath } from "@shared/staffAccess";
+import { CHANGE_PASSWORD_PATH } from "@shared/passwordAccount";
 import { billingPrefill, type BillingProfile, type ClientHubProfile } from "@shared/clientHubSettings";
 import Footer from "@/components/Footer";
 import BookingForm, { type PortalOrderPrefill } from "@/components/BookingForm";
@@ -11,7 +12,7 @@ import { exampleBilling, exampleProfile } from "@/lib/exampleHub";
 
 export default function PortalOrder() {
   const example = useExampleMode();
-  const { user, userType, staffProfile, clientProfile, loading, signOutUser } = useAuth();
+  const { user, userType, staffProfile, clientProfile, loading, mustChangePassword, signOutUser } = useAuth();
   const [prefill, setPrefill] = useState<PortalOrderPrefill | null>(example ? billingPrefill(exampleProfile(), exampleBilling()) : null);
   const [error, setError] = useState("");
 
@@ -41,6 +42,7 @@ export default function PortalOrder() {
 
   if (!example) {
     if (loading) return <Pending />;
+    if (user && mustChangePassword) return <Navigate to={CHANGE_PASSWORD_PATH} replace />;
     if (user && userType === "staff") return <Navigate to={staffHomePath(staffProfile?.role)} replace />;
     const gate = clientPortalAction({ loading, hasUser: Boolean(user), isClient: userType === "client" });
     if (gate.type !== "show-home" || !user) return <Navigate to="/portal" replace />;
