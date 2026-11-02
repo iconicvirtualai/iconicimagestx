@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ChangePassword from "./ChangePassword";
 
 const auth = vi.hoisted(() => ({
-  user: { uid: "photo-1", getIdToken: vi.fn(async () => "photo-token") } as { uid: string; getIdToken: () => Promise<string> } | null,
+  user: { uid: "photo-1", email: "dummy.photo@example.com", getIdToken: vi.fn(async () => "photo-token") } as { uid: string; email?: string; getIdToken: (force?: boolean) => Promise<string> } | null,
   loading: false,
   userType: "staff" as "staff" | "client" | null,
   staffProfile: { role: "photographer", mustChangePassword: true } as { role?: string; mustChangePassword?: boolean } | null,
@@ -16,6 +16,7 @@ const auth = vi.hoisted(() => ({
   mustChangePassword: true,
   refreshProfile: vi.fn(async () => undefined),
   notePasswordChanged: vi.fn(),
+  signIn: vi.fn(async () => undefined),
 }));
 
 vi.mock("@/contexts/AuthContext", () => ({
@@ -63,7 +64,8 @@ async function fill(id: string, value: string) {
 }
 
 beforeEach(() => {
-  auth.user = { uid: "photo-1", getIdToken: vi.fn(async () => "photo-token") };
+  auth.user = { uid: "photo-1", email: "dummy.photo@example.com", getIdToken: vi.fn(async () => "photo-token") };
+  auth.signIn.mockClear();
   auth.loading = false;
   auth.userType = "staff";
   auth.staffProfile = { role: "photographer", mustChangePassword: true };
@@ -108,6 +110,8 @@ describe("change password", () => {
       body: JSON.stringify({ password: "chosen-password" }),
     }));
     expect(auth.notePasswordChanged).toHaveBeenCalled();
+    expect(auth.signIn).toHaveBeenCalledWith("dummy.photo@example.com", "chosen-password");
+    expect(auth.user?.getIdToken).toHaveBeenCalledWith(true);
     expect(auth.refreshProfile).toHaveBeenCalled();
     expect(path()).toBe("Photographer home");
   });

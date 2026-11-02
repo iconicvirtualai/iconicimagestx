@@ -6,7 +6,7 @@
 
 import { Router } from "express";
 import admin from "firebase-admin";
-import { requireAdmin, requireStaff } from "../middleware/auth";
+import { requireAdmin, requireStaff, type AuthenticatedRequest } from "../middleware/auth";
 import { isHostedDeployment, liveServerEnv } from "../../shared/tempAdmin";
 import { ownerAllowlist } from "../../shared/ownerAccess";
 import { normalizeSiteEditorFlags, siteEditorAccess } from "../../shared/siteEditor";
@@ -29,6 +29,10 @@ router.get("/", requireStaff, async (_req, res) => {
   }
 });
 
+function actingAdmin(req: AuthenticatedRequest): { uid: string; email?: string | null } {
+  return { uid: req.user?.uid || "", email: req.user?.email || null };
+}
+
 function staffLoginFailure(err: unknown, res: { status: (code: number) => { json: (body: unknown) => unknown } }, fallback: string) {
   if (err instanceof StaffLoginError) {
     return res.status(err.status).json({ error: err.message });
@@ -38,9 +42,9 @@ function staffLoginFailure(err: unknown, res: { status: (code: number) => { json
 }
 
 // POST /api/staff — create staff member + Firebase Auth account
-router.post("/", requireAdmin, async (req, res) => {
+router.post("/", requireAdmin, async (req: AuthenticatedRequest, res) => {
   try {
-    const result = await provisionStaffLogin(req.body || {});
+    const result = await provisionStaffLogin(req.body || {}, actingAdmin(req));
     return res.status(result.created ? 201 : 200).json({
       id: result.uid,
       created: result.created,
@@ -54,9 +58,14 @@ router.post("/", requireAdmin, async (req, res) => {
 });
 
 // POST /api/staff/:id/password — set a new password for an existing member
-router.post("/:id/password", requireAdmin, async (req, res) => {
+router.post("/:id/password", requireAdmin, async (req: AuthenticatedRequest, res) => {
   try {
-    const result = await setStaffPassword(String(req.params.id || ""), req.body?.password);
+    const result = await setStaffPassword(
+      String(req.params.id || ""),
+      req.body?.password,
+      actingAdmin(req),
+      req.body?.replaceExisting === true,
+    );
     return res.json({ id: result.uid, mustChangePassword: true });
   } catch (err: unknown) {
     return staffLoginFailure(err, res, "Failed to set the password.");

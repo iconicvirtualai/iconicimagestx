@@ -1971,6 +1971,44 @@ function isActiveStaffRecord(data) {
   if (data.isActive === false) return false;
   return isStaffRole(data.role);
 }
+const MUST_CHANGE_PASSWORD_CODE = "must_change_password";
+function hasMustChangePassword(record) {
+  return record?.mustChangePassword === true;
+}
+function isPasswordChangeApiPath(url) {
+  const path2 = String(url || "").split("?")[0].replace(/\/+$/, "");
+  return path2 === "/api/account/password";
+}
+function mustChangePasswordResponse(res) {
+  return res.status(403).json({
+    code: MUST_CHANGE_PASSWORD_CODE,
+    error: "Choose a new password before using the portal."
+  });
+}
+async function profileRequiresNewPassword(uid) {
+  try {
+    const db = admin.firestore();
+    const [staff, client] = await Promise.all([
+      db.collection("staff").doc(uid).get(),
+      db.collection("clients").doc(uid).get()
+    ]);
+    return hasMustChangePassword(staff.exists ? staff.data() : null) || hasMustChangePassword(client.exists ? client.data() : null);
+  } catch {
+    console.error("[Auth] mustChangePassword lookup failed.");
+    return false;
+  }
+}
+async function sessionMustChangePassword(user) {
+  if (!user?.uid) return false;
+  if (user.mustChangePassword === true) return true;
+  return profileRequiresNewPassword(user.uid);
+}
+async function rejectStalePassword(req, res, user) {
+  if (isPasswordChangeApiPath(req.originalUrl || req.url)) return false;
+  if (!await sessionMustChangePassword(user)) return false;
+  mustChangePasswordResponse(res);
+  return true;
+}
 function tempAdminAllowed() {
   return isTempAdminEnabled(liveServerEnv());
 }
@@ -2014,7 +2052,8 @@ async function requireAuth(req, res, next) {
   const token = authHeader.split("Bearer ")[1];
   try {
     req.user = await admin.auth().verifyIdToken(token);
-    next();
+    if (await rejectStalePassword(req, res, req.user)) return;
+    return next();
   } catch {
     return res.status(401).json({ error: "Invalid or expired token." });
   }

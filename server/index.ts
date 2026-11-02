@@ -47,6 +47,7 @@ import { photographerCalendarRoster } from "./services/photographerRoster";
 import { clientNotifyLive } from "../shared/clientNotify";
 import { isPublicApiOrigin } from "./lib/publicCors";
 import { requireAdmin, requireStaff } from "./middleware/auth";
+import { blockUntilPasswordChanged } from "./middleware/mustChangePassword";
 import { handleListingPhotoUpload } from "./routes/listingPhotos";
 import { handleGetPublicPortalListing } from "./routes/portalListing";
 import presentationsRouter, { handlePresentationShell } from "./routes/presentations";
@@ -121,6 +122,7 @@ export function createServer() {
   // Standard middleware
   app.use(express.json({ limit: "10mb" }));
   app.use(express.urlencoded({ extended: true }));
+  app.use(blockUntilPasswordChanged);
 
   // Static public/sitemap.xml and robots.txt are the vercel.app copies and are
   // removed from the Vercel output. This route is what both hosts receive.

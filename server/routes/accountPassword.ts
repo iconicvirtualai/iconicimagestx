@@ -14,6 +14,11 @@ async function clearMustChangeFlag(uid: string) {
     if (!snap.exists) continue;
     await ref.update({ mustChangePassword: false, updatedAt: now });
   }
+  const record = await admin.auth().getUser(uid);
+  const claims = { ...(record.customClaims || {}) };
+  delete claims.mustChangePassword;
+  await admin.auth().setCustomUserClaims(uid, claims);
+  await admin.auth().revokeRefreshTokens(uid);
 }
 
 /** Signed-in person replaces their own password and clears the first-login flag. */

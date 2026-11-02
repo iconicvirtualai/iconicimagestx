@@ -41,6 +41,69 @@ function liveServerEnv(env = process.env) {
     NODE_ENV: env["NODE_ENV"]
   };
 }
+const MIN_ACCOUNT_PASSWORD_LENGTH = 8;
+const MAX_ACCOUNT_PASSWORD_LENGTH = 128;
+const MUST_CHANGE_PASSWORD_CODE = "must_change_password";
+function passwordPolicyError(password) {
+  if (password.length < MIN_ACCOUNT_PASSWORD_LENGTH) {
+    return `Password must be at least ${MIN_ACCOUNT_PASSWORD_LENGTH} characters.`;
+  }
+  if (password.length > MAX_ACCOUNT_PASSWORD_LENGTH) {
+    return `Password must be at most ${MAX_ACCOUNT_PASSWORD_LENGTH} characters.`;
+  }
+  return null;
+}
+function hasMustChangePassword(record2) {
+  return record2?.mustChangePassword === true;
+}
+function isPasswordChangeApiPath(url) {
+  const path2 = String(url || "").split("?")[0].replace(/\/+$/, "");
+  return path2 === "/api/account/password";
+}
+function mustChangePasswordResponse(res) {
+  return res.status(403).json({
+    code: MUST_CHANGE_PASSWORD_CODE,
+    error: "Choose a new password before using the portal."
+  });
+}
+async function profileRequiresNewPassword(uid) {
+  try {
+    const db2 = admin.firestore();
+    const [staff, client] = await Promise.all([
+      db2.collection("staff").doc(uid).get(),
+      db2.collection("clients").doc(uid).get()
+    ]);
+    return hasMustChangePassword(staff.exists ? staff.data() : null) || hasMustChangePassword(client.exists ? client.data() : null);
+  } catch {
+    console.error("[Auth] mustChangePassword lookup failed.");
+    return false;
+  }
+}
+async function sessionMustChangePassword(user) {
+  if (!user?.uid) return false;
+  if (user.mustChangePassword === true) return true;
+  return profileRequiresNewPassword(user.uid);
+}
+async function rejectStalePassword(req, res, user) {
+  if (isPasswordChangeApiPath(req.originalUrl || req.url)) return false;
+  if (!await sessionMustChangePassword(user)) return false;
+  mustChangePasswordResponse(res);
+  return true;
+}
+async function blockUntilPasswordChanged(req, res, next) {
+  if (!req.originalUrl.startsWith("/api/") && !req.url.startsWith("/api/")) return next();
+  if (isPasswordChangeApiPath(req.originalUrl || req.url)) return next();
+  const header = req.headers.authorization;
+  if (!header?.startsWith("Bearer ")) return next();
+  if (isTempAdminEnabled(liveServerEnv()) && header === "Bearer temp-admin-token") return next();
+  if (!admin.apps.length) return next();
+  try {
+    const decoded = await admin.auth().verifyIdToken(header.slice("Bearer ".length).trim());
+    if (await sessionMustChangePassword(decoded)) return mustChangePasswordResponse(res);
+  } catch {
+  }
+  return next();
+}
 function tempAdminAllowed() {
   return isTempAdminEnabled(liveServerEnv());
 }
@@ -84,7 +147,8 @@ async function requireAuth(req, res, next) {
   const token = authHeader.split("Bearer ")[1];
   try {
     req.user = await admin.auth().verifyIdToken(token);
-    next();
+    if (await rejectStalePassword(req, res, req.user)) return;
+    return next();
   } catch {
     return res.status(401).json({ error: "Invalid or expired token." });
   }
@@ -22355,17 +22419,6 @@ async function playtestInvoiceRecord(id) {
   }
   return null;
 }
-const MIN_ACCOUNT_PASSWORD_LENGTH = 8;
-const MAX_ACCOUNT_PASSWORD_LENGTH = 128;
-function passwordPolicyError(password) {
-  if (password.length < MIN_ACCOUNT_PASSWORD_LENGTH) {
-    return `Password must be at least ${MIN_ACCOUNT_PASSWORD_LENGTH} characters.`;
-  }
-  if (password.length > MAX_ACCOUNT_PASSWORD_LENGTH) {
-    return `Password must be at most ${MAX_ACCOUNT_PASSWORD_LENGTH} characters.`;
-  }
-  return null;
-}
 class StaffLoginError extends Error {
   status;
   constructor(status2, message) {
@@ -22381,30 +22434,95 @@ function passwordFrom(input) {
 function httpError$2(status2, message) {
   return new StaffLoginError(status2, message);
 }
-async function ensureAuthUser(email, password, displayName) {
+const CLIENT_TAKEN = "That email belongs to a client account. The password and role were not changed.";
+const ADMIN_TAKEN = "That email belongs to an admin. The password and role were not changed.";
+const REPLACE_REQUIRED = "That email already has a login. Check Replace existing login to set a new password. Nothing was changed.";
+async function findAuthUser(email) {
   try {
-    const existing = await admin.auth().getUserByEmail(email);
-    await admin.auth().updateUser(existing.uid, { password, displayName, email });
-    return { uid: existing.uid, created: false };
+    return await admin.auth().getUserByEmail(email);
   } catch (err) {
     const code = err.code;
-    if (code !== "auth/user-not-found") throw err;
-  }
-  try {
-    const created = await admin.auth().createUser({ email, password, displayName });
-    return { uid: created.uid, created: true };
-  } catch (err) {
-    const code = err.code;
-    if (code === "auth/email-already-exists") {
-      const existing = await admin.auth().getUserByEmail(email);
-      await admin.auth().updateUser(existing.uid, { password, displayName, email });
-      return { uid: existing.uid, created: false };
-    }
-    if (code === "auth/invalid-password" || code === "auth/weak-password") {
-      throw httpError$2(400, "Password must be at least 8 characters.");
-    }
+    if (code === "auth/user-not-found") return null;
     throw err;
   }
+}
+async function clientLinked(uid, email) {
+  const db2 = admin.firestore();
+  const byId = await db2.collection("clients").doc(uid).get();
+  if (byId.exists) return true;
+  const [byEmail, byUid] = await Promise.all([
+    db2.collection("clients").where("email", "==", email).limit(1).get(),
+    db2.collection("clients").where("firebaseUid", "==", uid).limit(1).get()
+  ]);
+  return !byEmail.empty || !byUid.empty;
+}
+async function staffLoginFor(uid, email) {
+  const db2 = admin.firestore();
+  const direct = await db2.collection("staff").doc(uid).get();
+  if (direct.exists) {
+    const role = direct.data()?.role;
+    if (typeof role === "string" && role) return { id: direct.id, role };
+  }
+  const matches = await db2.collection("staff").where("email", "==", email).get();
+  const found = matches.docs.find((entry2) => !entry2.id.startsWith("manual_") && typeof entry2.data()?.role === "string");
+  if (!found) return null;
+  return { id: found.id, role: String(found.data().role) };
+}
+async function stampMustChangeClaim(uid) {
+  const record2 = await admin.auth().getUser(uid);
+  const claims = { ...record2.customClaims || {}, mustChangePassword: true };
+  await admin.auth().setCustomUserClaims(uid, claims);
+  await admin.auth().revokeRefreshTokens(uid);
+}
+function logReplacement(actor2, target) {
+  console.info("[Staff] Replaced existing login", JSON.stringify({
+    actorUid: actor2.uid,
+    actorEmail: actor2.email || null,
+    targetUid: target.uid,
+    targetEmail: target.email,
+    previousRole: target.previousRole,
+    nextRole: target.nextRole
+  }));
+}
+async function ensureAuthUser(input) {
+  const existing = await findAuthUser(input.email);
+  if (!existing) {
+    try {
+      const created = await admin.auth().createUser({
+        email: input.email,
+        password: input.password,
+        displayName: input.displayName
+      });
+      await stampMustChangeClaim(created.uid);
+      return { uid: created.uid, created: true };
+    } catch (err) {
+      const code = err.code;
+      if (code !== "auth/email-already-exists") {
+        if (code === "auth/invalid-password" || code === "auth/weak-password") {
+          throw httpError$2(400, "Password must be at least 8 characters.");
+        }
+        throw err;
+      }
+    }
+  }
+  const user = existing || await admin.auth().getUserByEmail(input.email);
+  if (await clientLinked(user.uid, input.email)) throw httpError$2(409, CLIENT_TAKEN);
+  const staff = await staffLoginFor(user.uid, input.email);
+  if (staff?.role === "admin" && input.requestedRole !== null) throw httpError$2(409, ADMIN_TAKEN);
+  if (!input.replaceExisting) throw httpError$2(409, REPLACE_REQUIRED);
+  await admin.auth().updateUser(user.uid, {
+    password: input.password,
+    displayName: input.displayName,
+    email: input.email
+  });
+  await stampMustChangeClaim(user.uid);
+  logReplacement(input.actor, {
+    uid: user.uid,
+    email: input.email,
+    previousRole: staff?.role || null,
+    nextRole: input.requestedRole
+  });
+  return { uid: user.uid, created: false };
 }
 async function deleteManualDuplicates(email, authUid) {
   const dupes = await admin.firestore().collection("staff").where("email", "==", email).get();
@@ -22419,7 +22537,7 @@ function editorFlags(role, email, flags) {
   });
   return { view: access.view, edit: access.edit, publish: access.publish };
 }
-async function provisionStaffLogin(input) {
+async function provisionStaffLogin(input, actor2) {
   const firstName = cleanPersonName(input.firstName);
   const lastName = cleanPersonName(input.lastName);
   const email = normalizeEmail$1(input.email);
@@ -22433,7 +22551,14 @@ async function provisionStaffLogin(input) {
   const policy = passwordPolicyError(password);
   if (policy) throw httpError$2(400, policy);
   const displayName = `${firstName} ${lastName}`.trim();
-  const { uid, created } = await ensureAuthUser(email, password, displayName);
+  const { uid, created } = await ensureAuthUser({
+    email,
+    password,
+    displayName,
+    replaceExisting: input.replaceExisting === true,
+    requestedRole: role,
+    actor: actor2
+  });
   const db2 = admin.firestore();
   const ref = db2.collection("staff").doc(uid);
   const existing = await ref.get();
@@ -22456,7 +22581,7 @@ async function provisionStaffLogin(input) {
   await deleteManualDuplicates(email, uid);
   return { uid, created, role, mustChangePassword: true };
 }
-async function setStaffPassword(staffId, password) {
+async function setStaffPassword(staffId, password, actor2, replaceExisting) {
   const nextPassword = String(password || "");
   const policy = passwordPolicyError(nextPassword);
   if (policy) throw httpError$2(400, policy);
@@ -22470,7 +22595,14 @@ async function setStaffPassword(staffId, password) {
   }
   const firstName = cleanPersonName(data.firstName) || "Staff";
   const lastName = cleanPersonName(data.lastName);
-  const { uid } = await ensureAuthUser(email, nextPassword, `${firstName} ${lastName}`.trim());
+  const { uid } = await ensureAuthUser({
+    email,
+    password: nextPassword,
+    displayName: `${firstName} ${lastName}`.trim(),
+    replaceExisting,
+    requestedRole: null,
+    actor: actor2
+  });
   const now = admin.firestore.FieldValue.serverTimestamp();
   if (uid === staffId) {
     await db2.collection("staff").doc(uid).update({
@@ -22503,6 +22635,9 @@ router$n.get("/", requireStaff, async (_req, res) => {
     return res.status(500).json({ error: "Failed to fetch staff." });
   }
 });
+function actingAdmin(req) {
+  return { uid: req.user?.uid || "", email: req.user?.email || null };
+}
 function staffLoginFailure(err, res, fallback) {
   if (err instanceof StaffLoginError) {
     return res.status(err.status).json({ error: err.message });
@@ -22512,7 +22647,7 @@ function staffLoginFailure(err, res, fallback) {
 }
 router$n.post("/", requireAdmin, async (req, res) => {
   try {
-    const result = await provisionStaffLogin(req.body || {});
+    const result = await provisionStaffLogin(req.body || {}, actingAdmin(req));
     return res.status(result.created ? 201 : 200).json({
       id: result.uid,
       created: result.created,
@@ -22526,7 +22661,12 @@ router$n.post("/", requireAdmin, async (req, res) => {
 });
 router$n.post("/:id/password", requireAdmin, async (req, res) => {
   try {
-    const result = await setStaffPassword(String(req.params.id || ""), req.body?.password);
+    const result = await setStaffPassword(
+      String(req.params.id || ""),
+      req.body?.password,
+      actingAdmin(req),
+      req.body?.replaceExisting === true
+    );
     return res.json({ id: result.uid, mustChangePassword: true });
   } catch (err) {
     return staffLoginFailure(err, res, "Failed to set the password.");
@@ -22644,6 +22784,11 @@ async function clearMustChangeFlag(uid) {
     if (!snap.exists) continue;
     await ref.update({ mustChangePassword: false, updatedAt: now });
   }
+  const record2 = await admin.auth().getUser(uid);
+  const claims = { ...record2.customClaims || {} };
+  delete claims.mustChangePassword;
+  await admin.auth().setCustomUserClaims(uid, claims);
+  await admin.auth().revokeRefreshTokens(uid);
 }
 router$m.post("/password", requireAuth, async (req, res) => {
   const password = String(req.body?.password || "");
@@ -33506,6 +33651,7 @@ function createServer() {
   app.use("/api/site-content/dropbox", express.json({ limit: "1mb" }));
   app.use(express.json({ limit: "10mb" }));
   app.use(express.urlencoded({ extended: true }));
+  app.use(blockUntilPasswordChanged);
   const sendPublicSeoFile = (kind) => (req, res) => {
     const origin = originForHost(req.get("host"));
     res.setHeader("Vary", "Host");

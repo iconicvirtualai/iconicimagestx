@@ -74,6 +74,7 @@ export default function AdminTeam() {
   const [editing, setEditing] = React.useState<StaffMember | null>(null);
   const [form, setForm] = React.useState(BLANK);
   const [password, setPassword] = React.useState("");
+  const [replaceExisting, setReplaceExisting] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
 
   React.useEffect(() => {
@@ -84,11 +85,12 @@ export default function AdminTeam() {
     return () => unsub();
   }, []);
 
-  const openAdd = () => { setEditing(null); setForm(BLANK); setPassword(""); setShowForm(true); };
+  const openAdd = () => { setEditing(null); setForm(BLANK); setPassword(""); setReplaceExisting(false); setShowForm(true); };
 
   const openEdit = (member: StaffMember) => {
     setEditing(member);
     setPassword("");
+    setReplaceExisting(false);
     setForm({ email: member.email, firstName: member.firstName, lastName: member.lastName, role: member.role, isActive: member.isActive, siteEditor: normalizeSiteEditorFlags(member.siteEditor) });
     setShowForm(true);
   };
@@ -116,7 +118,7 @@ export default function AdminTeam() {
           const response = await fetch(`/api/staff/${editing.uid}/password`, {
             method: "POST",
             headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-            body: JSON.stringify({ password }),
+            body: JSON.stringify({ password, replaceExisting }),
           });
           const data = await response.json().catch(() => ({}));
           if (!response.ok) {
@@ -131,7 +133,7 @@ export default function AdminTeam() {
         const response = await fetch("/api/staff", {
           method: "POST",
           headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ ...form, password }),
+          body: JSON.stringify({ ...form, password, replaceExisting }),
         });
         const data = await response.json().catch(() => ({}));
         if (!response.ok) {
@@ -242,6 +244,20 @@ export default function AdminTeam() {
                 ? "Leave blank to keep the current password. A new password must be changed on the next sign-in."
                 : "At least 8 characters. They sign in with this password, then choose their own."}
             />
+            <label className="mt-3 flex items-start gap-2 text-sm font-semibold text-gray-700">
+              <input
+                type="checkbox"
+                className="mt-1 h-4 w-4 accent-[#0d9488]"
+                checked={replaceExisting}
+                onChange={(event) => setReplaceExisting(event.target.checked)}
+              />
+              <span>
+                Replace existing login
+                <span className="mt-1 block text-xs font-medium text-gray-400">
+                  Required to set a password on an email that already has a login. A client account is refused. An admin&apos;s role is not changed.
+                </span>
+              </span>
+            </label>
           </div>
 
           <SiteEditorToggles

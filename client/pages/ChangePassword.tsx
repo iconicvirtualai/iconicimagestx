@@ -6,7 +6,7 @@ import { nextPathAfterSignIn, passwordChoiceError } from "@shared/passwordAccoun
 import { PasswordField } from "@/components/PasswordField";
 
 export default function ChangePassword() {
-  const { user, loading, userType, staffProfile, clientProfile, mustChangePassword, refreshProfile, notePasswordChanged } = useAuth();
+  const { user, loading, userType, staffProfile, clientProfile, mustChangePassword, refreshProfile, notePasswordChanged, signIn } = useAuth();
   const navigate = useNavigate();
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -42,6 +42,12 @@ export default function ChangePassword() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Could not change the password.");
       notePasswordChanged();
+      if (user.email) await signIn(user.email, password);
+      try {
+        await user.getIdToken(true);
+      } catch {
+        // Refresh tokens were revoked. The sign-in above already has a new token.
+      }
       await refreshProfile();
       const next = nextPathAfterSignIn({
         mustChangePassword: false,

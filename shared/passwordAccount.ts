@@ -16,6 +16,11 @@ export const PASSWORD_RESET_HOSTS = [
   "iconicimagestx.com",
 ] as const;
 
+export const PASSWORD_RESET_FALLBACK_URL = "https://iconicimagestx.vercel.app/login";
+export const MUST_CHANGE_PASSWORD_CODE = "must_change_password";
+
+const LOCAL_RESET_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
+
 const GENERATED_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
 
 export function passwordPolicyError(password: string): string | null {
@@ -52,9 +57,27 @@ export function nextPathAfterSignIn(input: {
   return null;
 }
 
+/** Continue URL for a password reset. Unknown origins use the vercel.app login. */
 export function passwordResetContinueUrl(origin: string): string {
-  const base = origin.trim().replace(/\/$/, "");
-  return `${base}/login`;
+  let parsed: URL;
+  try {
+    parsed = new URL(origin);
+  } catch {
+    return PASSWORD_RESET_FALLBACK_URL;
+  }
+  const host = parsed.hostname.toLowerCase();
+  const listed = (PASSWORD_RESET_HOSTS as readonly string[]).includes(host);
+  const local = LOCAL_RESET_HOSTS.has(host);
+  if (!listed && !local) return PASSWORD_RESET_FALLBACK_URL;
+  if (parsed.protocol !== "https:" && !(local && parsed.protocol === "http:")) {
+    return PASSWORD_RESET_FALLBACK_URL;
+  }
+  return `${parsed.origin}/login`;
+}
+
+export function isPasswordChangeApiPath(url: string | undefined): boolean {
+  const path = String(url || "").split("?")[0].replace(/\/+$/, "");
+  return path === "/api/account/password";
 }
 
 export function passwordResetActionSettings(origin: string): { url: string; handleCodeInApp: false } {

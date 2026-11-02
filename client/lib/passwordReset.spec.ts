@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { sendPasswordResetEmail } from "firebase/auth";
-import { FORGOT_PASSWORD_NOTICE, ENTER_EMAIL_NOTICE } from "@shared/passwordAccount";
+import { FORGOT_PASSWORD_NOTICE, ENTER_EMAIL_NOTICE, PASSWORD_RESET_FALLBACK_URL } from "@shared/passwordAccount";
 import { requestPasswordReset } from "./passwordReset";
 
 vi.mock("firebase/auth", () => ({
@@ -39,6 +39,23 @@ describe("requestPasswordReset", () => {
       { app: "test-auth" },
       "cadi@caditorres.com",
       { url: "https://iconicimagestx.com/login", handleCodeInApp: false },
+    );
+  });
+
+  it("falls back when the page origin is not an Iconic host", async () => {
+    send.mockResolvedValue(undefined);
+    await requestPasswordReset("cadi@caditorres.com", "https://evil.example");
+    expect(send).toHaveBeenCalledWith(
+      { app: "test-auth" },
+      "cadi@caditorres.com",
+      { url: PASSWORD_RESET_FALLBACK_URL, handleCodeInApp: false },
+    );
+    send.mockClear();
+    await requestPasswordReset("cadi@caditorres.com", "http://localhost:5173");
+    expect(send).toHaveBeenCalledWith(
+      { app: "test-auth" },
+      "cadi@caditorres.com",
+      { url: "http://localhost:5173/login", handleCodeInApp: false },
     );
   });
 

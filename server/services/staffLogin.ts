@@ -23,6 +23,12 @@ export interface ProvisionStaffInput {
   password?: unknown;
   tempPassword?: unknown;
   siteEditor?: unknown;
+  replaceExisting?: unknown;
+}
+
+export interface StaffLoginActor {
+  uid: string;
+  email?: string | null;
 }
 
 export interface ProvisionStaffResult {
@@ -42,31 +48,115 @@ function httpError(status: number, message: string): StaffLoginError {
   return new StaffLoginError(status, message);
 }
 
-async function ensureAuthUser(email: string, password: string, displayName: string): Promise<{ uid: string; created: boolean }> {
-  try {
-    const existing = await admin.auth().getUserByEmail(email);
-    await admin.auth().updateUser(existing.uid, { password, displayName, email });
-    return { uid: existing.uid, created: false };
-  } catch (err: unknown) {
-    const code = (err as { code?: string }).code;
-    if (code !== "auth/user-not-found") throw err;
-  }
+const CLIENT_TAKEN = "That email belongs to a client account. The password and role were not changed.";
+const ADMIN_TAKEN = "That email belongs to an admin. The password and role were not changed.";
+const REPLACE_REQUIRED = "That email already has a login. Check Replace existing login to set a new password. Nothing was changed.";
 
+async function findAuthUser(email: string): Promise<admin.auth.UserRecord | null> {
   try {
-    const created = await admin.auth().createUser({ email, password, displayName });
-    return { uid: created.uid, created: true };
+    return await admin.auth().getUserByEmail(email);
   } catch (err: unknown) {
     const code = (err as { code?: string }).code;
-    if (code === "auth/email-already-exists") {
-      const existing = await admin.auth().getUserByEmail(email);
-      await admin.auth().updateUser(existing.uid, { password, displayName, email });
-      return { uid: existing.uid, created: false };
-    }
-    if (code === "auth/invalid-password" || code === "auth/weak-password") {
-      throw httpError(400, "Password must be at least 8 characters.");
-    }
+    if (code === "auth/user-not-found") return null;
     throw err;
   }
+}
+
+async function clientLinked(uid: string, email: string): Promise<boolean> {
+  const db = admin.firestore();
+  const byId = await db.collection("clients").doc(uid).get();
+  if (byId.exists) return true;
+  const [byEmail, byUid] = await Promise.all([
+    db.collection("clients").where("email", "==", email).limit(1).get(),
+    db.collection("clients").where("firebaseUid", "==", uid).limit(1).get(),
+  ]);
+  return !byEmail.empty || !byUid.empty;
+}
+
+async function staffLoginFor(uid: string, email: string): Promise<{ id: string; role: string } | null> {
+  const db = admin.firestore();
+  const direct = await db.collection("staff").doc(uid).get();
+  if (direct.exists) {
+    const role = direct.data()?.role;
+    if (typeof role === "string" && role) return { id: direct.id, role };
+  }
+  const matches = await db.collection("staff").where("email", "==", email).get();
+  const found = matches.docs.find((entry) => !entry.id.startsWith("manual_") && typeof entry.data()?.role === "string");
+  if (!found) return null;
+  return { id: found.id, role: String(found.data().role) };
+}
+
+async function stampMustChangeClaim(uid: string) {
+  const record = await admin.auth().getUser(uid);
+  const claims = { ...(record.customClaims || {}), mustChangePassword: true };
+  await admin.auth().setCustomUserClaims(uid, claims);
+  await admin.auth().revokeRefreshTokens(uid);
+}
+
+function logReplacement(actor: StaffLoginActor, target: { uid: string; email: string; previousRole: string | null; nextRole: string | null }) {
+  console.info("[Staff] Replaced existing login", JSON.stringify({
+    actorUid: actor.uid,
+    actorEmail: actor.email || null,
+    targetUid: target.uid,
+    targetEmail: target.email,
+    previousRole: target.previousRole,
+    nextRole: target.nextRole,
+  }));
+}
+
+/**
+ * Create an Auth user, or set a password on an existing one only when the
+ * admin checked Replace existing login. Client logins and admin roles are
+ * never taken over.
+ */
+async function ensureAuthUser(input: {
+  email: string;
+  password: string;
+  displayName: string;
+  replaceExisting: boolean;
+  requestedRole: string | null;
+  actor: StaffLoginActor;
+}): Promise<{ uid: string; created: boolean }> {
+  const existing = await findAuthUser(input.email);
+  if (!existing) {
+    try {
+      const created = await admin.auth().createUser({
+        email: input.email,
+        password: input.password,
+        displayName: input.displayName,
+      });
+      await stampMustChangeClaim(created.uid);
+      return { uid: created.uid, created: true };
+    } catch (err: unknown) {
+      const code = (err as { code?: string }).code;
+      if (code !== "auth/email-already-exists") {
+        if (code === "auth/invalid-password" || code === "auth/weak-password") {
+          throw httpError(400, "Password must be at least 8 characters.");
+        }
+        throw err;
+      }
+    }
+  }
+
+  const user = existing || await admin.auth().getUserByEmail(input.email);
+  if (await clientLinked(user.uid, input.email)) throw httpError(409, CLIENT_TAKEN);
+  const staff = await staffLoginFor(user.uid, input.email);
+  if (staff?.role === "admin" && input.requestedRole !== null) throw httpError(409, ADMIN_TAKEN);
+  if (!input.replaceExisting) throw httpError(409, REPLACE_REQUIRED);
+
+  await admin.auth().updateUser(user.uid, {
+    password: input.password,
+    displayName: input.displayName,
+    email: input.email,
+  });
+  await stampMustChangeClaim(user.uid);
+  logReplacement(input.actor, {
+    uid: user.uid,
+    email: input.email,
+    previousRole: staff?.role || null,
+    nextRole: input.requestedRole,
+  });
+  return { uid: user.uid, created: false };
 }
 
 async function deleteManualDuplicates(email: string, authUid: string) {
@@ -87,7 +177,7 @@ function editorFlags(role: string, email: string, flags: unknown): SiteEditorFla
 }
 
 /** Create the Auth user, or replace the password when that email already has one. */
-export async function provisionStaffLogin(input: ProvisionStaffInput): Promise<ProvisionStaffResult> {
+export async function provisionStaffLogin(input: ProvisionStaffInput, actor: StaffLoginActor): Promise<ProvisionStaffResult> {
   const firstName = cleanPersonName(input.firstName);
   const lastName = cleanPersonName(input.lastName);
   const email = normalizeEmail(input.email);
@@ -102,7 +192,14 @@ export async function provisionStaffLogin(input: ProvisionStaffInput): Promise<P
   if (policy) throw httpError(400, policy);
 
   const displayName = `${firstName} ${lastName}`.trim();
-  const { uid, created } = await ensureAuthUser(email, password, displayName);
+  const { uid, created } = await ensureAuthUser({
+    email,
+    password,
+    displayName,
+    replaceExisting: input.replaceExisting === true,
+    requestedRole: role,
+    actor,
+  });
   const db = admin.firestore();
   const ref = db.collection("staff").doc(uid);
   const existing = await ref.get();
@@ -127,7 +224,12 @@ export async function provisionStaffLogin(input: ProvisionStaffInput): Promise<P
 }
 
 /** Admin sets a new password on a photographer or other staff record. */
-export async function setStaffPassword(staffId: string, password: unknown): Promise<{ uid: string; mustChangePassword: true }> {
+export async function setStaffPassword(
+  staffId: string,
+  password: unknown,
+  actor: StaffLoginActor,
+  replaceExisting: boolean,
+): Promise<{ uid: string; mustChangePassword: true }> {
   const nextPassword = String(password || "");
   const policy = passwordPolicyError(nextPassword);
   if (policy) throw httpError(400, policy);
@@ -141,7 +243,14 @@ export async function setStaffPassword(staffId: string, password: unknown): Prom
   }
   const firstName = cleanPersonName(data.firstName) || "Staff";
   const lastName = cleanPersonName(data.lastName);
-  const { uid } = await ensureAuthUser(email, nextPassword, `${firstName} ${lastName}`.trim());
+  const { uid } = await ensureAuthUser({
+    email,
+    password: nextPassword,
+    displayName: `${firstName} ${lastName}`.trim(),
+    replaceExisting,
+    requestedRole: null,
+    actor,
+  });
   const now = admin.firestore.FieldValue.serverTimestamp();
   if (uid === staffId) {
     await db.collection("staff").doc(uid).update({

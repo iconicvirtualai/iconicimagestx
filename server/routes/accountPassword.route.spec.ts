@@ -5,6 +5,8 @@ import express from "express";
 const state = vi.hoisted(() => ({
   docs: new Map<string, Record<string, unknown>>(),
   passwords: new Map<string, string>(),
+  claims: new Map<string, Record<string, unknown>>(),
+  revoked: [] as string[],
 }));
 
 function key(collection: string, id: string) {
@@ -44,6 +46,7 @@ vi.mock("firebase-admin", () => {
     auth: () => ({
       async verifyIdToken(token: string) {
         if (token === "photo-token") return { uid: "photo-1", email: "dummy.photo@example.com" };
+        if (token === "photo-claim") return { uid: "photo-1", email: "dummy.photo@example.com", mustChangePassword: true };
         if (token === "client-token") return { uid: "client-1", email: "ada@example.com" };
         throw new Error("invalid");
       },
@@ -51,12 +54,23 @@ vi.mock("firebase-admin", () => {
         if (patch.password) state.passwords.set(uid, patch.password);
         return { uid };
       },
+      async getUser(uid: string) {
+        return { uid, customClaims: { ...(state.claims.get(uid) || {}) } };
+      },
+      async setCustomUserClaims(uid: string, claims: Record<string, unknown>) {
+        state.claims.set(uid, { ...claims });
+      },
+      async revokeRefreshTokens(uid: string) {
+        state.revoked.push(uid);
+      },
     }),
   };
   return { default: admin };
 });
 
 import accountPasswordRouter from "./accountPassword";
+import { requireAuth } from "../middleware/auth";
+import { blockUntilPasswordChanged } from "../middleware/mustChangePassword";
 
 let server: Server;
 let baseUrl = "";
@@ -64,6 +78,9 @@ let baseUrl = "";
 beforeAll(async () => {
   const app = express();
   app.use(express.json());
+  app.use(blockUntilPasswordChanged);
+  app.get("/api/probe", (_req, res) => res.json({ ok: true }));
+  app.get("/api/session/probe", requireAuth, (_req, res) => res.json({ ok: true }));
   app.use("/api/account", accountPasswordRouter);
   server = await new Promise<Server>((resolve) => {
     const listening = app.listen(0, "127.0.0.1", () => resolve(listening));
@@ -83,8 +100,12 @@ afterAll(async () => {
 beforeEach(() => {
   state.docs = new Map();
   state.passwords = new Map();
+  state.claims = new Map();
+  state.revoked = [];
   state.docs.set("staff/photo-1", { role: "photographer", mustChangePassword: true, email: "dummy.photo@example.com" });
   state.docs.set("clients/client-1", { email: "ada@example.com", mustChangePassword: true });
+  state.claims.set("photo-1", { mustChangePassword: true });
+  state.claims.set("client-1", { mustChangePassword: true });
 });
 
 function change(token: string, password: string) {
@@ -97,6 +118,28 @@ function change(token: string, password: string) {
     body: JSON.stringify({ password }),
   });
 }
+
+describe("must-change password gate", () => {
+  it("blocks authenticated routes, allows the password route, and clears the claim", async () => {
+    const claimed = await fetch(`${baseUrl}/api/probe`, { headers: { Authorization: "Bearer photo-claim" } });
+    expect(claimed.status).toBe(403);
+    expect(await claimed.json()).toMatchObject({ code: "must_change_password" });
+
+    const flagged = await fetch(`${baseUrl}/api/session/probe`, { headers: { Authorization: "Bearer photo-token" } });
+    expect(flagged.status).toBe(403);
+    expect(await flagged.json()).toMatchObject({ code: "must_change_password" });
+
+    const changed = await change("photo-token", "chosen-password");
+    expect(changed.status).toBe(200);
+    expect(state.docs.get("staff/photo-1")?.mustChangePassword).toBe(false);
+    expect(state.claims.get("photo-1")?.mustChangePassword).toBeUndefined();
+    expect(state.revoked).toContain("photo-1");
+
+    const open = await fetch(`${baseUrl}/api/session/probe`, { headers: { Authorization: "Bearer photo-token" } });
+    expect(open.status).toBe(200);
+    expect(await open.json()).toEqual({ ok: true });
+  });
+});
 
 describe("POST /api/account/password", () => {
   it("lets a photographer replace the temporary password and clears the flag", async () => {

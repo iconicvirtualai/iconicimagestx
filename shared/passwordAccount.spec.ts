@@ -4,6 +4,7 @@ import {
   CHANGE_PASSWORD_PATH,
   ENTER_EMAIL_NOTICE,
   FORGOT_PASSWORD_NOTICE,
+  PASSWORD_RESET_FALLBACK_URL,
   PASSWORD_RESET_HOSTS,
   generateTemporaryPassword,
   nextPathAfterSignIn,
@@ -86,5 +87,13 @@ describe("forgot-password continue URL", () => {
     expect(matchingRedirect("/change-password", "iconicimagestx.vercel.app")).toBeUndefined();
     expect(FORGOT_PASSWORD_NOTICE).toBe("If that email has an account, a reset link is on its way.");
     expect(ENTER_EMAIL_NOTICE).toBe("Enter a valid email address.");
+  });
+
+  it("keeps localhost and falls back for any other origin", () => {
+    expect(passwordResetContinueUrl("http://localhost:5173")).toBe("http://localhost:5173/login");
+    expect(passwordResetContinueUrl("http://127.0.0.1:8080")).toBe("http://127.0.0.1:8080/login");
+    expect(passwordResetContinueUrl("https://evil.example")).toBe(PASSWORD_RESET_FALLBACK_URL);
+    expect(passwordResetContinueUrl("https://iconicimagestx.vercel.app.evil.com")).toBe(PASSWORD_RESET_FALLBACK_URL);
+    expect(passwordResetContinueUrl("not a url")).toBe(PASSWORD_RESET_FALLBACK_URL);
   });
 });

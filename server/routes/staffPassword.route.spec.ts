@@ -4,7 +4,9 @@ import express from "express";
 
 const state = vi.hoisted(() => ({
   staff: new Map<string, Record<string, unknown>>(),
-  users: new Map<string, { uid: string; email: string; password?: string; displayName?: string }>(),
+  clients: new Map<string, Record<string, unknown>>(),
+  users: new Map<string, { uid: string; email: string; password?: string; displayName?: string; customClaims?: Record<string, unknown> }>(),
+  revoked: [] as string[],
   seq: 0,
 }));
 
@@ -27,42 +29,50 @@ vi.mock("firebase-admin", () => {
             const ref = {
               id,
               async get() {
-                if (name !== "staff") return { id, exists: false, data: () => undefined, ref };
-                const data = state.staff.get(id);
+                const bucket = name === "clients" ? state.clients : name === "staff" ? state.staff : null;
+                if (!bucket) return { id, exists: false, data: () => undefined, ref };
+                const data = bucket.get(id);
                 return { id, exists: data !== undefined, data: () => (data ? { ...data } : undefined), ref };
               },
               async set(data: Record<string, unknown>, options?: { merge?: boolean }) {
-                const current = options?.merge ? state.staff.get(id) || {} : {};
-                state.staff.set(id, { ...current, ...data });
+                const bucket = name === "clients" ? state.clients : state.staff;
+                const current = options?.merge ? bucket.get(id) || {} : {};
+                bucket.set(id, { ...current, ...data });
               },
               async update(patch: Record<string, unknown>) {
-                const current = state.staff.get(id);
+                const bucket = name === "clients" ? state.clients : state.staff;
+                const current = bucket.get(id);
                 if (!current) throw new Error("missing");
-                state.staff.set(id, { ...current, ...patch });
+                bucket.set(id, { ...current, ...patch });
               },
               async delete() {
-                state.staff.delete(id);
+                (name === "clients" ? state.clients : state.staff).delete(id);
               },
             };
             return ref;
           },
           where(field: string, _op: string, value: string) {
-            return {
+            const query = {
               async get() {
-                const docs = [...state.staff.entries()]
+                const bucket = name === "clients" ? state.clients : state.staff;
+                const docs = [...bucket.entries()]
                   .filter(([, data]) => data[field] === value)
                   .map(([id]) => staffDocs().collection(name).doc(id))
                   .map((ref) => ({
                     id: ref.id,
                     ref,
                     data: () => {
-                      const data = state.staff.get(ref.id);
+                      const data = (name === "clients" ? state.clients : state.staff).get(ref.id);
                       return data ? { ...data } : undefined;
                     },
                   }));
                 return { empty: docs.length === 0, docs, size: docs.length };
               },
+              limit() {
+                return query;
+              },
             };
+            return query;
           },
         };
       },
@@ -99,6 +109,19 @@ vi.mock("firebase-admin", () => {
         Object.assign(user, patch);
         return { ...user };
       },
+      async getUser(uid: string) {
+        const user = state.users.get(uid);
+        if (!user) throw new Error("missing user");
+        return { ...user, customClaims: user.customClaims || {} };
+      },
+      async setCustomUserClaims(uid: string, claims: Record<string, unknown>) {
+        const user = state.users.get(uid);
+        if (!user) throw new Error("missing user");
+        user.customClaims = { ...claims };
+      },
+      async revokeRefreshTokens(uid: string) {
+        state.revoked.push(uid);
+      },
     }),
   };
   return { default: admin };
@@ -130,7 +153,9 @@ afterAll(async () => {
 
 beforeEach(() => {
   state.staff = new Map();
+  state.clients = new Map();
   state.users = new Map();
+  state.revoked = [];
   state.seq = 0;
   state.staff.set("admin-1", { role: "admin", isActive: true, email: "cadi@example.com" });
 });
@@ -166,24 +191,78 @@ describe("POST /api/staff password", () => {
     });
     expect(saved).not.toHaveProperty("password");
     expect(state.users.get(body.id)?.password).toBe("temporary1");
+    expect(state.users.get(body.id)?.customClaims).toMatchObject({ mustChangePassword: true });
   });
 
-  it("updates the existing auth user when the email is already registered", async () => {
-    state.users.set("existing-1", { uid: "existing-1", email: "dummy.photo@example.com", password: "old-password" });
-    state.staff.set("manual_9", { email: "dummy.photo@example.com", role: "photographer", firstName: "Old" });
+  it("refuses a client email without changing the password or role", async () => {
+    state.users.set("client-9", { uid: "client-9", email: "ada@example.com", password: "keep-me" });
+    state.clients.set("crm-ada", { email: "ada@example.com", firebaseUid: "client-9" });
     const res = await createPhotographer({
+      firstName: "Ada",
+      lastName: "Agent",
+      email: "ada@example.com",
+      role: "photographer",
+      password: "temporary1",
+      replaceExisting: true,
+    });
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toMatch(/client account/i);
+    expect(state.users.get("client-9")?.password).toBe("keep-me");
+    expect(state.staff.has("client-9")).toBe(false);
+    expect(state.clients.get("crm-ada")?.role).toBeUndefined();
+  });
+
+  it("refuses an admin email without changing the password or role", async () => {
+    state.users.set("owner-1", { uid: "owner-1", email: "owner@example.com", password: "keep-me" });
+    state.staff.set("owner-1", { role: "admin", email: "owner@example.com", isActive: true });
+    const res = await createPhotographer({
+      firstName: "Owner",
+      lastName: "Account",
+      email: "owner@example.com",
+      role: "photographer",
+      password: "temporary1",
+      replaceExisting: true,
+    });
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toMatch(/admin/i);
+    expect(state.users.get("owner-1")?.password).toBe("keep-me");
+    expect(state.staff.get("owner-1")?.role).toBe("admin");
+  });
+
+  it("replaces an existing non-admin login only when replaceExisting is set, and logs the admin", async () => {
+    const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
+    state.users.set("existing-1", { uid: "existing-1", email: "dummy.photo@example.com", password: "old-password" });
+    state.staff.set("existing-1", { role: "coordinator", email: "dummy.photo@example.com", isActive: true });
+    state.staff.set("manual_9", { email: "dummy.photo@example.com", role: "photographer", firstName: "Old" });
+    const blocked = await createPhotographer({
       firstName: "Dummy",
       lastName: "Photographer",
       email: "Dummy.Photo@example.com",
       role: "photographer",
       password: "temporary1",
     });
+    expect(blocked.status).toBe(409);
+    expect(state.users.get("existing-1")?.password).toBe("old-password");
+    expect(state.staff.get("existing-1")?.role).toBe("coordinator");
+
+    const res = await createPhotographer({
+      firstName: "Dummy",
+      lastName: "Photographer",
+      email: "Dummy.Photo@example.com",
+      role: "photographer",
+      password: "temporary1",
+      replaceExisting: true,
+    });
     const body = await res.json();
     expect(res.status).toBe(200);
     expect(body).toMatchObject({ id: "existing-1", created: false, role: "photographer", mustChangePassword: true });
     expect(state.users.get("existing-1")?.password).toBe("temporary1");
+    expect(state.users.get("existing-1")?.customClaims).toMatchObject({ mustChangePassword: true });
     expect(state.staff.get("existing-1")).toMatchObject({ role: "photographer", mustChangePassword: true });
     expect(state.staff.has("manual_9")).toBe(false);
+    expect(state.revoked).toContain("existing-1");
+    expect(info.mock.calls.some((call) => String(call[1] || call[0]).includes("admin-1"))).toBe(true);
+    info.mockRestore();
   });
 
   it("rejects a short password and an anonymous caller", async () => {
@@ -221,7 +300,7 @@ describe("POST /api/staff/:id/password", () => {
     const res = await fetch(`${baseUrl}/api/staff/photo-1/password`, {
       method: "POST",
       headers: { Authorization: "Bearer admin-token", "Content-Type": "application/json" },
-      body: JSON.stringify({ password: "replacement1" }),
+      body: JSON.stringify({ password: "replacement1", replaceExisting: true }),
     });
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ id: "photo-1", mustChangePassword: true });
