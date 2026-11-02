@@ -89,26 +89,6 @@
       "statusCode": 301
     },
     {
-      "source": "/forgot-password",
-      "destination": "/login?mode=reset",
-      "statusCode": 301
-    },
-    {
-      "source": "/forgot-password/",
-      "destination": "/login?mode=reset",
-      "statusCode": 301
-    },
-    {
-      "source": "/studios",
-      "destination": "/studio-105",
-      "statusCode": 302
-    },
-    {
-      "source": "/studios/",
-      "destination": "/studio-105",
-      "statusCode": 302
-    },
-    {
       "source": "/holiday-event",
       "destination": "/thankful",
       "statusCode": 302

@@ -196,14 +196,34 @@ describe("public link check", () => {
     expect(read("client/components/PublicContactLine.tsx")).toContain("BUSINESS_CONTACT.mapsHref");
     expect(read("client/pages/Headshots10.tsx")).toContain("BUSINESS_CONTACT.mapsHref");
     expect(read("client/pages/Headshots10.tsx")).toContain("BUSINESS_CONTACT.mapsEmbed");
+    const studio = read("client/pages/Studio105.tsx");
+    expect(studio).toContain("Get directions");
+    expect(studio).toContain("BUSINESS_CONTACT.mapsHref");
+    expect(studio).toContain("BUSINESS_CONTACT.mapsEmbed");
+    expect(studio).toContain('loading="lazy"');
+    expect(studio).toContain('title="Map of Studio 105, 26410 Oakridge Dr. Ste 105 - 108, Spring, TX 77380"');
+    expect(studio).not.toMatch(/maps\.googleapis\.com|AIza/);
+    expect(decodeURIComponent(BUSINESS_CONTACT.mapsHref)).toBe(
+      "https://www.google.com/maps/dir/?api=1&destination=26410 Oakridge Dr. Ste 105 - 108, Spring, TX 77380",
+    );
   });
 
   it("sends the crawled 404s to the closest live page and leaves vercel.app and thankful alone", () => {
     expect(follow("/booking")).toEqual({ hops: ["/booking", "/book"], status: 301 });
-    expect(follow("/forgot-password")).toEqual({ hops: ["/forgot-password", "/login"], status: 301 });
-    expect(matchingRedirect("/forgot-password", HOST)?.destination).toBe("/login?mode=reset");
-    expect(follow("/studios")).toEqual({ hops: ["/studios", "/studio-105"], status: 302 });
     expect(follow("/holiday-event")).toEqual({ hops: ["/holiday-event", "/thankful"], status: 302 });
+    expect(matchingRedirect("/forgot-password", HOST)).toBeUndefined();
+    expect(matchingRedirect("/forgot-password/", HOST)).toBeUndefined();
+    expect(matchingRedirect("/studios", HOST)).toBeUndefined();
+    expect(matchingRedirect("/studios/", HOST)).toBeUndefined();
+    const app = read("client/App.tsx");
+    const vercel = read("vercel.json");
+    const netlify = read("netlify.toml");
+    for (const source of [app, vercel, netlify]) {
+      expect(source).not.toContain('"/forgot-password"');
+      expect(source).not.toContain('"/studios"');
+      expect(source).not.toContain("path=\"/forgot-password\"");
+      expect(source).not.toContain("path=\"/studios\"");
+    }
     expect(follow("/services")).toEqual({ hops: ["/services", "/pricing"], status: 301 });
     expect(follow("/services/virtual-staging").hops).toEqual(["/services/virtual-staging"]);
     expect(follow("/gallery")).toEqual({ hops: ["/gallery", "/portal"], status: 307 });
