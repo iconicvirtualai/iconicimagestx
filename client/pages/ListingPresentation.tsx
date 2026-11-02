@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
-import type { PublicPresentation } from "@shared/presentation";
+import { presentationClipboardUrl, type PublicPresentation } from "@shared/presentation";
 
 const SERIF = '"Cormorant Garamond", "Iowan Old Style", Palatino, Georgia, serif';
 
@@ -233,7 +233,10 @@ export default function ListingPresentation() {
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
-  const shareUrl = useMemo(() => (typeof window === "undefined" ? "" : window.location.href), [token]);
+  const shareUrl = useMemo(
+    () => (typeof window === "undefined" ? "" : presentationClipboardUrl(window.location.origin, token)),
+    [token],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -275,7 +278,8 @@ export default function ListingPresentation() {
   }, [presentation]);
 
   const copy = () => {
-    const url = window.location.href;
+    const url = presentationClipboardUrl(window.location.origin, token);
+    if (!url) return;
     setCopied(true);
     window.setTimeout(() => setCopied(false), 12000);
     const fallback = () => {

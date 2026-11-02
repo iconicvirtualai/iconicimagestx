@@ -11,6 +11,8 @@ import { GalleryDownloadLockNotice } from "@/components/GalleryDownloadLock";
 import { DoorsOpenDeliveryNote } from "@/components/DoorsOpenTour";
 import { ClientGalleryBoard } from "@/components/gallery/ClientGalleryMedia";
 import type { ClientGalleryItem } from "@/components/gallery/clientGalleryMedia";
+import { useAuth } from "@/contexts/AuthContext";
+import { presentationClipboardUrl } from "@shared/presentation";
 
 export interface PublicGalleryModel {
   address?: unknown;
@@ -23,7 +25,14 @@ export interface PublicGalleryModel {
   invoiceId?: string | null;
   /** Absolute tokenized pay link from the public site. A legacy auto-id falls back to /invoice/{id}. */
   invoicePayPath?: string | null;
+  /** `/present/<token>` when this delivery already has a presentation. */
+  sharePath?: string | null;
   mediaItems?: ClientGalleryItem[];
+}
+
+/** Share control on /gallery/:id. Copies the presentation page, never a file or /studio URL. */
+export function publicGalleryCopyUrl(origin: string, sharePath: string | null | undefined): string {
+  return presentationClipboardUrl(origin, sharePath || "");
 }
 
 function publicInvoiceHref(gallery: PublicGalleryModel): string {
@@ -149,11 +158,13 @@ export function PublicGalleryMissing() {
 export default function PublicGallery() {
   const { galleryId } = useParams<{ galleryId: string }>();
   const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
   const [gallery, setGallery] = React.useState<PublicGalleryModel | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [unavailable, setUnavailable] = React.useState(false);
 
   React.useEffect(() => {
+    if (authLoading) return;
     if (!galleryId) {
       setUnavailable(true);
       setLoading(false);
@@ -176,7 +187,16 @@ export default function PublicGallery() {
         // A project id shared on /gallery/:id can still open its studio or delivery gallery.
         // Resolver text is for staff logs. This page never renders it.
         if (res.status === 404) {
-          const linkRes = await fetch(`/api/galleries/link/${encodeURIComponent(galleryId)}`);
+          const headers: Record<string, string> = {};
+          if (user) {
+            try {
+              const token = await user.getIdToken();
+              if (token) headers.Authorization = `Bearer ${token}`;
+            } catch {
+              // A missing session stays on the public gallery miss.
+            }
+          }
+          const linkRes = await fetch(`/api/galleries/link/${encodeURIComponent(galleryId)}`, { headers });
           const link = await linkRes.json().catch(() => null);
           if (cancelled) return;
           const openGalleryId = link && typeof link.openGalleryId === "string" ? link.openGalleryId : "";
@@ -201,10 +221,15 @@ export default function PublicGallery() {
     return () => {
       cancelled = true;
     };
-  }, [galleryId, navigate]);
+  }, [galleryId, navigate, user, authLoading]);
 
-  const copyLink = async (url: string) => {
-    await navigator.clipboard.writeText(url);
+  const copyLink = async () => {
+    const shareLink = publicGalleryCopyUrl(window.location.origin, gallery?.sharePath);
+    if (!shareLink) {
+      toast.error("This presentation link is not active.");
+      return;
+    }
+    await navigator.clipboard.writeText(shareLink);
     toast.success("Share link copied.");
   };
 

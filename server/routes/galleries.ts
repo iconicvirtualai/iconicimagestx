@@ -21,6 +21,7 @@ import { readInvoiceDoc } from "../lib/invoiceDoc";
 import { galleryStatusNeedsReleaseGate } from "../../shared/galleryRelease";
 import { deliverGalleryToClient } from "../services/galleryDeliver";
 import { loadGalleryReleaseForGallery } from "../services/galleryReleaseGate";
+import { activePresentationPath } from "../../shared/presentation";
 import { handlePublicGalleryLink } from "./galleryLink";
 
 const router = Router();
@@ -99,7 +100,25 @@ async function downloadGateForGallery(gallery: Record<string, unknown>): Promise
   };
 }
 
-function clientGalleryPayload(id: string, gallery: Record<string, unknown>, gate: GalleryDownloadGate & { invoice: Record<string, unknown> | null }) {
+async function presentationSharePath(gallery: Record<string, unknown>): Promise<string | null> {
+  const listingId = typeof gallery.listingId === "string" ? gallery.listingId.trim() : "";
+  if (!listingId) return null;
+  try {
+    const snap = await db().collection("listings").doc(listingId).get();
+    if (!snap.exists) return null;
+    return activePresentationPath(snap.data() || {});
+  } catch (err) {
+    console.warn("[Galleries] Presentation link lookup skipped.", err);
+    return null;
+  }
+}
+
+function clientGalleryPayload(
+  id: string,
+  gallery: Record<string, unknown>,
+  gate: GalleryDownloadGate & { invoice: Record<string, unknown> | null },
+  sharePath: string | null,
+) {
   const unlocked = clientGalleryDownloadsUnlocked(gate);
   const invoice = gate.invoice;
   const showMedia = ["delivered", "approved"].includes(String(gallery.status || ""));
@@ -129,6 +148,7 @@ function clientGalleryPayload(id: string, gallery: Record<string, unknown>, gate
     lockTitle: unlocked ? null : ICONIC_DOWNLOAD_LOCK.title,
     lockMessage: unlocked ? null : ICONIC_DOWNLOAD_LOCK.message,
     mediaItems: showMedia ? lockedClientGalleryMedia(id, media, unlocked) : [],
+    sharePath,
   };
 }
 
@@ -253,8 +273,11 @@ router.get("/public/:id", async (req, res) => {
     }
 
     const gallery = doc.data()!;
-    const gate = await downloadGateForGallery(gallery);
-    return res.json(clientGalleryPayload(doc.id, gallery, gate));
+    const [gate, sharePath] = await Promise.all([
+      downloadGateForGallery(gallery),
+      presentationSharePath(gallery),
+    ]);
+    return res.json(clientGalleryPayload(doc.id, gallery, gate, sharePath));
   } catch (err) {
     console.error("[Galleries] Public fetch error:", err);
     const code = (err as { code?: unknown }).code;
@@ -265,7 +288,7 @@ router.get("/public/:id", async (req, res) => {
   }
 });
 
-// ─── GET /api/galleries/link/:id — Staff-shared /studio/:id resolver ────────
+// ─── GET /api/galleries/link/:id — Private /studio/:id resolver ─────────────
 // Registered before /:id so "link" is not treated as a gallery id.
 
 router.get("/link/:id", handlePublicGalleryLink);
@@ -290,9 +313,12 @@ router.get("/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
       if (!["delivered", "approved"].includes(gallery.status)) {
         return res.status(403).json({ error: "Gallery not yet available." });
       }
-      const gate = await downloadGateForGallery(gallery);
+      const [gate, sharePath] = await Promise.all([
+        downloadGateForGallery(gallery),
+        presentationSharePath(gallery),
+      ]);
       return res.json({
-        ...clientGalleryPayload(doc.id, gallery, gate),
+        ...clientGalleryPayload(doc.id, gallery, gate, sharePath),
         clientName: gallery.clientName || null,
       });
     }
