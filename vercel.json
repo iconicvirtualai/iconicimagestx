@@ -79,6 +79,56 @@
       "permanent": false
     },
     {
+      "source": "/booking",
+      "destination": "/book",
+      "statusCode": 301
+    },
+    {
+      "source": "/booking/",
+      "destination": "/book",
+      "statusCode": 301
+    },
+    {
+      "source": "/forgot-password",
+      "destination": "/login?mode=reset",
+      "statusCode": 301
+    },
+    {
+      "source": "/forgot-password/",
+      "destination": "/login?mode=reset",
+      "statusCode": 301
+    },
+    {
+      "source": "/studios",
+      "destination": "/studio-105",
+      "statusCode": 302
+    },
+    {
+      "source": "/studios/",
+      "destination": "/studio-105",
+      "statusCode": 302
+    },
+    {
+      "source": "/holiday-event",
+      "destination": "/thankful",
+      "statusCode": 302
+    },
+    {
+      "source": "/holiday-event/",
+      "destination": "/thankful",
+      "statusCode": 302
+    },
+    {
+      "source": "/services",
+      "destination": "/pricing",
+      "statusCode": 301
+    },
+    {
+      "source": "/services/",
+      "destination": "/pricing",
+      "statusCode": 301
+    },
+    {
       "source": "/home",
       "destination": "/",
       "statusCode": 301

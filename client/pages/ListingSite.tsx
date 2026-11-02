@@ -229,7 +229,7 @@ function Accordion({ title, open, onToggle, children }: { title: string; open: b
 function PoweredBy() {
   return (
     <footer className="ls-powered">
-      <a href="https://iconicimagestx.com">
+      <a href="/">
         <img src="/media/brand/iconic-camera-logo.png" alt="" width={28} height={28} />
         Powered by Iconic Images
       </a>

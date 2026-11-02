@@ -24,9 +24,7 @@ describe("bare /studio and /gallery", () => {
   });
 
   it("redirects only the exact bare paths on Vercel, ahead of the SPA rewrite", () => {
-    const redirects = (vercel.redirects ?? []).filter(
-      (rule) => rule.source.startsWith("/studio") || rule.source.startsWith("/gallery"),
-    );
+    const redirects = (vercel.redirects ?? []).filter((rule) => BARE.includes(rule.source));
     expect(redirects.map((rule) => rule.source)).toEqual(BARE);
     for (const rule of redirects) {
       expect(rule.permanent).toBe(false);

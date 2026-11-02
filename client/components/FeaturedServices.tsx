@@ -28,7 +28,7 @@ const ServiceCard = ({
       <p className="text-gray-300 text-sm leading-relaxed mb-6">{description}</p>
 
       <Link
-        to="/services"
+        to="/pricing"
         className="inline-flex items-center gap-2 text-white hover:text-gray-200 transition-colors font-medium text-sm"
       >
         Learn More

@@ -35,7 +35,7 @@ export default function Insights() {
               <a href="/insights" className="inline-block rounded-lg bg-teal-500 px-6 py-3 text-center font-semibold text-white transition-colors hover:bg-teal-600">
                 Insights & Articles
               </a>
-              <a href="/insights/prep" className="inline-block rounded-lg border-2 border-teal-500 px-6 py-3 text-center font-semibold text-teal-600 transition-colors hover:bg-teal-50">
+              <a href="/book" className="inline-block rounded-lg border-2 border-teal-500 px-6 py-3 text-center font-semibold text-teal-600 transition-colors hover:bg-teal-50">
                 Photoshoot Prep Guide
               </a>
             </div>

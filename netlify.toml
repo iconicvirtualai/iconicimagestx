@@ -77,3 +77,54 @@
   from = "/gallery/"
   status = 302
   to = "/portal"
+
+# Public aliases. /studios and /holiday-event stay temporary until PR #161.
+[[redirects]]
+  from = "/booking"
+  status = 301
+  to = "/book"
+
+[[redirects]]
+  from = "/booking/"
+  status = 301
+  to = "/book"
+
+[[redirects]]
+  from = "/forgot-password"
+  status = 301
+  to = "/login?mode=reset"
+
+[[redirects]]
+  from = "/forgot-password/"
+  status = 301
+  to = "/login?mode=reset"
+
+[[redirects]]
+  from = "/studios"
+  status = 302
+  to = "/studio-105"
+
+[[redirects]]
+  from = "/studios/"
+  status = 302
+  to = "/studio-105"
+
+[[redirects]]
+  from = "/holiday-event"
+  status = 302
+  to = "/thankful"
+
+[[redirects]]
+  from = "/holiday-event/"
+  status = 302
+  to = "/thankful"
+
+[[redirects]]
+  from = "/services"
+  status = 301
+  to = "/pricing"
+
+[[redirects]]
+  from = "/services/"
+  status = 301
+  to = "/pricing"
