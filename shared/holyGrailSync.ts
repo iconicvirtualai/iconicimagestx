@@ -1,7 +1,9 @@
 /**
  * Marketing Holy Grail column contract.
- * Website and HAR feeds may append the inbox (A–H, optional J) and may update
- * Contacts AH, AL, AM, and AN. Every other tab and column stays untouched.
+ * Website and HAR feeds may append the inbox (A–H, optional J).
+ * Contacts columns are found by header name on row 1. The only headers the
+ * site may write are Source / Synced, Last Order, Order Status, and Site Client ID.
+ * Formula and CRM headers are never written.
  */
 
 import { normalizePersonName } from "./emailMarketing/contacts";
@@ -65,8 +67,33 @@ export const HOLY_GRAIL_NEVER_WRITE_TABS = [
 export const INBOX_VALUE_COLUMNS = ["A", "B", "C", "D", "E", "F", "G", "H"] as const;
 export const INBOX_ACTION_COLUMN = "J";
 export const INBOX_FORMULA_COLUMN = "I";
-export const CONTACTS_WRITE_COLUMNS = ["AH", "AL", "AM", "AN"] as const;
-export const CONTACTS_NEVER_WRITE_COLUMNS = ["A", "G", "K", "AI", "AJ", "AK"] as const;
+
+/** Contacts headers the site is allowed to write. Letters come from row 1. */
+export const CONTACTS_WRITE_HEADERS = ["Source / Synced", "Last Order", "Order Status", "Site Client ID"] as const;
+
+/** Read on every run. A missing one fails the sync before any write. */
+export const CONTACTS_REQUIRED_HEADERS = [
+  "Client ID",
+  "Email",
+  "Phone",
+  "Live Status",
+  "Email OK",
+  "Source / Synced",
+  "Last Order",
+  "Order Status",
+  "Site Client ID",
+] as const;
+
+/** Formula or CRM-owned. Never a write target, whatever letter they occupy. */
+export const CONTACTS_FORMULA_HEADERS = [
+  "Client ID",
+  "Touch Count",
+  "Last Touch",
+  "Live Status",
+  "Section",
+  "Priority",
+  "Call OK",
+] as const;
 
 export const ACTION_POSSIBLE_DUPE = "possible dupe" as const;
 export const ACTION_SUPPRESSED = "suppressed" as const;
@@ -533,9 +560,64 @@ export interface HolyGrailIndexes {
   marketingSuppression: SuppressionEntry[];
 }
 
-export function emailOkColumnFromHeader(header: string[]): string | null {
-  const index = header.findIndex((cell) => cell.trim().toLowerCase() === "email ok");
-  return index >= 0 ? columnLetter(index) : null;
+export function normalizeHeader(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+export interface ContactsColumns {
+  clientId: string;
+  email: string;
+  phone: string;
+  liveStatus: string;
+  emailOk: string;
+  sourceSynced: string;
+  lastOrder: string;
+  orderStatus: string;
+  siteClientId: string;
+}
+
+const CONTACTS_HEADER_FIELDS: Array<[keyof ContactsColumns, typeof CONTACTS_REQUIRED_HEADERS[number]]> = [
+  ["clientId", "Client ID"],
+  ["email", "Email"],
+  ["phone", "Phone"],
+  ["liveStatus", "Live Status"],
+  ["emailOk", "Email OK"],
+  ["sourceSynced", "Source / Synced"],
+  ["lastOrder", "Last Order"],
+  ["orderStatus", "Order Status"],
+  ["siteClientId", "Site Client ID"],
+];
+
+/** Map Contacts row 1 to letters. Duplicate or absent required headers fail closed. */
+export function resolveContactsColumns(header: string[]): { ok: true; columns: ContactsColumns } | { ok: false; missing: string[] } {
+  const found = new Map<string, string[]>();
+  header.forEach((cell, index) => {
+    const name = normalizeHeader(String(cell ?? ""));
+    if (!name) return;
+    const letters = found.get(name) || [];
+    letters.push(columnLetter(index));
+    found.set(name, letters);
+  });
+  const missing: string[] = [];
+  const columns = {} as ContactsColumns;
+  for (const [key, label] of CONTACTS_HEADER_FIELDS) {
+    const letters = found.get(normalizeHeader(label)) || [];
+    if (letters.length === 1) columns[key] = letters[0];
+    else if (letters.length === 0) missing.push(label);
+    else missing.push(`${label} (duplicate)`);
+  }
+  if (missing.length) return { ok: false, missing };
+  const writeLetters = [columns.sourceSynced, columns.lastOrder, columns.orderStatus, columns.siteClientId];
+  for (const label of CONTACTS_FORMULA_HEADERS) {
+    const letters = found.get(normalizeHeader(label)) || [];
+    if (letters.some((letter) => writeLetters.includes(letter))) missing.push(`${label} (overlaps a write column)`);
+  }
+  if (missing.length) return { ok: false, missing };
+  return { ok: true, columns };
+}
+
+export function contactsWriteLetters(columns: ContactsColumns): string[] {
+  return [columns.sourceSynced, columns.lastOrder, columns.orderStatus, columns.siteClientId];
 }
 
 export function buildContactIndex(input: {
@@ -623,10 +705,10 @@ export interface InboxCells {
 }
 
 export interface ContactCells {
-  AH: string;
-  AL?: string;
-  AM?: string;
-  AN: string;
+  sourceSynced: string;
+  lastOrder?: string;
+  orderStatus?: string;
+  siteClientId: string;
 }
 
 export interface PlannedLead {
@@ -664,11 +746,11 @@ function inboxFromLead(lead: HolyGrailLead, notes: string): InboxCells {
 
 function contactCells(lead: HolyGrailLead, nowMs: number): ContactCells {
   const cells: ContactCells = {
-    AH: sourceSyncedValue(lead.source, nowMs, lead.harListingId),
-    AN: sheetText(lead.siteClientId, 160),
+    sourceSynced: sourceSyncedValue(lead.source, nowMs, lead.harListingId),
+    siteClientId: sheetText(lead.siteClientId, 160),
   };
-  if (lead.lastOrder) cells.AL = lead.lastOrder;
-  if (lead.orderStatus) cells.AM = lead.orderStatus;
+  if (lead.lastOrder) cells.lastOrder = lead.lastOrder;
+  if (lead.orderStatus) cells.orderStatus = lead.orderStatus;
   return cells;
 }
 
@@ -874,19 +956,19 @@ export function inboxActionRange(row: number): string {
   return quoteTab(HOLY_GRAIL_TABS.inbox, `J${row}`);
 }
 
-export function contactCellRange(column: keyof ContactCells, row: number): string {
+export function contactCellRange(column: string, row: number): string {
   return quoteTab(HOLY_GRAIL_TABS.contacts, `${column}${row}`);
 }
 
-export function contactWrites(plan: PlannedLead): SheetCellWrite[] {
+export function contactWrites(plan: PlannedLead, columns: ContactsColumns): SheetCellWrite[] {
   if (plan.disposition !== "known" || plan.contactRow == null || !plan.contactCells) return [];
   const cells = plan.contactCells;
   const writes: SheetCellWrite[] = [
-    { range: contactCellRange("AH", plan.contactRow), value: cells.AH },
-    { range: contactCellRange("AN", plan.contactRow), value: cells.AN },
+    { range: contactCellRange(columns.sourceSynced, plan.contactRow), value: cells.sourceSynced },
+    { range: contactCellRange(columns.siteClientId, plan.contactRow), value: cells.siteClientId },
   ];
-  if (cells.AL) writes.push({ range: contactCellRange("AL", plan.contactRow), value: cells.AL });
-  if (cells.AM) writes.push({ range: contactCellRange("AM", plan.contactRow), value: cells.AM });
+  if (cells.lastOrder) writes.push({ range: contactCellRange(columns.lastOrder, plan.contactRow), value: cells.lastOrder });
+  if (cells.orderStatus) writes.push({ range: contactCellRange(columns.orderStatus, plan.contactRow), value: cells.orderStatus });
   return writes;
 }
 
@@ -914,7 +996,7 @@ export function parseSheetRange(range: string): ParsedRange {
   return { tab, startCol, endCol };
 }
 
-export function assertAllowedSheetRange(range: string): void {
+export function assertAllowedSheetRange(range: string, columns?: ContactsColumns): void {
   const parsed = parseSheetRange(range);
   if (parsed.tab === HOLY_GRAIL_TABS.inbox) {
     for (let col = parsed.startCol; col <= parsed.endCol; col += 1) {
@@ -925,9 +1007,11 @@ export function assertAllowedSheetRange(range: string): void {
     return;
   }
   if (parsed.tab === HOLY_GRAIL_TABS.contacts) {
+    if (!columns) throw new Error(`Refusing to write ${HOLY_GRAIL_TABS.contacts} without a header map.`);
+    const allowed = new Set(contactsWriteLetters(columns));
     for (let col = parsed.startCol; col <= parsed.endCol; col += 1) {
       const letter = columnLetter(col);
-      if (!CONTACTS_WRITE_COLUMNS.includes(letter as typeof CONTACTS_WRITE_COLUMNS[number])) {
+      if (!allowed.has(letter)) {
         throw new Error(`Refusing to write ${HOLY_GRAIL_TABS.contacts} column ${letter}.`);
       }
     }

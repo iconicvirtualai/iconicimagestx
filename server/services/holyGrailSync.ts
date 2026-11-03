@@ -16,7 +16,6 @@ import {
   assertAllowedSheetRange,
   buildContactIndex,
   contactWrites,
-  emailOkColumnFromHeader,
   emptyCursor,
   holyGrailLive,
   inboxAppendRange,
@@ -27,11 +26,14 @@ import {
   leadsFromChanges,
   planHolyGrailBatch,
   quoteTab,
+  resolveContactsColumns,
   selectFresh,
   suppressionFromGrid,
   type ChangeDoc,
   type CollectionCursor,
+  type ContactCells,
   type ContactIndexRow,
+  type ContactsColumns,
   type HolyGrailIndexes,
   type HolyGrailLead,
   type InboxCells,
@@ -44,6 +46,11 @@ import { fetchHarLeads, HAR_STUB_REASON, type HarFetchResult } from "./holyGrail
 const SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets";
 const STATE_DOC = "holyGrail";
 const FORBIDDEN_LOG = "[HolyGrail] Sheets returned 403. Share spreadsheet 1kZWkEHWdH_2nsLHokPaTs4pRxpkgLcOWqIaXu9wGsX8 with the service account client_email in FIREBASE_SERVICE_ACCOUNT (or OWNER_SHEETS_SA_EMAIL if that fallback is in use). The cursor was not advanced.";
+const HEADER_RANGE = quoteTab(HOLY_GRAIL_TABS.contacts, "A1:ZZ1");
+
+function missingHeaderLog(missing: string[]): string {
+  return `[HolyGrail] Contacts row 1 is missing required headers: ${missing.join(", ")}. Needed: Client ID, Email, Phone, Live Status, Email OK, Source / Synced, Last Order, Order Status, Site Client ID. Nothing was written and the cursor did not move.`;
+}
 
 type CollectionName = "clients" | "orderRequests" | "orders";
 const COLLECTIONS: CollectionName[] = ["clients", "orderRequests", "orders"];
@@ -65,10 +72,12 @@ export interface HolyGrailRunResult {
   skippedTest: number;
   unchanged: number;
   message: string;
+  missingHeaders?: string[];
   preview?: unknown[];
   writes?: {
     inbox: string[];
     contacts: string[];
+    contactsHeaders: string[];
     never: string[];
   };
 }
@@ -76,10 +85,7 @@ export interface HolyGrailRunResult {
 interface SyncState {
   exists: boolean;
   cursors: Record<CollectionName, CollectionCursor>;
-  emailOkColumn: string | null;
 }
-
-let cachedEmailOkColumn: string | null = null;
 
 function db() {
   if (!admin.apps.length) throw new Error("Firebase Admin is not configured.");
@@ -119,11 +125,16 @@ function baseResult(partial: Partial<HolyGrailRunResult>): HolyGrailRunResult {
   };
 }
 
-function contractWrites() {
+function contractWrites(columns?: ContactsColumns) {
   return {
     inbox: ["A", "B", "C", "D", "E", "F", "G", "H", "J"],
-    contacts: ["AH", "AL", "AM", "AN"],
-    never: ["I", "A", "G", "K", "AI", "AJ", "AK"],
+    contacts: columns
+      ? [columns.sourceSynced, columns.lastOrder, columns.orderStatus, columns.siteClientId]
+      : ["Source / Synced", "Last Order", "Order Status", "Site Client ID"],
+    contactsHeaders: ["Source / Synced", "Last Order", "Order Status", "Site Client ID"],
+    never: columns
+      ? ["I", columns.clientId, columns.email, columns.phone, columns.liveStatus]
+      : ["I", "Client ID", "Email", "Phone", "Live Status", "Touch Count", "Last Touch"],
   };
 }
 
@@ -146,7 +157,6 @@ async function loadState(): Promise<SyncState> {
     return {
       exists: false,
       cursors: { clients: emptyCursor(0), orderRequests: emptyCursor(0), orders: emptyCursor(0) },
-      emailOkColumn: cachedEmailOkColumn,
     };
   }
   const data = snap.data() || {};
@@ -157,14 +167,12 @@ async function loadState(): Promise<SyncState> {
     orderRequests: readCursor(stored.orderRequests) || emptyCursor(now),
     orders: readCursor(stored.orders) || emptyCursor(now),
   };
-  const emailOkColumn = typeof data.emailOkColumn === "string" && data.emailOkColumn ? data.emailOkColumn : cachedEmailOkColumn;
-  return { exists: true, cursors, emailOkColumn };
+  return { exists: true, cursors };
 }
 
 async function saveState(state: SyncState, anchoredAt?: string) {
   await db().collection("sheetSync").doc(STATE_DOC).set({
     cursors: state.cursors,
-    emailOkColumn: state.emailOkColumn,
     ...(anchoredAt ? { anchoredAt } : {}),
     updatedAt: new Date().toISOString(),
   }, { merge: true });
@@ -258,76 +266,68 @@ function isMissingTab(error: unknown): boolean {
   return /Unable to parse range/i.test(message);
 }
 
-async function loadIndexes(
-  credentials: SheetsCredentials,
-  emailOkColumn: string | null,
-): Promise<{ indexes: HolyGrailIndexes; emailOkColumn: string | null } | { forbidden: true }> {
-  const sheets = sheetsClient(credentials);
-  const contactRanges = [
-    quoteTab(HOLY_GRAIL_TABS.contacts, "A:A"),
-    quoteTab(HOLY_GRAIL_TABS.contacts, "G:G"),
-    quoteTab(HOLY_GRAIL_TABS.contacts, "R:R"),
-    quoteTab(HOLY_GRAIL_TABS.contacts, "S:S"),
-    quoteTab(HOLY_GRAIL_TABS.contacts, "A1:AN1"),
-  ];
-  if (emailOkColumn) contactRanges.push(quoteTab(HOLY_GRAIL_TABS.contacts, `${emailOkColumn}:${emailOkColumn}`));
-  const withSuppression = [...contactRanges, quoteTab(HOLY_GRAIL_TABS.suppression, "A:H")];
+type SheetGrid = Map<string, unknown[][]>;
+type SheetRead = SheetGrid | { forbidden: true } | { missingTab: true };
 
-  let ranges = withSuppression;
-  let response;
+async function batchGet(sheets: ReturnType<typeof sheetsClient>, ranges: string[]): Promise<SheetRead> {
   try {
-    response = await sheets.spreadsheets.values.batchGet({
+    const response = await sheets.spreadsheets.values.batchGet({
       spreadsheetId: HOLY_GRAIL_SHEET_ID,
       ranges,
       valueRenderOption: "FORMATTED_VALUE",
     });
+    const grid: SheetGrid = new Map();
+    ranges.forEach((range, index) => {
+      grid.set(range, (response.data.valueRanges?.[index]?.values || []) as unknown[][]);
+    });
+    return grid;
   } catch (error) {
     if (isSheetsForbidden(error)) return { forbidden: true };
-    if (!isMissingTab(error)) throw error;
-    ranges = contactRanges;
-    response = await sheets.spreadsheets.values.batchGet({
-      spreadsheetId: HOLY_GRAIL_SHEET_ID,
-      ranges,
-      valueRenderOption: "FORMATTED_VALUE",
-    });
+    if (isMissingTab(error)) return { missingTab: true };
+    throw error;
   }
+}
 
-  const valueRanges = response.data.valueRanges || [];
-  const byRange = new Map<string, unknown[][]>();
-  ranges.forEach((range, index) => {
-    byRange.set(range, (valueRanges[index]?.values || []) as unknown[][]);
-  });
-  const headerRow = gridValues(byRange.get(quoteTab(HOLY_GRAIL_TABS.contacts, "A1:AN1")))[0] || [];
-  let resolvedEmailOk = emailOkColumn;
-  const discovered = emailOkColumnFromHeader(headerRow);
-  if (discovered && discovered !== emailOkColumn && !["A", "G", "R", "S"].includes(discovered)) {
-    const extra = await sheets.spreadsheets.values.get({
-      spreadsheetId: HOLY_GRAIL_SHEET_ID,
-      range: quoteTab(HOLY_GRAIL_TABS.contacts, `${discovered}:${discovered}`),
-      valueRenderOption: "FORMATTED_VALUE",
-    });
-    byRange.set(quoteTab(HOLY_GRAIL_TABS.contacts, `${discovered}:${discovered}`), (extra.data.values || []) as unknown[][]);
-    resolvedEmailOk = discovered;
-    cachedEmailOkColumn = discovered;
-  } else if (discovered) {
-    resolvedEmailOk = discovered;
-    cachedEmailOkColumn = discovered;
+function isGrid(value: SheetRead): value is SheetGrid {
+  return value instanceof Map;
+}
+
+async function loadIndexes(
+  credentials: SheetsCredentials,
+): Promise<{ indexes: HolyGrailIndexes; columns: ContactsColumns } | { forbidden: true } | { missingHeaders: string[] }> {
+  const sheets = sheetsClient(credentials);
+  const headerRead = await batchGet(sheets, [HEADER_RANGE]);
+  if (!isGrid(headerRead)) {
+    if ("forbidden" in headerRead) return { forbidden: true };
+    return { missingHeaders: ["Contacts header row"] };
   }
+  const header = gridValues(headerRead.get(HEADER_RANGE))[0] || [];
+  const resolved = resolveContactsColumns(header);
+  if (resolved.ok === false) return { missingHeaders: resolved.missing };
+  const columns = resolved.columns;
+  const readLetters = [...new Set([columns.clientId, columns.email, columns.phone, columns.liveStatus, columns.emailOk])];
+  const dataRanges = readLetters.map((letter) => quoteTab(HOLY_GRAIL_TABS.contacts, `${letter}:${letter}`));
+  const suppressionRange = quoteTab(HOLY_GRAIL_TABS.suppression, "A:H");
+  let dataRead = await batchGet(sheets, [...dataRanges, suppressionRange]);
+  if (!isGrid(dataRead) && "missingTab" in dataRead) dataRead = await batchGet(sheets, dataRanges);
+  if (!isGrid(dataRead)) {
+    if ("forbidden" in dataRead) return { forbidden: true };
+    throw new Error("Contacts columns named by the header row could not be read.");
+  }
+  const dataGrid = dataRead;
 
-  const emailOkValues = resolvedEmailOk
-    ? columnValues(byRange.get(quoteTab(HOLY_GRAIL_TABS.contacts, `${resolvedEmailOk}:${resolvedEmailOk}`)))
-    : [];
+  const valuesFor = (letter: string) => columnValues(dataGrid.get(quoteTab(HOLY_GRAIL_TABS.contacts, `${letter}:${letter}`)));
   const contacts: ContactIndexRow[] = buildContactIndex({
-    clientIds: columnValues(byRange.get(quoteTab(HOLY_GRAIL_TABS.contacts, "A:A"))),
-    liveStatus: columnValues(byRange.get(quoteTab(HOLY_GRAIL_TABS.contacts, "G:G"))),
-    emails: columnValues(byRange.get(quoteTab(HOLY_GRAIL_TABS.contacts, "R:R"))),
-    phones: columnValues(byRange.get(quoteTab(HOLY_GRAIL_TABS.contacts, "S:S"))),
-    emailOk: emailOkValues,
+    clientIds: valuesFor(columns.clientId),
+    liveStatus: valuesFor(columns.liveStatus),
+    emails: valuesFor(columns.email),
+    phones: valuesFor(columns.phone),
+    emailOk: valuesFor(columns.emailOk),
   });
-  const suppression = suppressionFromGrid(gridValues(byRange.get(quoteTab(HOLY_GRAIL_TABS.suppression, "A:H"))));
+  const suppression = suppressionFromGrid(gridValues(dataGrid.get(suppressionRange)));
   const marketingSuppression = await loadMarketingSuppression();
   return {
-    emailOkColumn: resolvedEmailOk,
+    columns,
     indexes: {
       contacts,
       suppressionEmails: suppression.emails,
@@ -374,7 +374,7 @@ function counts(plans: PlannedLead[]) {
   };
 }
 
-function previewRows(plans: PlannedLead[]) {
+function previewRows(plans: PlannedLead[], columns: ContactsColumns) {
   return plans.slice(0, 100).map((plan) => {
     if ((plan.disposition === "append" || plan.disposition === "possible-dupe") && plan.inbox) {
       return {
@@ -393,7 +393,7 @@ function previewRows(plans: PlannedLead[]) {
         reason: plan.reason,
         tab: HOLY_GRAIL_TABS.contacts,
         row: plan.contactRow,
-        cells: plan.contactCells,
+        cells: contactPreview(plan.contactCells, columns),
       };
     }
     return {
@@ -405,13 +405,23 @@ function previewRows(plans: PlannedLead[]) {
   });
 }
 
-async function applyPlans(credentials: SheetsCredentials, plans: PlannedLead[]) {
+function contactPreview(cells: ContactCells, columns: ContactsColumns): Record<string, string> {
+  const preview: Record<string, string> = {
+    [columns.sourceSynced]: cells.sourceSynced,
+    [columns.siteClientId]: cells.siteClientId,
+  };
+  if (cells.lastOrder) preview[columns.lastOrder] = cells.lastOrder;
+  if (cells.orderStatus) preview[columns.orderStatus] = cells.orderStatus;
+  return preview;
+}
+
+async function applyPlans(credentials: SheetsCredentials, plans: PlannedLead[], columns: ContactsColumns) {
   const appending = plans.filter((plan) => (plan.disposition === "append" || plan.disposition === "possible-dupe") && plan.inbox);
-  const updates = plans.flatMap((plan) => contactWrites(plan));
+  const updates = plans.flatMap((plan) => contactWrites(plan, columns));
   if (!appending.length && !updates.length) return;
   assertAllowedSheetRange(inboxAppendRange());
   const actionPending = appending.filter((plan) => plan.action);
-  updates.forEach((update) => assertAllowedSheetRange(update.range));
+  updates.forEach((update) => assertAllowedSheetRange(update.range, columns));
   const sheets = sheetsClient(credentials);
   if (appending.length) {
     const appended = await sheets.spreadsheets.values.append({
@@ -478,7 +488,6 @@ export async function runHolyGrailSync(options: { dryRun: boolean; sinceMs?: num
         await saveState({
           exists: true,
           cursors: { clients: anchored, orderRequests: anchored, orders: anchored },
-          emailOkColumn: state.emailOkColumn,
         }, new Date(now).toISOString());
       }
       return baseResult({
@@ -516,7 +525,7 @@ export async function runHolyGrailSync(options: { dryRun: boolean; sinceMs?: num
   const leads = leadsFromChanges(docs);
   if (!leads.length) {
     if (!options.dryRun && cursorsMoved(cursors, nextCursors)) {
-      await saveState({ exists: true, cursors: nextCursors, emailOkColumn: state.emailOkColumn });
+      await saveState({ exists: true, cursors: nextCursors });
     }
     return baseResult({
       dryRun: options.dryRun,
@@ -544,7 +553,7 @@ export async function runHolyGrailSync(options: { dryRun: boolean; sinceMs?: num
 
   let loaded: Awaited<ReturnType<typeof loadIndexes>>;
   try {
-    loaded = await loadIndexes(credentials, state.emailOkColumn || cachedEmailOkColumn);
+    loaded = await loadIndexes(credentials);
   } catch (error) {
     if (isSheetsForbidden(error)) {
       console.error(FORBIDDEN_LOG);
@@ -572,6 +581,18 @@ export async function runHolyGrailSync(options: { dryRun: boolean; sinceMs?: num
       message: "Sheets returned 403. Share the spreadsheet with the service account client_email in FIREBASE_SERVICE_ACCOUNT (fallback OWNER_SHEETS_SA_EMAIL). Nothing was written and the cursor did not move.",
     });
   }
+  if ("missingHeaders" in loaded) {
+    console.error(missingHeaderLog(loaded.missingHeaders));
+    return baseResult({
+      ok: false,
+      dryRun: options.dryRun,
+      live,
+      scanned,
+      skippedTest,
+      missingHeaders: loaded.missingHeaders,
+      message: `Contacts row 1 is missing required headers: ${loaded.missingHeaders.join(", ")}. Nothing was written and the cursor did not move.`,
+    });
+  }
 
   const memory = await loadMemories(leads.map((lead) => lead.key));
   const plans = planHolyGrailBatch(leads, loaded.indexes, now, memory);
@@ -584,13 +605,13 @@ export async function runHolyGrailSync(options: { dryRun: boolean; sinceMs?: num
       skippedTest,
       ...tally,
       message: "Dry run. Nothing was written and the cursor did not move.",
-      preview: previewRows(plans),
-      writes: contractWrites(),
+      preview: previewRows(plans, loaded.columns),
+      writes: contractWrites(loaded.columns),
     });
   }
 
   try {
-    await applyPlans(credentials, plans);
+    await applyPlans(credentials, plans, loaded.columns);
   } catch (error) {
     if (isSheetsForbidden(error)) {
       console.error(FORBIDDEN_LOG);
@@ -608,7 +629,7 @@ export async function runHolyGrailSync(options: { dryRun: boolean; sinceMs?: num
   }
 
   await saveMemories(plans);
-  await saveState({ exists: true, cursors: nextCursors, emailOkColumn: loaded.emailOkColumn });
+  await saveState({ exists: true, cursors: nextCursors });
   const wrote = tally.append + tally.possibleDupes + tally.knownUpdates > 0;
   return baseResult({
     live,
@@ -658,8 +679,7 @@ async function applyExternalLeads(leads: HolyGrailLead[]): Promise<HolyGrailRunR
     console.error("[HolyGrail] Sheets credentials are missing. Set FIREBASE_SERVICE_ACCOUNT or OWNER_SHEETS_SA_EMAIL and OWNER_SHEETS_SA_KEY.");
     return baseResult({ ok: false, configured: false, message: "Sheets credentials are not configured. HAR leads were not written." });
   }
-  const state = await loadState();
-  const loaded = await loadIndexes(credentials, state.emailOkColumn || cachedEmailOkColumn);
+  const loaded = await loadIndexes(credentials);
   if ("forbidden" in loaded) {
     console.error(FORBIDDEN_LOG);
     return baseResult({
@@ -668,10 +688,18 @@ async function applyExternalLeads(leads: HolyGrailLead[]): Promise<HolyGrailRunR
       message: "Sheets returned 403. HAR leads were not written and the website cursor did not move.",
     });
   }
+  if ("missingHeaders" in loaded) {
+    console.error(missingHeaderLog(loaded.missingHeaders));
+    return baseResult({
+      ok: false,
+      missingHeaders: loaded.missingHeaders,
+      message: `Contacts row 1 is missing required headers: ${loaded.missingHeaders.join(", ")}. HAR leads were not written.`,
+    });
+  }
   const memory = await loadMemories(leads.map((lead) => lead.key));
   const plans = planHolyGrailBatch(leads, loaded.indexes, Date.now(), memory);
   try {
-    await applyPlans(credentials, plans);
+    await applyPlans(credentials, plans, loaded.columns);
   } catch (error) {
     if (isSheetsForbidden(error)) {
       console.error(FORBIDDEN_LOG);
@@ -680,12 +708,6 @@ async function applyExternalLeads(leads: HolyGrailLead[]): Promise<HolyGrailRunR
     throw error;
   }
   await saveMemories(plans);
-  if (loaded.emailOkColumn && loaded.emailOkColumn !== state.emailOkColumn) {
-    await db().collection("sheetSync").doc(STATE_DOC).set({
-      emailOkColumn: loaded.emailOkColumn,
-      updatedAt: new Date().toISOString(),
-    }, { merge: true });
-  }
   const tally = counts(plans);
   return baseResult({
     wrote: tally.append + tally.possibleDupes + tally.knownUpdates > 0,

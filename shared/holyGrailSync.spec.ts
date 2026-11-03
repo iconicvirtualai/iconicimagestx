@@ -4,8 +4,8 @@ import type { SuppressionEntry } from "./emailMarketing/types";
 import {
   ACTION_POSSIBLE_DUPE,
   ACTION_SUPPRESSED,
-  CONTACTS_NEVER_WRITE_COLUMNS,
-  CONTACTS_WRITE_COLUMNS,
+  CONTACTS_FORMULA_HEADERS,
+  CONTACTS_WRITE_HEADERS,
   HOLY_GRAIL_NEVER_WRITE_TABS,
   HOLY_GRAIL_TABS,
   INBOX_FORMULA_COLUMN,
@@ -13,9 +13,9 @@ import {
   buildContactIndex,
   cityFromAddressText,
   contactWrites,
-  emailOkColumnFromHeader,
   emptyCursor,
   holyGrailLive,
+  columnIndex,
   columnLetter,
   inboxAppendRange,
   inboxRowValues,
@@ -28,11 +28,13 @@ import {
   normalizeSyncPhone,
   parseSheetRange,
   planHolyGrailLead,
+  resolveContactsColumns,
   selectFresh,
   sheetText,
   sourceSyncedValue,
   suppressionFromGrid,
   type ContactIndexRow,
+  type ContactsColumns,
   type HolyGrailIndexes,
   type HolyGrailLead,
   type LeadMemory,
@@ -81,6 +83,37 @@ function lead(partial: Partial<HolyGrailLead> = {}): HolyGrailLead {
     harListingId: "",
     ...partial,
   };
+}
+
+function revampHeader(): string[] {
+  const header = Array.from({ length: columnIndex("AN") + 1 }, () => "");
+  const set = (letter: string, name: string) => {
+    header[columnIndex(letter)] = name;
+  };
+  set("A", "Full Name");
+  set("C", "Phone");
+  set("D", "Email");
+  set("E", "Stage");
+  set("F", "Status");
+  set("L", "Last Touch");
+  set("M", "Client ID");
+  set("P", "Live Status");
+  set("S", "Touch Count");
+  set("T", "Email OK");
+  set("AH", "Source / Synced");
+  set("AI", "Section");
+  set("AJ", "Priority");
+  set("AK", "Call OK");
+  set("AL", "Last Order");
+  set("AM", "Order Status");
+  set("AN", "Site Client ID");
+  return header;
+}
+
+function revampColumns(): ContactsColumns {
+  const resolved = resolveContactsColumns(revampHeader());
+  if (resolved.ok === false) throw new Error(resolved.missing.join(", "));
+  return resolved.columns;
 }
 
 function columnsIn(range: string): string[] {
@@ -180,14 +213,15 @@ describe("Holy Grail column mapping", () => {
     expect(Object.keys(planned.inbox || {})).not.toContain(INBOX_FORMULA_COLUMN);
   });
 
-  it("updates only Contacts AH, AL, AM, and AN for a known client", () => {
+  it("updates only the four site-owned headers, which sit at AH, AL, AM, and AN", () => {
+    const columns = revampColumns();
     const planned = planHolyGrailLead(lead({ iconicClientId: "IC-08515" }), indexes([
       row({ row: 15, clientId: "IC-08515", email: "ada@example.com", phone: "7135550100" }),
     ]), NOW);
     expect(planned.disposition).toBe("known");
     expect(planned.contactRow).toBe(15);
     expect(planned.inbox).toBeNull();
-    const writes = contactWrites(planned);
+    const writes = contactWrites(planned, columns);
     expect(writes.map((write) => write.range)).toEqual([
       `'${HOLY_GRAIL_TABS.contacts}'!AH15`,
       `'${HOLY_GRAIL_TABS.contacts}'!AN15`,
@@ -201,11 +235,12 @@ describe("Holy Grail column mapping", () => {
       "Booked",
     ]);
     const written = writes.flatMap((write) => columnsIn(write.range));
-    for (const column of CONTACTS_NEVER_WRITE_COLUMNS) {
-      expect(written).not.toContain(column);
+    for (const letter of ["M", "C", "D", "S", "L", "P", "A", "I"]) {
+      expect(written).not.toContain(letter);
     }
     expect(written).toEqual(["AH", "AN", "AL", "AM"]);
-    expect(CONTACTS_WRITE_COLUMNS).toEqual(["AH", "AL", "AM", "AN"]);
+    expect(CONTACTS_WRITE_HEADERS).toEqual(["Source / Synced", "Last Order", "Order Status", "Site Client ID"]);
+    writes.forEach((write) => expect(() => assertAllowedSheetRange(write.range, columns)).not.toThrow());
   });
 
   it("puts a possible-dupe flag in column J and does not update Contacts", () => {
@@ -224,16 +259,59 @@ describe("Holy Grail column mapping", () => {
     expect(() => assertAllowedSheetRange(`'${HOLY_GRAIL_TABS.inbox}'!J12`)).not.toThrow();
     expect(() => assertAllowedSheetRange(`'${HOLY_GRAIL_TABS.inbox}'!I2`)).toThrow(/column I/);
     expect(() => assertAllowedSheetRange(`'${HOLY_GRAIL_TABS.inbox}'!A:J`)).toThrow(/column I/);
-    expect(() => assertAllowedSheetRange(`'${HOLY_GRAIL_TABS.contacts}'!AH12:AN12`)).toThrow(/column AI/);
+    const columns = revampColumns();
+    expect(() => assertAllowedSheetRange(`'${HOLY_GRAIL_TABS.contacts}'!AH15`, columns)).not.toThrow();
+    expect(() => assertAllowedSheetRange(`'${HOLY_GRAIL_TABS.contacts}'!M15`, columns)).toThrow(/column M/);
+    expect(() => assertAllowedSheetRange(`'${HOLY_GRAIL_TABS.contacts}'!C15`, columns)).toThrow(/column C/);
+    expect(() => assertAllowedSheetRange(`'${HOLY_GRAIL_TABS.contacts}'!D15`, columns)).toThrow(/column D/);
+    expect(() => assertAllowedSheetRange(`'${HOLY_GRAIL_TABS.contacts}'!S15`, columns)).toThrow(/column S/);
+    expect(() => assertAllowedSheetRange(`'${HOLY_GRAIL_TABS.contacts}'!L15`, columns)).toThrow(/column L/);
+    expect(() => assertAllowedSheetRange(`'${HOLY_GRAIL_TABS.contacts}'!P15`, columns)).toThrow(/column P/);
+    expect(() => assertAllowedSheetRange(`'${HOLY_GRAIL_TABS.contacts}'!AH12:AN12`, columns)).toThrow(/column AI/);
+    expect(() => assertAllowedSheetRange(`'${HOLY_GRAIL_TABS.contacts}'!AH15`)).toThrow(/header map/);
     for (const tab of HOLY_GRAIL_NEVER_WRITE_TABS) {
       expect(() => assertAllowedSheetRange(`'${tab}'!A1`)).toThrow(/Refusing to write tab/);
     }
   });
 
-  it("finds the Email OK header and reads suppression emails without treating row 1 as a person", () => {
-    const header = Array.from({ length: 40 }, () => "");
-    header[19] = "Email OK";
-    expect(emailOkColumnFromHeader(header)).toBe("T");
+  it("resolves the rebuilt Contacts headers and fails soft when one is missing", () => {
+    const columns = revampColumns();
+    expect(columns).toMatchObject({
+      clientId: "M",
+      phone: "C",
+      email: "D",
+      liveStatus: "P",
+      emailOk: "T",
+      sourceSynced: "AH",
+      lastOrder: "AL",
+      orderStatus: "AM",
+      siteClientId: "AN",
+    });
+    expect(CONTACTS_FORMULA_HEADERS).toEqual(expect.arrayContaining(["Touch Count", "Last Touch", "Client ID", "Live Status"]));
+    const shifted = revampHeader();
+    shifted[columnIndex("AH")] = "";
+    while (shifted.length <= columnIndex("BA")) shifted.push("");
+    shifted[columnIndex("BA")] = "Source / Synced";
+    const moved = resolveContactsColumns(shifted);
+    expect(moved.ok).toBe(true);
+    if (moved.ok !== true) return;
+    const planned = planHolyGrailLead(lead({ iconicClientId: "IC-08515" }), indexes([
+      row({ row: 15, clientId: "IC-08515", email: "ada@example.com", phone: "7135550100" }),
+    ]), NOW);
+    expect(contactWrites(planned, moved.columns).map((write) => columnsIn(write.range)[0])).toEqual(["BA", "AN", "AL", "AM"]);
+    const missing = resolveContactsColumns(revampHeader().map((cell) => (cell === "Email OK" ? "" : cell)));
+    expect(missing.ok).toBe(false);
+    if (missing.ok !== false) return;
+    expect(missing.missing).toEqual(["Email OK"]);
+    const duplicate = revampHeader();
+    duplicate[columnIndex("B")] = "Client ID";
+    const doubled = resolveContactsColumns(duplicate);
+    expect(doubled.ok).toBe(false);
+    if (doubled.ok !== false) return;
+    expect(doubled.missing).toContain("Client ID (duplicate)");
+  });
+
+  it("reads suppression emails without treating row 1 as a person", () => {
     const contacts = buildContactIndex({
       clientIds: ["Client ID", "IC-00001", ""],
       liveStatus: ["Live Status", "Active", ""],
@@ -302,7 +380,7 @@ describe("Holy Grail dedupe", () => {
     expect(dnc.disposition).toBe("known");
     expect(dnc.flag).toBe(ACTION_SUPPRESSED);
     expect(dnc.inbox).toBeNull();
-    expect(dnc.contactCells?.AH).toBe("website:2026-11-03T21:00Z");
+    expect(dnc.contactCells?.sourceSynced).toBe("website:2026-11-03T21:00Z");
 
     const emailNo = planHolyGrailLead(lead({ phone: "", phoneRaw: "" }), indexes([
       row({ ...ada, phone: "", emailOk: "NO" }),
