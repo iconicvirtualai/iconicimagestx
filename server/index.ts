@@ -57,6 +57,7 @@ import { mountOwners } from "./routes/owners";
 import siteContentRouter from "./routes/siteContent";
 import insightsRouter, { handleInsightShell } from "./routes/insights";
 import testDataCleanupRouter from "./routes/testDataCleanup";
+import holyGrailRouter from "./routes/holyGrail";
 import { originForHost, robotsTxt, sitemapXml } from "../shared/siteSeo.ts";
 
 const SETTINGS_FILE = path.join(process.cwd(), "site_settings.json");
@@ -305,6 +306,7 @@ export function createServer() {
   app.use("/api/senior-living", seniorLivingRouter);
   app.use("/api/apprenticeship", apprenticeshipRouter);
   app.use("/api/admin/test-data", testDataCleanupRouter);
+  app.use("/api/holy-grail", holyGrailRouter);
 
   // ─── Error handler ─────────────────────────────────────────────────
   app.use(
