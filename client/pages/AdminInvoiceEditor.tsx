@@ -4,7 +4,6 @@ import { ChevronLeft, Copy, Plus, Save, Send } from "lucide-react";
 import { collection, doc, getDoc, getDocs, onSnapshot, updateDoc } from "firebase/firestore";
 import { toast } from "sonner";
 import AdminLayout from "@/components/AdminLayout";
-import { PackageCatalogPicker } from "@/components/PackageCatalogPicker";
 import {
   BrandedInvoiceShell,
   InvoiceFaceSummary,
@@ -17,6 +16,10 @@ import { db } from "@/lib/firebase";
 import { deliverInvoiceEmail } from "@/lib/deliverInvoice";
 import { watchInvoicePresets } from "@/lib/invoicePresets";
 import { saveStaffInvoiceEdits } from "@/lib/staffInvoice";
+import { OrderServicesFields } from "@/components/OrderServicesFields";
+import { adjustmentKind, isPromoInvoiceLine } from "@shared/invoiceFace";
+import { isTravelFeeLine } from "@shared/travelZones";
+import type { OrderServiceSavePatch } from "@shared/orderRequestServices";
 import {
   BOOKING_CATALOG_KIND_LABELS,
   BOOKING_PACKAGE_CATEGORY_LABELS,
@@ -285,8 +288,36 @@ export default function AdminInvoiceEditor() {
     setForm((prev) => repriceInvoiceAdjustments({ ...prev, ...patch }, presetsRef.current));
   };
 
-  const replaceService = (index: number, next: StaffServiceLine) => {
-    edit({ services: form.services.map((row, rowIndex) => rowIndex === index ? next : row) });
+  const applyServicePatch = (patch: OrderServiceSavePatch) => {
+    dirty.current = true;
+    const services = patch.lineItems
+      .filter((item) => !isPromoInvoiceLine(item) && !adjustmentKind(item) && !isTravelFeeLine(item))
+      .map((item) => ({
+        id: item.id,
+        name: item.name,
+        description: item.description,
+        category: item.category,
+        bookingKind: item.bookingKind,
+        tier: item.tier,
+        unitPrice: item.unitPrice,
+        qty: item.qty,
+        price: item.price,
+      }));
+    setForm((prev) => ({
+      ...prev,
+      services,
+      promoCode: patch.promoCode || "",
+      promoDiscount: patch.promotions,
+      tax: patch.tax,
+      processing: patch.processing,
+      fees: patch.fees,
+      travel: patch.travel,
+      processingOverridden: true,
+      taxOverridden: true,
+      feesOverridden: true,
+      travelOverridden: true,
+      promoOverridden: true,
+    }));
   };
 
   const onPreset = (kind: InvoicePresetKind, presetId: string) => {
@@ -454,117 +485,23 @@ export default function AdminInvoiceEditor() {
 
         <div>
           <p className="text-[10px] font-black uppercase tracking-[0.3em] text-[#1d4ed8]">Line items</p>
-          {form.services.length === 0 && (
-            <p className="mt-3 text-sm text-gray-500">No services yet. Add one from the package catalog.</p>
-          )}
-          <div className="mt-3 space-y-4">
-            {form.services.map((service, index) => {
-              const match = findStaffCatalogPackage(service, catalog);
-              const categoryLabel = match ? BOOKING_PACKAGE_CATEGORY_LABELS[match.category] : "";
-              const kindLabel = match ? BOOKING_CATALOG_KIND_LABELS[match.bookingKind] : "";
-              const catalogPrice = match ? match.price : null;
-              return (
-                <div key={`${service.id || "line"}-${index}`} className="space-y-4 rounded-2xl border border-gray-200 border-l-4 border-l-[#FFD700] p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <span className={labelCls}>Package</span>
-                      <div className="mt-1">
-                        <PackageCatalogPicker
-                          catalog={catalog}
-                          selectedId={match?.id}
-                          fallbackName={service.name}
-                          label={`Package ${index + 1}`}
-                          onSelect={(packageId) => {
-                            const pkg = catalog.find((item) => item.id === packageId);
-                            if (!pkg) return;
-                            replaceService(index, staffServiceFromPackage(pkg, service.qty || 1));
-                          }}
-                        />
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      aria-label={`Remove service ${index + 1}`}
-                      className="mt-6 text-xs font-bold text-red-600 hover:text-red-700"
-                      onClick={() => edit({ services: form.services.filter((_, rowIndex) => rowIndex !== index) })}
-                    >
-                      Remove
-                    </button>
-                  </div>
-
-                  <label className="block">
-                    <span className={labelCls}>Description</span>
-                    <textarea
-                      aria-label={`Description ${index + 1}`}
-                      className={`${areaCls} mt-1`}
-                      rows={4}
-                      value={service.description || ""}
-                      placeholder={match?.description || "Package description"}
-                      onChange={(e) => replaceService(index, { ...service, description: e.target.value })}
-                    />
-                  </label>
-
-                  {match && match.includedServices.length > 0 && (
-                    <p className="text-xs font-medium leading-relaxed text-gray-500">
-                      <span className="font-bold text-gray-600">Includes </span>
-                      {match.includedServices.join(" · ")}
-                    </p>
-                  )}
-
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                    <label className="block">
-                      <span className={labelCls}>Quantity</span>
-                      <input
-                        aria-label={`Quantity ${index + 1}`}
-                        type="number"
-                        min={1}
-                        className={`${inputCls} mt-1`}
-                        value={service.qty || 1}
-                        onChange={(e) => replaceService(index, staffServiceQty(service, Number(e.target.value)))}
-                      />
-                    </label>
-                    <label className="block">
-                      <span className={labelCls}>Unit price</span>
-                      <div className="relative mt-1">
-                        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-gray-400">$</span>
-                        <input
-                          aria-label={`Unit price ${index + 1}`}
-                          type="number"
-                          min={0}
-                          step="0.01"
-                          className={`${inputCls} pl-7`}
-                          value={service.unitPrice ?? 0}
-                          onChange={(e) => replaceService(index, staffServiceUnitPrice(service, Number(e.target.value)))}
-                        />
-                      </div>
-                      {catalogPrice != null && (
-                        <span className="mt-1 block text-xs font-medium text-gray-500">
-                          Catalog price <MoneyAmount className="min-w-0 text-xs font-medium text-gray-500">{money(catalogPrice)}</MoneyAmount>
-                        </span>
-                      )}
-                    </label>
-                    <div>
-                      <span className={labelCls}>Line total</span>
-                      <MoneyAmount className="mt-1 px-1 py-2.5 text-sm font-black text-black">{money(service.price)}</MoneyAmount>
-                      {categoryLabel && (
-                        <span className="block text-xs font-medium text-gray-500">{categoryLabel} · {kindLabel}</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+          <div className="mt-3">
+            <OrderServicesFields
+              record={{
+                lineItems: form.services,
+                promoCode: form.promoCode,
+                promoDiscount: form.promoDiscount,
+                tax: form.tax,
+                fees: form.fees,
+                travel: form.travel,
+                processing: form.processing,
+              }}
+              resetKey={invoiceId || "invoice"}
+              onChange={applyServicePatch}
+            />
           </div>
-          <button
-            type="button"
-            className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-[#1d4ed8]"
-            onClick={() => edit({ services: [...form.services, { name: "", description: "", price: 0, unitPrice: 0, qty: 1 }] })}
-          >
-            <Plus className="w-3.5 h-3.5" /> Add service
-          </button>
+          <a href="/admin/invoice-presets" className="mt-3 inline-block text-xs font-bold text-[#1d4ed8]">Invoice presets</a>
         </div>
-
-        <PresetFields form={form} presets={presets} onPreset={onPreset} onAmount={edit} />
 
         <InvoiceFaceSummary face={face} />
 

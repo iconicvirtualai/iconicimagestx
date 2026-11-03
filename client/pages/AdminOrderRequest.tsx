@@ -40,7 +40,6 @@ import { staffInvoicePath } from "@shared/staffInvoice";
 import { ensureLinkedInvoice, resolveLinkedInvoice } from "@/lib/orderProjectInvoice";
 import { syncOrderBillingToInvoice } from "@/lib/staffInvoice";
 import { separatePromoDiscount } from "@shared/bookingPricing";
-import { packagesForStaffEditor, type StaffCatalogPackage } from "@shared/bookingCatalog";
 import { BOOKING_PROCESSING_LABEL } from "@shared/invoiceProcessing";
 import { orderChargeSummary, orderServiceLines } from "@shared/orderPackageLines";
 import {
@@ -48,8 +47,7 @@ import {
   presentOrderCharges,
   type OrderServiceSavePatch,
 } from "@shared/orderRequestServices";
-import { OrderServiceEditor } from "@/components/OrderServiceEditor";
-import { usePricingRates } from "@/lib/usePricingRates";
+import { OrderServicesFields } from "@/components/OrderServicesFields";
 import { linkOrderToListing, resolvePortalClientId } from "@/lib/listingClient";
 import { deliverInvoiceEmail } from "@/lib/deliverInvoice";
 import { assignBookingPhotographer } from "@/lib/assignBookingPhotographer";
@@ -168,8 +166,6 @@ export default function AdminOrderRequest() {
     basics: Array.isArray(order?.selectedBasics) ? order.selectedBasics.filter((item: unknown) => typeof item === "string").join(",") : "",
     durationMinutes: Number.isInteger(scheduleDuration) ? scheduleDuration : null,
   });
-  const [catalog, setCatalog] = React.useState<StaffCatalogPackage[]>(() => packagesForStaffEditor([]));
-  const pricingRates = usePricingRates();
   const servicePatchRef = React.useRef<OrderServiceSavePatch | null>(null);
   const [projectTypeChoice, setProjectTypeChoice] = React.useState<"real_estate" | "business">("real_estate");
   const projectTypeTouched = React.useRef(false);
@@ -223,22 +219,6 @@ export default function AdminOrderRequest() {
     });
     return () => { cancel = true; };
   }, [order?.id, order?.invoiceId, order?.listingId, order?.convertedToOrderId, order?.orderId]);
-
-  React.useEffect(() => {
-    let cancelled = false;
-    getDocs(collection(db, "packages"))
-      .then((snap) => {
-        if (cancelled) return;
-        setCatalog(packagesForStaffEditor(
-          snap.docs.map((entry) => ({ id: entry.id, ...entry.data() })),
-          { includeInactive: true },
-        ));
-      })
-      .catch(() => {
-        if (!cancelled) setCatalog(packagesForStaffEditor([]));
-      });
-    return () => { cancelled = true; };
-  }, []);
 
   const applyServicePatch = React.useCallback((patch: OrderServiceSavePatch) => {
     servicePatchRef.current = patch;
@@ -687,17 +667,9 @@ export default function AdminOrderRequest() {
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
             <h3 className={`${labelCls} mb-4`}>Services</h3>
             {editing ? (
-              <OrderServiceEditor
-                catalog={catalog}
-                initialLines={order.lineItems}
+              <OrderServicesFields
+                record={order}
                 resetKey={`${order.id}:${editing}`}
-                promoDiscount={order.promoDiscount}
-                promoCode={order.promoCode}
-                tax={order?.pricing?.tax ?? order.tax}
-                fees={order.fees}
-                travel={order.travel}
-                processing={order.processing}
-                rates={pricingRates}
                 onChange={applyServicePatch}
               />
             ) : shownServices.length > 0 || shownProcessing > 0 ? (

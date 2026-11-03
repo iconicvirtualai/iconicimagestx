@@ -18,6 +18,9 @@ import {
   projectInvoiceButtonLabel,
 } from "@shared/orderProjectInvoice";
 import { ensureLinkedInvoice } from "@/lib/orderProjectInvoice";
+import { OrderServicesFields } from "@/components/OrderServicesFields";
+import { syncOrderBillingToInvoice } from "@/lib/staffInvoice";
+import { orderBillingFromServicePatch, type OrderServiceSavePatch } from "@shared/orderRequestServices";
 import { readProjectSurface } from "@/lib/projectSurfaceRead";
 import { addressText, recordAddressText } from "@shared/addressText";
 import { calendarDateKey, formatChicagoDate } from "@shared/clientHome";
@@ -285,6 +288,7 @@ export default function AdminListingFile({
 
   // Info editing
   const [editingInfo, setEditingInfo] = React.useState(false);
+  const servicePatchRef = React.useRef<OrderServiceSavePatch | null>(null);
   const [infoForm, setInfoForm] = React.useState<any>(initialProject ?? {});
   const [tourInput, setTourInput] = React.useState("");
   const editingInfoRef = React.useRef(false);
@@ -391,7 +395,23 @@ export default function AdminListingFile({
       for (const key of INFO_FIELDS) {
         if (infoForm[key] !== undefined) payload[key] = infoForm[key] ?? "";
       }
+      const servicePatch = servicePatchRef.current;
+      const billing = servicePatch ? orderBillingFromServicePatch(servicePatch) : null;
+      if (billing) {
+        payload.services = billing.services;
+        payload.lineItems = billing.lineItems;
+        payload.total = billing.total;
+        payload.pricing = billing.pricing;
+      }
       await patch(payload);
+      if (billing) {
+        const requestId = String(project.orderRequestId || loadedSurface?.orderRequest?.id || "");
+        const orderId = String(project.orderId || loadedSurface?.order?.id || "");
+        const invoiceId = String(project.invoiceId || loadedSurface?.invoiceId || "");
+        if (requestId) await updateDoc(doc(db, "orderRequests", requestId), { ...billing, updatedAt: serverTimestamp() });
+        if (orderId && orderId !== requestId) await updateDoc(doc(db, "orders", orderId), { ...billing, updatedAt: serverTimestamp() });
+        if (invoiceId) await syncOrderBillingToInvoice(invoiceId, billing);
+      }
       toast.success("Saved.");
       setEditingInfo(false);
     } catch { toast.error("Failed to save."); }
@@ -788,6 +808,29 @@ export default function AdminListingFile({
                     <InfoField label="Brand Colors" value={infoForm.brandColors} editing={editingInfo} onChange={v => setInfoForm((f: any) => ({ ...f, brandColors: v }))} />
                     <InfoField label="Deliverables" value={infoForm.deliverables} editing={editingInfo} onChange={v => setInfoForm((f: any) => ({ ...f, deliverables: v }))} />
                   </>)}
+                  <div className="sm:col-span-2">
+                    <label className={labelCls}>Services</label>
+                    {editingInfo ? (
+                      <OrderServicesFields
+                        record={{
+                          ...(linkedOrder || {}),
+                          lineItems: (linkedOrder as { lineItems?: unknown } | null)?.lineItems
+                            || project.lineItems
+                            || (Array.isArray(project.services) ? project.services.map((name: unknown) => (
+                              typeof name === "string" ? { name, qty: 1, price: 0, unitPrice: 0 } : name
+                            )) : []),
+                        }}
+                        resetKey={`${project.id}:${editingInfo}`}
+                        onChange={(next) => { servicePatchRef.current = next; }}
+                      />
+                    ) : (
+                      <p className="text-sm font-bold text-gray-700">
+                        {(Array.isArray(project.services) && project.services.length > 0)
+                          ? project.services.map((name: unknown) => typeof name === "string" ? name : (name as { name?: string })?.name).filter(Boolean).join(", ")
+                          : "No services yet. Choose Edit to add them."}
+                      </p>
+                    )}
+                  </div>
                   <div className="sm:col-span-2">
                     <label className={labelCls}>Notes</label>
                     {editingInfo ? (

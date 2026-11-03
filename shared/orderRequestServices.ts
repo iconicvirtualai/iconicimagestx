@@ -121,6 +121,50 @@ export interface OrderServiceSavePatch extends OrderServiceQuote {
   promoCode?: string | null;
 }
 
+/** Fields written onto an order or project when services are saved. Does not email. */
+export function orderBillingFromServicePatch(patch: OrderServiceSavePatch): {
+  lineItems: BookingLineItem[];
+  subtotal: number;
+  processing: number;
+  fees: number;
+  travel: number;
+  tax: number;
+  total: number;
+  promoDiscount: number;
+  promoCode: string | null;
+  selectedService: string | null;
+  selectedBasics: string[];
+  selectedAddOns: string[];
+  catalogPackageIds: string[];
+  catalogVariantIds: string[];
+  pricing: OrderServiceSavePatch["pricing"];
+  services: string[];
+  appointmentDuration?: number;
+} {
+  return {
+    lineItems: patch.lineItems,
+    subtotal: patch.subtotal,
+    processing: patch.processing,
+    fees: patch.fees,
+    travel: patch.travel,
+    tax: patch.tax,
+    total: patch.total,
+    promoDiscount: patch.promotions,
+    promoCode: patch.promoCode ?? null,
+    selectedService: patch.selectedService,
+    selectedBasics: patch.selectedBasics,
+    selectedAddOns: patch.selectedAddOns,
+    catalogPackageIds: patch.catalogPackageIds,
+    catalogVariantIds: patch.catalogVariantIds,
+    pricing: patch.pricing,
+    services: patch.lineItems
+      .filter((item) => item.price >= 0 && !String(item.id || "").startsWith("promo-") && !String(item.name || "").startsWith("Promo Code:"))
+      .map((item) => item.name)
+      .filter(Boolean),
+    ...(patch.appointmentDuration != null ? { appointmentDuration: patch.appointmentDuration } : {}),
+  };
+}
+
 export interface PresentedOrderCharges {
   services: OrderServiceLine[];
   processing: number;

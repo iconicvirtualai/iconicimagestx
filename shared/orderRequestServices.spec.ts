@@ -209,8 +209,8 @@ describe("order request service save", () => {
 
 describe("order request page", () => {
   it("uses the catalog picker instead of a free-text service name", () => {
-    expect(orderPage).toContain("OrderServiceEditor");
-    expect(orderPage).toContain("packagesForStaffEditor");
+    expect(orderPage).toContain("OrderServicesFields");
+    expect(readFileSync(new URL("../client/components/OrderServicesFields.tsx", import.meta.url), "utf8")).toContain("OrderServiceEditor");
     expect(orderPage).not.toContain('placeholder="Service name"');
     expect(orderPage).not.toContain("+ Add Service");
   });

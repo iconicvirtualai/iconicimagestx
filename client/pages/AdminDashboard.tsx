@@ -33,6 +33,8 @@ import {
 } from "firebase/firestore";
 import { toast } from "sonner";
 import { resolvePortalClientId } from "@/lib/listingClient";
+import { OrderServicesFields } from "@/components/OrderServicesFields";
+import { orderBillingFromServicePatch, type OrderServiceSavePatch } from "@shared/orderRequestServices";
 import OperationsStatsGrid from "@/components/OperationsStatsGrid";
 import OperationsOverview from "@/components/OperationsOverview";
 
@@ -121,6 +123,7 @@ export default function AdminDashboard() {
 
   const [showNewOrder, setShowNewOrder] = React.useState(false);
   const [form, setForm] = React.useState(BLANK);
+  const servicePatchRef = React.useRef<OrderServiceSavePatch | null>(null);
   const photographers = useBookingPhotographers(showNewOrder);
   const suggestedTimes = useSuggestedAppointments({
     active: showNewOrder,
@@ -194,9 +197,11 @@ export default function AdminDashboard() {
         clientId,
         phone: form.phone,
         address: form.address,
-        lineItems: form.serviceNote ? [{ name: form.serviceNote, price: 0 }] : [],
-        pricing: {},
-        total: 0,
+        ...(servicePatchRef.current ? orderBillingFromServicePatch(servicePatchRef.current) : {
+          lineItems: [],
+          pricing: {},
+          total: 0,
+        }),
         scheduledDate: form.scheduledDate || null,
         appointmentDate: form.scheduledDate || null,
         scheduledTime: form.scheduledTime || null,
@@ -321,11 +326,11 @@ export default function AdminDashboard() {
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Service / Notes</label>
-                <input
-                  value={form.serviceNote}                  onChange={(e) => setForm((p) => ({ ...p, serviceNote: e.target.value }))}
-                  placeholder="e.g. Listing Showcase + Aerial"
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#0d9488]/30"
+                <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Services</label>
+                <OrderServicesFields
+                  record={{ lineItems: [] }}
+                  resetKey="new-dashboard-order"
+                  onChange={(next) => { servicePatchRef.current = next; }}
                 />
               </div>
               <div>
