@@ -13,7 +13,9 @@ export function PublicContactLine({
 }) {
   return (
     <p className={className} data-testid="public-contact-line">
-      {BUSINESS_CONTACT.address}
+      <a href={BUSINESS_CONTACT.mapsHref} target="_blank" rel="noopener noreferrer" className={linkClassName}>
+        {BUSINESS_CONTACT.address}
+      </a>
       {" | "}
       <a href={BUSINESS_CONTACT.phoneHref} className={linkClassName}>
         {BUSINESS_CONTACT.phoneDisplay}

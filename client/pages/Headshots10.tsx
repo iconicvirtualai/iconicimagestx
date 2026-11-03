@@ -13,7 +13,6 @@ import {
   HEADSHOTS_FULL_LINE,
   HEADSHOTS_H1,
   HEADSHOTS_HOLD_MINUTES,
-  HEADSHOTS_MAPS_QUERY,
   HEADSHOTS_MAX_QUANTITY,
   HEADSHOTS_RESERVE_LINE,
   HEADSHOTS_STUDIO_ADDRESS,
@@ -657,7 +656,7 @@ export default function Headshots10() {
           <div className="mt-4 flex flex-wrap gap-3">
             <a
               className="inline-flex min-h-12 items-center rounded-full bg-[#081228] px-5 font-bold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#00B4C8]"
-              href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(HEADSHOTS_MAPS_QUERY)}`}
+              href={BUSINESS_CONTACT.mapsHref}
               target="_blank"
               rel="noreferrer"
             >
@@ -675,7 +674,7 @@ export default function Headshots10() {
             className="mt-5 h-64 w-full border border-[#081228]/15"
             loading="lazy"
             referrerPolicy="no-referrer-when-downgrade"
-            src={`https://maps.google.com/maps?q=${encodeURIComponent(HEADSHOTS_MAPS_QUERY)}&output=embed`}
+            src={BUSINESS_CONTACT.mapsEmbed}
           />
         </section>
 

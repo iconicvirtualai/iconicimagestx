@@ -25,6 +25,7 @@ import {
   toDate,
 } from "@/lib/scheduleRecords";
 import { useAuth } from "@/contexts/AuthContext";
+import { countedAppointmentRevenue, sumOperationsPaidRevenue } from "@shared/revenueCount";
 
 export interface OperationMetrics {
   orderRequestsCount: number;
@@ -193,13 +194,13 @@ export function useOperationsMetrics() {
       .map(normalizeCalendarMetricEvent)
       .filter((event): event is any => Boolean(event) && isThisWeek(getApptDate(event)));
 
-    const revToday = scheduledToday.reduce((s, i) => s + appointmentRevenue(i), 0);
-    const revWeek = scheduledWeek.reduce((s, i) => s + appointmentRevenue(i), 0);
-    const revMonth = scheduledMonth.reduce((s, i) => s + appointmentRevenue(i), 0);
+    const revToday = scheduledToday.reduce((s, i) => s + countedAppointmentRevenue(i, appointmentRevenue(i)), 0);
+    const revWeek = scheduledWeek.reduce((s, i) => s + countedAppointmentRevenue(i, appointmentRevenue(i)), 0);
+    const revMonth = scheduledMonth.reduce((s, i) => s + countedAppointmentRevenue(i, appointmentRevenue(i)), 0);
     const revProjected = appointmentItems.filter(i => {
       const d = getApptDate(i);
       return d && chicagoDateKey(d) >= todayKey && !["paid", "delivered_paid"].includes((i.status || "").toLowerCase());
-    }).reduce((s, i) => s + appointmentRevenue(i), 0);
+    }).reduce((s, i) => s + countedAppointmentRevenue(i, appointmentRevenue(i)), 0);
 
     const shooters: Record<string, number> = {};
     let unassignedAppointmentsThisWeek = 0;
@@ -255,7 +256,7 @@ export function useOperationsMetrics() {
     const cancellationsCount = stabilityItems.filter(i => (i.status || "").toLowerCase() === "cancelled").length;
     const noShowsCount = stabilityItems.filter(i => (i.status || "").toLowerCase() === "no_show").length;
 
-    const revenueAppointments = appointmentItems.filter((item) => appointmentRevenue(item) > 0);
+    const revenueAppointments = appointmentItems.filter((item) => countedAppointmentRevenue(item, appointmentRevenue(item)) > 0);
 
     const clientData: Record<string, { rev: number; vol: number; last: Date }> = {};
     revenueAppointments.forEach(i => {
@@ -301,9 +302,7 @@ export function useOperationsMetrics() {
 
     const listingsInProgressCount = listings.filter(l => ["in_progress", "delivered"].includes((l.status || "").toLowerCase())).length;
     
-    const paidRevenue = invoices.reduce((sum, invoice: any) => (
-      sum + (Number(invoice.total) || Number(invoice.amountDue) + Number(invoice.amountPaid) || 0)
-    ), 0);
+    const paidRevenue = sumOperationsPaidRevenue(invoices);
 
     return {
       orderRequestsCount: orderRequestsFiltered.length,

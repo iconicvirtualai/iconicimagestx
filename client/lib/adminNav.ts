@@ -80,6 +80,7 @@ export const navGroups: { label: string; items: AdminNavItem[] }[] = [
       { label: "Email Templates", href: "/admin/email-templates", icon: Mail, roles: ADMIN_ONLY },
       { label: "Site Editor", href: "/admin/edit-site", icon: Palette, roles: ADMIN_ONLY },
       { label: "Revenue", href: "/admin/revenue", icon: DollarSign, roles: ADMIN_ONLY },
+      { label: "Test data", href: "/admin/test-data", icon: Package, roles: ADMIN_ONLY },
       { label: "Billing", href: "/admin/billing", icon: CreditCard, roles: ADMIN_ONLY },
       { label: "Client Billing", href: "/admin/client-billing", icon: CreditCard, roles: ADMIN_ONLY },
       { label: "Invoice Presets", href: "/admin/invoice-presets", icon: DollarSign, roles: COORD_UP },

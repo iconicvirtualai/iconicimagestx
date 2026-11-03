@@ -1,4 +1,5 @@
 import AdminRevenue from "@/pages/AdminRevenue";
+import AdminTestDataCleanup from "@/pages/AdminTestDataCleanup";
 import AdminBilling from "@/pages/AdminBilling";
 import AdminClientBilling from "@/pages/AdminClientBilling";
 import AdminAicon from "@/pages/AdminAicon";
@@ -190,6 +191,9 @@ const App = () => (
             <Route path="/studio" element={<Navigate to="/studio-105" replace />} />
             {/* Bare /gallery has no project id. The client portal is the door. */}
             <Route path="/gallery" element={<Navigate to="/portal" replace />} />
+            <Route path="/booking" element={<Navigate to="/book" replace />} />
+            <Route path="/holiday-event" element={<Navigate to="/thankful" replace />} />
+            <Route path="/services" element={<Navigate to="/pricing" replace />} />
             <Route path="/studio/:listingId" element={<ClientStudio />} />
             <Route path="/gallery/:galleryId" element={<PublicGallery />} />
             <Route path="/present/:token" element={<ListingPresentation />} />
@@ -266,6 +270,7 @@ const App = () => (
             <Route path="/admin/current-pricing" element={<ProtectedRoute requiredRole="admin"><AdminCurrentPricing /></ProtectedRoute>} />
             
             <Route path="/admin/revenue" element={<ProtectedRoute requiredRole="admin"><AdminRevenue /></ProtectedRoute>} />
+            <Route path="/admin/test-data" element={<ProtectedRoute requiredRole="admin"><AdminTestDataCleanup /></ProtectedRoute>} />
             <Route path="/admin/billing" element={<ProtectedRoute requiredRole="admin"><AdminBilling /></ProtectedRoute>} />
             <Route path="/admin/client-billing" element={<ProtectedRoute requiredRole="admin"><AdminClientBilling /></ProtectedRoute>} />
             <Route path="/admin/aicon" element={<ProtectedRoute requiredRole="coordinator"><AdminAicon /></ProtectedRoute>} />

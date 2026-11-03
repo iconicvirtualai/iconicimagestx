@@ -13,6 +13,8 @@ import { db } from "@/lib/firebase";
 import { collection, onSnapshot, addDoc, serverTimestamp, updateDoc, doc } from "firebase/firestore";
 import { toast } from "sonner";
 import OperationsStatsGrid from "@/components/OperationsStatsGrid";
+import { adminRevenueAcceptance, summarizeBillingTotals } from "@shared/revenueCount";
+import { PlaytestBadge } from "@/components/PlaytestBadge";
 
 function fmtCurrency(n: number): string { return "$" + (n || 0).toLocaleString("en-US", { minimumFractionDigits: 2 }); }
 function fmtDate(ts: unknown): string {
@@ -84,6 +86,10 @@ export default function AdminClientBilling() {
         due: total - paid,
         status,
         lineItems: o.lineItems || [],
+        countsTowardRevenue: o.countsTowardRevenue,
+        playtest: o.playtest,
+        qaOnly: o.qaOnly,
+        id: o.id,
       };
     }).filter(inv => inv.total > 0);
   }, [orders, invoiceDocs]);
@@ -98,13 +104,16 @@ export default function AdminClientBilling() {
     return result;
   }, [invoices, search, statusFilter]);
 
-  const stats = React.useMemo(() => ({
-    total: invoices.reduce((s, i) => s + i.total, 0),
-    collected: invoices.reduce((s, i) => s + i.paid, 0),
-    outstanding: invoices.reduce((s, i) => s + i.due, 0),
-    overdue: invoices.filter(i => i.status === "overdue").reduce((s, i) => s + i.due, 0),
-    count: invoices.length,
-  }), [invoices]);
+  const stats = React.useMemo(() => {
+    const money = summarizeBillingTotals(invoices.map((inv) => ({
+      total: inv.total,
+      paid: inv.paid,
+      due: inv.due,
+      status: inv.status,
+      source: inv,
+    })));
+    return { ...money, count: invoices.length };
+  }, [invoices]);
 
   const openInvoice = (invoiceId: string) => {
     if (!invoiceId) {
@@ -152,6 +161,7 @@ export default function AdminClientBilling() {
         invoice: { invoiceNumber: `INV-${Date.now().toString(36).toUpperCase()}`, status: "draft", amountDue: total, amountPaid: 0 },
         status: "new",
         source: "manual_invoice",
+        ...adminRevenueAcceptance(user?.email || "admin"),
         notes: newInv.notes,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -167,6 +177,7 @@ export default function AdminClientBilling() {
   return (
     <AdminLayout title="Client Billing">
       <OperationsStatsGrid />
+      <p className="text-xs text-gray-500 mb-4">Totals include only orders an admin accepted or created. The rows below stay visible.</p>
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
@@ -236,7 +247,7 @@ export default function AdminClientBilling() {
                     <td className="py-3 px-4 text-xs font-bold text-[#0d9488]">{inv.invoiceNumber}</td>
                     <td className="py-3 px-4 text-xs text-gray-500">{fmtDate(inv.date)}</td>
                     <td className="py-3 px-4">
-                      <p className="text-xs font-bold">{inv.clientName}</p>
+                      <p className="text-xs font-bold">{inv.clientName}<PlaytestBadge record={inv} /></p>
                       <p className="text-[10px] text-gray-400">{inv.clientEmail}</p>
                     </td>
                     <td className="py-3 px-4 text-right text-xs font-bold"><MoneyAmount className="text-xs font-bold">{fmtCurrency(inv.total)}</MoneyAmount></td>

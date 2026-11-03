@@ -661,7 +661,9 @@ function parseContactLine(line) {
     phoneDisplay,
     phoneHref: `tel:+1${phoneDigits}`,
     email,
-    emailHref: `mailto:${email}`
+    emailHref: `mailto:${email}`,
+    mapsHref: `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`,
+    mapsEmbed: `https://maps.google.com/maps?q=${encodeURIComponent(address)}&output=embed`
   };
 }
 parseContactLine(BUSINESS_CONTACT_LINE);

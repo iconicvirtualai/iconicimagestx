@@ -22,6 +22,7 @@ import { fetchPublishedSquareInvoiceUrl, resolveSquareCheckoutUrl, squareApiBase
 import { squareBuyerPrefill } from "../../shared/clientHubSettings";
 import { clientInvoiceUrl } from "../../shared/invoicePayLink";
 import { publicClientUrl } from "../../shared/publicSiteUrl";
+import { revenueStamp, sumTransactionAmounts } from "../../shared/revenueCount";
 import {
   createPayToken,
   decideInvoiceView,
@@ -404,7 +405,8 @@ async function applySuccessfulPayment({
     }).catch((err) => console.error("[Payments] Order balance update failed:", err));
   }
 
-  if (resolvedClientId) {
+  const stamp = revenueStamp(invoice);
+  if (resolvedClientId && stamp.countsTowardRevenue) {
     await db().collection("clients").doc(resolvedClientId).update({
       totalSpend: admin.firestore.FieldValue.increment(amount),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -420,6 +422,7 @@ async function applySuccessfulPayment({
     amount,
     paymentMethod: method,
     status: "completed",
+    ...stamp,
     ...(squarePaymentId ? { squarePaymentId } : {}),
     ...(stripePaymentIntentId ? { stripePaymentIntentId } : {}),
     processedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -1401,9 +1404,9 @@ router.get("/transactions", requireCoordinator, async (req, res) => {
 
     const snapshot = await query.limit(Number(limit)).get();
     const transactions = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-    const totalRevenue = transactions
-      .filter((t: Record<string, unknown>) => t.status === "completed" && t.type === "payment")
-      .reduce((sum: number, t: Record<string, unknown>) => sum + (Number(t.amount) || 0), 0);
+    const totalRevenue = sumTransactionAmounts(
+      transactions.filter((t: Record<string, unknown>) => t.status === "completed" && t.type === "payment"),
+    );
 
     return res.json({ transactions, totalRevenue });
   } catch (err) {
@@ -1478,6 +1481,7 @@ async function handleStripeRefund(charge: Stripe.Charge) {
     amount: -refundAmount,
     paymentMethod: "stripe",
     status: "completed",
+    ...revenueStamp(invoiceDoc.data()),
     stripePaymentIntentId: intentId,
     processedAt: admin.firestore.FieldValue.serverTimestamp(),
     processedBy: "system",

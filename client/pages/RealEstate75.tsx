@@ -39,7 +39,6 @@ const HERO_ALT = "25 listing photos for $75, 20-minute shoot by Iconic apprentic
 /** Where /realestate-75 is embedded. Return from Square lands on /realestate-75/schedule?booking=received. */
 const RETURN_PAGE = "realestate-75";
 /** Wix parent site. Links that leave this landing page open there, not inside the embed. */
-const MAIN_SITE = "https://www.iconicimagestx.com";
 
 /** Twelve listing photos, in file order. Cities come from the shoot notes. Unknown cities stay off the alt text. */
 const LISTING_GALLERY = [
@@ -625,14 +624,14 @@ function NeedMore({ gclid }: { gclid: string }) {
         </p>
         <div className="mt-6 flex flex-col gap-3 sm:flex-row">
           <a
-            href={withGclid(`${MAIN_SITE}/pricing`, gclid)}
+            href={withGclid("/pricing", gclid)}
             target="_top"
             className="inline-flex min-h-12 items-center justify-center rounded-xl bg-black px-5 text-base font-semibold text-white hover:bg-neutral-800"
           >
             See pricing
           </a>
           <a
-            href={withGclid(`${MAIN_SITE}/book`, gclid)}
+            href={withGclid("/book", gclid)}
             target="_top"
             className="inline-flex min-h-12 items-center justify-center rounded-xl border border-neutral-300 bg-white px-5 text-base font-semibold text-neutral-950 hover:bg-neutral-50"
           >

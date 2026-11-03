@@ -85,7 +85,7 @@ export default function Go() {
           linkClassName="text-sm font-semibold text-white underline decoration-white/40 underline-offset-4 hover:decoration-white"
         />
         <a
-          href="https://iconicimagestx.com"
+          href="/"
           className="text-sm font-semibold text-white underline decoration-white/40 underline-offset-4 hover:decoration-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
         >
           iconicimagestx.com
