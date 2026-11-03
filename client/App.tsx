@@ -68,11 +68,9 @@ import AdminCustomerCenter from "./pages/AdminCustomerCenter";
 import AdminClientAccount from "./pages/AdminClientAccount";
 import AdminSiteEditor from "./pages/AdminSiteEditor";
 import AdminEmailTemplates from "./pages/AdminEmailTemplates";
-import AdminCurrentPricing from "./pages/AdminCurrentPricing";
 import AdminOrderDetail from "./pages/AdminOrderDetail";
 import AdminOrderRequest from "./pages/AdminOrderRequest";
 import AdminInvoiceEditor from "./pages/AdminInvoiceEditor";
-import AdminBookingCatalog from "./pages/AdminBookingCatalog";
 import AdminPricing from "./pages/AdminPricing";
 import AdminInvoicePresets from "./pages/AdminInvoicePresets";
 import AdminListings from "./pages/AdminListings";
@@ -240,7 +238,7 @@ const App = () => (
             <Route path="/admin/orders/:id" element={<ProtectedRoute requiredRole="coordinator"><AdminOrderDetail /></ProtectedRoute>} />
             <Route path="/admin/order-request/:id" element={<ProtectedRoute requiredRole="coordinator"><AdminOrderRequest /></ProtectedRoute>} />
             <Route path="/admin/invoice/:invoiceId" element={<ProtectedRoute requiredRole="coordinator"><AdminInvoiceEditor /></ProtectedRoute>} />
-            <Route path="/admin/booking-catalog" element={<ProtectedRoute requiredRole="coordinator"><AdminBookingCatalog /></ProtectedRoute>} />
+            <Route path="/admin/booking-catalog" element={<Navigate to="/admin/pricing" replace />} />
             <Route path="/admin/pricing" element={<ProtectedRoute requiredRole="coordinator"><AdminPricing /></ProtectedRoute>} />
             <Route path="/admin/invoice-presets" element={<ProtectedRoute requiredRole="coordinator"><AdminInvoicePresets /></ProtectedRoute>} />
             <Route path="/admin/messages" element={<ProtectedRoute requiredRole="coordinator"><AdminMessages /></ProtectedRoute>} />
@@ -264,7 +262,7 @@ const App = () => (
             <Route path="/admin/team" element={<ProtectedRoute requiredRole="admin"><AdminTeam /></ProtectedRoute>} />
             <Route path="/admin/edit-site" element={<ProtectedRoute requiredRole="staff"><AdminSiteEditor /></ProtectedRoute>} />
             <Route path="/admin/email-templates" element={<ProtectedRoute requiredRole="admin"><AdminEmailTemplates /></ProtectedRoute>} />
-            <Route path="/admin/current-pricing" element={<ProtectedRoute requiredRole="admin"><AdminCurrentPricing /></ProtectedRoute>} />
+            <Route path="/admin/current-pricing" element={<Navigate to="/admin/pricing" replace />} />
             
             <Route path="/admin/revenue" element={<ProtectedRoute requiredRole="admin"><AdminRevenue /></ProtectedRoute>} />
             <Route path="/admin/billing" element={<ProtectedRoute requiredRole="admin"><AdminBilling /></ProtectedRoute>} />

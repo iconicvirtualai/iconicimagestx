@@ -12,7 +12,6 @@ import {
   MessageSquare,
   Newspaper,
   Share2,
-  Package,
   Palette,
   Settings,
   ShoppingBag,
@@ -55,7 +54,6 @@ export const navGroups: { label: string; items: AdminNavItem[] }[] = [
       { label: "Studio", href: "/admin/studio", icon: Camera, roles: ALL_STAFF },
       { label: "Orders", href: "/admin/orders", icon: ShoppingBag, roles: COORD_UP },
       { label: "Holiday RSVPs", href: "/admin/holiday-rsvps", icon: CalendarDays, roles: COORD_UP },
-      { label: "Booking catalog", href: "/admin/booking-catalog", icon: Package, roles: COORD_UP },
       { label: "Prices", href: "/admin/pricing", icon: DollarSign, roles: COORD_UP },
       { label: "Schedule", href: "/admin/schedule", icon: CalendarDays, roles: COORD_UP },
       { label: "Projects", href: "/admin/listings", icon: Home, roles: COORD_UP },
@@ -77,7 +75,6 @@ export const navGroups: { label: string; items: AdminNavItem[] }[] = [
     label: "Settings",
     items: [
       { label: "Team", href: "/admin/team", icon: UserCircle, roles: ADMIN_ONLY },
-      { label: "Pricing", href: "/admin/current-pricing", icon: DollarSign, roles: ADMIN_ONLY },
       { label: "Email Templates", href: "/admin/email-templates", icon: Mail, roles: ADMIN_ONLY },
       { label: "Site Editor", href: "/admin/edit-site", icon: Palette, roles: ADMIN_ONLY },
       { label: "Revenue", href: "/admin/revenue", icon: DollarSign, roles: ADMIN_ONLY },

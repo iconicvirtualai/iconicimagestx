@@ -36,9 +36,9 @@ import {
 const bookingForm = readFileSync(new URL("../client/components/BookingForm.tsx", import.meta.url), "utf8");
 const catalogSource = readFileSync(new URL("./bookingCatalog.ts", import.meta.url), "utf8");
 const rules = readFileSync(new URL("../firestore.rules", import.meta.url), "utf8");
-const adminPricing = readFileSync(new URL("../client/pages/AdminCurrentPricing.tsx", import.meta.url), "utf8");
+const adminPricing = readFileSync(new URL("../client/pages/AdminPricing.tsx", import.meta.url), "utf8");
 const packageSchema = readFileSync(new URL("../client/lib/schema.ts", import.meta.url), "utf8");
-const catalogPage = readFileSync(new URL("../client/pages/AdminBookingCatalog.tsx", import.meta.url), "utf8");
+const catalogPage = readFileSync(new URL("../client/pages/AdminPricing.tsx", import.meta.url), "utf8");
 const appPage = readFileSync(new URL("../client/App.tsx", import.meta.url), "utf8");
 const bookingsRoute = readFileSync(new URL("../server/routes/bookings.ts", import.meta.url), "utf8");
 
