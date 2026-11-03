@@ -4,6 +4,7 @@ import { MoneyAmount } from "@/components/MoneyAmount";
 import ApprenticeLiveSlotPicker, { type LiveSlotState } from "@/components/ApprenticeLiveSlotPicker";
 import PropertyAddressField from "@/components/PropertyAddressField";
 import { trackConversion } from "@/lib/tracking";
+import { usePricingRates } from "@/lib/usePricingRates";
 import { BUSINESS_CONTACT, LEGAL_BUSINESS_NAME } from "@shared/businessContact";
 import { APPRENTICESHIP_OVERAGE_LABEL } from "@shared/bookingCatalog";
 import {
@@ -11,6 +12,7 @@ import {
   APPRENTICESHIP_BOOKING_FEE,
   APPRENTICESHIP_BOOKING_FEE_LINE,
   APPRENTICESHIP_DEPOSIT_REQUIRED_LINE,
+  apprenticeshipBookingFeeLine,
 } from "@shared/apprenticeship";
 import type { PickedServiceLocation } from "@shared/serviceLocation";
 import {
@@ -879,7 +881,10 @@ function Schedule(props: {
   onPatch: (partial: Partial<Draft>) => void;
 }) {
   const { draft, confirmation, area, pkg } = props;
-  const balance = Math.max(0, Math.round((props.quote.total - APPRENTICESHIP_BOOKING_FEE) * 100) / 100);
+  const rates = usePricingRates();
+  const bookingFee = rates.apprenticeshipBookingFee || APPRENTICESHIP_BOOKING_FEE;
+  const bookingFeeLine = apprenticeshipBookingFeeLine(bookingFee) || APPRENTICESHIP_BOOKING_FEE_LINE;
+  const balance = Math.max(0, Math.round((props.quote.total - bookingFee) * 100) / 100);
   return (
     <section id="schedule" className="scroll-mt-4 border-t border-neutral-200 px-4 py-14 md:px-8">
       <div className="mx-auto max-w-3xl">
@@ -914,7 +919,7 @@ function Schedule(props: {
                   Pay $25 booking fee
                 </a>
                 <p className="mt-3 text-sm leading-relaxed text-neutral-700">
-                  Secure card checkout by Square. {APPRENTICESHIP_BOOKING_FEE_LINE}. Balance after the shoot: ${balance.toFixed(2)}.
+                  Secure card checkout by Square. {bookingFeeLine}. Balance after the shoot: ${balance.toFixed(2)}.
                 </p>
               </>
             ) : (
@@ -1064,14 +1069,14 @@ function Schedule(props: {
               <div className="rounded-xl bg-neutral-950 p-4 text-white" data-testid="re75-deposit-due">
                 <p className="flex items-center justify-between gap-4 text-lg font-black">
                   <span>Due now: booking fee</span>
-                  <span>${APPRENTICESHIP_BOOKING_FEE.toFixed(2)}</span>
+                  <span>${bookingFee.toFixed(2)}</span>
                 </p>
                 <p className="mt-1 flex items-center justify-between gap-4 text-sm text-white/80">
                   <span>Balance after the shoot</span>
                   <span>${balance.toFixed(2)}</span>
                 </p>
                 <p className="mt-2 text-sm leading-relaxed text-white/80">
-                  {APPRENTICESHIP_BOOKING_FEE_LINE}. Secure card checkout by Square. {APPRENTICESHIP_DEPOSIT_REQUIRED_LINE}
+                  {bookingFeeLine}. Secure card checkout by Square. {APPRENTICESHIP_DEPOSIT_REQUIRED_LINE}
                 </p>
               </div>
               {area.status === "inside" && area.travelFee === "tbd" ? (

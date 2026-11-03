@@ -315,16 +315,16 @@ const SETTLED$1 = /* @__PURE__ */ new Set(["paid", "comped"]);
 function isGuessableInvoiceId(id) {
   return id.startsWith("listing_") || id.startsWith("ordreq_") || id.startsWith("playtest-");
 }
-function text$w(value) {
+function text$x(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function settled$1(invoice) {
-  return SETTLED$1.has(text$w(invoice?.status).toLowerCase());
+  return SETTLED$1.has(text$x(invoice?.status).toLowerCase());
 }
 function invoicePayLinkFor(invoice, env, extra) {
   if (!invoice || settled$1(invoice)) return null;
-  const id = text$w(invoice.id);
-  const token = text$w(invoice.payToken);
+  const id = text$x(invoice.id);
+  const token = text$x(invoice.payToken);
   if (!id || !token) return null;
   const url = new URL(`${publicSiteUrl(env)}/invoice/${encodeURIComponent(id)}`);
   url.searchParams.set("t", token);
@@ -335,7 +335,7 @@ function clientInvoiceUrl(invoice, env, extra) {
   const tokenized = invoicePayLinkFor(invoice, env, extra);
   if (tokenized) return tokenized;
   if (!invoice || settled$1(invoice)) return null;
-  const id = text$w(invoice.id);
+  const id = text$x(invoice.id);
   if (!id || isGuessableInvoiceId(id)) return null;
   const url = new URL(`${publicSiteUrl(env)}/invoice/${encodeURIComponent(id)}`);
   applyQuery(url, extra);
@@ -344,7 +344,7 @@ function clientInvoiceUrl(invoice, env, extra) {
 function applyQuery(url, extra) {
   if (!extra) return;
   for (const [key, value] of Object.entries(extra)) {
-    const textValue = text$w(value);
+    const textValue = text$x(value);
     if (textValue && key !== "t") url.searchParams.set(key, textValue);
   }
 }
@@ -737,8 +737,17 @@ const PROMO_DISCOUNTS = {
   ICONICAI: 35,
   NEWYEAR: 50
 };
-function promoDiscountFor(raw) {
+function promoDiscountFor(raw, promos, subtotal = 0) {
   const code = raw.trim().toUpperCase();
+  if (!code) return null;
+  if (promos) {
+    const match = promos.find((item) => item.active !== false && item.code.trim().toUpperCase() === code);
+    if (!match || match.discount <= 0) return null;
+    const discount = match.mode === "percent" ? Math.round(Math.max(0, subtotal) * match.discount) / 100 : match.discount;
+    const rounded = Math.round(discount * 100) / 100;
+    if (rounded <= 0) return null;
+    return { code: match.code.trim().toUpperCase(), discount: rounded };
+  }
   if (code === "ICONICAI") return { code, discount: PROMO_DISCOUNTS.ICONICAI };
   if (code === "NEWYEAR") return { code, discount: PROMO_DISCOUNTS.NEWYEAR };
   return null;
@@ -1001,6 +1010,28 @@ function catalogServiceCategory(value, fallback) {
   if (SERVICE_CATEGORIES.has(raw)) return raw;
   return fallback;
 }
+function catalogVariants(value) {
+  if (!Array.isArray(value)) return void 0;
+  const variants = [];
+  for (const entry2 of value) {
+    if (!entry2 || typeof entry2 !== "object") continue;
+    const row = entry2;
+    const id = catalogText(row.id);
+    const name = catalogText(row.name);
+    const price = finiteCatalogNumber(row.price);
+    if (!id || !name || price == null || price < 0) continue;
+    const duration = finiteCatalogNumber(row.durationMinutes);
+    const description = catalogText(row.description);
+    variants.push({
+      id,
+      name,
+      price,
+      ...duration != null && duration > 0 ? { durationMinutes: Math.round(duration) } : {},
+      ...description ? { description } : {}
+    });
+  }
+  return variants.length > 0 ? variants : void 0;
+}
 function withCatalogNotes(item, doc, current) {
   const appointmentLimit = catalogText(doc.appointmentLimit) || current?.appointmentLimit;
   const overage = catalogText(doc.overage) || current?.overage;
@@ -1010,6 +1041,8 @@ function withCatalogNotes(item, doc, current) {
   const addonGroup = catalogText(doc.addonGroup) || current?.addonGroup;
   const serviceCategory2 = catalogServiceCategory(doc.serviceCategory, current?.serviceCategory);
   const rules = catalogStringList(doc.rules, current?.rules);
+  const durationMinutes = Object.prototype.hasOwnProperty.call(doc, "durationMinutes") ? finiteCatalogNumber(doc.durationMinutes) : current?.durationMinutes;
+  const variants = Object.prototype.hasOwnProperty.call(doc, "variants") ? catalogVariants(doc.variants) : current?.variants;
   return {
     ...item,
     ...appointmentLimit ? { appointmentLimit } : {},
@@ -1019,20 +1052,26 @@ function withCatalogNotes(item, doc, current) {
     ...aside ? { aside } : {},
     ...addonGroup ? { addonGroup } : {},
     ...serviceCategory2 ? { serviceCategory: serviceCategory2 } : {},
-    ...rules?.length ? { rules } : {}
+    ...rules?.length ? { rules } : {},
+    ...durationMinutes != null && durationMinutes > 0 ? { durationMinutes: Math.round(durationMinutes) } : {},
+    ...variants?.length ? { variants } : {}
   };
 }
 function packagesForStaffEditor(liveDocs = [], options) {
   const byId = /* @__PURE__ */ new Map();
-  for (const seed of bookingPackageSeedDocs()) {
-    byId.set(seed.id, withCatalogNotes(
-      { ...seed, includedServices: [...seed.includedServices] },
-      seed
+  for (const seed2 of bookingPackageSeedDocs()) {
+    byId.set(seed2.id, withCatalogNotes(
+      { ...seed2, includedServices: [...seed2.includedServices] },
+      seed2
     ));
   }
   for (const doc of liveDocs) {
     const id = catalogText(doc.id || doc.bookingId);
     if (!id) continue;
+    if (doc.removed === true) {
+      byId.delete(id);
+      continue;
+    }
     const current = byId.get(id);
     const name = catalogText(doc.name) || current?.name || "";
     if (!name) continue;
@@ -1174,7 +1213,7 @@ function findCatalogItem(catalog, id) {
   const priced = matches.filter((item) => item.price === price);
   return priced.length === 1 ? priced[0] : void 0;
 }
-function roundMoney$a(value) {
+function roundMoney$b(value) {
   return Math.round(value * 100) / 100;
 }
 function catalogLineName(pkg, qty = 1) {
@@ -1188,13 +1227,13 @@ function catalogLineName(pkg, qty = 1) {
 }
 function catalogLine(pkg, qty = 1) {
   const count2 = qty > 0 ? qty : 1;
-  const unitPrice = roundMoney$a(pkg.price);
+  const unitPrice = roundMoney$b(pkg.price);
   const line = {
     id: pkg.bookingId || pkg.id,
     name: catalogLineName(pkg, count2),
     unitPrice,
     qty: count2,
-    price: roundMoney$a(unitPrice * count2)
+    price: roundMoney$b(unitPrice * count2)
   };
   if (pkg.description) line.description = pkg.description;
   if (pkg.category) line.category = pkg.category;
@@ -1271,6 +1310,13 @@ function normalizeBookingLineItems(items) {
     if (bookingKind) line.bookingKind = bookingKind;
     const tier = optionalLineText(item.tier);
     if (tier) line.tier = tier;
+    const catalogId = optionalLineText(item.catalogId);
+    if (catalogId) line.catalogId = catalogId;
+    const variantId = optionalLineText(item.variantId);
+    if (variantId) line.variantId = variantId;
+    const duration = Number(item.durationMinutes);
+    if (Number.isFinite(duration) && duration > 0) line.durationMinutes = Math.round(duration);
+    if (item.custom === true) line.custom = true;
     return line;
   });
 }
@@ -1338,7 +1384,19 @@ function insertServiceLine(items, line) {
   if (promoAt === -1) return [...items, line];
   return [...items.slice(0, promoAt), line, ...items.slice(promoAt)];
 }
-function resolveSubmittedBooking(body, catalog) {
+function previewServiceSubtotal(body, list2) {
+  const items = buildSubmittedLineItems({
+    selectedService: optionalLineText(body.selectedService),
+    selectedBasics: textList(body.selectedBasics),
+    selectedAddOns: textList(body.selectedAddOns),
+    premiumUpgrade: body.premiumUpgrade === true,
+    virtualStagingCredits: Number(body.virtualStagingCredits) || 0,
+    specializedPhotography: optionalLineText(body.specializedPhotography),
+    catalog: list2
+  });
+  return roundMoney$b(items.filter((item) => !String(item.id || "").startsWith("promo-") && !item.name.startsWith("Promo Code:")).reduce((sum, item) => sum + item.price, 0));
+}
+function resolveSubmittedBooking(body, catalog, options) {
   const list2 = catalog ?? packagesForStaffEditor([]);
   const posted = normalizeBookingLineItems(body.lineItems);
   const postedIds = posted.map((item) => item.id).filter((id) => Boolean(id));
@@ -1357,7 +1415,8 @@ function resolveSubmittedBooking(body, catalog) {
     else if (postedIds.includes("specialized-social")) specialized = "social";
     else specialized = "";
   }
-  const promo = promoDiscountFor(optionalLineText(body.promoCode));
+  const postedPromo = optionalLineText(body.promoCode);
+  const promo = options?.promos ? promoDiscountFor(postedPromo, options.promos, previewServiceSubtotal(body, list2)) : promoDiscountFor(postedPromo);
   let lineItems = buildSubmittedLineItems({
     selectedService,
     selectedBasics,
@@ -1410,7 +1469,7 @@ function resolveSubmittedBooking(body, catalog) {
   }
   return {
     lineItems,
-    total: roundMoney$a(sumLineItemPrices(lineItems)),
+    total: roundMoney$b(sumLineItemPrices(lineItems)),
     promoCode: promo?.code ?? null,
     promoDiscount: promo?.discount ?? 0,
     selectedService: selectedService || null,
@@ -1488,7 +1547,7 @@ function adjustmentKind(item) {
   return null;
 }
 function invoiceAdjustmentLine(kind, amount) {
-  const price = roundMoney$9(Math.max(0, amount));
+  const price = roundMoney$a(Math.max(0, amount));
   const name = kind === "processing" ? "Processing" : kind === "fees" ? "Fees" : "Travel";
   return {
     id: ADJUSTMENT_LINE_IDS[kind],
@@ -1499,7 +1558,7 @@ function invoiceAdjustmentLine(kind, amount) {
     category: ADJUSTMENT_LINE_IDS[kind]
   };
 }
-function roundMoney$9(value) {
+function roundMoney$a(value) {
   if (!Number.isFinite(value)) return 0;
   return Math.round(value * 100) / 100;
 }
@@ -1616,19 +1675,26 @@ function publicMediaItem(item, canDownload) {
     thumbnailUrl: publicText(item.thumbnailUrl) || publicText(item.poster)
   };
 }
+const PROCESSING_FEE_RATE = 0.028;
 const BOOKING_PROCESSING_LABEL = "Processing (2.8%)";
 function processingEnabled(env) {
   const source = process.env;
   const raw = String(source?.INVOICE_PROCESSING_MODE ?? "").trim().toLowerCase();
   return raw !== "off" && raw !== "disabled" && raw !== "legacy" && raw !== "0";
 }
-function processingFee(base) {
-  return fromCents(processingFeeCents(toCents$1(base)));
+function processingFee(base, percent = PROCESSING_FEE_RATE * 100) {
+  return fromCents(processingFeeCents(toCents$1(base), percent));
 }
-function processingFeeCents(baseCents) {
+function processingFeeCents(baseCents, percent = PROCESSING_FEE_RATE * 100) {
   const cents2 = Math.round(Number(baseCents));
   if (!Number.isFinite(cents2) || cents2 <= 0) return 0;
-  return Math.floor((cents2 * 28 + 500) / 1e3);
+  const basis = Math.round(Number(percent) * 100);
+  if (!Number.isFinite(basis) || basis <= 0) return 0;
+  return Math.floor((cents2 * basis + 5e3) / 1e4);
+}
+function processingFeeLabel(percent = PROCESSING_FEE_RATE * 100) {
+  const shown = Number.isInteger(percent) ? String(percent) : String(Math.round(percent * 100) / 100);
+  return `Processing (${shown}%)`;
 }
 function computeInvoiceTotals(input) {
   const subtotal = nonNegativeMoney(input.subtotal);
@@ -1637,9 +1703,9 @@ function computeInvoiceTotals(input) {
   const travel = nonNegativeMoney(input.travel);
   const tax = nonNegativeMoney(input.tax);
   const amountPaid = nonNegativeMoney(input.amountPaid);
-  const netServices = roundMoney$8(Math.max(0, subtotal - promotions));
-  const processingBase = roundMoney$8(Math.max(0, netServices + fees));
-  const saleBeforeProcessing = roundMoney$8(netServices + fees + travel + tax);
+  const netServices = roundMoney$9(Math.max(0, subtotal - promotions));
+  const processingBase = roundMoney$9(Math.max(0, netServices + fees));
+  const saleBeforeProcessing = roundMoney$9(netServices + fees + travel + tax);
   const comped = input.comped === true;
   const stored = input.processing == null || !Number.isFinite(Number(input.processing)) ? null : nonNegativeMoney(input.processing);
   let processing = 0;
@@ -1651,10 +1717,10 @@ function computeInvoiceTotals(input) {
     processing = stored;
     processingPolicy = "stored";
   } else if (input.applyProcessing !== false) {
-    processing = processingFee(processingBase);
+    processing = processingFee(processingBase, input.processingPercent);
     processingPolicy = "included";
   }
-  const total = roundMoney$8(saleBeforeProcessing + processing);
+  const total = roundMoney$9(saleBeforeProcessing + processing);
   return {
     subtotal,
     promotions,
@@ -1665,7 +1731,7 @@ function computeInvoiceTotals(input) {
     processing,
     total,
     amountPaid,
-    amountDue: roundMoney$8(Math.max(0, total - amountPaid)),
+    amountDue: roundMoney$9(Math.max(0, total - amountPaid)),
     processingPolicy
   };
 }
@@ -1674,14 +1740,14 @@ function toCents$1(value) {
   return Math.round(value * 100);
 }
 function fromCents(cents2) {
-  return roundMoney$8(cents2 / 100);
+  return roundMoney$9(cents2 / 100);
 }
 function nonNegativeMoney(value) {
   const amount = Number(value);
   if (!Number.isFinite(amount) || amount <= 0) return 0;
-  return roundMoney$8(amount);
+  return roundMoney$9(amount);
 }
-function roundMoney$8(value) {
+function roundMoney$9(value) {
   if (!Number.isFinite(value)) return 0;
   return Math.round(value * 100) / 100;
 }
@@ -1691,8 +1757,8 @@ const TEAL = "#14B8C4";
 const GREEN = "#16A34A";
 const ROW = "#F3F4F6";
 function receiptProcessing(input) {
-  const status2 = text$v(input.invoice.status).toLowerCase();
-  const paymentStatus = text$v(input.invoice.paymentStatus).toLowerCase();
+  const status2 = text$w(input.invoice.status).toLowerCase();
+  const paymentStatus = text$w(input.invoice.paymentStatus).toLowerCase();
   if (status2 === "comped" || paymentStatus === "comped") return 0;
   const base = roundCents(input.subtotal - input.promotions + input.fees);
   const stored = finite$1(input.invoice.processing);
@@ -1981,7 +2047,7 @@ function dollars$1(value) {
   const amount = Number(String(value).replace(/[^0-9.-]/g, ""));
   return Number.isFinite(amount) ? amount : 0;
 }
-function text$v(value) {
+function text$w(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function escapeHtml$9(value) {
@@ -2625,7 +2691,7 @@ function addressText(value) {
   if (typeof value === "string") return value.trim();
   if (typeof value !== "object" || Array.isArray(value)) return "";
   const address = value;
-  const formatted = text$u(address.formatted) || text$u(address.label);
+  const formatted = text$v(address.formatted) || text$v(address.label);
   if (formatted) return formatted;
   return [address.street, address.city, address.state, address.zip].filter((part) => typeof part === "string" && part.trim()).join(", ");
 }
@@ -2638,7 +2704,7 @@ function recordAddressText(record2) {
   }
   return "";
 }
-function text$u(value) {
+function text$v(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 const PLAYTEST_ADDRESS = "100 Playtest Lane, Austin, TX 78701";
@@ -2827,13 +2893,13 @@ function haversineMiles(from, to) {
   const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
   return 2 * EARTH_RADIUS_MILES * Math.asin(Math.min(1, Math.sqrt(h)));
 }
-function assessTravel(value) {
+function assessTravel(value, zones = TRAVEL_ZONES) {
   const pin = pinFrom(value);
-  if (pin) return quoteFromMiles(haversineMiles(TRAVEL_ORIGIN, pin));
+  if (pin) return quoteFromMiles(haversineMiles(TRAVEL_ORIGIN, pin), zones);
   const zip = zipFrom(value);
   if (zip) {
     const centroid = TX_ZIP_CENTROIDS[zip];
-    if (centroid) return quoteFromMiles(haversineMiles(TRAVEL_ORIGIN, centroid));
+    if (centroid) return quoteFromMiles(haversineMiles(TRAVEL_ORIGIN, centroid), zones);
   }
   if (value && typeof value === "object" && !Array.isArray(value)) {
     const row = value;
@@ -2886,13 +2952,13 @@ function travelInvoiceLine(travel) {
     price
   };
 }
-function applyServerTravel(lineItems, address, clientTravelFeeCents) {
-  const travel = assessTravel(address);
+function applyServerTravel(lineItems, address, clientTravelFeeCents, zones = TRAVEL_ZONES) {
+  const travel = assessTravel(address, zones);
   const kept = normalizeBookingLineItems(lineItems).filter((item) => !isTravelFeeLine(item));
   const next = [...kept, travelInvoiceLine(travel)];
   return {
     lineItems: next,
-    total: roundMoney$7(sumLineItemPrices(next)),
+    total: roundMoney$8(sumLineItemPrices(next)),
     travel
   };
 }
@@ -2913,9 +2979,18 @@ function travelTextForRecord(record2, options) {
   if (address == null || address === "") return null;
   return travelSummaryText(assessTravel(address), options);
 }
-function quoteFromMiles(miles) {
+function quoteFromMiles(miles, zones = TRAVEL_ZONES) {
   const travelMiles = roundMiles(miles);
-  for (const zone of TRAVEL_ZONES) {
+  const bands = [...zones].sort((a, b) => a.outerMiles - b.outerMiles);
+  if (bands.length === 0) {
+    return {
+      travelZone: null,
+      travelMiles,
+      travelFeeCents: null,
+      travelQuoted: true
+    };
+  }
+  for (const zone of bands) {
     if (miles <= zone.outerMiles + BOUNDARY_EPSILON_MILES) {
       return {
         travelZone: zone.zone,
@@ -2965,7 +3040,7 @@ function emailMoney(cents2) {
 function roundMiles(miles) {
   return Math.round(miles * 100) / 100;
 }
-function roundMoney$7(value) {
+function roundMoney$8(value) {
   return Math.round(value * 100) / 100;
 }
 function toRad(degrees) {
@@ -2987,7 +3062,8 @@ function buildBookingInvoiceDraft(input) {
   if (input.applyProcessing) {
     const priced = applyProcessingToDraftLines(lineItems, {
       promoDiscount: Number(input.promoDiscount) || 0,
-      tax
+      tax,
+      processingPercent: input.processingPercent
     });
     lineItems = priced.lineItems;
     total = priced.total;
@@ -3012,13 +3088,15 @@ function buildBookingInvoiceDraft(input) {
       ...travelFields
     };
   }
+  const copiedProcessing = nonNegativeDraftMoney(input.processing);
+  const copiedLines = copiedProcessing > 0 && !lineItems.some((item) => adjustmentKind(item) === "processing") ? [...lineItems, invoiceAdjustmentLine("processing", copiedProcessing)] : lineItems;
   return {
     orderRequestId: input.orderRequestId || null,
     orderId: null,
     clientId: input.clientId || null,
     clientEmail: normalizeEmail$1(input.clientEmail),
     clientName: input.clientName,
-    lineItems,
+    lineItems: copiedLines,
     subtotal: input.travel ? total : Number(input.pricing?.subtotal ?? total) || 0,
     tax,
     total,
@@ -3028,8 +3106,14 @@ function buildBookingInvoiceDraft(input) {
     paymentProvider: "square",
     promoCode: input.promoCode || null,
     promoDiscount: Number(input.promoDiscount) || 0,
+    ...copiedProcessing > 0 ? { processing: copiedProcessing, processingPolicy: "stored" } : {},
     ...travelFields
   };
+}
+function nonNegativeDraftMoney(value) {
+  const amount = Number(value);
+  if (!Number.isFinite(amount) || amount <= 0) return 0;
+  return roundDraftMoney(amount);
 }
 function applyProcessingToDraftLines(lineItems, input) {
   const services2 = lineItems.filter((item) => !isPromoInvoiceLine(item) && !adjustmentKind(item) && !isTravelFeeLine(item));
@@ -3049,7 +3133,8 @@ function applyProcessingToDraftLines(lineItems, input) {
     travel,
     tax: input.tax,
     processing: storedProcessing ? storedProcessing.price : null,
-    applyProcessing: !storedProcessing
+    applyProcessing: !storedProcessing,
+    processingPercent: input.processingPercent
   });
   const next = [
     ...services2,
@@ -3884,10 +3969,10 @@ function clockTime(value) {
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 function storedAmount(value) {
-  if (typeof value === "number" && Number.isFinite(value)) return roundMoney$6(value);
+  if (typeof value === "number" && Number.isFinite(value)) return roundMoney$7(value);
   if (typeof value === "string" && value.trim()) {
     const parsed = Number(value.replace(/[$,\s]/g, ""));
-    if (Number.isFinite(parsed)) return roundMoney$6(parsed);
+    if (Number.isFinite(parsed)) return roundMoney$7(parsed);
   }
   return null;
 }
@@ -3953,7 +4038,7 @@ function buildClientInvoice(id, data, now = /* @__PURE__ */ new Date()) {
       createdAt: data.createdAt
     }, now),
     status: typeof data.status === "string" && data.status.trim() ? data.status.trim() : "",
-    clientName: text$t(data.clientName),
+    clientName: text$u(data.clientName),
     address: addressText(data.billToAddress || data.address || data.propertyAddress),
     createdAt,
     issuedOn: formatPortalDate(data.createdAt) || formatPortalDate(data.sentAt) || formatPortalDate(data.paidAt),
@@ -3963,7 +4048,7 @@ function buildClientInvoice(id, data, now = /* @__PURE__ */ new Date()) {
     fees: storedAmount(data.fees),
     travel: storedAmount(data.travel),
     promoDiscount: storedAmount(data.promoDiscount),
-    promoCode: text$t(data.promoCode),
+    promoCode: text$u(data.promoCode),
     tax: storedAmount(data.tax),
     total: storedAmount(data.total),
     amountPaid: storedAmount(data.amountPaid),
@@ -4015,15 +4100,15 @@ function storedLines(lineItems, services2) {
     if (typeof item === "string" && item.trim()) return [{ name: item.trim(), qty: null, amount: null }];
     if (!item || typeof item !== "object") return [];
     const record2 = item;
-    const named = text$t(record2.name) || text$t(record2.label);
-    const description = text$t(record2.description);
+    const named = text$u(record2.name) || text$u(record2.label);
+    const description = text$u(record2.description);
     const name = named || description;
     const qty = storedQty(record2.qty ?? record2.quantity);
     const amount = storedAmount(record2.price ?? record2.amount ?? record2.total);
     if (!name && amount == null && qty == null) return [];
     const line = { name: name || "Line item", qty, amount };
-    const id = text$t(record2.id);
-    const category = text$t(record2.category);
+    const id = text$u(record2.id);
+    const category = text$u(record2.category);
     if (id) line.id = id;
     if (category) line.category = category;
     if (named && description) line.description = description;
@@ -4059,10 +4144,10 @@ function isoStamp(value) {
   if (typeof value === "number" && Number.isFinite(value)) return new Date(value).toISOString();
   return null;
 }
-function text$t(value) {
+function text$u(value) {
   return typeof value === "string" ? value.trim() : "";
 }
-function roundMoney$6(value) {
+function roundMoney$7(value) {
   return Math.round(value * 100) / 100;
 }
 const MONTHS = {
@@ -4522,40 +4607,40 @@ function bookingListingGroups(input) {
   for (const doc of requests) {
     const node = nodeId("orderRequests", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("listings", text$s(doc.data.listingId)));
-    uf.link(node, nodeId("orders", text$s(doc.data.orderId) || text$s(doc.data.convertedToOrderId)));
-    uf.link(node, nodeId("invoices", text$s(doc.data.invoiceId)));
-    uf.link(node, nodeId("galleries", text$s(doc.data.galleryId)));
+    uf.link(node, nodeId("listings", text$t(doc.data.listingId)));
+    uf.link(node, nodeId("orders", text$t(doc.data.orderId) || text$t(doc.data.convertedToOrderId)));
+    uf.link(node, nodeId("invoices", text$t(doc.data.invoiceId)));
+    uf.link(node, nodeId("galleries", text$t(doc.data.galleryId)));
   }
   for (const doc of orders) {
     const node = nodeId("orders", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$s(doc.data.orderRequestId)));
-    uf.link(node, nodeId("listings", text$s(doc.data.listingId)));
-    uf.link(node, nodeId("invoices", text$s(doc.data.invoiceId)));
-    uf.link(node, nodeId("galleries", text$s(doc.data.galleryId)));
+    uf.link(node, nodeId("orderRequests", text$t(doc.data.orderRequestId)));
+    uf.link(node, nodeId("listings", text$t(doc.data.listingId)));
+    uf.link(node, nodeId("invoices", text$t(doc.data.invoiceId)));
+    uf.link(node, nodeId("galleries", text$t(doc.data.galleryId)));
   }
   for (const doc of invoices) {
     const node = nodeId("invoices", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$s(doc.data.orderRequestId)));
-    uf.link(node, nodeId("orders", text$s(doc.data.orderId)));
-    uf.link(node, nodeId("listings", text$s(doc.data.listingId)));
+    uf.link(node, nodeId("orderRequests", text$t(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$t(doc.data.orderId)));
+    uf.link(node, nodeId("listings", text$t(doc.data.listingId)));
   }
   for (const doc of appointments) {
     const node = nodeId("appointments", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$s(doc.data.orderRequestId)));
-    uf.link(node, nodeId("orders", text$s(doc.data.orderId)));
-    uf.link(node, nodeId("listings", text$s(doc.data.listingId)));
+    uf.link(node, nodeId("orderRequests", text$t(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$t(doc.data.orderId)));
+    uf.link(node, nodeId("listings", text$t(doc.data.listingId)));
   }
   for (const doc of galleries) {
     const node = nodeId("galleries", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$s(doc.data.orderRequestId)));
-    uf.link(node, nodeId("orders", text$s(doc.data.orderId)));
-    uf.link(node, nodeId("invoices", text$s(doc.data.invoiceId)));
-    uf.link(node, nodeId("listings", text$s(doc.data.listingId)));
+    uf.link(node, nodeId("orderRequests", text$t(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$t(doc.data.orderId)));
+    uf.link(node, nodeId("invoices", text$t(doc.data.invoiceId)));
+    uf.link(node, nodeId("listings", text$t(doc.data.listingId)));
   }
   const groups = [];
   for (const nodes of uf.components()) {
@@ -4615,7 +4700,7 @@ function fillEmptyListingFields(existing, desired) {
   return patch;
 }
 function clientOwnsListing(listing, clients) {
-  const clientId2 = text$s(listing.clientId);
+  const clientId2 = text$t(listing.clientId);
   const email = normalizeEmail$1(listing.clientEmail || listing.email);
   if (!clientId2 && !email) return true;
   if (clientId2 && clients.ids.includes(clientId2)) return true;
@@ -4687,10 +4772,10 @@ function chooseListing(group, listings, clients) {
 }
 function listingMatches(doc, group) {
   if (doc.id === group.stableId || group.preferredListingIds.includes(doc.id)) return true;
-  const requestId = text$s(doc.data.orderRequestId);
-  const orderId = text$s(doc.data.orderId);
-  const invoiceId = text$s(doc.data.invoiceId);
-  const appointmentId = text$s(doc.data.appointmentId);
+  const requestId = text$t(doc.data.orderRequestId);
+  const orderId = text$t(doc.data.orderId);
+  const invoiceId = text$t(doc.data.invoiceId);
+  const appointmentId = text$t(doc.data.appointmentId);
   return Boolean(
     requestId && group.orderRequestIds.includes(requestId) || orderId && group.orderIds.includes(orderId) || invoiceId && group.invoiceIds.includes(invoiceId) || appointmentId && group.appointmentIds.includes(appointmentId)
   );
@@ -4700,7 +4785,7 @@ function linksFor(group, listingId, listings, clients) {
   const links = [];
   const push = (collection, docs) => {
     for (const doc of docs) {
-      const current = text$s(doc.data.listingId);
+      const current = text$t(doc.data.listingId);
       if (current === listingId) continue;
       if (current && isPortalListingId(current) && ownedIds.has(current)) continue;
       links.push({ collection, id: doc.id });
@@ -4717,7 +4802,7 @@ function clientsFor(group, identity) {
   const ids = /* @__PURE__ */ new Set();
   const emails = /* @__PURE__ */ new Set();
   const addId = (value) => {
-    const id = text$s(value);
+    const id = text$t(value);
     if (id) ids.add(id);
   };
   const addEmail = (value) => {
@@ -4736,7 +4821,7 @@ function clientsFor(group, identity) {
 function preferredListingIds(group) {
   const ids = [];
   const push = (value) => {
-    const id = text$s(value);
+    const id = text$t(value);
     if (id && isPortalListingId(id) && !ids.includes(id)) ids.push(id);
   };
   for (const doc of [...group.orderRequests, ...group.orders, ...group.invoices, ...group.appointments, ...group.galleries]) {
@@ -4771,9 +4856,9 @@ function bestAddress(group) {
   }
   for (const doc of propertyDocs(group)) {
     for (const key of ["address", "propertyAddress", "shootLocation"]) {
-      if (typeof doc.data[key] === "string" && text$s(doc.data[key])) return text$s(doc.data[key]);
+      if (typeof doc.data[key] === "string" && text$t(doc.data[key])) return text$t(doc.data[key]);
     }
-    if (text$s(doc.data.addressLabel)) return text$s(doc.data.addressLabel);
+    if (text$t(doc.data.addressLabel)) return text$t(doc.data.addressLabel);
   }
   return null;
 }
@@ -4789,7 +4874,7 @@ function firstScheduleDate(group) {
 function firstScheduleTime(group) {
   for (const doc of [...group.appointments, ...group.orders, ...group.orderRequests]) {
     for (const key of ["scheduledTime", "appointmentTime", "apptTime", "requestedTime"]) {
-      const value = text$s(doc.data[key]);
+      const value = text$t(doc.data[key]);
       if (value && !/^tbd$/i.test(value)) return value;
     }
   }
@@ -4806,7 +4891,7 @@ function projectType(group) {
     if (doc.data.projectType === "real_estate") return "real_estate";
     const service = doc.data.selectedService;
     if (service && typeof service === "object") {
-      const category = text$s(service.category);
+      const category = text$t(service.category);
       if (category === "business" || category === "branding") return "business";
       if (category === "listings") return "real_estate";
     }
@@ -4832,7 +4917,7 @@ function namesFrom(value) {
   for (const item of value) {
     if (typeof item === "string" && item.trim()) names.push(item.trim());
     else if (item && typeof item === "object") {
-      const name = text$s(item.name);
+      const name = text$t(item.name);
       if (name) names.push(name);
     }
     if (names.length >= 40) break;
@@ -4857,8 +4942,8 @@ function accessInfo(group) {
   return [firstText$2(group, ["accessMethod"]), firstText$2(group, ["lockboxCode"])].filter(Boolean).join(" - ");
 }
 function clientId(group, identity) {
-  const bookingIds = propertyDocs(group).map((doc) => text$s(doc.data.clientId)).filter(Boolean);
-  const identityIds = (identity?.ids || []).map((id) => text$s(id)).filter(Boolean);
+  const bookingIds = propertyDocs(group).map((doc) => text$t(doc.data.clientId)).filter(Boolean);
+  const identityIds = (identity?.ids || []).map((id) => text$t(id)).filter(Boolean);
   return bookingIds.find((id) => identityIds.includes(id)) || bookingIds[0] || identityIds[0] || "";
 }
 function clientEmail(group, identity) {
@@ -4872,8 +4957,8 @@ function clientEmail(group, identity) {
 }
 function clientName$1(group) {
   for (const doc of propertyDocs(group)) {
-    if (text$s(doc.data.clientName)) return text$s(doc.data.clientName);
-    const joined = `${text$s(doc.data.firstName)} ${text$s(doc.data.lastName)}`.trim();
+    if (text$t(doc.data.clientName)) return text$t(doc.data.clientName);
+    const joined = `${text$t(doc.data.firstName)} ${text$t(doc.data.lastName)}`.trim();
     if (joined) return joined;
   }
   return "";
@@ -4881,7 +4966,7 @@ function clientName$1(group) {
 function chosenInvoiceId(group) {
   const known = new Set(group.invoiceIds);
   for (const doc of [...group.orderRequests, ...group.orders]) {
-    const id = text$s(doc.data.invoiceId);
+    const id = text$t(doc.data.invoiceId);
     if (id && known.has(id)) return id;
   }
   return newestDoc(group.invoices)?.id || group.invoiceIds[0] || "";
@@ -4890,7 +4975,7 @@ function chosenId(docs, ids, pointers = [], keys = []) {
   const known = new Set(ids);
   for (const doc of pointers) {
     for (const key of keys) {
-      const id = text$s(doc.data[key]);
+      const id = text$t(doc.data[key]);
       if (id && known.has(id)) return id;
     }
   }
@@ -4902,7 +4987,7 @@ function propertyDocs(group) {
 function firstText$2(group, keys) {
   for (const doc of propertyDocs(group)) {
     for (const key of keys) {
-      const value = text$s(doc.data[key]);
+      const value = text$t(doc.data[key]);
       if (value) return value;
     }
   }
@@ -4970,7 +5055,7 @@ function hasAddress(value) {
   if (typeof value === "string") return value.trim().length > 0;
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const record2 = value;
-  return ["formatted", "label", "street", "line1", "addressLine1", "city", "state", "zip"].some((key) => text$s(record2[key]).length > 0);
+  return ["formatted", "label", "street", "line1", "addressLine1", "city", "state", "zip"].some((key) => text$t(record2[key]).length > 0);
 }
 function statusKey(value) {
   return String(value || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
@@ -5002,14 +5087,14 @@ function isEmpty(value) {
 function isSentinel$1(value) {
   return Boolean(value && typeof value === "object" && "_methodName" in value);
 }
-function text$s(value) {
+function text$t(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function cleanDocs(docs) {
   const out = [];
   const seen = /* @__PURE__ */ new Set();
   for (const doc of docs || []) {
-    const id = text$s(doc?.id);
+    const id = text$t(doc?.id);
     if (!id || seen.has(id)) continue;
     seen.add(id);
     out.push({ id, data: doc.data && typeof doc.data === "object" ? doc.data : {} });
@@ -5095,7 +5180,7 @@ async function ensureBookingListingForRequest(orderRequestId) {
     galleries: []
   });
   const identity = {
-    ids: text$r(request.data.clientId) ? [text$r(request.data.clientId)] : [],
+    ids: text$s(request.data.clientId) ? [text$s(request.data.clientId)] : [],
     email: normalizeEmail$1(request.data.clientEmail || request.data.email)
   };
   const plans = await plansFor(bundle, identity);
@@ -5148,7 +5233,7 @@ async function applyBookingListingPlan(plan) {
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
       created = true;
-      console.info(`[Listings] Created ${plan.listingId} for booking ${text$r(plan.createFields.orderRequestId) || text$r(plan.createFields.orderId) || text$r(plan.createFields.invoiceId)}`);
+      console.info(`[Listings] Created ${plan.listingId} for booking ${text$s(plan.createFields.orderRequestId) || text$s(plan.createFields.orderId) || text$s(plan.createFields.invoiceId)}`);
     } catch (err) {
       if (!alreadyExists(err)) throw err;
       await fillListing(ref, plan.createFields);
@@ -5177,7 +5262,7 @@ async function linkRecord(collectionName2, id, listingId) {
   const ref = db$A().collection(collectionName2).doc(id);
   const snap = await ref.get();
   if (!snap.exists) return;
-  if (text$r(snap.data()?.listingId) === listingId) return;
+  if (text$s(snap.data()?.listingId) === listingId) return;
   await ref.update({
     listingId,
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
@@ -5191,9 +5276,9 @@ async function loadVisibleSeeds(identity) {
   const keep = (map, docs) => {
     for (const doc of docs) {
       if (!visibleToPortalClient({
-        clientId: text$r(doc.data.clientId),
-        email: text$r(doc.data.email),
-        clientEmail: text$r(doc.data.clientEmail)
+        clientId: text$s(doc.data.clientId),
+        email: text$s(doc.data.email),
+        clientEmail: text$s(doc.data.clientEmail)
       }, identity)) continue;
       if (!map.has(doc.id)) map.set(doc.id, doc);
     }
@@ -5224,44 +5309,44 @@ async function loadVisibleSeeds(identity) {
     galleries: []
   };
 }
-async function hydrateBundle(seed) {
-  const requests = mapDocs(seed.orderRequests);
-  const orders = mapDocs(seed.orders);
-  const invoices = mapDocs(seed.invoices);
-  const appointments = mapDocs(seed.appointments);
-  const galleries = mapDocs(seed.galleries);
+async function hydrateBundle(seed2) {
+  const requests = mapDocs(seed2.orderRequests);
+  const orders = mapDocs(seed2.orders);
+  const invoices = mapDocs(seed2.invoices);
+  const appointments = mapDocs(seed2.appointments);
+  const galleries = mapDocs(seed2.galleries);
   const requestIds = new Set(requests.keys());
   for (const doc of [...orders.values(), ...invoices.values(), ...appointments.values()]) {
-    const id = text$r(doc.data.orderRequestId);
+    const id = text$s(doc.data.orderRequestId);
     if (id) requestIds.add(id);
   }
   await readMissing("orderRequests", requestIds, requests);
   const orderIds = new Set(orders.keys());
   for (const doc of requests.values()) {
-    const id = text$r(doc.data.convertedToOrderId) || text$r(doc.data.orderId);
+    const id = text$s(doc.data.convertedToOrderId) || text$s(doc.data.orderId);
     if (id) orderIds.add(id);
   }
   for (const doc of [...invoices.values(), ...appointments.values()]) {
-    const id = text$r(doc.data.orderId);
+    const id = text$s(doc.data.orderId);
     if (id) orderIds.add(id);
   }
   await readMissing("orders", orderIds, orders);
   const invoiceIds = new Set(invoices.keys());
   for (const doc of [...requests.values(), ...orders.values()]) {
-    const id = text$r(doc.data.invoiceId);
+    const id = text$s(doc.data.invoiceId);
     if (id) invoiceIds.add(id);
   }
   await readMissing("invoices", invoiceIds, invoices);
   const legacyIds = /* @__PURE__ */ new Set();
   for (const doc of requests.values()) {
-    for (const id of legacyInvoiceDocIds({ orderRequestId: doc.id, listingId: text$r(doc.data.listingId) })) {
+    for (const id of legacyInvoiceDocIds({ orderRequestId: doc.id, listingId: text$s(doc.data.listingId) })) {
       legacyIds.add(id);
     }
   }
   for (const doc of orders.values()) {
     for (const id of legacyInvoiceDocIds({
-      orderRequestId: text$r(doc.data.orderRequestId),
-      listingId: text$r(doc.data.listingId)
+      orderRequestId: text$s(doc.data.orderRequestId),
+      listingId: text$s(doc.data.listingId)
     })) {
       legacyIds.add(id);
     }
@@ -5274,7 +5359,7 @@ async function hydrateBundle(seed) {
   mergeDocs(appointments, await queryIn("appointments", "orderId", [...orders.keys()]));
   const galleryIds = new Set(galleries.keys());
   for (const doc of [...requests.values(), ...orders.values()]) {
-    const id = text$r(doc.data.galleryId);
+    const id = text$s(doc.data.galleryId);
     if (id) galleryIds.add(id);
   }
   await readMissing("galleries", galleryIds, galleries);
@@ -5403,7 +5488,7 @@ function alreadyExists(err) {
 function isSentinel(value) {
   return Boolean(value && typeof value === "object" && "_methodName" in value);
 }
-function text$r(value) {
+function text$s(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function chunk$1(items, size) {
@@ -5420,14 +5505,14 @@ const BOOKING_PHOTOGRAPHER_STAFF_UIDS = {
   "david-gonzalez": "",
   "cadi-torres": ""
 };
-function text$q(value) {
+function text$r(value) {
   return typeof value === "string" ? value.trim().toLowerCase() : "";
 }
 function resolveBookingPhotographerStaff(input) {
   const publicId = input.publicId.trim();
   const configured = String(BOOKING_PHOTOGRAPHER_STAFF_UIDS[publicId] || "").trim();
-  const calendar = text$q(input.calendarId);
-  const match = calendar ? (input.staff || []).find((member) => text$q(member.email) === calendar || text$q(member.googleCalendarId) === calendar) : void 0;
+  const calendar = text$r(input.calendarId);
+  const match = calendar ? (input.staff || []).find((member) => text$r(member.email) === calendar || text$r(member.googleCalendarId) === calendar) : void 0;
   const candidate = String(match?.id || configured || "").trim();
   const uid = candidate && candidate !== publicId ? candidate : null;
   const matchedName = typeof match?.name === "string" ? match.name.trim() : "";
@@ -5656,7 +5741,7 @@ function nestedTotal(pricing) {
 function warnWhenStoredTotalDiffers(record2, lineItems) {
   const stored = [money$6(record2.total), money$6(nestedTotal(record2.pricing))].filter((amount) => amount != null);
   if (stored.length === 0) return;
-  const rebuilt = roundMoney$5(sumLineItemPrices(chargedServiceLines(lineItems)));
+  const rebuilt = roundMoney$6(sumLineItemPrices(chargedServiceLines(lineItems)));
   const drifted = [...new Set(stored.filter((amount) => Math.abs(amount - rebuilt) > 9e-3))];
   if (drifted.length === 0) return;
   console.warn(
@@ -5664,14 +5749,14 @@ function warnWhenStoredTotalDiffers(record2, lineItems) {
   );
 }
 function money$6(value) {
-  if (typeof value === "number" && Number.isFinite(value)) return roundMoney$5(value);
+  if (typeof value === "number" && Number.isFinite(value)) return roundMoney$6(value);
   if (typeof value === "string" && value.trim()) {
     const parsed = Number(value.replace(/[$,\s]/g, ""));
-    if (Number.isFinite(parsed)) return roundMoney$5(parsed);
+    if (Number.isFinite(parsed)) return roundMoney$6(parsed);
   }
   return void 0;
 }
-function roundMoney$5(value) {
+function roundMoney$6(value) {
   return Math.round(value * 100) / 100;
 }
 const PACKAGE_LABEL_KEYS = [
@@ -5693,14 +5778,14 @@ function orderServiceLines(record2, linked) {
   return synthesized ? [synthesized] : [];
 }
 function orderChargeSummary(record2, lines) {
-  const lineSubtotal = roundMoney$4(lines.reduce((sum, line) => sum + line.price, 0));
+  const lineSubtotal = roundMoney$5(lines.reduce((sum, line) => sum + line.price, 0));
   const pricing = nested$2(record2?.pricing);
   const tax = moneyOrNull$1(record2?.tax) ?? moneyOrNull$1(pricing.tax) ?? 0;
   const storedTotal = moneyOrNull$1(record2?.total) ?? moneyOrNull$1(pricing.total);
-  const total = storedTotal ?? roundMoney$4(lineSubtotal + tax);
+  const total = storedTotal ?? roundMoney$5(lineSubtotal + tax);
   const storedSubtotal = moneyOrNull$1(record2?.subtotal) ?? moneyOrNull$1(pricing.subtotal);
   const subtotal = lineSubtotal > 0 ? lineSubtotal : storedSubtotal && storedSubtotal > 0 ? storedSubtotal : total;
-  return { subtotal: roundMoney$4(subtotal), tax: roundMoney$4(tax), total: roundMoney$4(total) };
+  return { subtotal: roundMoney$5(subtotal), tax: roundMoney$5(tax), total: roundMoney$5(total) };
 }
 function storedServiceLines(record2) {
   if (!record2) return [];
@@ -5718,7 +5803,7 @@ function synthesizePackageLine(record2) {
 }
 function packageLabel(record2) {
   for (const key of PACKAGE_LABEL_KEYS) {
-    const value = text$p(record2[key]);
+    const value = text$q(record2[key]);
     if (value) return value;
   }
   return "";
@@ -5730,6 +5815,7 @@ function toOrderLine(item) {
     price: item.price
   };
   if (item.id) line.id = item.id;
+  if (item.durationMinutes && item.durationMinutes > 0) line.durationMinutes = item.durationMinutes;
   return line;
 }
 function isPromo(item) {
@@ -5754,10 +5840,10 @@ function moneyOrNull$1(value) {
 function nested$2(value) {
   return value && typeof value === "object" ? value : {};
 }
-function text$p(value) {
+function text$q(value) {
   return typeof value === "string" ? value.trim() : "";
 }
-function roundMoney$4(value) {
+function roundMoney$5(value) {
   return Math.round(value * 100) / 100;
 }
 const LISTING_HERO = "/media/launch/hero_day_exterior_front.jpg";
@@ -5786,7 +5872,7 @@ function buildAdminOrderTile(record2) {
   const packageName = skin2?.title || named || "Custom order";
   const charges = orderChargeSummary(record2, lines);
   return {
-    id: text$o(record2.id) || packageName,
+    id: text$p(record2.id) || packageName,
     orderCode: orderCode(kind, record2),
     kind,
     typeLabel: kind === "business" ? "Business" : "Listing",
@@ -5809,7 +5895,7 @@ function buildAdminOrderTile(record2) {
   };
 }
 function orderKind(record2, skin2) {
-  const raw = text$o(record2.projectType || record2.orderType || record2.type).toLowerCase();
+  const raw = text$p(record2.projectType || record2.orderType || record2.type).toLowerCase();
   if (raw === "business" || raw === "brand" || raw === "social") return "business";
   if (raw === "real_estate" || raw === "listing" || raw === "property") return "listing";
   if (skin2?.category === "listing") return "listing";
@@ -5823,9 +5909,9 @@ function channelFor(skin2, kind) {
   return kind === "business" ? "Human Brand" : "Listings & Spaces";
 }
 function orderCode(kind, record2) {
-  const explicit = text$o(record2.orderCode || record2.orderNumber || record2.displayId);
+  const explicit = text$p(record2.orderCode || record2.orderNumber || record2.displayId);
   if (explicit) return explicit.toUpperCase();
-  const id = text$o(record2.id);
+  const id = text$p(record2.id);
   const prefix = kind === "listing" ? "L" : "B";
   return `ORD - ${prefix} - ${orderCodeTail(id)}`;
 }
@@ -5843,29 +5929,29 @@ function orderCodeTail(id, salt = 0) {
   return String(1e4 + (h >>> 0) % 9e4);
 }
 function heroFromRecord(record2) {
-  const explicit = text$o(record2.heroUrl) || text$o(record2.coverUrl) || text$o(record2.coverImage);
+  const explicit = text$p(record2.heroUrl) || text$p(record2.coverUrl) || text$p(record2.coverImage);
   if (explicit) return explicit;
   const images = record2.images;
   if (!Array.isArray(images)) return "";
   for (const image of images) {
     if (typeof image === "string" && image.trim()) return image.trim();
     if (image && typeof image === "object") {
-      const url = text$o(image.url) || text$o(image.thumbnailUrl);
+      const url = text$p(image.url) || text$p(image.thumbnailUrl);
       if (url) return url;
     }
   }
   return "";
 }
 function clientName(record2) {
-  const named = text$o(record2.clientName) || text$o(record2.customerName) || text$o(record2.agentName) || [text$o(record2.firstName), text$o(record2.lastName)].filter(Boolean).join(" ");
+  const named = text$p(record2.clientName) || text$p(record2.customerName) || text$p(record2.agentName) || [text$p(record2.firstName), text$p(record2.lastName)].filter(Boolean).join(" ");
   return named || "—";
 }
 function appointmentLabel(record2) {
   const raw = record2.appointmentDate ?? record2.apptDate ?? record2.scheduledDate ?? record2.requestedDate;
   const key = calendarDateKey(raw);
   const date = formatShootDateLabel(key, typeof raw === "string" ? raw : void 0);
-  const time = text$o(record2.scheduledTime || record2.appointmentTime || record2.requestedTime);
-  const photographer = text$o(record2.assignedPhotographerName || record2.photographerName || record2.photographerPreference);
+  const time = text$p(record2.scheduledTime || record2.appointmentTime || record2.requestedTime);
+  const photographer = text$p(record2.assignedPhotographerName || record2.photographerName || record2.photographerPreference);
   return [date, time, photographer].filter(Boolean).join(" · ") || "—";
 }
 function tilePrice(amount) {
@@ -5933,7 +6019,7 @@ function money$5(value) {
   }
   return 0;
 }
-function text$o(value) {
+function text$p(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 const NOT_PROVIDED = "Not provided";
@@ -5954,7 +6040,7 @@ function officeNewOrderEmail(saved, options) {
   const notes = notesOf(saved);
   const fields = [
     ["Order number", orderNumber],
-    ["Admin link", text$n(options?.adminUrl) || NOT_PROVIDED],
+    ["Admin link", text$o(options?.adminUrl) || NOT_PROVIDED],
     ["Client name", clientName2],
     ["Client email", firstText$1(saved, ["clientEmail", "email"])],
     ["Client phone", firstText$1(saved, ["clientPhone", "phone"])],
@@ -5988,7 +6074,7 @@ function officeNewOrderEmail(saved, options) {
     ["Notes", notes],
     ["Booked via", bookedVia(saved)]
   ];
-  const officeNote = text$n(saved.officeNote);
+  const officeNote = text$o(saved.officeNote);
   if (officeNote) fields.unshift(["Office note", officeNote]);
   const subjectCore = `New order ${orderNumber} — ${packageName} — ${address} — ${requestedDate}`;
   const subject = isTestOrder(clientName2, notes) ? `[TEST] ${subjectCore}` : subjectCore;
@@ -6002,19 +6088,19 @@ ${notes}`.toUpperCase().includes("TEST ORDER");
 }
 function orderNumberOf(saved) {
   for (const key of ["orderNumber", "orderCode", "displayId"]) {
-    const value = text$n(saved[key]);
+    const value = text$o(saved[key]);
     if (value && value !== NOT_PROVIDED) return value;
   }
-  if (!text$n(saved.id)) return NOT_PROVIDED;
+  if (!text$o(saved.id)) return NOT_PROVIDED;
   return buildAdminOrderTile(saved).orderCode;
 }
 function explicitPackageName(saved) {
   for (const key of ["packageName", "serviceName"]) {
-    const value = text$n(saved[key]);
+    const value = text$o(saved[key]);
     if (value && value !== NOT_PROVIDED) return cleanPackageName(value) || value;
   }
-  const selected = text$n(saved.selectedService);
-  if (text$n(saved.id) || selected) {
+  const selected = text$o(saved.selectedService);
+  if (text$o(saved.id) || selected) {
     const tileName = buildAdminOrderTile(saved).packageName;
     if (tileName && tileName !== "Custom order") return tileName;
   }
@@ -6024,7 +6110,7 @@ function explicitPackageName(saved) {
 function clientNameOf(saved) {
   const named = firstText$1(saved, ["clientName", "customerName"]);
   if (named) return named;
-  const joined = [text$n(saved.firstName), text$n(saved.lastName)].filter(Boolean).join(" ");
+  const joined = [text$o(saved.firstName), text$o(saved.lastName)].filter(Boolean).join(" ");
   return joined || NOT_PROVIDED;
 }
 function agentContactOf(saved) {
@@ -6042,7 +6128,7 @@ function agentField(saved, keys, nestedKey) {
   if (direct !== NOT_PROVIDED) return direct;
   for (const holder of [saved.agent, saved.listingAgent, saved.realtor]) {
     const record2 = nested(holder);
-    const value = text$n(record2[nestedKey]);
+    const value = text$o(record2[nestedKey]);
     if (value) return value;
   }
   return "";
@@ -6051,7 +6137,7 @@ function digits$1(value) {
   return value === NOT_PROVIDED ? "" : value.replace(/\D/g, "");
 }
 function notesOf(saved) {
-  const parts = ["vibeNote", "notes", "specialInstructions", "internalNotes"].map((key) => text$n(saved[key])).filter(Boolean);
+  const parts = ["vibeNote", "notes", "specialInstructions", "internalNotes"].map((key) => text$o(saved[key])).filter(Boolean);
   return parts.length ? parts.join("\n") : NOT_PROVIDED;
 }
 function lockboxOf(saved) {
@@ -6059,12 +6145,12 @@ function lockboxOf(saved) {
   return code || NOT_PROVIDED;
 }
 function occupancyOf(saved) {
-  const parts = ["occupancy", "propertyStatus", "furnishingStatus"].map((key) => text$n(saved[key])).filter(Boolean);
+  const parts = ["occupancy", "propertyStatus", "furnishingStatus"].map((key) => text$o(saved[key])).filter(Boolean);
   return parts.length ? parts.join(", ") : NOT_PROVIDED;
 }
 function bookedVia(saved) {
-  const lead = text$n(saved.leadSource);
-  const source = text$n(saved.source);
+  const lead = text$o(saved.leadSource);
+  const source = text$o(saved.source);
   const blob = `${lead} ${source}`.toLowerCase();
   if (!blob.trim()) return NOT_PROVIDED;
   if (/admin/.test(blob)) return "Admin";
@@ -6074,7 +6160,7 @@ function bookedVia(saved) {
 }
 function paymentOf(saved, total) {
   const invoice = nested(saved.invoice);
-  const explicit = [saved.paymentStatus, saved.invoiceStatus, invoice.status].map((value) => text$n(value).toLowerCase()).find(Boolean) || "";
+  const explicit = [saved.paymentStatus, saved.invoiceStatus, invoice.status].map((value) => text$o(value).toLowerCase()).find(Boolean) || "";
   if (/partial/.test(explicit)) return "Partial";
   if (/\bpaid\b/.test(explicit) && !/unpaid/.test(explicit)) return "Paid";
   if (/unpaid/.test(explicit)) return "Unpaid";
@@ -6181,7 +6267,7 @@ function moneyOrNull(value) {
 function nested(value) {
   return value && typeof value === "object" ? value : {};
 }
-function text$n(value) {
+function text$o(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function escapeHtml$8(value) {
@@ -6492,15 +6578,15 @@ function canonicalSlotTime(value) {
   if (hour < 1 || hour > 12) return null;
   return `${hour}:${match[2]} ${match[3].toUpperCase()}`;
 }
-function text$m(value) {
+function text$n(value) {
   return typeof value === "string" ? value : "";
 }
 function isHolidayTestBooking(order) {
-  const email = `${text$m(order.email)} ${text$m(order.clientEmail)}`.toLowerCase();
+  const email = `${text$n(order.email)} ${text$n(order.clientEmail)}`.toLowerCase();
   if (email.includes("ops+deliveryqa@")) return true;
   if (order.playtest === true || order.test === true || order.isTest === true) return true;
-  const name = text$m(order.clientName) || `${text$m(order.firstName)} ${text$m(order.lastName)}`.trim();
-  const notes = text$m(order.vibeNote) || text$m(order.notes);
+  const name = text$n(order.clientName) || `${text$n(order.firstName)} ${text$n(order.lastName)}`.trim();
+  const notes = text$n(order.vibeNote) || text$n(order.notes);
   return `${name}
 ${notes}`.toUpperCase().includes("TEST ORDER");
 }
@@ -6521,15 +6607,15 @@ function holidayStoredDate(order) {
       }).format(date);
     }
   }
-  const fromNote = /^Date:\s*(\d{4}-\d{2}-\d{2})/im.exec(text$m(order.vibeNote));
+  const fromNote = /^Date:\s*(\d{4}-\d{2}-\d{2})/im.exec(text$n(order.vibeNote));
   if (fromNote) return fromNote[1];
-  if (text$m(order.leadSource).trim() === HOLIDAY_RSVP_LEAD) return THANKFUL_EVENT_DATE;
+  if (text$n(order.leadSource).trim() === HOLIDAY_RSVP_LEAD) return THANKFUL_EVENT_DATE;
   return null;
 }
 function holidayStoredTime(order) {
   const labeled = canonicalSlotTime(order.requestedTimeLabel);
   if (labeled) return labeled;
-  const note = text$m(order.vibeNote);
+  const note = text$n(order.vibeNote);
   const requested = /Requested photo time:\s*(\d{1,2}:\d{2}\s*[AP]M)/i.exec(note);
   if (requested) return canonicalSlotTime(requested[1]);
   const line = /^Time:\s*(\d{1,2}:\d{2}\s*[AP]M)/im.exec(note);
@@ -6539,8 +6625,8 @@ function holidayStoredTime(order) {
 function holidaySlotClaim(leadSource, date, time) {
   const clock = canonicalSlotTime(time);
   if (!clock) return null;
-  const lead = text$m(leadSource).trim();
-  const day = text$m(date).trim().slice(0, 10);
+  const lead = text$n(leadSource).trim();
+  const day = text$n(date).trim().slice(0, 10);
   if (lead === HOLIDAY_RSVP_LEAD) {
     const thankfulDay = day || THANKFUL_EVENT_DATE;
     if (thankfulDay !== THANKFUL_EVENT_DATE || !thankfulSlotTimes().includes(clock)) return null;
@@ -6566,7 +6652,7 @@ function holidayTakenFromOrders(orders, limit = HOLIDAY_SLOT_LIMIT) {
   const counts2 = /* @__PURE__ */ new Map();
   for (const order of orders) {
     if (isHolidayTestBooking(order)) continue;
-    const status2 = text$m(order.status).trim().toLowerCase();
+    const status2 = text$n(order.status).trim().toLowerCase();
     if (CLOSED_STATUSES$1.has(status2)) continue;
     const claim = holidaySlotClaim(order.leadSource, holidayStoredDate(order), holidayStoredTime(order));
     if (!claim) continue;
@@ -6599,18 +6685,18 @@ const HOLIDAY_SLOT_MINUTES = 15;
 const LEGACY_THANKFUL_DATE = "2026-11-14";
 const LEGACY_THANKFUL_TIME = "11:00 AM";
 const CLOSED_STATUSES = /* @__PURE__ */ new Set(["declined", "cancelled", "canceled"]);
-function text$l(value) {
+function text$m(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function noteOf(order) {
-  return text$l(order.vibeNote) || text$l(order.notes);
+  return text$m(order.vibeNote) || text$m(order.notes);
 }
 function lineValue(note, label) {
   const match = new RegExp(`^${label}:\\s*(.*)$`, "im").exec(note);
   return match ? match[1].trim() : "";
 }
 function holidayGuestName(order) {
-  const named = text$l(order.clientName) || `${text$l(order.firstName)} ${text$l(order.lastName)}`.trim();
+  const named = text$m(order.clientName) || `${text$m(order.firstName)} ${text$m(order.lastName)}`.trim();
   return named || "Guest";
 }
 function holidayHeadcountLabel(order) {
@@ -6644,18 +6730,18 @@ function holidayNotesLabel(order) {
   return lineValue(noteOf(order), "Notes");
 }
 function holidayPackageLabel(order) {
-  const selected = text$l(order.selectedService);
+  const selected = text$m(order.selectedService);
   if (selected) return selected;
-  const named = text$l(order.packageName);
+  const named = text$m(order.packageName);
   if (named) return named;
   const fromNote = lineValue(noteOf(order), "Package");
   return fromNote || "Holiday shoot";
 }
 function closedStatus(order) {
-  return CLOSED_STATUSES.has(text$l(order.status).toLowerCase());
+  return CLOSED_STATUSES.has(text$m(order.status).toLowerCase());
 }
 function holidayLead(order) {
-  const lead = text$l(order.leadSource);
+  const lead = text$m(order.leadSource);
   if (lead === HOLIDAY_RSVP_LEAD) return "thankful";
   if (lead === HOLIDAY_SEASON_LEAD) return "season";
   return null;
@@ -6711,11 +6797,11 @@ function buildPlan(order, adminUrl) {
   const name = holidayGuestName(order);
   const headcount = holidayHeadcountLabel(order);
   const headcountTitle = holidayHeadcountNumber(headcount) ?? (headcount || "—");
-  const orderNumber = text$l(order.orderNumber);
+  const orderNumber = text$m(order.orderNumber);
   const summary = kind === "thankful" ? `Thankful RSVP — ${name} (${headcountTitle})` : `'Tis shoot — ${name} — ${holidayPackageLabel(order)}`;
   const description = [
-    `Email: ${text$l(order.email) || text$l(order.clientEmail) || "—"}`,
-    `Phone: ${text$l(order.phone) || text$l(order.clientPhone) || "—"}`,
+    `Email: ${text$m(order.email) || text$m(order.clientEmail) || "—"}`,
+    `Phone: ${text$m(order.phone) || text$m(order.clientPhone) || "—"}`,
     `Headcount: ${headcount || "—"}`,
     `Kids/Santa: ${holidaySantaLabel(order) || "—"}`,
     `Menu vote: ${holidayMenuVote(order) || "—"}`,
@@ -6724,7 +6810,7 @@ function buildPlan(order, adminUrl) {
     `Admin: ${adminUrl}`
   ].join("\n");
   return {
-    orderId: text$l(order.id),
+    orderId: text$m(order.id),
     orderNumber,
     kind,
     name,
@@ -6741,7 +6827,7 @@ function classifyHolidayCalendarOrder(order, adminUrl) {
   if (!holidayLead(order)) return { action: "skip", reason: "notASlot" };
   if (isHolidayTestBooking(order)) return { action: "skip", reason: "test" };
   if (closedStatus(order)) return { action: "skip", reason: "cancelled" };
-  if (text$l(order.calendarEventId)) return { action: "skip", reason: "already" };
+  if (text$m(order.calendarEventId)) return { action: "skip", reason: "already" };
   const plan = buildPlan(order, adminUrl);
   if (!plan) return { action: "skip", reason: "notASlot" };
   return { action: "create", plan };
@@ -7116,6 +7202,302 @@ async function loadHolidaySlotOrders() {
 }
 async function loadHolidayCalendarOrders() {
   return (await holidayOrderSnaps()).map((doc) => ({ id: doc.id, ...doc.data }));
+}
+const SEED_PROMO_ICONICAI = 35;
+const SEED_PROMO_NEWYEAR = 50;
+const SEED_APPRENTICESHIP_BOOKING_FEE = 25;
+const SEED_HEADSHOTS_UNIT = 10;
+const SEED_HEADSHOTS_BOOKING_FEE = 10;
+const SEED_SENIOR_TOUR = 250;
+const SEED_SENIOR_FACILITY_RATE = 0.1;
+const SEED_SENIOR_DEPOSIT_PERCENT = 50;
+const SEED_SENIOR_ROOMS = [
+  { minCount: 1, maxCount: 10, each: 199 },
+  { minCount: 11, maxCount: 20, each: 175 }
+];
+const PRICING_ADJUSTMENTS_COLLECTION = "pricingAdjustments";
+const KINDS$1 = /* @__PURE__ */ new Set(["processing", "tax", "travel", "promo", "fee"]);
+const MODES = /* @__PURE__ */ new Set(["percent", "flat", "per_sqft"]);
+function roundMoney$4(value) {
+  if (!Number.isFinite(value)) return 0;
+  return Math.round(value * 100) / 100;
+}
+function text$l(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+function amountOf(value, fallback = 0) {
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount : fallback;
+}
+function seed(partial) {
+  return partial;
+}
+function defaultPricingAdjustments() {
+  const zones = TRAVEL_ZONES.map((zone) => seed({
+    id: `travel-zone-${zone.zone}`,
+    kind: "travel",
+    name: zone.feeCents === 0 ? `Travel zone ${zone.zone}` : `Travel zone ${zone.zone}`,
+    active: true,
+    removed: false,
+    mode: "flat",
+    amount: zone.feeCents / 100,
+    zone: zone.zone,
+    outerMiles: zone.outerMiles,
+    sortOrder: 100 + zone.zone,
+    note: zone.feeCents === 0 ? `Up to ${zone.outerMiles} straight-line miles. No travel fee.` : `Up to ${zone.outerMiles} straight-line miles.`
+  }));
+  return [
+    seed({
+      id: "processing-fee",
+      kind: "processing",
+      name: "Processing fee",
+      active: true,
+      removed: false,
+      mode: "percent",
+      amount: roundMoney$4(PROCESSING_FEE_RATE * 100),
+      sortOrder: 10,
+      note: "Added on top of the service total. Travel and tax stay outside it."
+    }),
+    seed({
+      id: "sales-tax",
+      kind: "tax",
+      name: "Sales tax",
+      active: false,
+      removed: false,
+      mode: "percent",
+      amount: 0,
+      sortOrder: 20,
+      note: "None set. Turn it on and enter a percent when a rate should be charged."
+    }),
+    ...zones,
+    seed({
+      id: "promo-ICONICAI",
+      kind: "promo",
+      name: "ICONICAI",
+      active: true,
+      removed: false,
+      mode: "flat",
+      amount: SEED_PROMO_ICONICAI,
+      code: "ICONICAI",
+      sortOrder: 200,
+      note: "Dollars off one order."
+    }),
+    seed({
+      id: "promo-NEWYEAR",
+      kind: "promo",
+      name: "NEWYEAR",
+      active: true,
+      removed: false,
+      mode: "flat",
+      amount: SEED_PROMO_NEWYEAR,
+      code: "NEWYEAR",
+      sortOrder: 210
+    }),
+    seed({
+      id: "apprenticeship-booking-fee",
+      kind: "fee",
+      name: "Apprenticeship booking fee",
+      active: true,
+      removed: false,
+      mode: "flat",
+      amount: SEED_APPRENTICESHIP_BOOKING_FEE,
+      sortOrder: 300,
+      note: "Due when the apprentice time is booked. Credited toward the package."
+    }),
+    seed({
+      id: "headshots-unit",
+      kind: "fee",
+      name: "Tuesday headshot",
+      active: true,
+      removed: false,
+      mode: "flat",
+      amount: SEED_HEADSHOTS_UNIT,
+      sortOrder: 310,
+      note: "Price for one headshot."
+    }),
+    seed({
+      id: "headshots-booking-fee",
+      kind: "fee",
+      name: "Headshot booking fee",
+      active: true,
+      removed: false,
+      mode: "flat",
+      amount: SEED_HEADSHOTS_BOOKING_FEE,
+      sortOrder: 320,
+      note: "Due today. Counts toward the headshots."
+    }),
+    seed({
+      id: "senior-tour",
+      kind: "fee",
+      name: "Senior living 3D tour",
+      active: true,
+      removed: false,
+      mode: "flat",
+      amount: SEED_SENIOR_TOUR,
+      sortOrder: 400
+    }),
+    seed({
+      id: "senior-facility-rate",
+      kind: "fee",
+      name: "Senior living facility",
+      active: true,
+      removed: false,
+      mode: "per_sqft",
+      amount: SEED_SENIOR_FACILITY_RATE,
+      sortOrder: 410,
+      note: "Dollars per square foot."
+    }),
+    ...SEED_SENIOR_ROOMS.map((band, index) => seed({
+      id: `senior-room-${band.minCount}-${band.maxCount}`,
+      kind: "fee",
+      name: `Senior living rooms ${band.minCount}–${band.maxCount}`,
+      active: true,
+      removed: false,
+      mode: "flat",
+      amount: band.each,
+      minCount: band.minCount,
+      maxCount: band.maxCount,
+      sortOrder: 420 + index,
+      note: "Price for each room in this count."
+    })),
+    seed({
+      id: "senior-deposit",
+      kind: "fee",
+      name: "Senior living deposit",
+      active: true,
+      removed: false,
+      mode: "percent",
+      amount: SEED_SENIOR_DEPOSIT_PERCENT,
+      sortOrder: 430,
+      note: "Percent of the senior living total due to reserve the date."
+    })
+  ];
+}
+function optionalNumber(value) {
+  if (value == null || value === "") return void 0;
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount : void 0;
+}
+function fromDoc(doc, current) {
+  const id = text$l(doc.id) || current?.id || "";
+  if (!id) return null;
+  const kindRaw = text$l(doc.kind);
+  const modeRaw = text$l(doc.mode);
+  const kind = KINDS$1.has(kindRaw) ? kindRaw : current?.kind;
+  const mode = MODES.has(modeRaw) ? modeRaw : current?.mode;
+  if (!kind || !mode) return null;
+  const code = text$l(doc.code) || current?.code;
+  const note = text$l(doc.note) || current?.note;
+  const zone = optionalNumber(doc.zone) ?? current?.zone;
+  const outerMiles = optionalNumber(doc.outerMiles) ?? current?.outerMiles;
+  const minCount = optionalNumber(doc.minCount) ?? current?.minCount;
+  const maxCount = optionalNumber(doc.maxCount) ?? current?.maxCount;
+  return {
+    id,
+    kind,
+    name: text$l(doc.name) || current?.name || id,
+    active: doc.active === false ? false : doc.active === true ? true : current?.active ?? true,
+    removed: false,
+    mode,
+    amount: roundMoney$4(amountOf(doc.amount, current?.amount ?? 0)),
+    sortOrder: optionalNumber(doc.sortOrder) ?? current?.sortOrder ?? 1e3,
+    ...code ? { code } : {},
+    ...note ? { note } : {},
+    ...zone != null ? { zone } : {},
+    ...outerMiles != null ? { outerMiles } : {},
+    ...minCount != null ? { minCount } : {},
+    ...maxCount != null ? { maxCount } : {}
+  };
+}
+function mergePricingAdjustments(liveDocs = [], options) {
+  const byId = /* @__PURE__ */ new Map();
+  for (const item of defaultPricingAdjustments()) byId.set(item.id, { ...item });
+  for (const doc of liveDocs) {
+    const id = text$l(doc.id);
+    if (!id) continue;
+    if (doc.removed === true) {
+      {
+        byId.delete(id);
+      }
+      continue;
+    }
+    const parsed = fromDoc(doc, byId.get(id));
+    if (parsed) byId.set(id, parsed);
+  }
+  return [...byId.values()].sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
+}
+function activeAmount(items, id, fallback) {
+  const item = items.find((entry2) => entry2.id === id);
+  if (!item) {
+    const seeded = defaultPricingAdjustments().some((entry2) => entry2.id === id);
+    return seeded ? 0 : fallback;
+  }
+  if (item.removed || !item.active) return 0;
+  return item.amount;
+}
+function pricingRates(items = mergePricingAdjustments([])) {
+  const processing = items.find((item) => item.kind === "processing" && item.active && !item.removed);
+  const tax = items.find((item) => item.kind === "tax" && item.active && !item.removed);
+  const seedTravelIds = defaultPricingAdjustments().filter((item) => item.kind === "travel").map((item) => item.id);
+  const travelItems = items.filter((item) => item.kind === "travel" && !item.removed);
+  const travelZones = travelItems.filter((item) => item.active && item.zone != null && item.outerMiles != null).map((item) => ({
+    zone: Math.round(item.zone || 0),
+    outerMiles: Number(item.outerMiles),
+    feeCents: Math.round(Math.max(0, item.amount) * 100)
+  })).filter((zone) => zone.zone > 0 && zone.outerMiles > 0).sort((a, b) => a.outerMiles - b.outerMiles);
+  const travelSeedMissing = seedTravelIds.some((id) => !travelItems.some((item) => item.id === id));
+  const promos = items.filter((item) => item.kind === "promo" && item.active && !item.removed && text$l(item.code)).map((item) => ({
+    code: text$l(item.code).toUpperCase(),
+    discount: Math.max(0, item.amount),
+    mode: item.mode === "percent" ? "percent" : "flat",
+    active: true
+  }));
+  const roomRates = items.filter((item) => item.id.startsWith("senior-room-") && item.active && !item.removed).map((item) => ({
+    minCount: Math.round(item.minCount || 0),
+    maxCount: Math.round(item.maxCount || 0),
+    each: item.amount
+  })).filter((band) => band.minCount > 0 && band.maxCount >= band.minCount);
+  const defaults = defaultPricingAdjustments();
+  const fallbackRooms = defaults.filter((item) => item.id.startsWith("senior-room-")).map((item) => ({
+    minCount: item.minCount || 0,
+    maxCount: item.maxCount || 0,
+    each: item.amount
+  }));
+  return {
+    processingPercent: processing ? Math.max(0, processing.amount) : 0,
+    processingActive: Boolean(processing && processing.amount > 0),
+    taxPercent: tax ? Math.max(0, tax.amount) : 0,
+    taxActive: Boolean(tax && tax.amount > 0),
+    travelZones: travelZones.length > 0 ? travelZones : travelSeedMissing || travelItems.length > 0 ? [] : [...TRAVEL_ZONES],
+    promos,
+    apprenticeshipBookingFee: activeAmount(items, "apprenticeship-booking-fee", SEED_APPRENTICESHIP_BOOKING_FEE),
+    headshotsUnitPrice: activeAmount(items, "headshots-unit", SEED_HEADSHOTS_UNIT),
+    headshotsBookingFee: activeAmount(items, "headshots-booking-fee", SEED_HEADSHOTS_BOOKING_FEE),
+    seniorTourPrice: activeAmount(items, "senior-tour", SEED_SENIOR_TOUR),
+    seniorFacilityRatePerSqft: activeAmount(items, "senior-facility-rate", SEED_SENIOR_FACILITY_RATE),
+    seniorRoomRates: roomRates.length > 0 ? roomRates : fallbackRooms,
+    seniorDepositPercent: activeAmount(items, "senior-deposit", SEED_SENIOR_DEPOSIT_PERCENT)
+  };
+}
+function percentOfDollars(base, percent) {
+  if (!Number.isFinite(base) || base <= 0 || !Number.isFinite(percent) || percent <= 0) return 0;
+  const cents2 = Math.round(base * 100);
+  const basis = Math.round(percent * 100);
+  if (basis <= 0) return 0;
+  return Math.floor((cents2 * basis + 5e3) / 1e4) / 100;
+}
+function taxDollars(base, rates) {
+  if (!rates.taxActive) return 0;
+  return percentOfDollars(base, rates.taxPercent);
+}
+async function loadPricingRates() {
+  try {
+    const snap = await admin.firestore().collection(PRICING_ADJUSTMENTS_COLLECTION).get();
+    return pricingRates(mergePricingAdjustments(snap.docs.map((entry2) => ({ id: entry2.id, ...entry2.data() }))));
+  } catch (err) {
+    console.error("[Pricing] Settings read failed — using the seeded rates", err);
+    return pricingRates(mergePricingAdjustments([]));
+  }
 }
 const HUB_SOCIAL_PLATFORMS = [
   { id: "facebook", label: "Facebook" },
@@ -7535,15 +7917,15 @@ function formatOrderNumber(n) {
 async function nextOrderNumber() {
   const db2 = admin.firestore();
   const ref = db2.collection("counters").doc("orderNumbers");
-  let seed = 0;
+  let seed2 = 0;
   const snap = await ref.get();
   if (!snap.exists) {
     const agg = await db2.collection("orderRequests").count().get();
-    seed = agg.data().count;
+    seed2 = agg.data().count;
   }
   const n = await db2.runTransaction(async (tx) => {
     const cur = await tx.get(ref);
-    const last = cur.exists ? Number(cur.data()?.last) || 0 : seed;
+    const last = cur.exists ? Number(cur.data()?.last) || 0 : seed2;
     const next = last + 1;
     tx.set(ref, { last: next, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
     return next;
@@ -8240,14 +8622,23 @@ function openApprenticeshipSlots(input) {
 function roundMoney$3(value) {
   return Math.round(value * 100) / 100;
 }
+function apprenticeshipBookingFeeLine(fee = APPRENTICESHIP_BOOKING_FEE) {
+  if (fee === APPRENTICESHIP_BOOKING_FEE) return APPRENTICESHIP_BOOKING_FEE_LINE;
+  const shown = Number.isInteger(fee) ? String(fee) : fee.toFixed(2);
+  return `Booking fee $${shown}, credited toward your package`;
+}
 function quoteApprenticeship(input) {
   const catalog = input.catalog ?? packagesForStaffEditor([]);
   const pkg = findApprenticeshipPackage(input.packageId, catalog);
   if (!pkg) return { ok: false, error: "Choose an apprenticeship package." };
+  const rates = input.rates;
   const traveled = applyServerTravel(
     buildSubmittedLineItems({ selectedBasics: [pkg.id], catalog }),
-    input.address
+    input.address,
+    void 0,
+    rates?.travelZones
   );
+  const bookingFee = rates?.apprenticeshipBookingFee ?? APPRENTICESHIP_BOOKING_FEE;
   const draft = buildBookingInvoiceDraft({
     lineItems: traveled.lineItems,
     total: traveled.total,
@@ -8255,7 +8646,8 @@ function quoteApprenticeship(input) {
     clientEmail: "quote@iconicimagestx.com",
     clientName: "Quote",
     travel: traveled.travel,
-    applyProcessing: input.applyProcessing !== false
+    applyProcessing: input.applyProcessing !== false && (rates ? rates.processingActive : true),
+    processingPercent: rates?.processingPercent
   });
   const travelLine = travelCustomerLine(traveled.travel);
   return {
@@ -8266,14 +8658,14 @@ function quoteApprenticeship(input) {
       durationMinutes: pkg.durationMinutes,
       subtotal: draft.subtotal,
       processing: draft.processing ?? 0,
-      processingLabel: BOOKING_PROCESSING_LABEL,
+      processingLabel: rates ? processingFeeLabel(rates.processingPercent) : BOOKING_PROCESSING_LABEL,
       travel: traveled.travel,
       travelLabel: travelLine.label,
       travelAmount: travelLine.amount,
       total: draft.total,
-      bookingFee: APPRENTICESHIP_BOOKING_FEE,
-      bookingFeeLine: APPRENTICESHIP_BOOKING_FEE_LINE,
-      balanceDue: roundMoney$3(Math.max(0, draft.total - APPRENTICESHIP_BOOKING_FEE)),
+      bookingFee,
+      bookingFeeLine: apprenticeshipBookingFeeLine(bookingFee),
+      balanceDue: roundMoney$3(Math.max(0, draft.total - bookingFee)),
       balanceLine: APPRENTICESHIP_BALANCE_LINE,
       lineItems: draft.lineItems
     }
@@ -8761,21 +9153,24 @@ function clampHeadshotQuantity(value, maxQuantity = HEADSHOTS_MAX_QUANTITY) {
 function headshotSlotsNeeded(quantity, doubleSlotAt = HEADSHOTS_DOUBLE_SLOT_AT) {
   return quantity >= doubleSlotAt ? 2 : 1;
 }
-function quoteHeadshots(quantity, applyProcessing = true, maxQuantity = HEADSHOTS_MAX_QUANTITY) {
+function quoteHeadshots(quantity, applyProcessing = true, maxQuantity = HEADSHOTS_MAX_QUANTITY, rates) {
   const qty = clampHeadshotQuantity(quantity, maxQuantity);
-  const subtotal = roundMoney$2(qty * HEADSHOTS_UNIT_PRICE);
-  const bookingFee = Math.min(HEADSHOTS_BOOKING_FEE, subtotal);
-  const dueTodayProcessing = applyProcessing ? processingFee(bookingFee) : 0;
+  const unitPrice = rates?.unitPrice ?? HEADSHOTS_UNIT_PRICE;
+  const subtotal = roundMoney$2(qty * unitPrice);
+  const bookingFee = Math.min(rates?.bookingFee ?? HEADSHOTS_BOOKING_FEE, subtotal);
+  const percent = rates?.processingPercent;
+  const dueTodayProcessing = applyProcessing ? processingFee(bookingFee, percent) : 0;
   const dueToday = roundMoney$2(bookingFee + dueTodayProcessing);
   const balanceSubtotal = roundMoney$2(subtotal - bookingFee);
-  const balanceProcessing = applyProcessing && balanceSubtotal > 0 ? processingFee(balanceSubtotal) : 0;
+  const balanceProcessing = applyProcessing && balanceSubtotal > 0 ? processingFee(balanceSubtotal, percent) : 0;
   const balanceTotal = roundMoney$2(balanceSubtotal + balanceProcessing);
   const processing = roundMoney$2(dueTodayProcessing + balanceProcessing);
   const total = roundMoney$2(subtotal + processing);
-  const balanceLine = balanceSubtotal > 0 ? applyProcessing ? `Balance on delivery: ${money$4(balanceSubtotal)} + 2.8%` : `Balance on delivery: ${money$4(balanceSubtotal)}` : null;
+  const percentLabel = percent == null || Math.round(percent * 100) === 280 ? "2.8%" : `${Math.round(percent * 100) / 100}%`;
+  const balanceLine = balanceSubtotal > 0 ? applyProcessing ? `Balance on delivery: ${money$4(balanceSubtotal)} + ${percentLabel}` : `Balance on delivery: ${money$4(balanceSubtotal)}` : null;
   return {
     quantity: qty,
-    unitPrice: HEADSHOTS_UNIT_PRICE,
+    unitPrice,
     subtotal,
     processing,
     total,
@@ -8787,17 +9182,17 @@ function quoteHeadshots(quantity, applyProcessing = true, maxQuantity = HEADSHOT
     balanceTotal,
     balanceLine,
     dueTodayLine: `Due today: ${money$4(dueToday)}`,
-    priceLine: applyProcessing ? HEADSHOTS_PRICE_LINE : `${money$4(HEADSHOTS_UNIT_PRICE)} per headshot.`,
+    priceLine: applyProcessing ? HEADSHOTS_PRICE_LINE : `${money$4(unitPrice)} per headshot.`,
     slotsNeeded: headshotSlotsNeeded(qty)
   };
 }
-function headshotLineItems(quantity, maxQuantity = HEADSHOTS_MAX_QUANTITY) {
+function headshotLineItems(quantity, maxQuantity = HEADSHOTS_MAX_QUANTITY, unitPrice = HEADSHOTS_UNIT_PRICE) {
   const qty = clampHeadshotQuantity(quantity, maxQuantity);
-  const price = roundMoney$2(qty * HEADSHOTS_UNIT_PRICE);
+  const price = roundMoney$2(qty * unitPrice);
   return [{
     id: "tuesday-headshot",
     name: "Tuesday headshot",
-    unitPrice: HEADSHOTS_UNIT_PRICE,
+    unitPrice,
     qty,
     price
   }];
@@ -9726,9 +10121,10 @@ router$y.post("/", async (req, res) => {
     }
     const displayAddress = addressLabel(savedAddress);
     const catalog = await loadBookingCatalog();
+    const rates = await loadPricingRates();
     const unpriced = unpricedCatalogBookingError(req.body, catalog);
     if (unpriced) return res.status(400).json({ error: unpriced });
-    const resolved = resolveSubmittedBooking(req.body, catalog);
+    const resolved = resolveSubmittedBooking(req.body, catalog, { promos: rates.promos });
     const keptLines = resolved.lineItems.filter((item) => !isTravelFeeLine(item));
     if (chargedServiceLines(keptLines).length === 0) {
       return res.status(400).json({ error: "No services selected." });
@@ -9755,10 +10151,10 @@ router$y.post("/", async (req, res) => {
         months: req.body.socialMonths,
         now: /* @__PURE__ */ new Date()
       });
-      if (!quoted.ok) return res.status(400).json({ error: quoted.error });
+      if (quoted.ok === false) return res.status(400).json({ error: quoted.error });
       serviceLines = serviceLines.map((item, index) => index === 0 ? { ...item, unitPrice: quoted.termDollars, price: quoted.termDollars } : item);
     }
-    let traveled = applyServerTravel(serviceLines, savedAddress);
+    let traveled = applyServerTravel(serviceLines, savedAddress, void 0, rates.travelZones);
     if (realEstate75Lead && realEstate75Area?.status === "inside" && realEstate75Area.travelFee === "tbd") {
       const travel2 = quoteRealEstate75Travel(traveled.travel);
       const kept = traveled.lineItems.filter((item) => !isTravelFeeLine(item));
@@ -9772,16 +10168,19 @@ router$y.post("/", async (req, res) => {
     const travel = traveled.travel;
     const promoCode = resolved.promoCode;
     const promoDiscount = resolved.promoDiscount;
+    const serviceBase = Math.max(0, sumLineItemPrices(traveled.lineItems.filter((item) => !isTravelFeeLine(item) && !isPromoInvoiceLine(item))) - promoDiscount);
+    const tax = taxDollars(serviceBase, rates);
     const sale = buildBookingInvoiceDraft({
       lineItems: traveled.lineItems,
       total: traveled.total,
-      pricing: { subtotal: traveled.total, tax: 0 },
+      pricing: { subtotal: traveled.total, tax },
       clientEmail: email,
       clientName: clientName2,
       promoCode,
       promoDiscount,
       travel,
-      applyProcessing: processingEnabled()
+      applyProcessing: processingEnabled() && rates.processingActive,
+      processingPercent: rates.processingPercent
     });
     const lineItems = sale.lineItems;
     const total = sale.total;
@@ -10436,9 +10835,11 @@ router$y.get("/slots", async (req, res) => {
 });
 router$y.get("/catalog", async (_req, res) => {
   const catalog = await loadBookingCatalog();
+  const rates = await loadPricingRates();
   return res.json({
     ...publicBookingCatalogResponse(catalog),
-    processingEnabled: processingEnabled()
+    processingEnabled: processingEnabled() && rates.processingActive,
+    pricingRates: rates
   });
 });
 router$y.get("/", requireCoordinator, async (_req, res) => {
@@ -10545,7 +10946,8 @@ router$y.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       longitude: locationFields.longitude,
       placeId: locationFields.placeId
     };
-    const traveledConfirm = applyServerTravel(linesForConfirmedOrder(request), requestAddress);
+    const confirmRates = await loadPricingRates();
+    const traveledConfirm = applyServerTravel(linesForConfirmedOrder(request), requestAddress, void 0, confirmRates.travelZones);
     const requestLineItems = traveledConfirm.lineItems;
     const travel = traveledConfirm.travel;
     const requestTotal = traveledConfirm.total;
@@ -11089,8 +11491,8 @@ function text$g(value) {
 function oneLine$1(value, max) {
   return value.replace(/[\r\n\u0000]+/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
 }
-function seniorFacilityPrice(sqft) {
-  const centsPerSqft = Math.round(SENIOR_FACILITY_RATE_PER_SQFT * 100);
+function seniorFacilityPrice(sqft, rate2 = SENIOR_FACILITY_RATE_PER_SQFT) {
+  const centsPerSqft = Math.round(rate2 * 100);
   return sqft * centsPerSqft / 100;
 }
 function seniorLivingHostingLabel(id) {
@@ -11221,22 +11623,27 @@ function cents(amount) {
 function dollars(amountCents) {
   return amountCents / 100;
 }
-function seniorRoomUnitPrice(count2) {
+function seniorRoomUnitPrice(count2, bands = SENIOR_ROOM_RATES) {
   if (!Number.isInteger(count2) || count2 < 1) return null;
-  const tier = SENIOR_ROOM_RATES.find(
+  const tier = bands.find(
     (band) => count2 >= band.minCount && count2 <= band.maxCount
   );
   return tier ? tier.each : null;
 }
 function quoteSeniorLivingOrder(input) {
+  const rates = input.rates;
+  const tourPrice = rates?.seniorTourPrice ?? SENIOR_TOUR_PRICE;
+  const roomBands = rates?.seniorRoomRates ?? SENIOR_ROOM_RATES;
+  const roomCap = roomBands.reduce((max, band) => Math.max(max, band.maxCount), 0) || SENIOR_ROOM_RATES[SENIOR_ROOM_RATES.length - 1].maxCount;
+  const facilityRate = rates?.seniorFacilityRatePerSqft ?? SENIOR_FACILITY_RATE_PER_SQFT;
   const lines = [];
   if (input.tour) {
     lines.push({
       id: "tour-3d",
       name: SENIOR_LIVING_SERVICE_LABELS["tour-3d"],
       qty: 1,
-      unitPrice: SENIOR_TOUR_PRICE,
-      price: SENIOR_TOUR_PRICE
+      unitPrice: tourPrice,
+      price: tourPrice
     });
   }
   const roomCount = input.roomCount;
@@ -11244,10 +11651,10 @@ function quoteSeniorLivingOrder(input) {
     if (!Number.isInteger(roomCount) || roomCount < 0) {
       return { ok: false, error: "Enter a room count from 0 to 20." };
     }
-    if (roomCount > SENIOR_ROOM_RATES[SENIOR_ROOM_RATES.length - 1].maxCount) {
+    if (roomCount > roomCap) {
       return { ok: false, error: "Room count cannot be more than 20." };
     }
-    const each = seniorRoomUnitPrice(roomCount);
+    const each = seniorRoomUnitPrice(roomCount, roomBands);
     if (each == null) {
       return { ok: false, error: "Enter a room count from 0 to 20." };
     }
@@ -11267,7 +11674,7 @@ function quoteSeniorLivingOrder(input) {
     if (facilitySqft > SENIOR_FACILITY_SQFT_CAP) {
       return { ok: false, error: "Facility size cannot be more than 20,000 sq ft." };
     }
-    const price = seniorFacilityPrice(facilitySqft);
+    const price = seniorFacilityPrice(facilitySqft, facilityRate);
     lines.push({
       id: "facility",
       name: SENIOR_LIVING_SERVICE_LABELS.facility,
@@ -11282,7 +11689,7 @@ function quoteSeniorLivingOrder(input) {
   const serviceSubtotal = dollars(
     lines.reduce((sum, line) => sum + cents(line.price), 0)
   );
-  const travel = assessTravel(input.address);
+  const travel = assessTravel(input.address, rates?.travelZones);
   const travelItem = travelInvoiceLine(travel);
   const travelLine = {
     id: travelItem.id,
@@ -11292,10 +11699,12 @@ function quoteSeniorLivingOrder(input) {
     price: travelItem.price
   };
   const priced = cents(serviceSubtotal) + cents(travelLine.price);
-  const processing = dollars(Math.round(priced * SENIOR_LIVING_PROCESSING_RATE));
+  const processingRate = rates ? rates.processingPercent / 100 : SENIOR_LIVING_PROCESSING_RATE;
+  const processing = rates && !rates.processingActive ? 0 : dollars(Math.round(priced * processingRate));
   const total = dollars(priced + cents(processing));
+  const depositPercent = rates?.seniorDepositPercent ?? SENIOR_LIVING_DEPOSIT_PERCENT;
   const depositAmount = dollars(
-    Math.round(cents(total) * (SENIOR_LIVING_DEPOSIT_PERCENT / 100))
+    Math.round(cents(total) * (depositPercent / 100))
   );
   const balanceDue = dollars(cents(total) - cents(depositAmount));
   return {
@@ -11313,7 +11722,7 @@ function quoteSeniorLivingOrder(input) {
   };
 }
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-function parseSeniorLivingOrder(body) {
+function parseSeniorLivingOrder(body, rates) {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     return { ok: false, honeypot: false, error: "That order could not be read." };
   }
@@ -11325,7 +11734,8 @@ function parseSeniorLivingOrder(body) {
     tour: raw.tour === true,
     roomCount,
     facilitySqft,
-    address: text$g(raw.address)
+    address: text$g(raw.address),
+    rates
   });
   if (quoted.ok === false) return { ok: false, honeypot: false, error: quoted.error };
   if (quoted.quote.travel.travelQuoted) {
@@ -11653,8 +12063,13 @@ router$x.post("/order", async (req, res) => {
     });
   }
   const { value } = parsed;
-  const applyProcessing = processingEnabled();
-  const quote = quoteHeadshots(value.quantity, applyProcessing, config.maxQuantity);
+  const rates = await loadPricingRates();
+  const applyProcessing = processingEnabled() && rates.processingActive;
+  const quote = quoteHeadshots(value.quantity, applyProcessing, config.maxQuantity, {
+    unitPrice: rates.headshotsUnitPrice,
+    bookingFee: rates.headshotsBookingFee,
+    processingPercent: rates.processingPercent
+  });
   await maybeReleaseExpiredHeadshotHolds();
   const availability = await readHeadshotAvailability();
   if (!availability.live) {
@@ -11700,7 +12115,12 @@ router$x.post("/order", async (req, res) => {
     console.error("[Headshots] Calendar hold failed:", error);
     return res.status(503).json({ error: HEADSHOTS_CALENDAR_FALLBACK });
   }
-  const traveled = applyServerTravel(headshotLineItems(quote.quantity, config.maxQuantity), HEADSHOTS_STUDIO_ADDRESS);
+  const traveled = applyServerTravel(
+    headshotLineItems(quote.quantity, config.maxQuantity, quote.unitPrice),
+    HEADSHOTS_STUDIO_ADDRESS,
+    void 0,
+    rates.travelZones
+  );
   const draft = buildBookingInvoiceDraft({
     lineItems: traveled.lineItems,
     total: traveled.total,
@@ -27950,7 +28370,8 @@ router$a.post("/order", async (req, res) => {
       error: `Too many requests. Please wait and try again, or call ${BUSINESS_CONTACT.phoneDisplay}.`
     });
   }
-  const parsed = parseSeniorLivingOrder(req.body);
+  const rates = await loadPricingRates();
+  const parsed = parseSeniorLivingOrder(req.body, rates);
   if (parsed.ok === false) {
     if (parsed.honeypot === true) {
       return res.json({ success: true, message: "Request received." });
@@ -28010,7 +28431,7 @@ router$a.post("/order", async (req, res) => {
       travelFeeCents: quote.travel.travelFeeCents,
       travelQuoted: quote.travel.travelQuoted,
       depositRequired: SENIOR_LIVING_DEPOSIT_REQUIRED,
-      depositPercent: SENIOR_LIVING_DEPOSIT_PERCENT,
+      depositPercent: rates.seniorDepositPercent,
       depositAmount: quote.depositAmount,
       depositPaid: 0,
       balanceDue: quote.total,
@@ -28022,7 +28443,7 @@ router$a.post("/order", async (req, res) => {
       vibeNote: [
         depositCopy,
         `Deposit required: yes`,
-        `Deposit percent: ${SENIOR_LIVING_DEPOSIT_PERCENT}`,
+        `Deposit percent: ${rates.seniorDepositPercent}`,
         `Deposit due today: ${quote.depositAmount}`,
         `Balance due after the shoot: ${quote.balanceDue}`,
         `Processing: ${quote.processing}`,
@@ -28064,7 +28485,7 @@ router$a.post("/order", async (req, res) => {
       travelFeeCents: quote.travel.travelFeeCents,
       travelQuoted: quote.travel.travelQuoted,
       depositRequired: SENIOR_LIVING_DEPOSIT_REQUIRED,
-      depositPercent: SENIOR_LIVING_DEPOSIT_PERCENT,
+      depositPercent: rates.seniorDepositPercent,
       depositAmount: quote.depositAmount,
       depositPaid: 0,
       balanceDue: quote.total,
@@ -28105,7 +28526,7 @@ router$a.post("/order", async (req, res) => {
       amountPaid: 0,
       amountDue: quote.total,
       depositRequired: SENIOR_LIVING_DEPOSIT_REQUIRED,
-      depositPercent: SENIOR_LIVING_DEPOSIT_PERCENT,
+      depositPercent: rates.seniorDepositPercent,
       depositAmount: quote.depositAmount,
       depositPaid: 0,
       status: "draft",
@@ -28152,7 +28573,7 @@ router$a.post("/order", async (req, res) => {
       total: quote.total,
       processing: quote.processing,
       depositRequired: true,
-      depositPercent: SENIOR_LIVING_DEPOSIT_PERCENT,
+      depositPercent: rates.seniorDepositPercent,
       depositAmount: quote.depositAmount,
       balanceDue: quote.balanceDue,
       scheduledDate: value.scheduledDate,
@@ -28168,7 +28589,7 @@ router$a.post("/order", async (req, res) => {
         `Title: ${value.title}`,
         `Onsite contact: ${value.onsiteContact}`,
         `Deposit required: yes`,
-        `Deposit percent: ${SENIOR_LIVING_DEPOSIT_PERCENT}`,
+        `Deposit percent: ${rates.seniorDepositPercent}`,
         `Deposit due today: ${quote.depositAmount}`,
         `Balance due after the shoot: ${quote.balanceDue}`,
         `Tour hosting: ${hostingNote}`,
@@ -28367,10 +28788,12 @@ router$9.post("/order", async (req, res) => {
       error: `Orders are not available on this server yet. Please call ${BUSINESS_CONTACT.phoneDisplay}.`
     });
   }
+  const rates = await loadPricingRates();
+  const feeLabel = Number.isInteger(rates.apprenticeshipBookingFee) ? String(rates.apprenticeshipBookingFee) : rates.apprenticeshipBookingFee.toFixed(2);
   const checkoutLive = seniorDepositCheckoutLive();
   if (!checkoutLive) {
     return res.status(503).json({
-      error: `Online booking is paused. Call ${BUSINESS_CONTACT.phoneDisplay} to book and pay the $25 booking fee.`
+      error: `Online booking is paused. Call ${BUSINESS_CONTACT.phoneDisplay} to book and pay the $${feeLabel} booking fee.`
     });
   }
   const catalog = await loadCatalog();
@@ -28378,7 +28801,8 @@ router$9.post("/order", async (req, res) => {
     packageId: parsed.value.packageId,
     address: parsed.value.address,
     applyProcessing: processingEnabled(),
-    catalog
+    catalog,
+    rates
   });
   if (quoted.ok === false) return res.status(400).json({ error: quoted.error });
   const { quote } = quoted;
@@ -28438,7 +28862,7 @@ router$9.post("/order", async (req, res) => {
     holdExpiresAt: apprenticeshipHoldExpiresAt(/* @__PURE__ */ new Date())
   };
   const note = [
-    APPRENTICESHIP_BOOKING_FEE_LINE,
+    quote.bookingFeeLine,
     "Not confirmed until the $25 booking fee is paid.",
     APPRENTICESHIP_BALANCE_LINE,
     value.preferredTime ? `Preferred time: ${value.preferredTime}` : "",
@@ -28470,7 +28894,7 @@ router$9.post("/order", async (req, res) => {
       travelFeeCents: quote.travel.travelFeeCents,
       travelQuoted: quote.travel.travelQuoted,
       depositRequired: true,
-      depositAmount: APPRENTICESHIP_BOOKING_FEE,
+      depositAmount: quote.bookingFee,
       depositPaid: 0,
       depositStatus: "awaiting",
       ...holdFields,
@@ -28511,7 +28935,7 @@ router$9.post("/order", async (req, res) => {
       travelFeeCents: quote.travel.travelFeeCents,
       travelQuoted: quote.travel.travelQuoted,
       depositRequired: true,
-      depositAmount: APPRENTICESHIP_BOOKING_FEE,
+      depositAmount: quote.bookingFee,
       depositPaid: 0,
       depositStatus: "awaiting",
       ...holdFields,
@@ -28552,7 +28976,7 @@ router$9.post("/order", async (req, res) => {
       amountPaid: 0,
       amountDue: quote.total,
       depositRequired: true,
-      depositAmount: APPRENTICESHIP_BOOKING_FEE,
+      depositAmount: quote.bookingFee,
       depositPaid: 0,
       status: "draft",
       paymentProvider: "square",
@@ -28613,7 +29037,7 @@ router$9.post("/order", async (req, res) => {
       orderNumber,
       invoiceId: invoiceRef.id,
       payToken,
-      depositAmount: APPRENTICESHIP_BOOKING_FEE,
+      depositAmount: quote.bookingFee,
       total: quote.total,
       balanceDue: quote.balanceDue,
       checkoutReady: checkoutLive,

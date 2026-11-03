@@ -38,6 +38,7 @@ import { publicClientUrl } from "../../shared/publicSiteUrl";
 import { seniorDepositCheckoutLive } from "../../shared/seniorLiving";
 import { storedServiceLocationFields } from "../../shared/serviceLocation";
 import { applyServerTravel } from "../../shared/travelZones";
+import { loadPricingRates } from "../services/pricingAdjustments";
 import { clientIp } from "../lib/clientIp";
 import { createRateLimiter } from "../lib/rateLimit";
 import { createBookingCalendarHold, deleteBookingCalendarHold, readHeadshotAvailability } from "../services/bookingAvailability";
@@ -131,8 +132,13 @@ router.post("/order", async (req, res) => {
   }
 
   const { value } = parsed;
-  const applyProcessing = processingEnabled();
-  const quote = quoteHeadshots(value.quantity, applyProcessing, config.maxQuantity);
+  const rates = await loadPricingRates();
+  const applyProcessing = processingEnabled() && rates.processingActive;
+  const quote = quoteHeadshots(value.quantity, applyProcessing, config.maxQuantity, {
+    unitPrice: rates.headshotsUnitPrice,
+    bookingFee: rates.headshotsBookingFee,
+    processingPercent: rates.processingPercent,
+  });
   await maybeReleaseExpiredHeadshotHolds();
   const availability = await readHeadshotAvailability();
   if (!availability.live) {
@@ -182,7 +188,12 @@ router.post("/order", async (req, res) => {
     return res.status(503).json({ error: HEADSHOTS_CALENDAR_FALLBACK });
   }
 
-  const traveled = applyServerTravel(headshotLineItems(quote.quantity, config.maxQuantity), HEADSHOTS_STUDIO_ADDRESS);
+  const traveled = applyServerTravel(
+    headshotLineItems(quote.quantity, config.maxQuantity, quote.unitPrice),
+    HEADSHOTS_STUDIO_ADDRESS,
+    undefined,
+    rates.travelZones,
+  );
   const draft = buildBookingInvoiceDraft({
     lineItems: traveled.lineItems,
     total: traveled.total,

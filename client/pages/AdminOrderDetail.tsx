@@ -29,6 +29,9 @@ import { publicClientUrl } from "@shared/publicSiteUrl";
 import { filterAssignableStaff, recordAllowsQaStaff } from "@shared/qaStaff";
 import { DotOptInBadge } from "@/components/DoorsOpenTour";
 import { cancelOrderRequest } from "@/lib/cancelOrderRequest";
+import { OrderServicesFields } from "@/components/OrderServicesFields";
+import { syncOrderBillingToInvoice } from "@/lib/staffInvoice";
+import { orderBillingFromServicePatch, type OrderServiceSavePatch } from "@shared/orderRequestServices";
 import { recordCountsTowardRevenue } from "@shared/revenueCount";
 
 // ─── Status system ────────────────────────────────────────────────────────────
@@ -87,6 +90,7 @@ export default function AdminOrderDetail() {
   // Staff for assignment
   const [staff, setStaff] = React.useState<any[]>([]);
   const [services, setServices] = React.useState<any[]>([]);
+  const servicePatchRef = React.useRef<OrderServiceSavePatch | null>(null);
 
   React.useEffect(() => {
     if (!id) return;
@@ -196,9 +200,15 @@ export default function AdminOrderDetail() {
       if (editForm.appointmentNotes !== order.appointmentNotes) updates.appointmentNotes = editForm.appointmentNotes;
       if (editForm.accessInstructions !== order.accessInstructions) updates.accessInstructions = editForm.accessInstructions;
       if (editForm.internalNotes !== order.internalNotes) updates.internalNotes = editForm.internalNotes;
+      const servicePatch = servicePatchRef.current;
+      if (servicePatch) Object.assign(updates, orderBillingFromServicePatch(servicePatch));
 
       if (Object.keys(updates).length > 0) {
         await patch(updates, "Order details updated by admin");
+        const invoiceId = String(order.invoice?.id || order.invoiceId || "");
+        if (invoiceId && servicePatch) {
+          await syncOrderBillingToInvoice(invoiceId, updates);
+        }
       }
       setEditing(false);
     } catch (err) {
@@ -617,7 +627,13 @@ export default function AdminOrderDetail() {
             {/* Services */}
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
               <h3 className={`${labelCls} mb-4`}>Services & Pricing</h3>
-              {svcList.length > 0 ? (
+              {editing ? (
+                <OrderServicesFields
+                  record={editForm}
+                  resetKey={`${order.id}:${editing}`}
+                  onChange={(next) => { servicePatchRef.current = next; }}
+                />
+              ) : svcList.length > 0 ? (
                 <div>
                   {svcList.map((s: any, i: number) => (
                     <div key={i} className={`flex items-baseline justify-between gap-3 py-3 ${i > 0 ? "border-t border-gray-100" : ""}`}>

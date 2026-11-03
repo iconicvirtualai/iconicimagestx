@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import AdminLayout from "@/components/AdminLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { deliverInvoiceEmail } from "@/lib/deliverInvoice";
+import { OrderServicesFields } from "@/components/OrderServicesFields";
+import { orderBillingFromServicePatch, type OrderServiceSavePatch } from "@shared/orderRequestServices";
 import { staffInvoicePath } from "@shared/staffInvoice";
 import { formatChicagoDate } from "@shared/clientHome";
 import { clientBillingInvoiceNumber, type ClientBillingInvoiceDoc } from "@shared/orderProjectInvoice";
@@ -45,7 +47,8 @@ export default function AdminClientBilling() {
   const [showCreate, setShowCreate] = React.useState(false);
 
   // New invoice form
-  const [newInv, setNewInv] = React.useState({ clientName: "", clientEmail: "", items: [{ name: "", price: 0 }], notes: "" });
+  const [newInv, setNewInv] = React.useState({ clientName: "", clientEmail: "", notes: "" });
+  const servicePatchRef = React.useRef<OrderServiceSavePatch | null>(null);
 
   React.useEffect(() => {
     const ready = { orders: false, invoices: false };
@@ -144,21 +147,15 @@ export default function AdminClientBilling() {
     }
   };
 
-  const handleAddItem = () => setNewInv(f => ({ ...f, items: [...f.items, { name: "", price: 0 }] }));
-  const handleRemoveItem = (idx: number) => setNewInv(f => ({ ...f, items: f.items.filter((_, i) => i !== idx) }));
-  const handleItemChange = (idx: number, field: string, val: any) => setNewInv(f => ({ ...f, items: f.items.map((item, i) => i === idx ? { ...item, [field]: val } : item) }));
-
   const handleCreateInvoice = async () => {
     if (!newInv.clientName || !newInv.clientEmail) { toast.error("Client name and email required."); return; }
-    const total = newInv.items.reduce((s, i) => s + (Number(i.price) || 0), 0);
+    const billing = servicePatchRef.current ? orderBillingFromServicePatch(servicePatchRef.current) : null;
     try {
       await addDoc(collection(db, "orderRequests"), {
         clientName: newInv.clientName,
         email: newInv.clientEmail,
-        lineItems: newInv.items.filter(i => i.name),
-        total,
-        pricing: { subtotal: total, total },
-        invoice: { invoiceNumber: `INV-${Date.now().toString(36).toUpperCase()}`, status: "draft", amountDue: total, amountPaid: 0 },
+        ...(billing || { lineItems: [], total: 0, pricing: { subtotal: 0, total: 0 } }),
+        invoice: { invoiceNumber: `INV-${Date.now().toString(36).toUpperCase()}`, status: "draft", amountDue: billing?.total || 0, amountPaid: 0 },
         status: "new",
         source: "manual_invoice",
         ...adminRevenueAcceptance(user?.email || "admin"),
@@ -168,7 +165,8 @@ export default function AdminClientBilling() {
       });
       toast.success("Invoice created!");
       setShowCreate(false);
-      setNewInv({ clientName: "", clientEmail: "", items: [{ name: "", price: 0 }], notes: "" });
+      servicePatchRef.current = null;
+      setNewInv({ clientName: "", clientEmail: "", notes: "" });
     } catch (err) { console.error(err); toast.error("Failed."); }
   };
 
@@ -279,21 +277,14 @@ export default function AdminClientBilling() {
                 <div><p className={`${labelCls} mb-1`}>Client Email *</p><input value={newInv.clientEmail} onChange={e => setNewInv(f => ({...f, clientEmail: e.target.value}))} className={inputCls} /></div>
               </div>
               <div>
-                <p className={`${labelCls} mb-2`}>Line Items</p>
-                {newInv.items.map((item, i) => (
-                  <div key={i} className="flex gap-2 mb-2">
-                    <input value={item.name} onChange={e => handleItemChange(i, "name", e.target.value)} placeholder="Service name" className={`${inputCls} flex-1`} />
-                    <input type="number" value={item.price || ""} onChange={e => handleItemChange(i, "price", Number(e.target.value))} placeholder="Price" className={`${inputCls} w-28`} />
-                    {newInv.items.length > 1 && <button onClick={() => handleRemoveItem(i)} className="text-red-400 hover:text-red-600 text-xs font-bold px-2">X</button>}
-                  </div>
-                ))}
-                <button onClick={handleAddItem} className="text-xs font-bold text-[#0d9488] mt-1">+ Add Line Item</button>
+                <p className={`${labelCls} mb-2`}>Services</p>
+                <OrderServicesFields
+                  record={{ lineItems: [] }}
+                  resetKey={showCreate ? "new-invoice" : "closed"}
+                  onChange={(next) => { servicePatchRef.current = next; }}
+                />
               </div>
               <div><p className={`${labelCls} mb-1`}>Notes</p><textarea value={newInv.notes} onChange={e => setNewInv(f => ({...f, notes: e.target.value}))} rows={2} className={`${inputCls} resize-none`} /></div>
-              <div className="flex items-baseline justify-between gap-3 border-t pt-3 text-lg">
-                <span className="min-w-0 font-black">Total</span>
-                <MoneyAmount className="font-black text-[#0d9488]">{fmtCurrency(newInv.items.reduce((s, i) => s + (Number(i.price) || 0), 0))}</MoneyAmount>
-              </div>
             </div>
             <div className="flex gap-3">
               <Button onClick={() => setShowCreate(false)} variant="outline" className="flex-1 rounded-xl">Cancel</Button>

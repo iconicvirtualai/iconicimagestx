@@ -43,12 +43,11 @@ describe("staff invoice routes", () => {
     expect(editorPage).toContain("Copy payment link");
     expect(editorPage).toContain('collection(db, "packages")');
     expect(editorPage).toContain("packagesForStaffEditor");
-    expect(editorPage).toContain("PackageCatalogPicker");
+    expect(editorPage).toContain("OrderServicesFields");
     expect(pickerPage).toContain("Choose a package");
     expect(pickerPage).toContain("Search packages");
     expect(editorPage).toContain("invoicePageInvoiceNumber");
-    expect(editorPage).toContain(">Description<");
-    expect(editorPage).toContain(">Quantity<");
+    expect(readFileSync(new URL("../client/components/OrderServiceEditor.tsx", import.meta.url), "utf8")).toContain("Remove price");
     expect(editorPage).toContain("Discount amount");
     expect(editorPage).toContain("INVOICE_PRESET_KIND_LABELS");
     expect(editorPage).toContain("watchInvoicePresets");

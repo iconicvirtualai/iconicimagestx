@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Calendar, Check, Clock, MapPin, Minus, Plus } from "lucide-react";
 import { trackConversion } from "@/lib/tracking";
+import { usePricingRates } from "@/lib/usePricingRates";
 import { BUSINESS_CONTACT, LEGAL_BUSINESS_NAME } from "@shared/businessContact";
 import {
   HEADSHOT_PATHS,
@@ -156,9 +157,14 @@ export default function Headshots10() {
   const [confirmation, setConfirmation] = useState<PendingBooking | null>(null);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const tuesdays = useMemo(() => upcomingHeadshotTuesdays(new Date(), HEADSHOTS_DATE_COUNT), []);
+  const rates = usePricingRates();
   const quote = useMemo(
-    () => quoteHeadshots(draft.quantity, processingOn, maxQuantity),
-    [draft.quantity, processingOn, maxQuantity],
+    () => quoteHeadshots(draft.quantity, processingOn && rates.processingActive, maxQuantity, {
+      unitPrice: rates.headshotsUnitPrice,
+      bookingFee: rates.headshotsBookingFee,
+      processingPercent: rates.processingPercent,
+    }),
+    [draft.quantity, processingOn, maxQuantity, rates],
   );
   const paidReturn = useMemo(() => {
     const params = new URLSearchParams(location.search);
@@ -419,7 +425,11 @@ export default function Headshots10() {
       ? { ...draft, orderNumber: returnedOrder, paid: true }
       : null;
   const showingConfirmation = Boolean(confirmed?.orderNumber);
-  const confirmedQuote = quoteHeadshots(confirmed?.quantity || quote.quantity, processingOn, maxQuantity);
+  const confirmedQuote = quoteHeadshots(confirmed?.quantity || quote.quantity, processingOn && rates.processingActive, maxQuantity, {
+    unitPrice: rates.headshotsUnitPrice,
+    bookingFee: rates.headshotsBookingFee,
+    processingPercent: rates.processingPercent,
+  });
   const slotsForDate = scheduleSlots.filter((slot) => slot.date === selectedDate);
   const slotsNeeded = headshotSlotsNeeded(quote.quantity, doubleSlotAt);
   const chips = [1, 3, 5, 10].filter((count) => count <= maxQuantity);

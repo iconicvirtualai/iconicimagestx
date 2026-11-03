@@ -39,11 +39,17 @@ describe("studio nav", () => {
     expect(labels).toEqual(expect.arrayContaining([
       "Shoots",
       "My jobs",
-      "Booking catalog",
+      "Prices",
       "Invoice Presets",
       "Projects",
       "Holiday RSVPs",
     ]));
+    expect(labels.filter((label) => label === "Prices")).toEqual(["Prices"]);
+    expect(labels).not.toContain("Booking catalog");
+    expect(labels).not.toContain("Pricing");
+    expect(hrefs).not.toContain("/admin/booking-catalog");
+    expect(hrefs).not.toContain("/admin/current-pricing");
+    expect(hrefs).toContain("/admin/pricing");
     expect(hrefs).toContain("/admin/holiday-rsvps");
     expect(mostSpecificNavHref("/admin/holiday-rsvps", hrefs)).toBe("/admin/holiday-rsvps");
   });

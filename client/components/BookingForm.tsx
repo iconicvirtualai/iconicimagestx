@@ -35,6 +35,8 @@ import {
   type BookingPriceInput,
 } from "@shared/bookingPricing";
 import { BOOKING_PROCESSING_LABEL, estimateBookingCharge } from "@shared/invoiceProcessing";
+import { taxDollars, type PricingRates } from "@shared/pricingSettings";
+import { readPricingRates, seedPricingRates } from "@/lib/pricingAdjustments";
 import {
   assessTravel,
   travelCustomerLine,
@@ -237,6 +239,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [slotsChecked, setSlotsChecked] = useState(false);
   const [processingOn, setProcessingOn] = useState(true);
+  const [pricing, setPricing] = useState<PricingRates>(() => seedPricingRates());
   const offer = useMemo(() => bookingOffer(catalog), [catalog]);
   const services = offer.services;
   const addOns = offer.addOns;
@@ -256,8 +259,23 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
     fetch("/api/bookings/catalog")
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (cancelled || !data || typeof data.processingEnabled !== "boolean") return;
-        setProcessingOn(data.processingEnabled);
+        if (cancelled || !data) return;
+        if (typeof data.processingEnabled === "boolean") setProcessingOn(data.processingEnabled);
+        if (data.pricingRates && typeof data.pricingRates === "object") {
+          setPricing((current) => ({ ...current, ...data.pricingRates }));
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    readPricingRates()
+      .then((next) => {
+        if (!cancelled && next) setPricing(next);
       })
       .catch(() => {});
     return () => {
@@ -708,15 +726,21 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
   const isConsultationPath = selectedServiceData && ["branding", "business", "growth"].includes(selectedServiceData.category);
   const isStudioPath = selectedServiceData?.category === "studio";
 
-  const travel = assessTravel(formData.servicePlace ?? formData.address);
+  const travel = assessTravel(formData.servicePlace ?? formData.address, pricing.travelZones);
   const showTravelLine = Boolean(formData.servicePlace) || formData.address.trim().length > 0;
+  const priceInput = bookingPriceInput();
+  const serviceBase = Math.max(0, sumLineItemPrices(buildSubmittedLineItems({ ...priceInput, promo: null })));
   const estimate = estimateBookingCharge(
-    bookingPriceInput(),
+    priceInput,
     showTravelLine ? travelFeeDollars(travel) : 0,
-    processingOn,
+    processingOn && pricing.processingActive,
+    {
+      processingPercent: pricing.processingPercent,
+      tax: taxDollars(Math.max(0, serviceBase - (appliedPromo?.discount || 0)), pricing),
+    },
   );
   const handleApplyPromo = () => {
-    const promo = promoDiscountFor(promoInput);
+    const promo = promoDiscountFor(promoInput, pricing.promos, serviceBase) ?? promoDiscountFor(promoInput);
     if (promo?.code === "ICONICAI") {
       setAppliedPromo(promo); // $35 off (1 free virtual staging)
       toast.success("Promo code 'ICONICAI' applied! ($35 discount)");

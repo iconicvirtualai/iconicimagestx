@@ -45,6 +45,9 @@ import { HOLIDAY_OFFICE_CALENDAR_ID, classifyHolidayCalendarOrder } from "../../
 import { createHolidaySquareCheckout } from "../services/holidaySquareCheckout";
 import { loadHolidaySlotOrders } from "../services/holidaySlots";
 import { packagesForStaffEditor, publicBookingCatalogResponse } from "../../shared/bookingCatalog";
+import { taxDollars } from "../../shared/pricingSettings";
+import { isPromoInvoiceLine } from "../../shared/invoiceFace";
+import { loadPricingRates } from "../services/pricingAdjustments";
 import { normalizeEmail } from "../../shared/listingAccess";
 import { portalBillingStamp } from "../../shared/clientHubSettings";
 import { addressText } from "../../shared/addressText";
@@ -211,9 +214,10 @@ router.post("/", async (req, res) => {
     const displayAddress = addressLabel(savedAddress);
 
     const catalog = await loadBookingCatalog();
+    const rates = await loadPricingRates();
     const unpriced = unpricedCatalogBookingError(req.body, catalog);
     if (unpriced) return res.status(400).json({ error: unpriced });
-    const resolved = resolveSubmittedBooking(req.body, catalog);
+    const resolved = resolveSubmittedBooking(req.body, catalog, { promos: rates.promos });
     // A posted travel fee is not a service and is not the price. Quote the pin or ZIP.
     const keptLines = resolved.lineItems.filter((item) => !isTravelFeeLine(item));
     if (chargedServiceLines(keptLines).length === 0) {
@@ -248,14 +252,14 @@ router.post("/", async (req, res) => {
         months: req.body.socialMonths,
         now: new Date(),
       });
-      if (!quoted.ok) return res.status(400).json({ error: quoted.error });
+      if (quoted.ok === false) return res.status(400).json({ error: quoted.error });
       serviceLines = serviceLines.map((item, index) => (
         index === 0
           ? { ...item, unitPrice: quoted.termDollars, price: quoted.termDollars }
           : item
       ));
     }
-    let traveled = applyServerTravel(serviceLines, savedAddress);
+    let traveled = applyServerTravel(serviceLines, savedAddress, undefined, rates.travelZones);
     if (realEstate75Lead && realEstate75Area?.status === "inside" && realEstate75Area.travelFee === "tbd") {
       const travel = quoteRealEstate75Travel(traveled.travel);
       const kept = traveled.lineItems.filter((item) => !isTravelFeeLine(item));
@@ -269,18 +273,23 @@ router.post("/", async (req, res) => {
     const travel = traveled.travel;
     const promoCode = resolved.promoCode;
     const promoDiscount = resolved.promoDiscount;
-    // New bookings store 2.8% once. The kill switch is server-only.
-    // Legacy invoices are not updated here.
+    const serviceBase = Math.max(0, sumLineItemPrices(traveled.lineItems.filter((item) => (
+      !isTravelFeeLine(item) && !isPromoInvoiceLine(item)
+    ))) - promoDiscount);
+    const tax = taxDollars(serviceBase, rates);
+    // New bookings store the processing rate once. The kill switch is server-only.
+    // Legacy invoices are not updated here. A removed processing fee stays off.
     const sale = buildBookingInvoiceDraft({
       lineItems: traveled.lineItems,
       total: traveled.total,
-      pricing: { subtotal: traveled.total, tax: 0 },
+      pricing: { subtotal: traveled.total, tax },
       clientEmail: email,
       clientName,
       promoCode,
       promoDiscount,
       travel,
-      applyProcessing: processingEnabled(),
+      applyProcessing: processingEnabled() && rates.processingActive,
+      processingPercent: rates.processingPercent,
     });
     const lineItems = sale.lineItems;
     const total = sale.total;
@@ -1025,9 +1034,11 @@ router.get("/slots", async (req, res) => {
 
 router.get("/catalog", async (_req, res) => {
   const catalog = await loadBookingCatalog();
+  const rates = await loadPricingRates();
   return res.json({
     ...publicBookingCatalogResponse(catalog),
-    processingEnabled: processingEnabled(),
+    processingEnabled: processingEnabled() && rates.processingActive,
+    pricingRates: rates,
   });
 });
 
@@ -1157,7 +1168,8 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
       longitude: locationFields.longitude,
       placeId: locationFields.placeId,
     };
-    const traveledConfirm = applyServerTravel(linesForConfirmedOrder(request), requestAddress);
+    const confirmRates = await loadPricingRates();
+    const traveledConfirm = applyServerTravel(linesForConfirmedOrder(request), requestAddress, undefined, confirmRates.travelZones);
     const requestLineItems = traveledConfirm.lineItems;
     const travel = traveledConfirm.travel;
     const requestTotal = traveledConfirm.total;

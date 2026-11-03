@@ -63,6 +63,8 @@ export interface InvoiceTotalsInput {
   processing?: number | null;
   /** False skips the automatic fee. Used for legacy copies and the server kill switch. */
   applyProcessing?: boolean;
+  /** Percent points. Omit for the 2.8% seed. A stored processing amount still wins. */
+  processingPercent?: number;
   comped?: boolean;
 }
 
@@ -95,15 +97,26 @@ export function processingEnabled(
 }
 
 /** 2.8% of the processing base, in dollars, rounded half-up to cents. */
-export function processingFee(base: number): number {
-  return fromCents(processingFeeCents(toCents(base)));
+export function processingFee(base: number, percent = PROCESSING_FEE_RATE * 100): number {
+  return fromCents(processingFeeCents(toCents(base), percent));
 }
 
-/** Integer cents. round(baseCents * 0.028), half-up. Zero when the base is not positive. */
-export function processingFeeCents(baseCents: number): number {
+/**
+ * Integer cents. round(baseCents * percent / 100), half-up.
+ * 2.8% is floor((cents * 280 + 5000) / 10000), which matches the old 28/1000 rule.
+ */
+export function processingFeeCents(baseCents: number, percent = PROCESSING_FEE_RATE * 100): number {
   const cents = Math.round(Number(baseCents));
   if (!Number.isFinite(cents) || cents <= 0) return 0;
-  return Math.floor((cents * 28 + 500) / 1000);
+  const basis = Math.round(Number(percent) * 100);
+  if (!Number.isFinite(basis) || basis <= 0) return 0;
+  return Math.floor((cents * basis + 5000) / 10000);
+}
+
+/** "Processing (2.8%)" at the seed rate. Other percents use the same shape. */
+export function processingFeeLabel(percent = PROCESSING_FEE_RATE * 100): string {
+  const shown = Number.isInteger(percent) ? String(percent) : String(Math.round(percent * 100) / 100);
+  return `Processing (${shown}%)`;
 }
 
 /**
@@ -134,7 +147,7 @@ export function computeInvoiceTotals(input: InvoiceTotalsInput): InvoiceTotals {
     processing = stored;
     processingPolicy = "stored";
   } else if (input.applyProcessing !== false) {
-    processing = processingFee(processingBase);
+    processing = processingFee(processingBase, input.processingPercent);
     processingPolicy = "included";
   }
 
@@ -163,6 +176,7 @@ export function estimateBookingCharge(
   input: BookingPriceInput,
   travel = 0,
   applyProcessing = true,
+  rates?: { processingPercent?: number; tax?: number },
 ): InvoiceTotals {
   const items = buildSubmittedLineItems({ ...input, promo: null });
   return computeInvoiceTotals({
@@ -170,8 +184,9 @@ export function estimateBookingCharge(
     promotions: input.promo?.discount ?? 0,
     fees: 0,
     travel,
-    tax: 0,
+    tax: rates?.tax ?? 0,
     applyProcessing,
+    processingPercent: rates?.processingPercent,
   });
 }
 

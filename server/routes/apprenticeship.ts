@@ -29,6 +29,7 @@ import { nextSequentialInvoiceNumber } from "../../shared/orderProjectInvoice";
 import { seniorDepositCheckoutLive } from "../../shared/seniorLiving";
 import { storedServiceLocationFields } from "../../shared/serviceLocation";
 import { packagesForStaffEditor } from "../../shared/bookingCatalog";
+import { loadPricingRates } from "../services/pricingAdjustments";
 import { clientIp } from "../lib/clientIp";
 import { createRateLimiter } from "../lib/rateLimit";
 import { requireStaff, type AuthenticatedRequest } from "../middleware/auth";
@@ -173,10 +174,14 @@ router.post("/order", async (req, res) => {
   // Every apprentice booking takes the $25 booking fee online. Without the
   // Square deposit checkout there is no way to collect it, so do not save a
   // booking (or hold a calendar slot) that could never be confirmed.
+  const rates = await loadPricingRates();
+  const feeLabel = Number.isInteger(rates.apprenticeshipBookingFee)
+    ? String(rates.apprenticeshipBookingFee)
+    : rates.apprenticeshipBookingFee.toFixed(2);
   const checkoutLive = seniorDepositCheckoutLive();
   if (!checkoutLive) {
     return res.status(503).json({
-      error: `Online booking is paused. Call ${BUSINESS_CONTACT.phoneDisplay} to book and pay the $25 booking fee.`,
+      error: `Online booking is paused. Call ${BUSINESS_CONTACT.phoneDisplay} to book and pay the $${feeLabel} booking fee.`,
     });
   }
 
@@ -186,6 +191,7 @@ router.post("/order", async (req, res) => {
     address: parsed.value.address,
     applyProcessing: processingEnabled(),
     catalog,
+    rates,
   });
   if (quoted.ok === false) return res.status(400).json({ error: quoted.error });
   const { quote } = quoted;
@@ -251,7 +257,7 @@ router.post("/order", async (req, res) => {
     holdExpiresAt: apprenticeshipHoldExpiresAt(new Date()),
   };
   const note = [
-    APPRENTICESHIP_BOOKING_FEE_LINE,
+    quote.bookingFeeLine,
     "Not confirmed until the $25 booking fee is paid.",
     APPRENTICESHIP_BALANCE_LINE,
     value.preferredTime ? `Preferred time: ${value.preferredTime}` : "",
@@ -284,7 +290,7 @@ router.post("/order", async (req, res) => {
       travelFeeCents: quote.travel.travelFeeCents,
       travelQuoted: quote.travel.travelQuoted,
       depositRequired: true,
-      depositAmount: APPRENTICESHIP_BOOKING_FEE,
+      depositAmount: quote.bookingFee,
       depositPaid: 0,
       depositStatus: "awaiting",
       ...holdFields,
@@ -326,7 +332,7 @@ router.post("/order", async (req, res) => {
       travelFeeCents: quote.travel.travelFeeCents,
       travelQuoted: quote.travel.travelQuoted,
       depositRequired: true,
-      depositAmount: APPRENTICESHIP_BOOKING_FEE,
+      depositAmount: quote.bookingFee,
       depositPaid: 0,
       depositStatus: "awaiting",
       ...holdFields,
@@ -368,7 +374,7 @@ router.post("/order", async (req, res) => {
       amountPaid: 0,
       amountDue: quote.total,
       depositRequired: true,
-      depositAmount: APPRENTICESHIP_BOOKING_FEE,
+      depositAmount: quote.bookingFee,
       depositPaid: 0,
       status: "draft",
       paymentProvider: "square",
@@ -432,7 +438,7 @@ router.post("/order", async (req, res) => {
       orderNumber,
       invoiceId: invoiceRef.id,
       payToken,
-      depositAmount: APPRENTICESHIP_BOOKING_FEE,
+      depositAmount: quote.bookingFee,
       total: quote.total,
       balanceDue: quote.balanceDue,
       checkoutReady: checkoutLive,

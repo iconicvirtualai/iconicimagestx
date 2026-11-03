@@ -322,8 +322,12 @@ export function invoiceDraftFromOrder(order: {
   lastName?: unknown;
   promoCode?: unknown;
   promoDiscount?: unknown;
+  processing?: unknown;
 }): BookingInvoiceDraftInput {
   const named = `${order.firstName || ""} ${order.lastName || ""}`.trim();
+  const processing = typeof order.processing === "number" && Number.isFinite(order.processing)
+    ? order.processing
+    : undefined;
   return {
     lineItems: order.lineItems,
     total: Number(order.total) || Number(order.pricing?.total) || 0,
@@ -334,6 +338,7 @@ export function invoiceDraftFromOrder(order: {
     orderRequestId: order.id,
     promoCode: typeof order.promoCode === "string" ? order.promoCode : null,
     promoDiscount: order.promoDiscount,
+    ...(processing != null ? { processing } : {}),
   };
 }
 

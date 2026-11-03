@@ -40,7 +40,14 @@ import { staffInvoicePath } from "@shared/staffInvoice";
 import { ensureLinkedInvoice, resolveLinkedInvoice } from "@/lib/orderProjectInvoice";
 import { syncOrderBillingToInvoice } from "@/lib/staffInvoice";
 import { separatePromoDiscount } from "@shared/bookingPricing";
+import { BOOKING_PROCESSING_LABEL } from "@shared/invoiceProcessing";
 import { orderChargeSummary, orderServiceLines } from "@shared/orderPackageLines";
+import {
+  formatAppointmentLength,
+  presentOrderCharges,
+  type OrderServiceSavePatch,
+} from "@shared/orderRequestServices";
+import { OrderServicesFields } from "@/components/OrderServicesFields";
 import { linkOrderToListing, resolvePortalClientId } from "@/lib/listingClient";
 import { deliverInvoiceEmail } from "@/lib/deliverInvoice";
 import { assignBookingPhotographer } from "@/lib/assignBookingPhotographer";
@@ -159,6 +166,7 @@ export default function AdminOrderRequest() {
     basics: Array.isArray(order?.selectedBasics) ? order.selectedBasics.filter((item: unknown) => typeof item === "string").join(",") : "",
     durationMinutes: Number.isInteger(scheduleDuration) ? scheduleDuration : null,
   });
+  const servicePatchRef = React.useRef<OrderServiceSavePatch | null>(null);
   const [projectTypeChoice, setProjectTypeChoice] = React.useState<"real_estate" | "business">("real_estate");
   const projectTypeTouched = React.useRef(false);
   const editingRef = React.useRef(false);
@@ -212,6 +220,35 @@ export default function AdminOrderRequest() {
     return () => { cancel = true; };
   }, [order?.id, order?.invoiceId, order?.listingId, order?.convertedToOrderId, order?.orderId]);
 
+  const applyServicePatch = React.useCallback((patch: OrderServiceSavePatch) => {
+    servicePatchRef.current = patch;
+    setForm((prev: any) => {
+      const pricing = prev?.pricing && typeof prev.pricing === "object" ? prev.pricing : {};
+      const next = {
+        ...prev,
+        lineItems: patch.lineItems,
+        subtotal: patch.subtotal,
+        processing: patch.processing,
+        total: patch.total,
+        pricing: {
+          ...pricing,
+          subtotal: patch.subtotal,
+          tax: patch.pricing.tax,
+          processing: patch.processing,
+          total: patch.total,
+        },
+        catalogPackageIds: patch.catalogPackageIds,
+        catalogVariantIds: patch.catalogVariantIds,
+        selectedService: patch.selectedService,
+        selectedBasics: patch.selectedBasics,
+        selectedAddOns: patch.selectedAddOns,
+      };
+      if (patch.appointmentDuration != null) next.appointmentDuration = patch.appointmentDuration;
+      if (patch.promoDiscount != null) next.promoDiscount = patch.promoDiscount;
+      return next;
+    });
+  }, []);
+
   React.useEffect(() => {
     getDocs(collection(db, "staff")).then(snap => {
       setStaff(snap.docs.map(d => {
@@ -226,9 +263,34 @@ export default function AdminOrderRequest() {
   const handleSave = async () => {
     if (!id) return;
     setSaving(true);
+    const patch = servicePatchRef.current;
+    const updates: any = { ...form, updatedAt: serverTimestamp() };
+    if (patch) {
+      updates.lineItems = patch.lineItems;
+      updates.subtotal = patch.subtotal;
+      updates.processing = patch.processing;
+      updates.total = patch.total;
+      updates.catalogPackageIds = patch.catalogPackageIds;
+      updates.catalogVariantIds = patch.catalogVariantIds;
+      updates.selectedService = patch.selectedService;
+      updates.selectedBasics = patch.selectedBasics;
+      updates.selectedAddOns = patch.selectedAddOns;
+      if (patch.appointmentDuration != null) updates.appointmentDuration = patch.appointmentDuration;
+      if (patch.promoDiscount != null) updates.promoDiscount = patch.promoDiscount;
+      if ("promoCode" in patch) updates.promoCode = patch.promoCode ?? null;
+      if (typeof patch.fees === "number") updates.fees = patch.fees;
+      if (typeof patch.travel === "number") updates.travel = patch.travel;
+      updates.tax = patch.tax;
+      updates.pricing = {
+        ...(form.pricing && typeof form.pricing === "object" ? form.pricing : {}),
+        subtotal: patch.subtotal,
+        tax: patch.tax,
+        processing: patch.processing,
+        total: patch.total,
+      };
+    }
+    delete updates.id;
     try {
-      const updates: any = { ...form, updatedAt: serverTimestamp() };
-      delete updates.id;
       await updateDoc(doc(db, "orderRequests", id), updates);
       setEditing(false);
     } catch (err) {
@@ -248,7 +310,7 @@ export default function AdminOrderRequest() {
         });
       }
       if (invoiceId) {
-        const synced = await syncOrderBillingToInvoice(invoiceId, form);
+        const synced = await syncOrderBillingToInvoice(invoiceId, updates);
         toast.success(synced ? "Order updated. Invoice updated." : "Order updated.");
       } else {
         toast.success("Order updated.");
@@ -503,6 +565,10 @@ export default function AdminOrderRequest() {
   const orderTotal = charges.total;
   const promoDiscount = Number(order.promoDiscount) || 0;
   const extraPromo = separatePromoDiscount(lineItems, promoDiscount);
+  const presented = presentOrderCharges(editing ? form : order);
+  const shownServices = presented.services;
+  const shownProcessing = presented.processing;
+  const shownTotal = editing && typeof form.total === "number" ? Number(form.total) || 0 : presented.total;
   const clientName = order.clientName || `${order.firstName || ""} ${order.lastName || ""}`.trim() || "—";
   const f = (key: string) => form[key] ?? order[key] ?? "";
   const setF = (key: string) => (val: string) => setForm((prev: any) => ({ ...prev, [key]: val }));
@@ -601,25 +667,19 @@ export default function AdminOrderRequest() {
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
             <h3 className={`${labelCls} mb-4`}>Services</h3>
             {editing ? (
-              <div>
-                {(form.lineItems || []).map((li, i) => (
-                  <div key={i} className="flex gap-2 mb-2 items-center">
-                    <input value={li.name || ""} onChange={e => { var items = [...(form.lineItems || [])]; items[i] = {...items[i], name: e.target.value}; setForm(function(f){ return {...f, lineItems: items}; }); }} placeholder="Service name" className="flex-1 bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-sm font-bold text-black focus:outline-none" />
-                    <input type="number" value={li.price || ""} onChange={e => { var items = [...(form.lineItems || [])]; items[i] = {...items[i], price: Number(e.target.value)}; setForm(function(f){ return {...f, lineItems: items, total: items.reduce(function(s,x){return s+(Number(x.price)||0)},0)}; }); }} placeholder="Price" className="w-28 bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-sm font-bold text-black focus:outline-none" />
-                    <button onClick={() => { var items = (form.lineItems || []).filter(function(_,idx){return idx!==i}); setForm(function(f){ return {...f, lineItems: items, total: items.reduce(function(s,x){return s+(Number(x.price)||0)},0)}; }); }} className="text-red-400 hover:text-red-300 text-xs font-bold px-2">X</button>
-                  </div>
-                ))}
-                <button onClick={() => setForm(function(f){ return {...f, lineItems: [...(f.lineItems||[]), {name:"",price:0}]}; })} className="text-[#0d9488] text-xs font-bold mt-2">+ Add Service</button>
-                <div className="border-t border-white/20 pt-3 mt-3 flex items-baseline justify-between gap-3">
-                  <span className="min-w-0 text-lg font-black text-white">Total</span>
-                  <MoneyAmount className="text-lg font-black text-[#0d9488]">{fmtCurrency((form.lineItems||[]).reduce(function(s,x){return s+(Number(x.price)||0)},0))}</MoneyAmount>
-                </div>
-              </div>
-            ) : lineItems.length > 0 ? (
+              <OrderServicesFields
+                record={order}
+                resetKey={`${order.id}:${editing}`}
+                onChange={applyServicePatch}
+              />
+            ) : shownServices.length > 0 || shownProcessing > 0 ? (
               <div className="mt-1 bg-gray-50 border border-gray-100 rounded-2xl overflow-hidden">
-                {lineItems.map((li: any, i: number) => (
+                {shownServices.map((li, i: number) => (
                   <div key={i} className={`flex items-baseline justify-between gap-3 px-4 py-3 ${i > 0 ? "border-t border-gray-200/50" : ""}`}>
-                    <span className="min-w-0 text-sm font-bold text-gray-900">{li.name || safe(li)}</span>
+                    <span className="min-w-0 text-sm font-bold text-gray-900">
+                      {li.name || safe(li)}
+                      {li.durationMinutes ? <span className="ml-2 text-[11px] font-bold text-gray-400">{formatAppointmentLength(li.durationMinutes)}</span> : null}
+                    </span>
                     {li.price != null && <MoneyAmount className="text-sm font-black text-[#0d9488]">{fmtCurrency(li.price)}</MoneyAmount>}
                   </div>
                 ))}
@@ -635,9 +695,21 @@ export default function AdminOrderRequest() {
                     <MoneyAmount className="text-sm font-bold text-green-600">-{fmtCurrency(extraPromo)}</MoneyAmount>
                   </div>
                 )}
+                {presented.fees > 0 && (
+                  <div className="flex items-baseline justify-between gap-3 px-4 py-3 border-t border-gray-200/50">
+                    <span className="min-w-0 text-sm font-bold text-gray-500">Fees</span>
+                    <MoneyAmount className="text-sm font-bold text-black">{fmtCurrency(presented.fees)}</MoneyAmount>
+                  </div>
+                )}
+                {shownProcessing > 0 && (
+                  <div data-testid="order-processing-line" className="flex items-baseline justify-between gap-3 px-4 py-3 border-t border-gray-200/50">
+                    <span className="min-w-0 text-sm font-bold text-gray-500">{BOOKING_PROCESSING_LABEL}</span>
+                    <MoneyAmount className="text-sm font-bold text-black">{fmtCurrency(shownProcessing)}</MoneyAmount>
+                  </div>
+                )}
                 <div className="bg-white border-t border-gray-200 px-4 py-4 flex items-baseline justify-between gap-3">
                   <span className="min-w-0 text-base font-black uppercase tracking-tight">Total Amount</span>
-                  <MoneyAmount className="text-xl font-black text-black">{fmtCurrency(orderTotal)}</MoneyAmount>
+                  <MoneyAmount className="text-xl font-black text-black">{fmtCurrency(shownTotal)}</MoneyAmount>
                 </div>
               </div>
             ) : (
@@ -657,7 +729,7 @@ export default function AdminOrderRequest() {
               <Button onClick={handleSave} disabled={saving} className="bg-[#0d9488] hover:bg-[#0f766e] text-white rounded-xl text-xs font-bold">
                 <Save className="w-3.5 h-3.5 mr-1.5" />{saving ? "Saving..." : "Save Changes"}
               </Button>
-              <Button onClick={() => { setEditing(false); setForm(order); }} variant="outline" className="rounded-xl text-xs font-bold">Cancel Edit</Button>
+              <Button onClick={() => { servicePatchRef.current = null; setEditing(false); setForm(order); }} variant="outline" className="rounded-xl text-xs font-bold">Cancel Edit</Button>
             </div>
           )}
         </div>
@@ -668,9 +740,9 @@ export default function AdminOrderRequest() {
           {/* ── Order Summary / Billing ── */}
           <div className="bg-black rounded-[2rem] p-6 text-white">
             <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-4">Order Summary</h3>
-            {lineItems.length > 0 && (
+            {shownServices.length > 0 && (
               <div className="space-y-2 mb-4">
-                {lineItems.map((li: any, i: number) => (
+                {shownServices.map((li, i: number) => (
                   <div key={i} className="flex items-baseline justify-between gap-3 text-sm">
                     <span className="min-w-0 text-gray-300 font-medium">{li.name || safe(li)}</span>
                     {li.price != null && <MoneyAmount className="font-bold">{fmtCurrency(li.price)}</MoneyAmount>}
@@ -690,10 +762,16 @@ export default function AdminOrderRequest() {
                 <MoneyAmount className="text-green-600 font-bold">-{fmtCurrency(extraPromo)}</MoneyAmount>
               </div>
             )}
+            {shownProcessing > 0 && (
+              <div data-testid="order-summary-processing" className="flex items-baseline justify-between gap-3 text-sm mb-2">
+                <span className="min-w-0 text-gray-400">{BOOKING_PROCESSING_LABEL}</span>
+                <MoneyAmount className="font-bold">{fmtCurrency(shownProcessing)}</MoneyAmount>
+              </div>
+            )}
             <div className="border-t border-gray-100 pt-3 mt-2">
               <div className="flex items-baseline justify-between gap-3 text-lg">
                 <span className="min-w-0 font-black text-white">Total</span>
-                <MoneyAmount className="font-black text-[#0d9488]">{fmtCurrency(orderTotal)}</MoneyAmount>
+                <MoneyAmount className="font-black text-[#0d9488]">{fmtCurrency(shownTotal)}</MoneyAmount>
               </div>
             </div>
             <div className="mt-4 pt-4 border-t border-gray-100 space-y-2 text-xs">

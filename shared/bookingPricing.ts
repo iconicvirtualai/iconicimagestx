@@ -40,6 +40,14 @@ export interface BookingLineItem {
   category?: string;
   bookingKind?: string;
   tier?: string;
+  /** Parent package id when the line was chosen from the catalog. */
+  catalogId?: string;
+  /** Priced version of that package, when the line is a variant. */
+  variantId?: string;
+  /** Appointment length copied from the catalog choice. */
+  durationMinutes?: number;
+  /** Staff typed this line. It is not a catalog id. */
+  custom?: boolean;
 }
 
 function chargeCatalog(input: BookingPriceInput): StaffCatalogPackage[] {
@@ -258,6 +266,13 @@ export function normalizeBookingLineItems(items: unknown): BookingLineItem[] {
     if (bookingKind) line.bookingKind = bookingKind;
     const tier = optionalLineText(item.tier);
     if (tier) line.tier = tier;
+    const catalogId = optionalLineText(item.catalogId);
+    if (catalogId) line.catalogId = catalogId;
+    const variantId = optionalLineText(item.variantId);
+    if (variantId) line.variantId = variantId;
+    const duration = Number(item.durationMinutes);
+    if (Number.isFinite(duration) && duration > 0) line.durationMinutes = Math.round(duration);
+    if (item.custom === true) line.custom = true;
     return line;
   });
 }
@@ -362,6 +377,21 @@ function insertServiceLine(items: BookingLineItem[], line: BookingLineItem): Boo
   return [...items.slice(0, promoAt), line, ...items.slice(promoAt)];
 }
 
+function previewServiceSubtotal(body: Record<string, unknown>, list: StaffCatalogPackage[]): number {
+  const items = buildSubmittedLineItems({
+    selectedService: optionalLineText(body.selectedService),
+    selectedBasics: textList(body.selectedBasics),
+    selectedAddOns: textList(body.selectedAddOns),
+    premiumUpgrade: body.premiumUpgrade === true,
+    virtualStagingCredits: Number(body.virtualStagingCredits) || 0,
+    specializedPhotography: optionalLineText(body.specializedPhotography),
+    catalog: list,
+  });
+  return roundMoney(items
+    .filter((item) => !String(item.id || "").startsWith("promo-") && !item.name.startsWith("Promo Code:"))
+    .reduce((sum, item) => sum + item.price, 0));
+}
+
 /**
  * Rebuild a public booking from the catalog.
  * Client line prices are ignored when a catalog id matches. Selection ids, and
@@ -372,6 +402,7 @@ function insertServiceLine(items: BookingLineItem[], line: BookingLineItem): Boo
 export function resolveSubmittedBooking(
   body: Record<string, unknown>,
   catalog?: StaffCatalogPackage[],
+  options?: { promos?: ReadonlyArray<{ code: string; discount: number; mode?: "flat" | "percent"; active?: boolean }> },
 ): ResolvedBookingSubmission {
   const list = catalog ?? packagesForStaffEditor([]);
   const posted = normalizeBookingLineItems(body.lineItems);
@@ -401,7 +432,10 @@ export function resolveSubmittedBooking(
     else specialized = "";
   }
 
-  const promo = promoDiscountFor(optionalLineText(body.promoCode));
+  const postedPromo = optionalLineText(body.promoCode);
+  const promo = options?.promos
+    ? promoDiscountFor(postedPromo, options.promos, previewServiceSubtotal(body, list))
+    : promoDiscountFor(postedPromo);
   let lineItems = buildSubmittedLineItems({
     selectedService,
     selectedBasics,

@@ -1,3 +1,4 @@
+import type { PricingRates } from "./pricingSettings.ts";
 import { assessTravel, travelInvoiceLine, type TravelAssessment } from "./travelZones.ts";
 
 /**
@@ -157,8 +158,8 @@ export function formatSeniorFacilityRate(
 }
 
 /** Whole dollars when the rate and size land on a cent. */
-export function seniorFacilityPrice(sqft: number): number {
-  const centsPerSqft = Math.round(SENIOR_FACILITY_RATE_PER_SQFT * 100);
+export function seniorFacilityPrice(sqft: number, rate = SENIOR_FACILITY_RATE_PER_SQFT): number {
+  const centsPerSqft = Math.round(rate * 100);
   return (sqft * centsPerSqft) / 100;
 }
 
@@ -366,9 +367,12 @@ function dollars(amountCents: number): number {
   return amountCents / 100;
 }
 
-export function seniorRoomUnitPrice(count: number): number | null {
+export function seniorRoomUnitPrice(
+  count: number,
+  bands: ReadonlyArray<{ minCount: number; maxCount: number; each: number }> = SENIOR_ROOM_RATES,
+): number | null {
   if (!Number.isInteger(count) || count < 1) return null;
-  const tier = SENIOR_ROOM_RATES.find(
+  const tier = bands.find(
     (band) => count >= band.minCount && count <= band.maxCount,
   );
   return tier ? tier.each : null;
@@ -379,15 +383,21 @@ export function quoteSeniorLivingOrder(input: {
   roomCount: number;
   facilitySqft: number;
   address: string;
+  rates?: PricingRates;
 }): { ok: true; quote: SeniorLivingQuote } | { ok: false; error: string } {
+  const rates = input.rates;
+  const tourPrice = rates?.seniorTourPrice ?? SENIOR_TOUR_PRICE;
+  const roomBands = rates?.seniorRoomRates ?? SENIOR_ROOM_RATES;
+  const roomCap = roomBands.reduce((max, band) => Math.max(max, band.maxCount), 0) || SENIOR_ROOM_RATES[SENIOR_ROOM_RATES.length - 1].maxCount;
+  const facilityRate = rates?.seniorFacilityRatePerSqft ?? SENIOR_FACILITY_RATE_PER_SQFT;
   const lines: SeniorLivingLine[] = [];
   if (input.tour) {
     lines.push({
       id: "tour-3d",
       name: SENIOR_LIVING_SERVICE_LABELS["tour-3d"],
       qty: 1,
-      unitPrice: SENIOR_TOUR_PRICE,
-      price: SENIOR_TOUR_PRICE,
+      unitPrice: tourPrice,
+      price: tourPrice,
     });
   }
   const roomCount = input.roomCount;
@@ -395,10 +405,10 @@ export function quoteSeniorLivingOrder(input: {
     if (!Number.isInteger(roomCount) || roomCount < 0) {
       return { ok: false, error: "Enter a room count from 0 to 20." };
     }
-    if (roomCount > SENIOR_ROOM_RATES[SENIOR_ROOM_RATES.length - 1].maxCount) {
+    if (roomCount > roomCap) {
       return { ok: false, error: "Room count cannot be more than 20." };
     }
-    const each = seniorRoomUnitPrice(roomCount);
+    const each = seniorRoomUnitPrice(roomCount, roomBands);
     if (each == null) {
       return { ok: false, error: "Enter a room count from 0 to 20." };
     }
@@ -418,7 +428,7 @@ export function quoteSeniorLivingOrder(input: {
     if (facilitySqft > SENIOR_FACILITY_SQFT_CAP) {
       return { ok: false, error: "Facility size cannot be more than 20,000 sq ft." };
     }
-    const price = seniorFacilityPrice(facilitySqft);
+    const price = seniorFacilityPrice(facilitySqft, facilityRate);
     lines.push({
       id: "facility",
       name: SENIOR_LIVING_SERVICE_LABELS.facility,
@@ -434,7 +444,7 @@ export function quoteSeniorLivingOrder(input: {
   const serviceSubtotal = dollars(
     lines.reduce((sum, line) => sum + cents(line.price), 0),
   );
-  const travel = assessTravel(input.address);
+  const travel = assessTravel(input.address, rates?.travelZones);
   const travelItem = travelInvoiceLine(travel);
   const travelLine: SeniorLivingLine = {
     id: travelItem.id,
@@ -444,10 +454,12 @@ export function quoteSeniorLivingOrder(input: {
     price: travelItem.price,
   };
   const priced = cents(serviceSubtotal) + cents(travelLine.price);
-  const processing = dollars(Math.round(priced * SENIOR_LIVING_PROCESSING_RATE));
+  const processingRate = rates ? rates.processingPercent / 100 : SENIOR_LIVING_PROCESSING_RATE;
+  const processing = rates && !rates.processingActive ? 0 : dollars(Math.round(priced * processingRate));
   const total = dollars(priced + cents(processing));
+  const depositPercent = rates?.seniorDepositPercent ?? SENIOR_LIVING_DEPOSIT_PERCENT;
   const depositAmount = dollars(
-    Math.round(cents(total) * (SENIOR_LIVING_DEPOSIT_PERCENT / 100)),
+    Math.round(cents(total) * (depositPercent / 100)),
   );
   const balanceDue = dollars(cents(total) - cents(depositAmount));
   return {
@@ -469,6 +481,7 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export function parseSeniorLivingOrder(
   body: unknown,
+  rates?: PricingRates,
 ):
   | { ok: true; value: SeniorLivingOrderInput; quote: SeniorLivingQuote }
   | { ok: false; honeypot: true }
@@ -487,6 +500,7 @@ export function parseSeniorLivingOrder(
     roomCount,
     facilitySqft,
     address: text(raw.address),
+    rates,
   });
   if (quoted.ok === false) return { ok: false, honeypot: false, error: quoted.error };
   if (quoted.quote.travel.travelQuoted) {

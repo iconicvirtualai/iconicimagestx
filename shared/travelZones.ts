@@ -116,14 +116,14 @@ export function pointMilesFromOrigin(miles: number, bearingDegrees = 0): { lat: 
  * uses TX_ZIP_CENTROIDS. Anything else is "Travel quoted".
  * Client fee fields on the same object are ignored.
  */
-export function assessTravel(value: unknown): TravelAssessment {
+export function assessTravel(value: unknown, zones: readonly TravelZone[] = TRAVEL_ZONES): TravelAssessment {
   const pin = pinFrom(value);
-  if (pin) return quoteFromMiles(haversineMiles(TRAVEL_ORIGIN, pin));
+  if (pin) return quoteFromMiles(haversineMiles(TRAVEL_ORIGIN, pin), zones);
 
   const zip = zipFrom(value);
   if (zip) {
     const centroid = TX_ZIP_CENTROIDS[zip];
-    if (centroid) return quoteFromMiles(haversineMiles(TRAVEL_ORIGIN, centroid));
+    if (centroid) return quoteFromMiles(haversineMiles(TRAVEL_ORIGIN, centroid), zones);
   }
 
   if (value && typeof value === "object" && !Array.isArray(value)) {
@@ -210,9 +210,10 @@ export function applyServerTravel(
   lineItems: BookingLineItem[] | unknown,
   address: unknown,
   clientTravelFeeCents?: unknown,
+  zones: readonly TravelZone[] = TRAVEL_ZONES,
 ): AppliedTravel {
   void clientTravelFeeCents;
-  const travel = assessTravel(address);
+  const travel = assessTravel(address, zones);
   const kept = normalizeBookingLineItems(lineItems).filter((item) => !isTravelFeeLine(item));
   const next = [...kept, travelInvoiceLine(travel)];
   return {
@@ -250,9 +251,18 @@ export function travelTextForRecord(
   return travelSummaryText(assessTravel(address), options);
 }
 
-function quoteFromMiles(miles: number): TravelAssessment {
+function quoteFromMiles(miles: number, zones: readonly TravelZone[] = TRAVEL_ZONES): TravelAssessment {
   const travelMiles = roundMiles(miles);
-  for (const zone of TRAVEL_ZONES) {
+  const bands = [...zones].sort((a, b) => a.outerMiles - b.outerMiles);
+  if (bands.length === 0) {
+    return {
+      travelZone: null,
+      travelMiles,
+      travelFeeCents: null,
+      travelQuoted: true,
+    };
+  }
+  for (const zone of bands) {
     if (miles <= zone.outerMiles + BOUNDARY_EPSILON_MILES) {
       return {
         travelZone: zone.zone,

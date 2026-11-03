@@ -17,6 +17,8 @@ import OperationsStatsGrid from "@/components/OperationsStatsGrid";
 import StaffActionQueue from "@/components/StaffActionQueue";
 import { recordAddressText } from "@shared/addressText";
 import { filterAssignableStaff, qaStaffAssignmentError, recordAllowsQaStaff } from "@shared/qaStaff";
+import { OrderServicesFields } from "@/components/OrderServicesFields";
+import { orderBillingFromServicePatch, type OrderServiceSavePatch } from "@shared/orderRequestServices";
 import { sumListingRevenue } from "@shared/revenueCount";
 import { choosePortalClient, listingAppointmentDate, scheduleTimeInputValue } from "@shared/listingWrite";
 import { StaffSuggestedTimes } from "@/components/SuggestedAppointments";
@@ -238,6 +240,7 @@ export default function AdminListings() {
   const [reForm, setReForm] = React.useState({ ...BLANK_RE });
   const [bizForm, setBizForm] = React.useState({ ...BLANK_BIZ });
   const [saving, setSaving] = React.useState(false);
+  const servicePatchRef = React.useRef<OrderServiceSavePatch | null>(null);
 
   // Client lookup
   const [clients, setClients] = React.useState<Client[]>([]);
@@ -442,8 +445,8 @@ export default function AdminListings() {
     setSaving(true);
     try {
       const clientName = `${form.firstName} ${form.lastName}`.trim();
-      const selectedServices = services.filter(s => form.serviceIds.includes(s.id));
-      const serviceNames = selectedServices.map(s => s.name);
+      const billing = servicePatchRef.current ? orderBillingFromServicePatch(servicePatchRef.current) : null;
+      const serviceNames = billing?.services || [];
       const photographerNames = assignablePhotographers.filter(p => form.photographerIds.includes(p.id)).map(p => p.name);
 
       const clientEmail = form.email.toLowerCase().trim();
@@ -459,8 +462,17 @@ export default function AdminListings() {
         clientPhone: form.phone || null,
         apptDate,
         apptTime: form.apptTime || null,
-        serviceIds: form.serviceIds,
+        serviceIds: billing?.catalogPackageIds || [],
         services: serviceNames,
+        lineItems: billing?.lineItems || [],
+        total: billing?.total || 0,
+        pricing: billing?.pricing || null,
+        promoCode: billing?.promoCode || null,
+        promoDiscount: billing?.promoDiscount || 0,
+        processing: billing?.processing || 0,
+        tax: billing?.tax || 0,
+        fees: billing?.fees || 0,
+        travel: billing?.travel || 0,
         photographerIds: form.photographerIds,
         photographerNames,
         notes: form.notes || null,
@@ -1170,25 +1182,13 @@ export default function AdminListings() {
                 )}
               </div>
 
-              {/* Services multi-select */}
               <div>
                 <label className={labelCls}>Services</label>
-                {filteredServices.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {filteredServices.map(s => {
-                      const sel = form.serviceIds.includes(s.id);
-                      return (
-                        <button key={s.id} type="button" onClick={() => toggleService(s.id)}
-                          className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${sel ? "bg-[#0d9488] text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
-                        >
-                          {s.name}{s.price ? ` · $${s.price}` : ""}
-                        </button>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="text-xs text-gray-400">No services configured. Add services in Settings &rarr; Pricing.</p>
-                )}
+                <OrderServicesFields
+                  record={{ lineItems: [] }}
+                  resetKey={showModal ? "new-project" : "closed"}
+                  onChange={(next) => { servicePatchRef.current = next; }}
+                />
               </div>
 
               {/* Access Info (RE only) */}

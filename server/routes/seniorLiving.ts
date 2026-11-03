@@ -13,7 +13,6 @@ import { createPayToken } from "../../shared/invoicePay";
 import { nextSequentialInvoiceNumber } from "../../shared/orderProjectInvoice";
 import {
   SENIOR_LIVING_MANUAL_DEPOSIT_NOTE,
-  SENIOR_LIVING_DEPOSIT_PERCENT,
   SENIOR_LIVING_DEPOSIT_REQUIRED,
   SENIOR_LIVING_HOSTING_NOTE,
   SENIOR_LIVING_ORDER_SOURCE,
@@ -27,6 +26,7 @@ import {
   seniorLivingOfficeEnv,
   seniorLivingOfficeRecord,
 } from "../../shared/seniorLiving";
+import { loadPricingRates } from "../services/pricingAdjustments";
 import { clientIp } from "../lib/clientIp";
 import { createRateLimiter } from "../lib/rateLimit";
 import { sendEmail } from "../services/email";
@@ -84,7 +84,8 @@ router.post("/order", async (req, res) => {
     });
   }
 
-  const parsed = parseSeniorLivingOrder(req.body);
+  const rates = await loadPricingRates();
+  const parsed = parseSeniorLivingOrder(req.body, rates);
   if (parsed.ok === false) {
     if (parsed.honeypot === true) {
       return res.json({ success: true, message: "Request received." });
@@ -146,7 +147,7 @@ router.post("/order", async (req, res) => {
       travelFeeCents: quote.travel.travelFeeCents,
       travelQuoted: quote.travel.travelQuoted,
       depositRequired: SENIOR_LIVING_DEPOSIT_REQUIRED,
-      depositPercent: SENIOR_LIVING_DEPOSIT_PERCENT,
+      depositPercent: rates.seniorDepositPercent,
       depositAmount: quote.depositAmount,
       depositPaid: 0,
       balanceDue: quote.total,
@@ -158,7 +159,7 @@ router.post("/order", async (req, res) => {
       vibeNote: [
         depositCopy,
         `Deposit required: yes`,
-        `Deposit percent: ${SENIOR_LIVING_DEPOSIT_PERCENT}`,
+        `Deposit percent: ${rates.seniorDepositPercent}`,
         `Deposit due today: ${quote.depositAmount}`,
         `Balance due after the shoot: ${quote.balanceDue}`,
         `Processing: ${quote.processing}`,
@@ -201,7 +202,7 @@ router.post("/order", async (req, res) => {
       travelFeeCents: quote.travel.travelFeeCents,
       travelQuoted: quote.travel.travelQuoted,
       depositRequired: SENIOR_LIVING_DEPOSIT_REQUIRED,
-      depositPercent: SENIOR_LIVING_DEPOSIT_PERCENT,
+      depositPercent: rates.seniorDepositPercent,
       depositAmount: quote.depositAmount,
       depositPaid: 0,
       balanceDue: quote.total,
@@ -244,7 +245,7 @@ router.post("/order", async (req, res) => {
       amountPaid: 0,
       amountDue: quote.total,
       depositRequired: SENIOR_LIVING_DEPOSIT_REQUIRED,
-      depositPercent: SENIOR_LIVING_DEPOSIT_PERCENT,
+      depositPercent: rates.seniorDepositPercent,
       depositAmount: quote.depositAmount,
       depositPaid: 0,
       status: "draft",
@@ -293,7 +294,7 @@ router.post("/order", async (req, res) => {
       total: quote.total,
       processing: quote.processing,
       depositRequired: true,
-      depositPercent: SENIOR_LIVING_DEPOSIT_PERCENT,
+      depositPercent: rates.seniorDepositPercent,
       depositAmount: quote.depositAmount,
       balanceDue: quote.balanceDue,
       scheduledDate: value.scheduledDate,
@@ -309,7 +310,7 @@ router.post("/order", async (req, res) => {
         `Title: ${value.title}`,
         `Onsite contact: ${value.onsiteContact}`,
         `Deposit required: yes`,
-        `Deposit percent: ${SENIOR_LIVING_DEPOSIT_PERCENT}`,
+        `Deposit percent: ${rates.seniorDepositPercent}`,
         `Deposit due today: ${quote.depositAmount}`,
         `Balance due after the shoot: ${quote.balanceDue}`,
         `Tour hosting: ${hostingNote}`,
