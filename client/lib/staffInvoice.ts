@@ -17,6 +17,9 @@ export async function syncOrderBillingToInvoice(invoiceId: string, order: {
   pricing?: { tax?: unknown } | null;
   promoCode?: unknown;
   promoDiscount?: unknown;
+  processing?: unknown;
+  fees?: unknown;
+  travel?: unknown;
   clientName?: unknown;
   firstName?: unknown;
   lastName?: unknown;

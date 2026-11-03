@@ -18,7 +18,8 @@ import {
   type CatalogItem,
   type StaffCatalogPackage,
 } from "./bookingCatalog.ts";
-import { BOOKING_PROCESSING_LABEL } from "./invoiceProcessing.ts";
+import { BOOKING_PROCESSING_LABEL, processingFeeLabel } from "./invoiceProcessing.ts";
+import type { PricingRates } from "./pricingSettings.ts";
 import { RE75_LEAD_SOURCE } from "./realestate75.ts";
 import { applyServerTravel, travelCustomerLine, type TravelAssessment } from "./travelZones.ts";
 
@@ -369,19 +370,30 @@ function roundMoney(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
+export function apprenticeshipBookingFeeLine(fee = APPRENTICESHIP_BOOKING_FEE): string {
+  if (fee === APPRENTICESHIP_BOOKING_FEE) return APPRENTICESHIP_BOOKING_FEE_LINE;
+  const shown = Number.isInteger(fee) ? String(fee) : fee.toFixed(2);
+  return `Booking fee $${shown}, credited toward your package`;
+}
+
 export function quoteApprenticeship(input: {
   packageId: string;
   address?: unknown;
   applyProcessing?: boolean;
   catalog?: StaffCatalogPackage[];
+  rates?: PricingRates;
 }): { ok: true; quote: ApprenticeshipQuote } | { ok: false; error: string } {
   const catalog = input.catalog ?? packagesForStaffEditor([]);
   const pkg = findApprenticeshipPackage(input.packageId, catalog);
   if (!pkg) return { ok: false, error: "Choose an apprenticeship package." };
+  const rates = input.rates;
   const traveled = applyServerTravel(
     buildSubmittedLineItems({ selectedBasics: [pkg.id], catalog }),
     input.address,
+    undefined,
+    rates?.travelZones,
   );
+  const bookingFee = rates?.apprenticeshipBookingFee ?? APPRENTICESHIP_BOOKING_FEE;
   const draft = buildBookingInvoiceDraft({
     lineItems: traveled.lineItems,
     total: traveled.total,
@@ -389,7 +401,8 @@ export function quoteApprenticeship(input: {
     clientEmail: "quote@iconicimagestx.com",
     clientName: "Quote",
     travel: traveled.travel,
-    applyProcessing: input.applyProcessing !== false,
+    applyProcessing: input.applyProcessing !== false && (rates ? rates.processingActive : true),
+    processingPercent: rates?.processingPercent,
   });
   const travelLine = travelCustomerLine(traveled.travel);
   return {
@@ -400,14 +413,14 @@ export function quoteApprenticeship(input: {
       durationMinutes: pkg.durationMinutes,
       subtotal: draft.subtotal,
       processing: draft.processing ?? 0,
-      processingLabel: BOOKING_PROCESSING_LABEL,
+      processingLabel: rates ? processingFeeLabel(rates.processingPercent) : BOOKING_PROCESSING_LABEL,
       travel: traveled.travel,
       travelLabel: travelLine.label,
       travelAmount: travelLine.amount,
       total: draft.total,
-      bookingFee: APPRENTICESHIP_BOOKING_FEE,
-      bookingFeeLine: APPRENTICESHIP_BOOKING_FEE_LINE,
-      balanceDue: roundMoney(Math.max(0, draft.total - APPRENTICESHIP_BOOKING_FEE)),
+      bookingFee,
+      bookingFeeLine: apprenticeshipBookingFeeLine(bookingFee),
+      balanceDue: roundMoney(Math.max(0, draft.total - bookingFee)),
       balanceLine: APPRENTICESHIP_BALANCE_LINE,
       lineItems: draft.lineItems,
     },

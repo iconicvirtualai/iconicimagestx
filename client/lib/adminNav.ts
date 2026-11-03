@@ -56,6 +56,7 @@ export const navGroups: { label: string; items: AdminNavItem[] }[] = [
       { label: "Orders", href: "/admin/orders", icon: ShoppingBag, roles: COORD_UP },
       { label: "Holiday RSVPs", href: "/admin/holiday-rsvps", icon: CalendarDays, roles: COORD_UP },
       { label: "Booking catalog", href: "/admin/booking-catalog", icon: Package, roles: COORD_UP },
+      { label: "Prices", href: "/admin/pricing", icon: DollarSign, roles: COORD_UP },
       { label: "Schedule", href: "/admin/schedule", icon: CalendarDays, roles: COORD_UP },
       { label: "Projects", href: "/admin/listings", icon: Home, roles: COORD_UP },
       { label: "Clients", href: "/admin/customers", icon: Users, roles: COORD_UP },

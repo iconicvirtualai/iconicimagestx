@@ -28,6 +28,7 @@ import {
 } from "@shared/seniorLiving";
 import { TRAVEL_ZONES } from "@shared/travelZones";
 import { useSiteHref, useSiteText } from "@/content/siteContent";
+import { usePricingRates } from "@/lib/usePricingRates";
 
 /**
  * /book preselects a catalog package with ?service= or ?package=.
@@ -73,9 +74,11 @@ function Photo({
 }
 
 function TravelNote() {
-  const freeZone = TRAVEL_ZONES.find((zone) => zone.feeCents === 0);
-  const paid = TRAVEL_ZONES.filter((zone) => zone.feeCents > 0);
-  const last = TRAVEL_ZONES[TRAVEL_ZONES.length - 1];
+  const rates = usePricingRates();
+  const zones = rates.travelZones.length > 0 ? rates.travelZones : TRAVEL_ZONES;
+  const freeZone = zones.find((zone) => zone.feeCents === 0);
+  const paid = zones.filter((zone) => zone.feeCents > 0);
+  const last = zones[zones.length - 1];
   return (
     <p
       data-testid="travel-zones"
@@ -114,6 +117,10 @@ export default function SeniorLiving() {
   const ctaHref = useSiteHref("seniorLiving", "hero", "cta", "#schedule");
   const galleryTitle = useSiteText("seniorLiving", "gallery", "title", "A Woodlands-area senior living community");
   const tourTitle = useSiteText("seniorLiving", "tour", "title", "Sample tour");
+  const rates = usePricingRates();
+  const tourPrice = rates.seniorTourPrice;
+  const roomRates = rates.seniorRoomRates.length > 0 ? rates.seniorRoomRates : SENIOR_ROOM_RATES;
+  const facilityRate = rates.seniorFacilityRatePerSqft || SENIOR_FACILITY_RATE_PER_SQFT;
   const [depositCheckoutLive, setDepositCheckoutLive] = useState(false);
   const depositCopy = seniorLivingDepositCopy(depositCheckoutLive);
   const photos = publishedSeniorLivingPhotos();
@@ -376,7 +383,7 @@ export default function SeniorLiving() {
                 <h3 className="text-2xl font-semibold leading-tight">3D Tour</h3>
                 <p className="mt-4 text-4xl font-semibold leading-none">
                   <MoneyAmount className="min-w-0 text-left">
-                    {formatUsd(SENIOR_TOUR_PRICE)}
+                    {formatUsd(tourPrice || SENIOR_TOUR_PRICE)}
                   </MoneyAmount>
                 </p>
                 <p className={`mt-4 ${bodyText}`}>
@@ -391,7 +398,7 @@ export default function SeniorLiving() {
                   Rooms, spaces or units
                 </h3>
                 <ul className="mt-3 space-y-3">
-                  {SENIOR_ROOM_RATES.map((tier) => (
+                  {roomRates.map((tier) => (
                     <li key={tier.maxCount}>
                       <p className="text-3xl font-semibold leading-none">
                         <MoneyAmount className="min-w-0 text-left">
@@ -420,7 +427,7 @@ export default function SeniorLiving() {
                 <p className={`mt-4 ${bodyText}`} data-testid="facility-rate">
                   Whole-building facilities:{" "}
                   <MoneyAmount className="min-w-0 text-left">
-                    {formatSeniorFacilityRate(SENIOR_FACILITY_RATE_PER_SQFT)}
+                    {formatSeniorFacilityRate(facilityRate)}
                   </MoneyAmount>{" "}
                   per sq ft
                 </p>
@@ -428,7 +435,7 @@ export default function SeniorLiving() {
                   a {SENIOR_FACILITY_SQFT_CAP.toLocaleString("en-US")} sq ft
                   community ={" "}
                   <MoneyAmount className="min-w-0 text-left">
-                    {formatUsd(seniorFacilityPrice(SENIOR_FACILITY_SQFT_CAP))}
+                    {formatUsd(seniorFacilityPrice(SENIOR_FACILITY_SQFT_CAP, facilityRate))}
                   </MoneyAmount>
                 </p>
                 <div className="mt-4 space-y-2" data-testid="facility-hosting">

@@ -251,6 +251,15 @@ service cloud.firestore {
       allow create, update, delete: if isStaff();
     }
 
+    // Prices Cadi edits: tax, processing, travel zones, promo codes, and
+    // the headshot, apprenticeship, and senior living rates.
+    // Public read is what the booking page needs. Staff write.
+    // Publish this file in the Firebase console. Vercel does not deploy rules.
+    match /pricingAdjustments/{adjustmentId} {
+      allow read: if true;
+      allow create, update, delete: if isStaff();
+    }
+
     // Invoice presets (processing, fees, travel, tax, promotions).
     // Staff edit the list. Choosing one fills an invoice amount. It does not charge anyone.
     match /invoicePresets/{presetId} {
@@ -353,7 +362,7 @@ service cloud.firestore {
 
     match /promoCodes/{codeId} {
       allow read: if true; // booking form validates these
-      allow write: if isAdmin();
+      allow create, update, delete: if isStaff();
     }
 
     // ─── Iconic Studio edit queue ────────────────────────────────────────────

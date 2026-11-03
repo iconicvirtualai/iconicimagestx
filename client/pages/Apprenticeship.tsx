@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import Layout from "@/components/Layout";
 import { MoneyAmount } from "@/components/MoneyAmount";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePricingRates } from "@/lib/usePricingRates";
 import {
   APPRENTICESHIP_BALANCE_LINE,
   APPRENTICESHIP_BOOKING_FEE_LINE,
@@ -64,6 +65,7 @@ export default function Apprenticeship() {
   const [savedOrder, setSavedOrder] = useState("");
   const [setupNote, setSetupNote] = useState<string | null>(null);
 
+  const rates = usePricingRates();
   const selected = packages.find((item) => item.id === packageId) || packages[0];
   const quote = useMemo(() => {
     if (!selected) return null;
@@ -71,9 +73,10 @@ export default function Apprenticeship() {
       packageId: selected.id,
       address,
       applyProcessing: processingOn,
+      rates,
     });
     return result.ok ? result.quote : null;
-  }, [selected, address, processingOn]);
+  }, [selected, address, processingOn, rates]);
 
   const days = useMemo(() => {
     const groups = new Map<string, ApprenticeshipSlot[]>();

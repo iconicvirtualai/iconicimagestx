@@ -73,6 +73,7 @@ import AdminOrderDetail from "./pages/AdminOrderDetail";
 import AdminOrderRequest from "./pages/AdminOrderRequest";
 import AdminInvoiceEditor from "./pages/AdminInvoiceEditor";
 import AdminBookingCatalog from "./pages/AdminBookingCatalog";
+import AdminPricing from "./pages/AdminPricing";
 import AdminInvoicePresets from "./pages/AdminInvoicePresets";
 import AdminListings from "./pages/AdminListings";
 import AdminMessages from "./pages/AdminMessages";
@@ -240,6 +241,7 @@ const App = () => (
             <Route path="/admin/order-request/:id" element={<ProtectedRoute requiredRole="coordinator"><AdminOrderRequest /></ProtectedRoute>} />
             <Route path="/admin/invoice/:invoiceId" element={<ProtectedRoute requiredRole="coordinator"><AdminInvoiceEditor /></ProtectedRoute>} />
             <Route path="/admin/booking-catalog" element={<ProtectedRoute requiredRole="coordinator"><AdminBookingCatalog /></ProtectedRoute>} />
+            <Route path="/admin/pricing" element={<ProtectedRoute requiredRole="coordinator"><AdminPricing /></ProtectedRoute>} />
             <Route path="/admin/invoice-presets" element={<ProtectedRoute requiredRole="coordinator"><AdminInvoicePresets /></ProtectedRoute>} />
             <Route path="/admin/messages" element={<ProtectedRoute requiredRole="coordinator"><AdminMessages /></ProtectedRoute>} />
             <Route path="/admin/communications" element={<ProtectedRoute requiredRole="coordinator"><AdminMessages /></ProtectedRoute>} />

@@ -448,6 +448,9 @@ export function orderServiceInvoicePatch(
     pricing?: { tax?: unknown } | null;
     promoCode?: unknown;
     promoDiscount?: unknown;
+    processing?: unknown;
+    fees?: unknown;
+    travel?: unknown;
     clientName?: unknown;
     firstName?: unknown;
     lastName?: unknown;
@@ -476,12 +479,21 @@ export function orderServiceInvoicePatch(
 
   if (!Array.isArray(order.lineItems)) return patch;
 
+  const processingAmount = typeof order.processing === "number" && Number.isFinite(order.processing)
+    ? storedCharge(order.processing)
+    : storedCharge(existing.processing);
+  const feeAmount = typeof order.fees === "number" && Number.isFinite(order.fees)
+    ? storedCharge(order.fees)
+    : storedCharge(existing.fees);
+  const travelAmount = typeof order.travel === "number" && Number.isFinite(order.travel)
+    ? storedCharge(order.travel)
+    : storedCharge(existing.travel);
   const lineItems = withAdjustmentLines(
     normalizeBookingLineItems(order.lineItems).filter((item) => (item.name.trim() || item.price !== 0) && !adjustmentKind(item)),
     {
-      processing: storedCharge(existing.processing),
-      fees: storedCharge(existing.fees),
-      travel: storedCharge(existing.travel),
+      processing: processingAmount,
+      fees: feeAmount,
+      travel: travelAmount,
     },
   );
   const services = lineItems.filter((item) => !isPromoLine(item) && !adjustmentKind(item));
@@ -500,5 +512,10 @@ export function orderServiceInvoicePatch(
   patch.promoDiscount = split.promoDiscount;
   patch.total = total;
   patch.amountDue = cents(Math.max(0, total - amountPaid));
+  if (typeof order.processing === "number" && Number.isFinite(order.processing)) {
+    patch.processing = processingAmount;
+  }
+  if (typeof order.fees === "number" && Number.isFinite(order.fees)) patch.fees = feeAmount;
+  if (typeof order.travel === "number" && Number.isFinite(order.travel)) patch.travel = travelAmount;
   return patch;
 }

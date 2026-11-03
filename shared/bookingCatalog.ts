@@ -251,8 +251,23 @@ export const PROMO_DISCOUNTS = {
 
 export type PromoCode = keyof typeof PROMO_DISCOUNTS;
 
-export function promoDiscountFor(raw: string): { code: PromoCode; discount: number } | null {
+export function promoDiscountFor(
+  raw: string,
+  promos?: ReadonlyArray<{ code: string; discount: number; mode?: "flat" | "percent"; active?: boolean }>,
+  subtotal = 0,
+): { code: string; discount: number } | null {
   const code = raw.trim().toUpperCase();
+  if (!code) return null;
+  if (promos) {
+    const match = promos.find((item) => item.active !== false && item.code.trim().toUpperCase() === code);
+    if (!match || match.discount <= 0) return null;
+    const discount = match.mode === "percent"
+      ? Math.round(Math.max(0, subtotal) * match.discount) / 100
+      : match.discount;
+    const rounded = Math.round(discount * 100) / 100;
+    if (rounded <= 0) return null;
+    return { code: match.code.trim().toUpperCase(), discount: rounded };
+  }
   if (code === "ICONICAI") return { code, discount: PROMO_DISCOUNTS.ICONICAI };
   if (code === "NEWYEAR") return { code, discount: PROMO_DISCOUNTS.NEWYEAR };
   return null;
@@ -624,6 +639,15 @@ export const BOOKING_CATALOG_KIND_LABELS: Record<BookingCatalogKind, string> = {
   upgrade: "Upgrade",
 };
 
+/** A priced version of one package. The parent stays the catalog id. */
+export interface CatalogVariant {
+  id: string;
+  name: string;
+  price: number;
+  durationMinutes?: number;
+  description?: string;
+}
+
 /** Package row the staff invoice picker can select. Same fields as the seed. */
 export interface StaffCatalogPackage {
   id: string;
@@ -645,6 +669,10 @@ export interface StaffCatalogPackage {
   cardTitle?: string;
   kicker?: string;
   aside?: string;
+  /** Minutes on the package doc, when staff have set a length. */
+  durationMinutes?: number;
+  /** Optional priced versions. Absent on the seed list. */
+  variants?: CatalogVariant[];
 }
 
 const PACKAGE_CATEGORIES = new Set<string>(BOOKING_PACKAGE_CATEGORY_ORDER);
@@ -675,6 +703,29 @@ function catalogServiceCategory(value: unknown, fallback?: Service["category"]):
   return fallback;
 }
 
+function catalogVariants(value: unknown): CatalogVariant[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const variants: CatalogVariant[] = [];
+  for (const entry of value) {
+    if (!entry || typeof entry !== "object") continue;
+    const row = entry as Record<string, unknown>;
+    const id = catalogText(row.id);
+    const name = catalogText(row.name);
+    const price = finiteCatalogNumber(row.price);
+    if (!id || !name || price == null || price < 0) continue;
+    const duration = finiteCatalogNumber(row.durationMinutes);
+    const description = catalogText(row.description);
+    variants.push({
+      id,
+      name,
+      price,
+      ...(duration != null && duration > 0 ? { durationMinutes: Math.round(duration) } : {}),
+      ...(description ? { description } : {}),
+    });
+  }
+  return variants.length > 0 ? variants : undefined;
+}
+
 function withCatalogNotes(item: StaffCatalogPackage, doc: Record<string, unknown>, current?: StaffCatalogPackage): StaffCatalogPackage {
   const appointmentLimit = catalogText(doc.appointmentLimit) || current?.appointmentLimit;
   const overage = catalogText(doc.overage) || current?.overage;
@@ -684,6 +735,12 @@ function withCatalogNotes(item: StaffCatalogPackage, doc: Record<string, unknown
   const addonGroup = catalogText(doc.addonGroup) || current?.addonGroup;
   const serviceCategory = catalogServiceCategory(doc.serviceCategory, current?.serviceCategory);
   const rules = catalogStringList(doc.rules, current?.rules);
+  const durationMinutes = Object.prototype.hasOwnProperty.call(doc, "durationMinutes")
+    ? finiteCatalogNumber(doc.durationMinutes)
+    : current?.durationMinutes;
+  const variants = Object.prototype.hasOwnProperty.call(doc, "variants")
+    ? catalogVariants(doc.variants)
+    : current?.variants;
   return {
     ...item,
     ...(appointmentLimit ? { appointmentLimit } : {}),
@@ -694,6 +751,8 @@ function withCatalogNotes(item: StaffCatalogPackage, doc: Record<string, unknown
     ...(addonGroup ? { addonGroup } : {}),
     ...(serviceCategory ? { serviceCategory } : {}),
     ...(rules?.length ? { rules } : {}),
+    ...(durationMinutes != null && durationMinutes > 0 ? { durationMinutes: Math.round(durationMinutes) } : {}),
+    ...(variants?.length ? { variants } : {}),
   };
 }
 
@@ -718,6 +777,10 @@ export function packagesForStaffEditor(
   for (const doc of liveDocs) {
     const id = catalogText(doc.id || doc.bookingId);
     if (!id) continue;
+    if (doc.removed === true) {
+      byId.delete(id);
+      continue;
+    }
     const current = byId.get(id);
     const name = catalogText(doc.name) || current?.name || "";
     if (!name) continue;

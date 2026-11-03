@@ -8,6 +8,7 @@ import {
   startOfMonth,
 } from "date-fns";
 import { MoneyAmount } from "@/components/MoneyAmount";
+import { usePricingRates } from "@/lib/usePricingRates";
 import { BUSINESS_CONTACT } from "@shared/businessContact";
 import {
   formatUsd,
@@ -98,11 +99,13 @@ export function SeniorLivingOrder({
 
   const rooms = roomCount.trim() === "" ? 0 : Number(roomCount);
   const sqft = facilitySqft.trim() === "" ? 0 : Number(facilitySqft);
+  const rates = usePricingRates();
   const quoted = quoteSeniorLivingOrder({
     tour,
     roomCount: rooms,
     facilitySqft: sqft,
     address,
+    rates,
   });
 
   function payload() {

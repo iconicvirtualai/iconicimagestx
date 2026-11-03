@@ -236,25 +236,33 @@ export function shouldRecordHeadshotConversion(input: {
  * Due today is the $10 booking fee plus 2.8% on that $10.
  * The balance is whatever headshots remain, plus 2.8% on that balance.
  */
-export function quoteHeadshots(quantity: number, applyProcessing = true, maxQuantity = HEADSHOTS_MAX_QUANTITY): HeadshotQuote {
+export function quoteHeadshots(
+  quantity: number,
+  applyProcessing = true,
+  maxQuantity = HEADSHOTS_MAX_QUANTITY,
+  rates?: { unitPrice?: number; bookingFee?: number; processingPercent?: number },
+): HeadshotQuote {
   const qty = clampHeadshotQuantity(quantity, maxQuantity);
-  const subtotal = roundMoney(qty * HEADSHOTS_UNIT_PRICE);
-  const bookingFee = Math.min(HEADSHOTS_BOOKING_FEE, subtotal);
-  const dueTodayProcessing = applyProcessing ? processingFee(bookingFee) : 0;
+  const unitPrice = rates?.unitPrice ?? HEADSHOTS_UNIT_PRICE;
+  const subtotal = roundMoney(qty * unitPrice);
+  const bookingFee = Math.min(rates?.bookingFee ?? HEADSHOTS_BOOKING_FEE, subtotal);
+  const percent = rates?.processingPercent;
+  const dueTodayProcessing = applyProcessing ? processingFee(bookingFee, percent) : 0;
   const dueToday = roundMoney(bookingFee + dueTodayProcessing);
   const balanceSubtotal = roundMoney(subtotal - bookingFee);
-  const balanceProcessing = applyProcessing && balanceSubtotal > 0 ? processingFee(balanceSubtotal) : 0;
+  const balanceProcessing = applyProcessing && balanceSubtotal > 0 ? processingFee(balanceSubtotal, percent) : 0;
   const balanceTotal = roundMoney(balanceSubtotal + balanceProcessing);
   const processing = roundMoney(dueTodayProcessing + balanceProcessing);
   const total = roundMoney(subtotal + processing);
+  const percentLabel = percent == null || Math.round(percent * 100) === 280 ? "2.8%" : `${Math.round(percent * 100) / 100}%`;
   const balanceLine = balanceSubtotal > 0
     ? applyProcessing
-      ? `Balance on delivery: ${money(balanceSubtotal)} + 2.8%`
+      ? `Balance on delivery: ${money(balanceSubtotal)} + ${percentLabel}`
       : `Balance on delivery: ${money(balanceSubtotal)}`
     : null;
   return {
     quantity: qty,
-    unitPrice: HEADSHOTS_UNIT_PRICE,
+    unitPrice,
     subtotal,
     processing,
     total,
@@ -266,18 +274,18 @@ export function quoteHeadshots(quantity: number, applyProcessing = true, maxQuan
     balanceTotal,
     balanceLine,
     dueTodayLine: `Due today: ${money(dueToday)}`,
-    priceLine: applyProcessing ? HEADSHOTS_PRICE_LINE : `${money(HEADSHOTS_UNIT_PRICE)} per headshot.`,
+    priceLine: applyProcessing ? HEADSHOTS_PRICE_LINE : `${money(unitPrice)} per headshot.`,
     slotsNeeded: headshotSlotsNeeded(qty),
   };
 }
 
-export function headshotLineItems(quantity: number, maxQuantity = HEADSHOTS_MAX_QUANTITY) {
+export function headshotLineItems(quantity: number, maxQuantity = HEADSHOTS_MAX_QUANTITY, unitPrice = HEADSHOTS_UNIT_PRICE) {
   const qty = clampHeadshotQuantity(quantity, maxQuantity);
-  const price = roundMoney(qty * HEADSHOTS_UNIT_PRICE);
+  const price = roundMoney(qty * unitPrice);
   return [{
     id: "tuesday-headshot",
     name: "Tuesday headshot",
-    unitPrice: HEADSHOTS_UNIT_PRICE,
+    unitPrice,
     qty,
     price,
   }];
