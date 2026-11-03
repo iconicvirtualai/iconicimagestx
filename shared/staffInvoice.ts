@@ -448,6 +448,7 @@ export function orderServiceInvoicePatch(
     pricing?: { tax?: unknown } | null;
     promoCode?: unknown;
     promoDiscount?: unknown;
+    processing?: unknown;
     clientName?: unknown;
     firstName?: unknown;
     lastName?: unknown;
@@ -476,10 +477,13 @@ export function orderServiceInvoicePatch(
 
   if (!Array.isArray(order.lineItems)) return patch;
 
+  const processingAmount = typeof order.processing === "number" && Number.isFinite(order.processing)
+    ? storedCharge(order.processing)
+    : storedCharge(existing.processing);
   const lineItems = withAdjustmentLines(
     normalizeBookingLineItems(order.lineItems).filter((item) => (item.name.trim() || item.price !== 0) && !adjustmentKind(item)),
     {
-      processing: storedCharge(existing.processing),
+      processing: processingAmount,
       fees: storedCharge(existing.fees),
       travel: storedCharge(existing.travel),
     },
@@ -500,5 +504,8 @@ export function orderServiceInvoicePatch(
   patch.promoDiscount = split.promoDiscount;
   patch.total = total;
   patch.amountDue = cents(Math.max(0, total - amountPaid));
+  if (typeof order.processing === "number" && Number.isFinite(order.processing)) {
+    patch.processing = processingAmount;
+  }
   return patch;
 }

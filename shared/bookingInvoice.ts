@@ -23,6 +23,11 @@ export interface BookingInvoiceDraftInput {
   orderRequestId?: string | null;
   promoCode?: string | null;
   promoDiscount?: unknown;
+  /**
+   * Fee already included in `total`. Copied onto the draft as its own line.
+   * Omit it to leave a stored invoice total untouched.
+   */
+  processing?: unknown;
   /** Server quote. When set, the draft line and total are rebuilt from it. */
   travel?: TravelAssessment | null;
   /**
@@ -99,13 +104,18 @@ export function buildBookingInvoiceDraft(input: BookingInvoiceDraftInput): Booki
     };
   }
 
+  const copiedProcessing = nonNegativeDraftMoney(input.processing);
+  const copiedLines = copiedProcessing > 0 && !lineItems.some((item) => adjustmentKind(item) === "processing")
+    ? [...lineItems, invoiceAdjustmentLine("processing", copiedProcessing)]
+    : lineItems;
+
   return {
     orderRequestId: input.orderRequestId || null,
     orderId: null,
     clientId: input.clientId || null,
     clientEmail: normalizeEmail(input.clientEmail),
     clientName: input.clientName,
-    lineItems,
+    lineItems: copiedLines,
     subtotal: input.travel ? total : (Number(input.pricing?.subtotal ?? total) || 0),
     tax,
     total,
@@ -115,8 +125,15 @@ export function buildBookingInvoiceDraft(input: BookingInvoiceDraftInput): Booki
     paymentProvider: "square",
     promoCode: input.promoCode || null,
     promoDiscount: Number(input.promoDiscount) || 0,
+    ...(copiedProcessing > 0 ? { processing: copiedProcessing, processingPolicy: "stored" as const } : {}),
     ...travelFields,
   };
+}
+
+function nonNegativeDraftMoney(value: unknown): number {
+  const amount = Number(value);
+  if (!Number.isFinite(amount) || amount <= 0) return 0;
+  return roundDraftMoney(amount);
 }
 
 function applyProcessingToDraftLines(
