@@ -1,4 +1,5 @@
 import AdminRevenue from "@/pages/AdminRevenue";
+import AdminTestDataCleanup from "@/pages/AdminTestDataCleanup";
 import AdminBilling from "@/pages/AdminBilling";
 import AdminClientBilling from "@/pages/AdminClientBilling";
 import AdminAicon from "@/pages/AdminAicon";
@@ -265,6 +266,7 @@ const App = () => (
             <Route path="/admin/current-pricing" element={<ProtectedRoute requiredRole="admin"><AdminCurrentPricing /></ProtectedRoute>} />
             
             <Route path="/admin/revenue" element={<ProtectedRoute requiredRole="admin"><AdminRevenue /></ProtectedRoute>} />
+            <Route path="/admin/test-data" element={<ProtectedRoute requiredRole="admin"><AdminTestDataCleanup /></ProtectedRoute>} />
             <Route path="/admin/billing" element={<ProtectedRoute requiredRole="admin"><AdminBilling /></ProtectedRoute>} />
             <Route path="/admin/client-billing" element={<ProtectedRoute requiredRole="admin"><AdminClientBilling /></ProtectedRoute>} />
             <Route path="/admin/aicon" element={<ProtectedRoute requiredRole="coordinator"><AdminAicon /></ProtectedRoute>} />

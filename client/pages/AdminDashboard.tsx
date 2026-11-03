@@ -32,6 +32,8 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
+import { adminRevenueAcceptance } from "@shared/revenueCount";
 import { resolvePortalClientId } from "@/lib/listingClient";
 import OperationsStatsGrid from "@/components/OperationsStatsGrid";
 import OperationsOverview from "@/components/OperationsOverview";
@@ -114,6 +116,7 @@ function useRecentlyVisited() {
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const recentPages = useRecentlyVisited();
 
   const [orderRequests, setOrderRequests] = React.useState<any[]>([]);
@@ -208,6 +211,7 @@ export default function AdminDashboard() {
         assignedPhotographerName: form.photographerName || null,
         status: "new",
         source: "admin",
+        ...adminRevenueAcceptance(user?.email || "admin"),
         createdAt: serverTimestamp(),
         submittedAt: serverTimestamp(),
         updatedAt: serverTimestamp(),

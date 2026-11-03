@@ -11,6 +11,7 @@
 import { Router } from "express";
 import admin from "firebase-admin";
 import { APPRENTICESHIP_AWAITING_DEPOSIT_STATUS } from "../../shared/apprenticeship";
+import { placedRevenueFields } from "../../shared/revenueCount";
 import { BUSINESS_CONTACT } from "../../shared/businessContact";
 import { buildBookingInvoiceDraft } from "../../shared/bookingInvoice";
 import {
@@ -250,6 +251,7 @@ router.post("/order", async (req, res) => {
       confirmationEmailStatus: "disabled",
       status: "new",
       source: HEADSHOTS_ORDER_SOURCE,
+      ...placedRevenueFields(),
       leadSource: HEADSHOTS_LEAD_SOURCE,
       ...(value.gclid ? { gclid: value.gclid } : {}),
       orderNumber,
@@ -288,6 +290,7 @@ router.post("/order", async (req, res) => {
       notes: note,
       status: APPRENTICESHIP_AWAITING_DEPOSIT_STATUS,
       source: HEADSHOTS_ORDER_SOURCE,
+      ...placedRevenueFields(),
       leadSource: HEADSHOTS_LEAD_SOURCE,
       orderNumber,
       calendarEventId: calendarEvent.eventId,
@@ -304,6 +307,7 @@ router.post("/order", async (req, res) => {
       orderId: orderRef.id,
       orderRequestId: requestRef.id,
       source: HEADSHOTS_ORDER_SOURCE,
+      ...placedRevenueFields(),
       clientName,
       clientEmail: value.email,
       clientPhone: value.phone,
