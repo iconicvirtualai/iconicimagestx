@@ -23,6 +23,7 @@ import messagingRouter from "./routes/messaging";
 import clientsRouter from "./routes/clients";
 import clientHubRouter from "./routes/clientHub";
 import staffRouter from "./routes/staff";
+import accountPasswordRouter from "./routes/accountPassword";
 import listingsRouter from "./routes/listings";
 import campaignsRouter from "./routes/campaigns";
 import marketingRouter from "./routes/marketing";
@@ -46,6 +47,7 @@ import { photographerCalendarRoster } from "./services/photographerRoster";
 import { clientNotifyLive } from "../shared/clientNotify";
 import { isPublicApiOrigin } from "./lib/publicCors";
 import { requireAdmin, requireStaff } from "./middleware/auth";
+import { blockUntilPasswordChanged } from "./middleware/mustChangePassword";
 import { handleListingPhotoUpload } from "./routes/listingPhotos";
 import { handleGetPublicPortalListing } from "./routes/portalListing";
 import presentationsRouter, { handlePresentationShell } from "./routes/presentations";
@@ -121,6 +123,7 @@ export function createServer() {
   // Standard middleware
   app.use(express.json({ limit: "10mb" }));
   app.use(express.urlencoded({ extended: true }));
+  app.use(blockUntilPasswordChanged);
 
   // Static public/sitemap.xml and robots.txt are the vercel.app copies and are
   // removed from the Vercel output. This route is what both hosts receive.
@@ -235,7 +238,8 @@ export function createServer() {
     }
   });
 
-  // Portal password-reset and other non-order client mail check this.
+  // Portal password-setup mail and other non-order client mail check this.
+  // Forgot password does not: Firebase sendPasswordResetEmail is ungated.
   // booking_received does not. live is false unless CLIENT_NOTIFY_LIVE is exactly "true"
   // and CLIENT_COMMS_ZONE is not RED.
   app.get("/api/client-notify", (_req, res) => {
@@ -261,6 +265,7 @@ export function createServer() {
   app.get("/api/listing-sites/:slug", handleGetListingSite);
   app.post("/api/listing-sites/:slug/inquiry", handleListingSiteInquiry);
   app.use("/api/staff", staffRouter);
+  app.use("/api/account", accountPasswordRouter);
   app.use("/api/site-content", siteContentRouter);
   app.use("/api/insights", insightsRouter);
   // Vercel does not chain rewrites. /present/:token is rewritten to this

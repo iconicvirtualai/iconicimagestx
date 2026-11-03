@@ -5,7 +5,6 @@ import {
   collection,
   onSnapshot,
   doc,
-  setDoc,
   updateDoc,
   deleteDoc,
 } from "firebase/firestore";
@@ -23,6 +22,8 @@ import { isQaStaff } from "@shared/qaStaff";
 import { INTENDED_OWNER_EMAIL } from "@shared/ownerAccess";
 import { normalizeSiteEditorFlags, type SiteEditorFlags } from "@shared/siteEditor";
 import { useAuth } from "@/contexts/AuthContext";
+import { PasswordField } from "@/components/PasswordField";
+import { passwordPolicyError } from "@shared/passwordAccount";
 
 type Role = "admin" | "coordinator" | "photographer" | "editor";
 
@@ -72,6 +73,8 @@ export default function AdminTeam() {
   const [showForm, setShowForm] = React.useState(false);
   const [editing, setEditing] = React.useState<StaffMember | null>(null);
   const [form, setForm] = React.useState(BLANK);
+  const [password, setPassword] = React.useState("");
+  const [replaceExisting, setReplaceExisting] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
 
   React.useEffect(() => {
@@ -82,22 +85,28 @@ export default function AdminTeam() {
     return () => unsub();
   }, []);
 
-  const openAdd = () => { setEditing(null); setForm(BLANK); setShowForm(true); };
+  const openAdd = () => { setEditing(null); setForm(BLANK); setPassword(""); setReplaceExisting(false); setShowForm(true); };
 
   const openEdit = (member: StaffMember) => {
     setEditing(member);
+    setPassword("");
+    setReplaceExisting(false);
     setForm({ email: member.email, firstName: member.firstName, lastName: member.lastName, role: member.role, isActive: member.isActive, siteEditor: normalizeSiteEditorFlags(member.siteEditor) });
     setShowForm(true);
   };
 
   const handleSave = async () => {
     if (!form.email || !form.firstName) { toast.error("Email and first name are required."); return; }
+    if (!user) { toast.error("Sign in again to save this login."); return; }
+    const passwordError = password ? passwordPolicyError(password) : null;
+    if (!editing && !password) { toast.error("Password must be at least 8 characters."); return; }
+    if (passwordError) { toast.error(passwordError); return; }
     setSaving(true);
     try {
+      const token = await user.getIdToken();
       if (editing) {
         await updateDoc(doc(db, "staff", editing.uid), { ...form });
-        if (user && !editing.uid.startsWith("manual_")) {
-          const token = await user.getIdToken();
+        if (!editing.uid.startsWith("manual_")) {
           const response = await fetch(`/api/staff/${editing.uid}`, {
             method: "PATCH",
             headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
@@ -105,13 +114,38 @@ export default function AdminTeam() {
           });
           if (!response.ok) toast.error("Site editor permissions were not saved.");
         }
-        toast.success("Team member updated.");
+        if (password) {
+          const response = await fetch(`/api/staff/${editing.uid}/password`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ password, replaceExisting }),
+          });
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            toast.error(data.error || "Could not set the password.");
+            return;
+          }
+          toast.success("Password updated. They must change it the next time they sign in.");
+        } else {
+          toast.success("Team member updated.");
+        }
       } else {
-        const uid = `manual_${Date.now()}`;
-        await setDoc(doc(db, "staff", uid), { ...form });
-        toast.success("Team member added. They'll need to sign in to activate their account.");
+        const response = await fetch("/api/staff", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ ...form, password, replaceExisting }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          toast.error(data.error || "Could not create the login.");
+          return;
+        }
+        toast.success(data.created === false
+          ? "That email already had a login. The password was updated and they must change it on first sign-in."
+          : "Login created. Share this password. They must change it the first time they sign in.");
       }
       setShowForm(false);
+      setPassword("");
     } catch {
       toast.error("Save failed. Please try again.");
     } finally {
@@ -196,6 +230,34 @@ export default function AdminTeam() {
                 {ROLE_OPTIONS.map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}
               </select>
             </div>
+          </div>
+
+          <div className="mb-6">
+            <PasswordField
+              id="staff-password"
+              label={editing ? "Set new password" : "Password"}
+              value={password}
+              onChange={setPassword}
+              autoComplete="new-password"
+              allowGenerate
+              hint={editing
+                ? "Leave blank to keep the current password. A new password must be changed on the next sign-in."
+                : "At least 8 characters. They sign in with this password, then choose their own."}
+            />
+            <label className="mt-3 flex items-start gap-2 text-sm font-semibold text-gray-700">
+              <input
+                type="checkbox"
+                className="mt-1 h-4 w-4 accent-[#0d9488]"
+                checked={replaceExisting}
+                onChange={(event) => setReplaceExisting(event.target.checked)}
+              />
+              <span>
+                Replace existing login
+                <span className="mt-1 block text-xs font-medium text-gray-400">
+                  Required to set a password on an email that already has a login. A client account is refused. An admin&apos;s role is not changed.
+                </span>
+              </span>
+            </label>
           </div>
 
           <SiteEditorToggles

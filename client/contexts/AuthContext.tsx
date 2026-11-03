@@ -16,12 +16,13 @@ import {
 import {
   signInWithEmailAndPassword,
   signOut,
-  sendPasswordResetEmail,
   onAuthStateChanged,
   type User,
 } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "../lib/firebase";
+import { requestPasswordReset } from "../lib/passwordReset";
+import { FORGOT_PASSWORD_NOTICE, hasMustChangePassword } from "@shared/passwordAccount";
 import type { StaffMember, Client } from "../lib/schema";
 import {
   INITIAL_AUTH_SESSION,
@@ -60,6 +61,8 @@ interface AuthContextValue {
   signIn: (email: string, password: string) => Promise<void>;
   signOutUser: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
+  mustChangePassword: boolean;
+  notePasswordChanged: () => void;
 
   // Client portal registration. Creates Firebase Auth + clients/{uid}.
   registerClient: (
@@ -259,10 +262,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Password reset
+  // Password reset. Firebase sends it. Client-notify does not gate this.
   const resetPassword = async (email: string) => {
     setError(null);
-    await sendPasswordResetEmail(auth, email);
+    const origin = typeof window === "undefined" ? "https://iconicimagestx.vercel.app" : window.location.origin;
+    const notice = await requestPasswordReset(email, origin);
+    if (notice !== FORGOT_PASSWORD_NOTICE) {
+      throw new Error(notice);
+    }
+  };
+
+  const notePasswordChanged = () => {
+    setStaffProfile((current) => (current ? { ...current, mustChangePassword: false } : current));
+    setClientProfile((current) => (current ? { ...current, mustChangePassword: false } : current));
   };
 
   const refreshProfile = async () => {
@@ -325,6 +337,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isCoordinator || staffProfile?.role === "photographer";
   const isStaff = userType === "staff";
   const isClient = userType === "client";
+  const mustChangePassword = hasMustChangePassword(staffProfile) || hasMustChangePassword(clientProfile);
 
   return (
     <AuthContext.Provider
@@ -338,6 +351,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signIn,
         signOutUser,
         resetPassword,
+        mustChangePassword,
+        notePasswordChanged,
         registerClient,
         refreshProfile,
         isAdmin,

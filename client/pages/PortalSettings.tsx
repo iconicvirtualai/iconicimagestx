@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, Navigate, useParams, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { CHANGE_PASSWORD_PATH } from "@shared/passwordAccount";
 import { clientPortalAction, staffHomePath } from "@shared/staffAccess";
 import {
   billingPrefill,
@@ -41,7 +42,7 @@ async function hubFetch<T>(path: string, userToken: () => Promise<string>, init?
 export default function PortalSettings() {
   const { section = "" } = useParams();
   const example = useExampleMode();
-  const { user, userType, staffProfile, clientProfile, loading, signOutUser } = useAuth();
+  const { user, userType, staffProfile, clientProfile, loading, mustChangePassword, signOutUser } = useAuth();
   const active = SECTIONS.has(section) ? section as PortalSettingsSection : null;
 
   if (!active) {
@@ -50,6 +51,7 @@ export default function PortalSettings() {
 
   if (!example) {
     if (loading) return <Pending />;
+    if (user && mustChangePassword) return <Navigate to={CHANGE_PASSWORD_PATH} replace />;
     if (user && userType === "staff") return <Navigate to={staffHomePath(staffProfile?.role)} replace />;
     const gate = clientPortalAction({ loading, hasUser: Boolean(user), isClient: userType === "client" });
     if (gate.type !== "show-home" || !user) return <Navigate to="/portal" replace />;

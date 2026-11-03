@@ -16,6 +16,7 @@ const auth = vi.hoisted(() => ({
   loading: false,
   resetPassword: vi.fn(),
   registerClient: vi.fn(),
+  mustChangePassword: false,
 }));
 
 vi.mock("../contexts/AuthContext", () => ({
@@ -76,6 +77,7 @@ function LoginHarness() {
       <HistoryProbe />
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/change-password" element={<h1>Change password</h1>} />
         <Route path="/portal/home" element={<h1>Portal home</h1>} />
         <Route path="/admin/dashboard" element={<h1>Staff dashboard</h1>} />
         <Route path="/admin/photographer" element={<h1>Photographer home</h1>} />
@@ -134,6 +136,7 @@ beforeEach(() => {
   auth.userType = null;
   auth.staffProfile = null;
   auth.loading = false;
+  auth.mustChangePassword = false;
   vi.mocked(toast.success).mockClear();
   vi.mocked(toast.error).mockClear();
 });
@@ -293,6 +296,24 @@ describe("create account", () => {
     expect(toast.success).toHaveBeenCalledWith("Account created. Welcome in.");
     expect(path()).toBe("/admin/photographer");
     expect(container?.textContent).toContain("Photographer home");
+  });
+
+  it("sends a photographer who must change their password to that screen before the portal", async () => {
+    auth.user = { uid: "photo-1" };
+    auth.userType = "staff";
+    auth.staffProfile = { role: "photographer" };
+    auth.mustChangePassword = true;
+    auth.loading = false;
+    await renderLogin();
+    expect(path()).toBe("/change-password");
+    expect(container?.textContent).toContain("Change password");
+    expect(container?.textContent).not.toContain("Photographer home");
+  });
+
+  it("links forgot password to the shared reset page", async () => {
+    await renderLogin();
+    const link = container?.querySelector('a[href="/forgot-password"]');
+    expect(link?.textContent).toContain("Forgot password?");
   });
 
   it("still routes an already signed-in staff member to their staff home", async () => {

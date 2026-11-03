@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { clientPortalAction, staffHomePath } from "@shared/staffAccess";
+import { CHANGE_PASSWORD_PATH } from "@shared/passwordAccount";
 import { calendarDateKey, type ClientAppointment, type ClientInvoiceStatement, type ClientListingCard } from "@shared/clientHome";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -21,7 +22,7 @@ interface PortalHome {
 }
 
 export default function ClientPortal() {
-  const { user, userType, staffProfile, clientProfile, loading, signOutUser } = useAuth();
+  const { user, userType, staffProfile, clientProfile, loading, mustChangePassword, signOutUser } = useAuth();
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const example = params.get("example") === "1";
@@ -64,6 +65,10 @@ export default function ClientPortal() {
 
   if (!example && loading) {
     return <PortalPending />;
+  }
+
+  if (!example && !loading && user && mustChangePassword) {
+    return <Navigate to={CHANGE_PASSWORD_PATH} replace />;
   }
 
   if (!example && user && userType === "staff") {

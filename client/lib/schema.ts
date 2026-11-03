@@ -24,6 +24,8 @@ export interface StaffMember {
   isActive: boolean;
   assignedOrders: string[];  // order IDs
   siteEditor?: { view: boolean; edit: boolean; publish: boolean };
+  /** Set when an admin assigns a password. Cleared after the person chooses their own. */
+  mustChangePassword?: boolean;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
@@ -44,6 +46,7 @@ export interface Client {
   lastOrderAt?: Timestamp;
   status: "active" | "inactive" | "vip";
   portalAccess: boolean;
+  mustChangePassword?: boolean;
   notes?: string;
   tags: string[];
   /** CRM grouping, such as a brokerage team or campaign list. */
