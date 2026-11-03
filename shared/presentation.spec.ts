@@ -6,6 +6,9 @@ import {
   createPresentationToken,
   injectPresentationMeta,
   isPresentationToken,
+  activePresentationPath,
+  copiedPresentationUrl,
+  presentationClipboardUrl,
   presentationPath,
   seededPresentation,
 } from "./presentation";
@@ -18,6 +21,40 @@ describe("listing presentation", () => {
     expect(isPresentationToken("short")).toBe(false);
     expect(isPresentationToken(PRESENTATION_PREVIEW_TOKEN)).toBe(true);
     expect(presentationPath(token)).toBe(`/present/${token}`);
+  });
+
+  it("builds a presentation share url and refuses a studio or file url", () => {
+    const token = "abcdefghijklmnopqrstuv";
+    const origin = "https://iconicimagestx.vercel.app";
+    expect(presentationClipboardUrl(origin, token)).toBe(`${origin}/present/${token}`);
+    expect(presentationClipboardUrl(origin, `/present/${token}`)).toBe(`${origin}/present/${token}`);
+    expect(presentationClipboardUrl(origin, PRESENTATION_PREVIEW_TOKEN)).toBe(`${origin}/present/preview`);
+    expect(presentationClipboardUrl(`${origin}/`, token)).toBe(`${origin}/present/${token}`);
+    expect(activePresentationPath({ presentationToken: token, presentationEnabled: true })).toBe(`/present/${token}`);
+    expect(activePresentationPath({ presentationToken: token, presentationEnabled: false })).toBeNull();
+    expect(activePresentationPath({ presentationToken: PRESENTATION_PREVIEW_TOKEN })).toBeNull();
+    expect(activePresentationPath({ presentationToken: "short" })).toBeNull();
+
+    expect(copiedPresentationUrl(origin, {
+      path: `/present/${token}`,
+      url: `${origin}/present/${token}`,
+      token,
+    })).toBe(`${origin}/present/${token}`);
+    expect(copiedPresentationUrl("https://preview.example", {
+      path: `/present/${token}`,
+      url: `${origin}/present/${token}`,
+    })).toBe(`${origin}/present/${token}`);
+    expect(copiedPresentationUrl(origin, {
+      path: `/studio/${token}`,
+      url: `${origin}/studio/listing1234`,
+      token,
+    })).toBe(`${origin}/present/${token}`);
+    expect(copiedPresentationUrl(origin, {
+      path: "/studio/listing1234",
+      url: "https://cdn.example/front-full.jpg",
+    })).toBe("");
+    expect(presentationClipboardUrl(origin, "/studio/listing1234")).toBe("");
+    expect(presentationClipboardUrl(origin, "https://cdn.example/walkthrough.mp4")).toBe("");
   });
 
   it("keeps edited photos, drops raw files, and groups rooms", () => {

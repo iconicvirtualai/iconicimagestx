@@ -99,6 +99,7 @@ export function ClientStudioView({
   signedIn,
   initialTab = "photos",
   initialSelectedPhoto = null,
+  onCopyShare,
   onPersistRevision,
 }: {
   project: any;
@@ -106,6 +107,7 @@ export function ClientStudioView({
   signedIn: boolean;
   initialTab?: StudioGalleryTabId;
   initialSelectedPhoto?: number | null;
+  onCopyShare?: () => void;
   onPersistRevision?: (revisions: any[]) => Promise<void>;
 }) {
   const [selectedPhoto, setSelectedPhoto] = React.useState<number | null>(initialSelectedPhoto);
@@ -190,6 +192,16 @@ export function ClientStudioView({
             <Link to={`/portal/listings/${listingId}`} className="inline-block mt-3 text-[10px] font-black uppercase tracking-widest text-[#0d9488]">
               Listing file
             </Link>
+          )}
+          {onCopyShare && (
+            <button
+              type="button"
+              onClick={onCopyShare}
+              data-testid="studio-copy-share"
+              className="mt-4 inline-flex items-center rounded-xl bg-white px-3 py-2 text-[10px] font-black uppercase tracking-widest text-black"
+            >
+              Copy share link
+            </button>
           )}
           {project.agentName && <p className="text-gray-400 mt-1">{project.agentName}</p>}
           {owner && project.clientName && project.clientName !== project.agentName && (

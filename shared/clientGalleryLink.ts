@@ -119,12 +119,16 @@ export type ClientGalleryLinkResult =
       kind: "listing";
       openGalleryId: string | null;
       project: StudioProject;
+      /** `/present/<token>` when this listing already has a client presentation. */
+      sharePath?: string;
     }
   | {
       ok: false;
       httpStatus: 400 | 403 | 404;
-      code: "invalid_id" | "unknown" | "studio_disabled" | "studio_locked" | "dangling_pointer";
+      code: "invalid_id" | "unknown" | "studio_disabled" | "studio_locked" | "dangling_pointer" | "studio_forbidden";
       message: string;
+      /** Listing the refusal is about. The HTTP handler does not send this. */
+      subjectId?: string;
     };
 
 const ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
@@ -385,6 +389,7 @@ function listingBlock(listing: GalleryLinkDoc, related: GalleryLinkDoc[]): Clien
       ok: false,
       httpStatus: 403,
       code: "studio_locked",
+      subjectId: listing.id,
       message: `Project ${listing.id} exists in listings, but Lock Studio is on. Turn Lock Studio off on the project file before /studio/${listing.id} will open. This id is not missing.${linkedSentence}`,
     };
   }
@@ -393,6 +398,7 @@ function listingBlock(listing: GalleryLinkDoc, related: GalleryLinkDoc[]): Clien
       ok: false,
       httpStatus: 403,
       code: "studio_disabled",
+      subjectId: listing.id,
       message: `Project ${listing.id} exists in listings, but Client Studio is turned off, so /studio/${listing.id} stays closed. Turn Client Studio on from the project file.${linkedSentence}`,
     };
   }

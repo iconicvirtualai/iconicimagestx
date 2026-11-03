@@ -1,6 +1,7 @@
 /**
- * Public resolver for staff-shared /studio/:id links.
- * Reads galleries and listings with the Admin SDK. Does not send email or SMS.
+ * Resolver for /studio/:id.
+ * The owning client and staff receive the project. Everyone else gets 401 or 403
+ * with no project and no media URLs. Does not send email or SMS.
  */
 
 import { RequestHandler } from "express";
@@ -13,13 +14,12 @@ import {
   type GalleryLinkDoc,
   type OwnerStudioProject,
 } from "../../shared/clientGalleryLink";
-import { studioDownloadsUnlocked } from "../../shared/lockImpact";
-import { publicShareVideos } from "../../shared/publicShare";
 import { invoiceRedirectTarget, legacyInvoiceDocIds } from "../../shared/invoicePay";
 import { clientCanViewListing, staffCanAccessListing } from "../../shared/listingAccess";
 import { readInvoiceDoc } from "../lib/invoiceDoc";
 import { isActiveStaffRecord } from "../../shared/staffAccess";
 import { isTempAdminEnabled, liveServerEnv } from "../../shared/tempAdmin";
+import { activePresentationPath } from "../../shared/presentation";
 import { resolveClientIdentity } from "../services/clientAccounts";
 import type { AuthenticatedRequest } from "../middleware/auth";
 
@@ -168,7 +168,7 @@ function callerCanOpenPrivateStudio(listing: GalleryLinkDoc, caller: StudioCalle
   return clientCanViewListing(listing, { uid: caller.uid, email: caller.email, ids: caller.ids });
 }
 
-/** A bad or missing session stays on the public share. It does not block the page. */
+/** A bad or missing session is signed out. It does not open the project. */
 async function readStudioCaller(req: { headers: { authorization?: string } }): Promise<StudioCaller | null> {
   const header = req.headers.authorization || "";
   if (!header.startsWith("Bearer ")) return null;
@@ -200,52 +200,47 @@ async function readStudioCaller(req: { headers: { authorization?: string } }): P
   }
 }
 
-/**
- * Public callers get display-route photos. Branded video is added only when
- * the same unlock as the owner view is open. The owning client and staff
- * with listing access get delivery files. Download URLs still follow that lock.
- */
-function sharePlaybackOpen(
-  listing: GalleryLinkDoc,
-  invoice: Record<string, unknown> | null,
-  related: GalleryLinkDoc[],
-): boolean {
-  return studioDownloadsUnlocked({
-    listing: {
-      id: listing.id,
-      invoiceStatus: listing.invoiceStatus,
-      paymentStatus: listing.paymentStatus,
-      invoice: listing.invoice,
-      downloadEnabled: listing.downloadEnabled === true || related.some((doc) => doc.downloadEnabled === true),
-      downloadsReleased: listing.downloadsReleased === true || related.some((doc) => doc.downloadsReleased === true),
-      lockDownloads: listing.lockDownloads,
-    },
-    galleries: [],
-    invoice,
-  });
+const STUDIO_SIGN_IN = "Sign in to open this studio.";
+const STUDIO_OTHER_CLIENT = "This studio belongs to another client.";
+
+function forbiddenStudio(): ClientGalleryLinkResult {
+  return { ok: false, httpStatus: 403, code: "studio_forbidden", message: STUDIO_OTHER_CLIENT };
+}
+
+async function callerCanOpenGallery(gallery: GalleryLinkDoc, caller: StudioCaller | null): Promise<boolean> {
+  if (callerCanOpenPrivateStudio(gallery, caller)) return true;
+  const listingId = text(gallery.listingId);
+  if (!listingId || listingId === gallery.id) return false;
+  const listing = docRecord(await db().collection("listings").doc(listingId).get());
+  return Boolean(listing && callerCanOpenPrivateStudio(listing, caller));
 }
 
 async function finishGalleryLink(
+  id: string,
   result: ClientGalleryLinkResult,
   caller: StudioCaller | null,
 ): Promise<ClientGalleryLinkResult> {
-  if (!result.ok || result.kind !== "listing") return result;
+  if (result.ok === false) {
+    if (result.code === "studio_locked" || result.code === "studio_disabled") {
+      const subjectId = result.subjectId || id;
+      const listing = docRecord(await db().collection("listings").doc(subjectId).get());
+      if (!listing || !callerCanOpenPrivateStudio(listing, caller)) return forbiddenStudio();
+    }
+    return result;
+  }
+
+  if (result.kind === "gallery") {
+    const gallery = await galleryById(result.galleryId);
+    if (!gallery || !(await callerCanOpenGallery(gallery, caller))) return forbiddenStudio();
+    return result;
+  }
+
   const listing = docRecord(await db().collection("listings").doc(result.project.id).get());
-  if (!listing) return result;
+  if (!listing || !callerCanOpenPrivateStudio(listing, caller)) return forbiddenStudio();
   const [invoice, related] = await Promise.all([
     invoiceForListing(listing),
     relatedForListing(listing),
   ]);
-  if (!callerCanOpenPrivateStudio(listing, caller)) {
-    if (result.project.view !== "public") return result;
-    return {
-      ...result,
-      project: {
-        ...result.project,
-        videos: publicShareVideos(listing, sharePlaybackOpen(listing, invoice, related)),
-      },
-    };
-  }
   if (result.project.view !== "public") return result;
   // Staff release flags and staff-set paid/comped listing fields stay open.
   // A stale copied paid field on an explicitly unpaid invoice stays open too.
@@ -253,9 +248,10 @@ async function finishGalleryLink(
     invoice: invoice ?? null,
     downloadEnabled: listing.downloadEnabled === true || related.some((doc) => doc.downloadEnabled === true),
     downloadsReleased: listing.downloadsReleased === true || related.some((doc) => doc.downloadsReleased === true),
-    staffAccess: Boolean(caller?.staffRole),
+    staffAccess: Boolean(caller.staffRole),
   });
-  return { ...result, project };
+  const sharePath = activePresentationPath(listing);
+  return sharePath ? { ...result, project, sharePath } : { ...result, project };
 }
 
 export const handlePublicGalleryLink: RequestHandler = async (req: AuthenticatedRequest, res) => {
@@ -269,8 +265,13 @@ export const handlePublicGalleryLink: RequestHandler = async (req: Authenticated
     return res.status(503).json({ code: "lookup_unavailable", error: message, message });
   }
 
+  const caller = await readStudioCaller(req);
+  if (!caller) {
+    return res.status(401).json({ code: "auth_required", error: STUDIO_SIGN_IN, message: STUDIO_SIGN_IN });
+  }
+
   try {
-    const result = await finishGalleryLink(await resolveClientGalleryLink(id), await readStudioCaller(req));
+    const result = await finishGalleryLink(id, await resolveClientGalleryLink(id), caller);
     if (result.ok === false) {
       return res.status(result.httpStatus).json({
         code: result.code,
@@ -278,7 +279,8 @@ export const handlePublicGalleryLink: RequestHandler = async (req: Authenticated
         message: result.message,
       });
     }
-    return res.json(result);
+    const { subjectId: _subjectId, ...body } = result as ClientGalleryLinkResult & { subjectId?: string };
+    return res.json(body);
   } catch (err) {
     console.error("[Galleries] Link resolve error:", err);
     const message = "Could not resolve this gallery link.";

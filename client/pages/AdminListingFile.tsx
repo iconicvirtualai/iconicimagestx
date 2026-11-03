@@ -23,8 +23,9 @@ import { addressText, recordAddressText } from "@shared/addressText";
 import { calendarDateKey, formatChicagoDate } from "@shared/clientHome";
 import { lockDownloadsOn, requirePaymentOn } from "@shared/paymentAccess";
 import { staffInvoicePath } from "@shared/staffInvoice";
-import { publicClientUrl } from "@shared/publicSiteUrl";
 import { projectStatusLabel, projectSurfaceStatus, type ProjectSurface } from "@shared/projectSurfaceStatus";
+import { copiedPresentationUrl } from "@shared/presentation";
+import { createPresentationLink } from "@/lib/presentationShare";
 import { PresentationShareButton, PresentationSharePanel } from "@/components/PresentationSharePanel";
 import { PhotoEditRequestStaff } from "@/components/PhotoEditRequestStaff";
 import { StaffMediaBoard } from "@/components/listing/StaffMediaBoard";
@@ -277,6 +278,19 @@ export default function AdminListingFile({
   const navigate = useNavigate();
   const { user } = useAuth();
   const getPresentationToken = () => user?.getIdToken();
+  const copyClientShare = async () => {
+    try {
+      const token = await getPresentationToken();
+      if (!token || !id) throw new Error("Sign in again before creating a presentation link.");
+      const link = await createPresentationLink(id, token);
+      const url = copiedPresentationUrl(window.location.origin, link);
+      if (!url) throw new Error("This presentation link is not active.");
+      await navigator.clipboard.writeText(url);
+      toast.success("Presentation link copied. No email or text was sent.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "The presentation link could not be created.");
+    }
+  };
   const [project, setProject] = React.useState<any>(initialProject);
   const [loading, setLoading] = React.useState(!initialProject);
   const [activeTab, setActiveTab] = React.useState(initialTab);
@@ -856,11 +870,11 @@ export default function AdminListingFile({
           {project.studioEnabled && (
             <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-5">
               <h3 className={`${labelCls} mb-3`}>Client Studio</h3>
-              <p className="text-[10px] text-gray-400 mb-3">Share this link with the client. It uses this project id and opens without a client login when Client Studio is on and Lock Studio is off.</p>
-              <button onClick={() => { navigator.clipboard.writeText(publicClientUrl(`/studio/${id}`)); toast.success("Studio link copied!"); }}
+              <p className="text-[10px] text-gray-400 mb-3">The studio page is private to this client and staff. Copy the presentation link to share the advertising page. It does not download files, and it does not email or text anyone.</p>
+              <button onClick={() => { void copyClientShare(); }}
                 className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-black text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-800 transition-colors"
               >
-                <Copy className="w-3.5 h-3.5" /> Copy Studio Link
+                <Copy className="w-3.5 h-3.5" /> Copy share link
               </button>
             </div>
           )}

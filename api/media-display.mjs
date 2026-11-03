@@ -323,6 +323,7 @@ function listingBlock(listing, related) {
       ok: false,
       httpStatus: 403,
       code: "studio_locked",
+      subjectId: listing.id,
       message: `Project ${listing.id} exists in listings, but Lock Studio is on. Turn Lock Studio off on the project file before /studio/${listing.id} will open. This id is not missing.${linkedSentence}`
     };
   }
@@ -331,6 +332,7 @@ function listingBlock(listing, related) {
       ok: false,
       httpStatus: 403,
       code: "studio_disabled",
+      subjectId: listing.id,
       message: `Project ${listing.id} exists in listings, but Client Studio is turned off, so /studio/${listing.id} stays closed. Turn Client Studio on from the project file.${linkedSentence}`
     };
   }

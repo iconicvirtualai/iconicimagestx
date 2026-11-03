@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { Copy, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { createPresentationLink } from "@/lib/presentationShare";
-import { PRESENTATION_PREVIEW_TOKEN, presentationPath } from "@shared/presentation";
+import { PRESENTATION_PREVIEW_TOKEN, copiedPresentationUrl, presentationClipboardUrl, presentationPath } from "@shared/presentation";
 
 type TokenGetter = () => Promise<string | undefined> | undefined;
 
@@ -28,7 +28,8 @@ export function PresentationShareButton({
     setBusy(true);
     try {
       const link = await mintLink(listingId, getToken);
-      const url = link.url || `${window.location.origin}${link.path}`;
+      const url = copiedPresentationUrl(window.location.origin, link);
+      if (!url) throw new Error("This presentation link is not active.");
       await navigator.clipboard.writeText(url);
       toast.success("Presentation link copied. No email or text was sent.");
     } catch (err) {
@@ -69,7 +70,11 @@ export function PresentationSharePanel({
 
   const share = async () => {
     if (demo || listingId === "sampledemo") {
-      const sample = `${window.location.origin}${samplePath}`;
+      const sample = presentationClipboardUrl(window.location.origin, PRESENTATION_PREVIEW_TOKEN);
+      if (!sample) {
+        toast.error("This presentation link is not active.");
+        return;
+      }
       setUrl(sample);
       setNote("This is the sample presentation. A saved client link needs Firebase.");
       await navigator.clipboard.writeText(sample);
@@ -79,7 +84,8 @@ export function PresentationSharePanel({
     setBusy(true);
     try {
       const link = await mintLink(listingId, getToken);
-      const next = link.url || `${window.location.origin}${link.path}`;
+      const next = copiedPresentationUrl(window.location.origin, link);
+      if (!next) throw new Error("This presentation link is not active.");
       setUrl(next);
       setNote(link.photoCount
         ? `${link.photoCount} photographs on this link. Nothing was emailed or texted.`
@@ -89,7 +95,10 @@ export function PresentationSharePanel({
     } catch (err) {
       const preview = (err as { previewPath?: string }).previewPath;
       setNote(err instanceof Error ? err.message : "The presentation link could not be created.");
-      if (preview) setUrl(`${window.location.origin}${preview}`);
+      if (preview) {
+        const sample = presentationClipboardUrl(window.location.origin, preview);
+        if (sample) setUrl(sample);
+      }
       toast.error(err instanceof Error ? err.message : "The presentation link could not be created.");
     } finally {
       setBusy(false);

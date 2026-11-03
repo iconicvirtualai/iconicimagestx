@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { renderToString } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
-import { PublicGalleryMissing, PUBLIC_GALLERY_MISSING_COPY, PublicGalleryView, type PublicGalleryModel } from "./PublicGallery";
+import { PublicGalleryMissing, PUBLIC_GALLERY_MISSING_COPY, PublicGalleryView, publicGalleryCopyUrl, type PublicGalleryModel } from "./PublicGallery";
 
 const INTERNAL = /fotello|collection|firestore/i;
 
@@ -159,6 +159,17 @@ function page(gallery: PublicGalleryModel) {
     </MemoryRouter>,
   );
 }
+
+describe("public gallery share link", () => {
+  it("copies the presentation path and never a file or studio url", () => {
+    const origin = "https://iconicimagestx.vercel.app";
+    const token = "abcdefghijklmnopqrstuv";
+    expect(publicGalleryCopyUrl(origin, `/present/${token}`)).toBe(`${origin}/present/${token}`);
+    expect(publicGalleryCopyUrl(origin, "/studio/listing1234")).toBe("");
+    expect(publicGalleryCopyUrl(origin, "https://cdn.example/branded.mp4")).toBe("");
+    expect(publicGalleryCopyUrl(origin, null)).toBe("");
+  });
+});
 
 describe("public delivery gallery", () => {
   it("renders every delivered media type on the gallery route view", () => {

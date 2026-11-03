@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { renderToString } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
+import { readFileSync } from "node:fs";
 import { PresentationView } from "./ListingPresentation";
 import { PresentationSharePanel } from "@/components/PresentationSharePanel";
-import { seededPresentation } from "@shared/presentation";
+import { copiedPresentationUrl, presentationClipboardUrl, seededPresentation } from "@shared/presentation";
 
 describe("listing presentation page", () => {
   it("renders a private photo feed without an agent or street on the sample", () => {
@@ -36,5 +37,21 @@ describe("listing presentation page", () => {
     );
     expect(html).toContain("Presentation / Share link");
     expect(html).toContain("does not email or text");
+  });
+
+  it("copies the presentation path from the token, not the studio url", () => {
+    const origin = "https://iconicimagestx.vercel.app";
+    const token = "abcdefghijklmnopqrstuv";
+    expect(presentationClipboardUrl(origin, token)).toBe(`${origin}/present/${token}`);
+    expect(copiedPresentationUrl(origin, {
+      path: `/present/${token}`,
+      url: `${origin}/present/${token}`,
+    })).toBe(`${origin}/present/${token}`);
+    const page = readFileSync(new URL("./ListingPresentation.tsx", import.meta.url), "utf8");
+    const panel = readFileSync(new URL("../components/PresentationSharePanel.tsx", import.meta.url), "utf8");
+    expect(page).toContain("presentationClipboardUrl(window.location.origin, token)");
+    expect(page).not.toContain("const url = window.location.href");
+    expect(panel).toContain("copiedPresentationUrl(window.location.origin, link)");
+    expect(panel).not.toContain("/studio/");
   });
 });

@@ -68,6 +68,71 @@ export function presentationPath(token: string): string {
   return `${PRESENTATION_PATH}/${encodeURIComponent(token)}`;
 }
 
+/** Saved client presentation. The sample token is not a client share. */
+export function activePresentationPath(record: Record<string, unknown> | null | undefined): string | null {
+  if (!record || record.presentationEnabled === false) return null;
+  const token = typeof record.presentationToken === "string" ? record.presentationToken.trim() : "";
+  if (!token || token === PRESENTATION_PREVIEW_TOKEN || !isPresentationToken(token)) return null;
+  return presentationPath(token);
+}
+
+/** Absolute `/present/<token>` URL. A studio path, file URL, or query string is refused. */
+export function presentationClipboardUrl(origin: string, tokenOrPath: string): string {
+  const raw = typeof tokenOrPath === "string" ? tokenOrPath.trim() : "";
+  if (!raw || raw.includes("..") || raw.includes("\\") || raw.includes("/studio/") || raw.includes("?") || raw.includes("#")) {
+    return "";
+  }
+  const path = raw.startsWith("/") ? raw : presentationPath(raw);
+  if (!path.startsWith(`${PRESENTATION_PATH}/`)) return "";
+  const encoded = path.slice(PRESENTATION_PATH.length + 1);
+  if (!encoded || encoded.includes("/")) return "";
+  let token = encoded;
+  try {
+    token = decodeURIComponent(encoded);
+  } catch {
+    return "";
+  }
+  if (!isPresentationToken(token)) return "";
+  const base = origin.trim().replace(/\/$/, "");
+  if (!/^https?:\/\//i.test(base)) return "";
+  return `${base}${presentationPath(token)}`;
+}
+
+/**
+ * URL a share button may copy. Prefers the API absolute URL when its path is
+ * the presentation path. Never returns a `/studio/` URL.
+ */
+export function copiedPresentationUrl(
+  origin: string,
+  link: { path?: string; url?: string; token?: string },
+): string {
+  const path = typeof link.path === "string" ? link.path.trim() : "";
+  if (path) {
+    const fromPath = presentationClipboardUrl(origin, path);
+    if (fromPath) {
+      const absolute = typeof link.url === "string" ? link.url.trim() : "";
+      if (absolute) {
+        try {
+          const url = new URL(absolute);
+          const expected = new URL(fromPath);
+          if (
+            (url.protocol === "https:" || url.protocol === "http:")
+            && url.pathname === expected.pathname
+            && !url.search
+            && !url.hash
+          ) {
+            return `${url.origin}${url.pathname}`;
+          }
+        } catch {
+          // The absolute URL was not usable. The path still is.
+        }
+      }
+      return fromPath;
+    }
+  }
+  return typeof link.token === "string" ? presentationClipboardUrl(origin, link.token) : "";
+}
+
 export function isPresentationToken(value: string): boolean {
   return value === PRESENTATION_PREVIEW_TOKEN || TOKEN_PATTERN.test(value);
 }

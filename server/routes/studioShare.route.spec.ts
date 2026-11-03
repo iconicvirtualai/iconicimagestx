@@ -2,8 +2,9 @@ import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * /studio/:id is the copied share link. Signed-out visitors and other clients
- * get the marketing view. The owning client and staff get delivery data.
+ * /studio/:id is private. Signed-out visitors get 401. Another client gets 403.
+ * Neither response includes the project or media URLs. The owning client and
+ * staff get delivery data. The public advertising page is /present/<token>.
  */
 
 const LISTING_ID = "playtest-job-sqoa1v8vech1MQfpl47bBMqw9zC3";
@@ -145,49 +146,16 @@ async function openStudio(authorization?: string, id = LISTING_ID) {
   return { statusCode, body };
 }
 
-function expectMarketingView(body: Record<string, unknown>) {
-  expect(body.kind).toBe("listing");
-  const project = body.project as Record<string, unknown>;
-  expect(project.view).toBe("public");
-  expect(project.address).toBe("100 Playtest Lane, Austin, TX 78701");
-  expect(project.agentName).toBe("Ada Agent");
-  const photo = `/api/media/display/${LISTING_ID}/0`;
-  const plan = `/api/media/display/${LISTING_ID}/1`;
-  const poster = `/api/media/display/${LISTING_ID}/2`;
-  expect(project.images).toEqual([{ url: photo, displayUrl: photo, name: "front.jpg" }]);
-  expect(project.videos).toEqual([{
-    url: null,
-    name: "Walkthrough",
-    poster,
-    thumbnailUrl: poster,
-    displayUrl: poster,
-  }]);
-  expect(project.tourUrl).toBe("https://my.matterport.com/show/?m=abc");
-  expect(project.floorPlans).toEqual([{ url: plan, displayUrl: plan, name: "Level 1.jpg" }]);
-  const json = JSON.stringify(body);
-  for (const secret of [
-    "ada@example.com",
-    "bob@example.com",
-    "invoice-pii@example.com",
-    "512-555-0100",
-    "Private Client",
-    "Warm the kitchen",
-    "lockbox",
-    "secret-token",
-    "delivery.zip",
-    "front-full.jpg",
-    "mls-full.jpg",
-    "plans.zip",
-    "inv_private_1",
-    "order_private_1",
-    "amountDue",
-    "downloadsUnlocked",
-    "walkthrough.mp4",
-    "final.jpg",
-    "level1.jpg",
-  ]) {
-    expect(json).not.toContain(secret);
-  }
+function expectClosed(statusCode: number, body: Record<string, unknown>, status: 401 | 403) {
+  const message = status === 401
+    ? "Sign in to open this studio."
+    : "This studio belongs to another client.";
+  expect(statusCode).toBe(status);
+  expect(body).toEqual({
+    code: status === 401 ? "auth_required" : "studio_forbidden",
+    error: message,
+    message,
+  });
 }
 
 function expectOwnerView(body: Record<string, unknown>, downloadsOpen: boolean, media: "full" | "display" = downloadsOpen ? "full" : "display") {
@@ -226,22 +194,19 @@ describe("GET /api/galleries/link/:id studio share", () => {
     expect(page).not.toContain("openGalleryId");
   });
 
-  it("renders the download-free share for a signed-out visitor", async () => {
+  it("refuses a signed-out visitor without a project or media url", async () => {
     const { statusCode, body } = await openStudio();
-    expect(statusCode).toBe(200);
-    expectMarketingView(body);
+    expectClosed(statusCode, body, 401);
   });
 
-  it("renders the same share for a different signed-in client", async () => {
+  it("refuses a different signed-in client without a project or media url", async () => {
     const { statusCode, body } = await openStudio("Bearer other-token");
-    expect(statusCode).toBe(200);
-    expectMarketingView(body);
+    expectClosed(statusCode, body, 403);
   });
 
   it("does not upgrade a rejected session", async () => {
     const { statusCode, body } = await openStudio("Bearer not-a-session");
-    expect(statusCode).toBe(200);
-    expectMarketingView(body);
+    expectClosed(statusCode, body, 401);
   });
 
   it("gives the owning client the private view and keeps downloads locked until paid", async () => {
@@ -302,31 +267,8 @@ describe("GET /api/galleries/link/:id studio share", () => {
     };
 
     const shared = await openStudio(undefined, DELIVERY_QA_IDS.listing);
-    expect(shared.statusCode).toBe(200);
-    const sharedProject = shared.body.project as {
-      view?: string;
-      images?: Array<{ url?: string; displayUrl?: string }>;
-      floorPlans?: Array<{ url?: string }>;
-      videos?: Array<{ url?: string | null }>;
-    };
-    expect(sharedProject.view).toBe("public");
+    expectClosed(shared.statusCode, shared.body, 401);
     expect(leaked(shared.body)).toEqual([]);
-    expect(sharedProject.images?.map((image) => image.url)).toEqual([
-      `/api/media/display/${DELIVERY_QA_IDS.listing}/0`,
-      `/api/media/display/${DELIVERY_QA_IDS.listing}/1`,
-      `/api/media/display/${DELIVERY_QA_IDS.listing}/2`,
-    ]);
-    expect(sharedProject.images?.[0]?.displayUrl).toBe(`/api/media/display/${DELIVERY_QA_IDS.listing}/0`);
-    expect(sharedProject.floorPlans?.[0]?.url).toBe(`/api/media/display/${DELIVERY_QA_IDS.listing}/3`);
-    expect(sharedProject.videos?.map((video) => video.url)).toEqual([null, null, null]);
-    expect(sharedProject.videos?.map((video) => (video as { poster?: string }).poster)).toEqual([
-      `/api/media/display/${DELIVERY_QA_IDS.listing}/4`,
-      `/api/media/display/${DELIVERY_QA_IDS.listing}/5`,
-      `/api/media/display/${DELIVERY_QA_IDS.listing}/6`,
-    ]);
-    expect(JSON.stringify(shared.body)).toContain("100 Playtest Lane, Austin, TX 78701");
-    expect(JSON.stringify(shared.body)).toContain("my.matterport.com/show");
-    expect(shared.body.project).not.toHaveProperty("files");
 
     const locked = await openStudio("Bearer qa-owner-token", DELIVERY_QA_IDS.listing);
     expect(locked.statusCode).toBe(200);
@@ -388,11 +330,9 @@ describe("GET /api/galleries/link/:id studio share", () => {
     expect(JSON.stringify(paid.body.project)).toContain("/media/photos/luxury-exterior.jpg");
     expect(JSON.stringify(paid.body)).not.toContain("amountDue");
     const paidShare = await openStudio(undefined, DELIVERY_QA_IDS.listing);
-    expect((paidShare.body.project as { view?: string }).view).toBe("public");
-    expectPlaybackShare(paidShare.body);
+    expectClosed(paidShare.statusCode, paidShare.body, 401);
     const paidOther = await openStudio("Bearer other-token", DELIVERY_QA_IDS.listing);
-    expect((paidOther.body.project as { view?: string }).view).toBe("public");
-    expectPlaybackShare(paidOther.body);
+    expectClosed(paidOther.statusCode, paidOther.body, 403);
 
     seed("invoices", DELIVERY_QA_IDS.invoice, invoice?.data || {});
     const listingDoc = plan.documents.find((doc) => doc.id === DELIVERY_QA_IDS.listing);
@@ -429,33 +369,60 @@ describe("GET /api/galleries/link/:id studio share", () => {
     expect((released.body.project as { downloadsUnlocked?: boolean }).downloadsUnlocked).toBe(true);
     expect(JSON.stringify(released.body.project)).toContain("/media/blaze/01_BUILT_v2.mp4");
     const releasedShare = await openStudio(undefined, DELIVERY_QA_IDS.listing);
-    expectPlaybackShare(releasedShare.body);
-    expect(JSON.stringify(releasedShare.body)).toContain("my.matterport.com/show");
+    expectClosed(releasedShare.statusCode, releasedShare.body, 401);
+    expect(JSON.stringify(releasedShare.body)).not.toContain("matterport");
+  });
+
+  it("keeps the released-gallery redirect for the owner and staff, and hides it from another client", async () => {
+    const galleryId = "gallery1234abcd";
+    seed("galleries", galleryId, {
+      status: "delivered",
+      clientId: "someone-else",
+      clientEmail: "other-client@example.com",
+      listingId: LISTING_ID,
+      mediaItems: [{ url: "https://cdn.example/secret.jpg", fileName: "secret.jpg" }],
+    });
+    const owner = await openStudio("Bearer owner-token", galleryId);
+    expect(owner.statusCode).toBe(200);
+    expect(owner.body.kind).toBe("gallery");
+    expect(owner.body.released).toBe(true);
+    expect(owner.body.galleryId).toBe(galleryId);
+    expect(owner.body.project).toBeUndefined();
+    expect(JSON.stringify(owner.body)).not.toContain("cdn.example");
+    expect(JSON.stringify(owner.body)).not.toContain("secret.jpg");
+
+    const staff = await openStudio("Bearer staff-token", galleryId);
+    expect(staff.statusCode).toBe(200);
+    expect(staff.body).toMatchObject({ kind: "gallery", released: true, galleryId });
+
+    const other = await openStudio("Bearer other-token", galleryId);
+    expectClosed(other.statusCode, other.body, 403);
+    const anon = await openStudio(undefined, galleryId);
+    expectClosed(anon.statusCode, anon.body, 401);
+  });
+
+  it("still tells the owner when Client Studio is off, and does not tell another client", async () => {
+    seed("listings", LISTING_ID, { ...listing(), studioEnabled: false });
+    const owner = await openStudio("Bearer owner-token");
+    expect(owner.statusCode).toBe(403);
+    expect(owner.body.code).toBe("studio_disabled");
+    expect(String(owner.body.message)).toMatch(/Client Studio is turned off/);
+    expect(owner.body.project).toBeUndefined();
+
+    const other = await openStudio("Bearer other-token");
+    expectClosed(other.statusCode, other.body, 403);
+    expect(JSON.stringify(other.body)).not.toMatch(/turned off|cdn\.example|secret-token/);
+  });
+
+  it("gives the owner the presentation path and does not give it to another client", async () => {
+    const token = "abcdefghijklmnopqrstuv";
+    seed("listings", LISTING_ID, { ...listing(), presentationToken: token, presentationEnabled: true });
+    const owner = await openStudio("Bearer owner-token");
+    expect(owner.statusCode).toBe(200);
+    expect(owner.body.sharePath).toBe(`/present/${token}`);
+    expect((owner.body.project as { view?: string }).view).toBe("owner");
+    const other = await openStudio("Bearer other-token");
+    expectClosed(other.statusCode, other.body, 403);
+    expect(JSON.stringify(other.body)).not.toContain(token);
   });
 });
-
-function expectPlaybackShare(body: Record<string, unknown>) {
-  const project = body.project as {
-    images?: Array<{ url?: string }>;
-    videos?: Array<{ url?: string | null; noDownload?: boolean }>;
-  };
-  expect(project.images?.[0]?.url).toBe(`/api/media/display/${DELIVERY_QA_IDS.listing}/0`);
-  const videos = project.videos ?? [];
-  expect(videos.map((video) => video.noDownload)).toEqual([true, true]);
-  expect(videos.map((video) => video.url)).toEqual([
-    "https://cdn.example/media/blaze/01_BUILT_v2.mp4",
-    "https://cdn.example/media/videos/snap-reels/snap-reel-01.mp4",
-  ]);
-  const json = JSON.stringify(body);
-  for (const hidden of [
-    "/media/video/product-photography.mp4",
-    "/media/photos/luxury-exterior.jpg",
-    "/media/photos/listing-living-01.jpg",
-    "/media/photos/drone-hero.jpg",
-    "/media/playtest/TEST-delivery-qa-floorplan.png",
-    "/media/playtest/TEST-delivery-qa-floorplan.pdf",
-    "/media/playtest/TEST-delivery-qa-other.zip",
-  ]) {
-    expect(json).not.toContain(hidden);
-  }
-}

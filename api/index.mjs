@@ -12531,33 +12531,6 @@ function posterIndex(row, items) {
   if (!poster) return -1;
   return items.findIndex((item) => item.sourceUrl === poster);
 }
-function isUnbranded(row) {
-  const category = text$d(row.category).toLowerCase();
-  const type = text$d(row.type).toLowerCase();
-  if (category === "unbranded" || type === "unbranded") return true;
-  const name = `${text$d(row.name)} ${text$d(row.fileName)} ${text$d(row.title)}`.toLowerCase();
-  return name.includes("unbranded");
-}
-function isBrandedPlayback(row) {
-  if (isMls(row) || isUnbranded(row)) return false;
-  const category = text$d(row.category).toLowerCase();
-  const type = text$d(row.type).toLowerCase();
-  if (category === "branded" || type === "branded") return true;
-  const name = `${text$d(row.name)} ${text$d(row.fileName)} ${text$d(row.title)}`.toLowerCase();
-  return /(^|[^a-z])branded([^a-z]|$)/.test(name);
-}
-function isReelPlayback(row) {
-  if (isMls(row) || isUnbranded(row)) return false;
-  const category = text$d(row.category).toLowerCase();
-  const type = text$d(row.type).toLowerCase();
-  return category === "reel" || type === "reel";
-}
-function deliveredVideoUrl(row) {
-  const url = shareableUrl$1(row.url) || shareableUrl$1(row.shareUrl);
-  if (!url || !VIDEO_FILE.test(url.split("#")[0])) return "";
-  if (/\/mls\//i.test(url)) return "";
-  return url;
-}
 function withPoster(media, listingId, index) {
   if (index < 0) return media;
   const poster = shareDisplayPath(listingId, index);
@@ -12572,13 +12545,6 @@ function publicShareVideos(listing, playback) {
     if (!row) continue;
     const name = mediaName$1(row, "Video");
     const posterAt = posterIndex(row, items);
-    if (playback && (isUnbranded(row) || isMls(row))) continue;
-    if (playback && (isBrandedPlayback(row) || isReelPlayback(row))) {
-      const url = deliveredVideoUrl(row);
-      if (!url) continue;
-      videos.push(withPoster({ url, name, noDownload: true }, listing.id, posterAt));
-      continue;
-    }
     if (posterAt < 0) continue;
     videos.push(withPoster({ url: null, name }, listing.id, posterAt));
   }
@@ -13148,6 +13114,7 @@ function listingBlock(listing, related) {
       ok: false,
       httpStatus: 403,
       code: "studio_locked",
+      subjectId: listing.id,
       message: `Project ${listing.id} exists in listings, but Lock Studio is on. Turn Lock Studio off on the project file before /studio/${listing.id} will open. This id is not missing.${linkedSentence}`
     };
   }
@@ -13156,6 +13123,7 @@ function listingBlock(listing, related) {
       ok: false,
       httpStatus: 403,
       code: "studio_disabled",
+      subjectId: listing.id,
       message: `Project ${listing.id} exists in listings, but Client Studio is turned off, so /studio/${listing.id} stays closed. Turn Client Studio on from the project file.${linkedSentence}`
     };
   }
@@ -13377,7 +13345,7 @@ function displaySafeShareMedia(listing) {
   return {
     images: share.images,
     floorPlans: share.floorPlans,
-    videos: publicShareVideos(listing, false),
+    videos: publicShareVideos(listing),
     tourUrl: safeTour || embedTour(listing, needles)
   };
 }
@@ -16026,8 +15994,1694 @@ async function orderIdForGallery(gallery) {
   const orderId = listing.exists ? listing.data()?.orderId : "";
   return typeof orderId === "string" ? orderId.trim() : "";
 }
+const PHOTO_EDIT_NOTE_LIMIT = 2e3;
+const PHOTO_EDIT_REQUEST_LIMIT = 100;
+const PHOTO_EDIT_REPLACEMENT_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const STATUSES = /* @__PURE__ */ new Set(["requested", "sent_out", "received_back"]);
+const REPLACEMENT_TYPES$1 = new Set(PHOTO_EDIT_REPLACEMENT_TYPES);
+function text$a(value, limit) {
+  if (typeof value !== "string") return "";
+  return value.replace(/\s+/g, " ").trim().slice(0, limit);
+}
+function noteText(value) {
+  if (typeof value !== "string") return "";
+  return value.replace(/\r\n/g, "\n").trim().slice(0, PHOTO_EDIT_NOTE_LIMIT);
+}
+function stamp(value) {
+  if (typeof value !== "string") return "";
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > 40) return "";
+  const parsed = Date.parse(trimmed);
+  return Number.isFinite(parsed) ? new Date(parsed).toISOString() : "";
+}
+function idText(value, limit = 80) {
+  const id = text$a(value, limit);
+  return /^[A-Za-z0-9_-]{8,80}$/.test(id) ? id : "";
+}
+function photoIdText(value) {
+  if (typeof value !== "string") return "";
+  const id = value.trim().slice(0, 180);
+  if (!id || /[\u0000-\u001f]/.test(id)) return "";
+  return id;
+}
+function sortRequests(requests) {
+  return [...requests].sort((a, b) => b.createdAt.localeCompare(a.createdAt) || a.id.localeCompare(b.id));
+}
+function timelineEntry(value) {
+  const row = value && typeof value === "object" ? value : null;
+  if (!row || !STATUSES.has(row.status)) return null;
+  const at = stamp(row.at);
+  const actorId = text$a(row.actorId, 128);
+  if (!at || !actorId) return null;
+  if (row.actor !== "client" && row.actor !== "staff") return null;
+  return { status: row.status, at, actor: row.actor, actorId };
+}
+function replacementEntry(value, listingId) {
+  if (!value || typeof value !== "object") return null;
+  const row = value;
+  const name = text$a(row.name, 180);
+  const path2 = typeof row.path === "string" ? row.path.trim() : "";
+  const contentType = typeof row.contentType === "string" ? row.contentType.trim().toLowerCase() : "";
+  const attachedAt = stamp(row.attachedAt);
+  const attachedBy = text$a(row.attachedBy, 128);
+  const url = httpsUrl(row.url);
+  if (!name || !attachedAt || !attachedBy || !url || !REPLACEMENT_TYPES$1.has(contentType)) return null;
+  if (!replacementPath(listingId, path2)) return null;
+  return {
+    name,
+    url,
+    path: path2,
+    contentType,
+    attachedAt,
+    attachedBy
+  };
+}
+function httpsUrl(value) {
+  if (typeof value !== "string" || value.length > 2e3) return "";
+  try {
+    const url = new URL(value.trim());
+    if (url.protocol !== "https:") return "";
+    return url.toString();
+  } catch {
+    return "";
+  }
+}
+function replacementPath(listingId, storagePath) {
+  if (!listingId || storagePath.includes("..") || storagePath.includes("\\") || storagePath.startsWith("/")) return false;
+  const prefix = `listings/${listingId}/replacements/`;
+  if (!storagePath.startsWith(prefix)) return false;
+  const rest = storagePath.slice(prefix.length);
+  return rest.length > 0 && !rest.includes("/");
+}
+function parseRequest(value) {
+  const row = value && typeof value === "object" ? value : null;
+  if (!row) return null;
+  const id = idText(row.id);
+  const listingId = idText(row.listingId, 128) || text$a(row.listingId, 128);
+  const photoId = photoIdText(row.photoId);
+  const note = noteText(row.note);
+  const clientId2 = text$a(row.clientId, 128);
+  const createdAt = stamp(row.createdAt);
+  const updatedAt = stamp(row.updatedAt);
+  if (!id || !listingId || !photoId || !note || !clientId2 || !createdAt || !updatedAt) return null;
+  if (!/^[A-Za-z0-9_-]{4,128}$/.test(listingId)) return null;
+  if (!STATUSES.has(row.status)) return null;
+  const timeline = Array.isArray(row.timeline) ? row.timeline.map(timelineEntry).filter((entry2) => Boolean(entry2)) : [];
+  if (timeline.length === 0) return null;
+  return {
+    id,
+    listingId,
+    photoId,
+    photoName: text$a(row.photoName, 180) || "Photo",
+    photoUrl: httpsUrl(row.photoUrl),
+    note,
+    status: row.status,
+    timeline,
+    replacement: replacementEntry(row.replacement, listingId),
+    clientId: clientId2,
+    createdAt,
+    updatedAt
+  };
+}
+function readPhotoEditRequests(value) {
+  if (!Array.isArray(value)) return [];
+  const seen = /* @__PURE__ */ new Set();
+  const requests = [];
+  for (const item of value) {
+    const request = parseRequest(item);
+    if (!request || seen.has(request.id)) continue;
+    seen.add(request.id);
+    requests.push(request);
+  }
+  return sortRequests(requests);
+}
+function openPhotoEditForPhoto(requests, photoId) {
+  return requests.find((request) => request.photoId === photoId && request.status !== "received_back") || null;
+}
+function createPhotoEditRequest(input) {
+  const id = idText(input.id);
+  const listingId = text$a(input.listingId, 128);
+  const photoId = photoIdText(input.photoId);
+  const note = noteText(input.note);
+  const clientId2 = text$a(input.clientId, 128);
+  const at = stamp(input.at);
+  if (!id) return { ok: false, status: 400, error: "Could not save that edit request." };
+  if (!/^[A-Za-z0-9_-]{4,128}$/.test(listingId)) return { ok: false, status: 400, error: "Listing id is not valid." };
+  if (!photoId || !input.knownPhotoIds.includes(photoId)) {
+    return { ok: false, status: 400, error: "That file is not on this listing." };
+  }
+  if (!note) return { ok: false, status: 400, error: "Add a note for the change you want." };
+  if (!clientId2) return { ok: false, status: 400, error: "Sign in again before requesting an edit." };
+  if (!at) return { ok: false, status: 400, error: "Could not save that edit request." };
+  if (input.existing.length >= PHOTO_EDIT_REQUEST_LIMIT) {
+    return { ok: false, status: 409, error: "This listing already has the maximum number of photo edit requests." };
+  }
+  if (openPhotoEditForPhoto(input.existing, photoId)) {
+    return { ok: false, status: 409, error: "This file already has an open edit request." };
+  }
+  const request = {
+    id,
+    listingId,
+    photoId,
+    photoName: text$a(input.photoName, 180) || "Photo",
+    photoUrl: httpsUrl(input.photoUrl),
+    note,
+    status: "requested",
+    timeline: [{ status: "requested", at, actor: "client", actorId: clientId2 }],
+    replacement: null,
+    clientId: clientId2,
+    createdAt: at,
+    updatedAt: at
+  };
+  return { ok: true, request, requests: sortRequests([...input.existing, request]) };
+}
+function advancePhotoEditRequest(input) {
+  const requestId = idText(input.requestId);
+  const actorId = text$a(input.actorId, 128);
+  const at = stamp(input.at);
+  if (!requestId || !actorId || !at) return { ok: false, status: 400, error: "Could not update that edit request." };
+  const current = input.requests.find((request2) => request2.id === requestId);
+  if (!current) return { ok: false, status: 404, error: "Edit request not found." };
+  if (input.to === "sent_out" && current.status !== "requested") {
+    return {
+      ok: false,
+      status: 400,
+      error: current.status === "sent_out" ? "This request is already sent out." : "This request is already received back."
+    };
+  }
+  if (input.to === "received_back" && current.status !== "sent_out") {
+    return {
+      ok: false,
+      status: 400,
+      error: current.status === "requested" ? "Mark this request sent out before marking it received back." : "This request is already received back."
+    };
+  }
+  const request = {
+    ...current,
+    status: input.to,
+    updatedAt: at,
+    timeline: [...current.timeline, { status: input.to, at, actor: "staff", actorId }]
+  };
+  return {
+    ok: true,
+    request,
+    requests: sortRequests(input.requests.map((item) => item.id === request.id ? request : item))
+  };
+}
+function attachPhotoEditReplacement(input) {
+  const requestId = idText(input.requestId);
+  const current = input.requests.find((request2) => request2.id === requestId);
+  if (!current) return { ok: false, status: 404, error: "Edit request not found." };
+  if (current.listingId !== input.listingId) return { ok: false, status: 404, error: "Edit request not found." };
+  const replacement = replacementEntry(input.replacement, input.listingId);
+  if (!replacement) return { ok: false, status: 400, error: "Attach a JPG, PNG, or WebP file." };
+  const request = {
+    ...current,
+    replacement,
+    updatedAt: replacement.attachedAt
+  };
+  return {
+    ok: true,
+    request,
+    requests: sortRequests(input.requests.map((item) => item.id === request.id ? request : item))
+  };
+}
+const PORTAL_ADDRESS_LIMITS = {
+  line1: 240,
+  line2: 240,
+  city: 120,
+  state: 50,
+  zip: 20
+};
+const PORTAL_FACT_TEXT_LIMIT = 1e3;
+const PORTAL_WEBSITE_DESIGNS = [
+  "issue",
+  "premiere",
+  "product-drop",
+  "gallery-wall",
+  "field-guide",
+  "two-up",
+  "golden-hour",
+  "index",
+  "dossier",
+  "stories"
+];
+const EMPTY = "Not on file yet";
+const FACT_DEFS = [
+  { id: "beds", label: "Beds", keys: ["bedrooms", "beds"] },
+  { id: "baths", label: "Baths", keys: ["bathrooms", "baths"] },
+  { id: "sqft", label: "Sqft", keys: ["squareFeet", "squareFootage", "sqft"] },
+  { id: "yearBuilt", label: "Year built", keys: ["yearBuilt"] },
+  { id: "pool", label: "Pool", keys: ["pool", "hasPool"] },
+  { id: "lotSize", label: "Lot size", keys: ["lotSize"] },
+  { id: "stories", label: "Stories", keys: ["stories", "levels"] },
+  { id: "neighborhood", label: "Neighborhood", keys: ["neighborhood", "subdivision"] },
+  { id: "schools", label: "Schools", keys: ["schools", "schoolDistrict"] },
+  { id: "amenities", label: "Amenities", keys: ["amenities"] },
+  { id: "flexSpaces", label: "Flex spaces", keys: ["flexSpaces", "flexSpace"] },
+  { id: "office", label: "Office", keys: ["office", "hasOffice"] }
+];
+const PORTAL_MARKETING_KIT = [
+  {
+    id: "flyer",
+    title: "Flyer",
+    status: "not_connected",
+    note: "Design tools are not connected yet. A flyer for this listing will be chosen here."
+  },
+  {
+    id: "social",
+    title: "Social post",
+    status: "not_connected",
+    note: "Design tools are not connected yet. Social posts for this listing will be chosen here."
+  },
+  {
+    id: "reel",
+    title: "Reel / short",
+    status: "not_connected",
+    note: "Design tools are not connected yet. Reels and shorts for this listing will be chosen here."
+  }
+];
+const WEBSITE_DESIGNS = new Set(PORTAL_WEBSITE_DESIGNS);
+const WEBSITE_FONTS = /* @__PURE__ */ new Set(["sans", "serif", "modern"]);
+const WEBSITE_COLORS = /* @__PURE__ */ new Set(["ink", "teal", "warm"]);
+const WEBSITE_STYLES = /* @__PURE__ */ new Set(["classic", "editorial", "minimal"]);
+const PORTAL_LISTING_ID = /^[A-Za-z0-9_-]{4,128}$/;
+function portalListingId(value) {
+  const id = text$9(value);
+  return PORTAL_LISTING_ID.test(id) ? id : "";
+}
+function isInvoiceOrPaymentActivity(event) {
+  if (/^(invoice|payment)$/i.test(event.kind)) return true;
+  return /\binvoice\b|\bpayment\b|\bamount due\b/i.test(event.summary);
+}
+function visitorPortalListingDetail(detail) {
+  return {
+    ...detail,
+    photos: detail.photos.filter((item) => !item.hidden),
+    videos: detail.videos.filter((item) => !item.hidden),
+    tours: detail.tours.filter((item) => !item.hidden),
+    floorplans: detail.floorplans.filter((item) => !item.hidden),
+    socialAssets: [],
+    clientFiles: [],
+    invoices: [],
+    activity: detail.activity.filter((event) => !isInvoiceOrPaymentActivity(event)),
+    photoEditRequests: []
+  };
+}
+function defaultPortalWebsite() {
+  return {
+    design: "index",
+    font: "sans",
+    color: "ink",
+    style: "classic",
+    published: false,
+    showPhotos: true,
+    showVideo: true,
+    showTours: true,
+    showFloorplans: true,
+    tileLook: ""
+  };
+}
+function hiddenPresentationKeys(listing) {
+  const keys = /* @__PURE__ */ new Set();
+  const photos = readMediaStore(listing?.portalMedia).photos;
+  for (const [id, prefs] of Object.entries(photos)) {
+    if (prefs.hidden && id) keys.add(id);
+  }
+  const arrangement = readMediaArrangement(listing?.mediaArrangement);
+  for (const section of arrangement.sections) {
+    if (section.hideFromListingSites) keys.add(`section:${section.id}`);
+  }
+  const buckets = [listing?.images, listing?.videos, listing?.floorplans, listing?.floorPlans, listing?.files, listing?.tours];
+  for (const bucket2 of buckets) {
+    if (!Array.isArray(bucket2)) continue;
+    for (const item of bucket2) {
+      if (!item || typeof item !== "object") continue;
+      const row = item;
+      if (!isHiddenFromListingSites(listing, row)) continue;
+      for (const key of [row.id, row.path, row.storagePath, row.url, row.shareUrl]) {
+        if (typeof key === "string" && key.trim()) keys.add(key.trim());
+      }
+    }
+  }
+  return keys;
+}
+function rowHiddenFromPresentation(row, hiddenKeys) {
+  if (row.culled === true) return true;
+  if (row.hiddenFromPresentation === true || row.portalHidden === true) return true;
+  const sectionId = text$9(row.sectionId);
+  if (sectionId && hiddenKeys.has(`section:${sectionId}`)) return true;
+  const id = text$9(row.id);
+  const path2 = text$9(row.path) || text$9(row.storagePath);
+  const url = text$9(row.url) || text$9(row.shareUrl);
+  return [id, path2, url].some((key) => Boolean(key) && hiddenKeys.has(key));
+}
+function buildPortalListingDetail(sources) {
+  const listing = sources.listing || {};
+  const id = text$9(listing.id);
+  const records = [listing, sources.order, sources.orderRequest].filter(Boolean);
+  const address = readAddress(records);
+  const store = readMediaStore(listing.portalMedia);
+  const savedOrder = arrangementActive(readMediaArrangement(listing.mediaArrangement));
+  const galleries = sources.galleries || [];
+  const photos = collectPhotos(listing, galleries, store, savedOrder);
+  const videos = collectVideos(listing, galleries, store, savedOrder);
+  const tours = collectTours(listing, galleries, store, savedOrder);
+  const floorplans = collectFloorplans(listing, galleries, store, savedOrder);
+  const socialAssets = collectClientUploads(listing, "social", savedOrder);
+  const clientFiles = collectClientUploads(listing, "file", savedOrder);
+  const website = readWebsite(listing.portalWebsite);
+  const invoices = readInvoices(sources.invoices || []);
+  const activity = buildActivity(sources, photos, videos, floorplans, tours);
+  const status2 = text$9(listing.status) || text$9(sources.order?.status) || text$9(sources.orderRequest?.status) || "open";
+  return applyStoredPortalData({
+    id,
+    title: address.formatted || "Listing",
+    status: status2,
+    address,
+    facts: FACT_DEFS.map((fact) => {
+      const value = factText(readFact(records, fact.keys));
+      return { id: fact.id, label: fact.label, value: value || EMPTY, empty: !value };
+    }),
+    photos,
+    videos,
+    tours,
+    floorplans,
+    photoGroups: savedOrder ? readMediaArrangement(listing.mediaArrangement).sections.filter((section) => photos.some((photo) => photo.groupId === section.id)).map((section) => ({ id: section.id, name: section.name, order: section.order })) : store.photoGroups,
+    socialAssets,
+    clientFiles,
+    marketing: PORTAL_MARKETING_KIT,
+    website,
+    invoices,
+    activity,
+    photoEditRequests: readPhotoEditRequests(listing.photoEditRequests)
+  }, listing.portalData);
+}
+function portalFactsDraftFromDetail(detail) {
+  const facts = {};
+  for (const fact of FACT_DEFS) {
+    const shown = detail.facts.find((item) => item.id === fact.id);
+    facts[fact.id] = shown && !shown.empty ? shown.value : "";
+  }
+  return {
+    address: {
+      line1: detail.address.line1,
+      line2: detail.address.line2,
+      city: detail.address.city,
+      state: detail.address.state,
+      zip: detail.address.zip
+    },
+    facts
+  };
+}
+function sanitizePortalListingFacts(value) {
+  const row = asRecord$4(value);
+  if (!row) return null;
+  const addressRow = asRecord$4(row.address);
+  const factsRow = asRecord$4(row.facts);
+  if (!addressRow || !factsRow) return null;
+  const facts = {};
+  for (const fact of FACT_DEFS) {
+    facts[fact.id] = Object.prototype.hasOwnProperty.call(factsRow, fact.id) ? clipText(factsRow[fact.id], PORTAL_FACT_TEXT_LIMIT) : "";
+  }
+  return { address: normalizeAddressLines(addressRow), facts };
+}
+function portalListingFactsWrite(detail, body, nowIso) {
+  const next = sanitizePortalListingFacts(body);
+  const current = sanitizePortalListingFacts(portalFactsDraftFromDetail(detail));
+  if (!next || !current) return { ok: false, error: "Say which listing facts to save." };
+  if (JSON.stringify(next) === JSON.stringify(current)) return { ok: true, changed: false };
+  return {
+    ok: true,
+    changed: true,
+    portalData: next,
+    activity: {
+      id: `portal-data-${nowIso}`,
+      at: nowIso,
+      kind: "data",
+      summary: "Listing facts updated"
+    }
+  };
+}
+function applyStoredPortalData(detail, stored) {
+  const saved = readStoredPortalData(stored);
+  if (!saved) return detail;
+  const address = saved.address ? {
+    ...detail.address,
+    ...saved.address,
+    formatted: formatPortalAddress(saved.address)
+  } : detail.address;
+  const facts = detail.facts.map((fact) => {
+    if (!Object.prototype.hasOwnProperty.call(saved.facts, fact.id)) return fact;
+    const value = saved.facts[fact.id];
+    return { ...fact, value: value || EMPTY, empty: !value };
+  });
+  return {
+    ...detail,
+    title: address.formatted || "Listing",
+    address,
+    facts
+  };
+}
+function readStoredPortalData(value) {
+  const row = asRecord$4(value);
+  if (!row) return null;
+  const addressRow = asRecord$4(row.address);
+  const factsRow = asRecord$4(row.facts);
+  if (!addressRow && !factsRow) return null;
+  const facts = {};
+  if (factsRow) {
+    for (const fact of FACT_DEFS) {
+      if (!Object.prototype.hasOwnProperty.call(factsRow, fact.id)) continue;
+      facts[fact.id] = clipText(factsRow[fact.id], PORTAL_FACT_TEXT_LIMIT);
+    }
+  }
+  return {
+    address: addressRow ? normalizeAddressLines(addressRow) : null,
+    facts
+  };
+}
+function normalizeAddressLines(row) {
+  return {
+    line1: clipText(row.line1, PORTAL_ADDRESS_LIMITS.line1),
+    line2: clipText(row.line2, PORTAL_ADDRESS_LIMITS.line2),
+    city: clipText(row.city, PORTAL_ADDRESS_LIMITS.city),
+    state: clipText(row.state, PORTAL_ADDRESS_LIMITS.state),
+    zip: clipText(row.zip, PORTAL_ADDRESS_LIMITS.zip)
+  };
+}
+function clipText(value, max) {
+  let raw = "";
+  if (typeof value === "string") raw = value;
+  else if (typeof value === "number" && Number.isFinite(value)) raw = String(value);
+  else if (typeof value === "boolean") raw = value ? "Yes" : "No";
+  else return "";
+  return raw.replace(/\u0000/g, "").trim().slice(0, max);
+}
+function applyPortalMediaChange(store, items, change, nowIso) {
+  if ("layout" in change) return applyPhotoLayout(store, items, change.layout, nowIso);
+  if ("group" in change) return applyPhotoGroup(store, items, change.group, nowIso);
+  const bucket2 = items.filter((item) => item.kind === change.kind).sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
+  const index = bucket2.findIndex((item) => item.id === change.id);
+  if (index < 0) return { ok: false, error: "That file is not on this listing." };
+  const next = bucket2.map((item) => ({ ...item }));
+  const current = next[index];
+  let summary = "";
+  if ("hidden" in change && current.hidden !== change.hidden) {
+    current.hidden = change.hidden;
+    summary = change.hidden ? `Hid ${mediaLabel(current)} from the presentation` : `Restored ${mediaLabel(current)} to the presentation`;
+  }
+  if ("move" in change) {
+    const swapWith = change.move === "earlier" ? index - 1 : index + 1;
+    if (swapWith >= 0 && swapWith < next.length) {
+      const other = next[swapWith];
+      next[swapWith] = current;
+      next[index] = other;
+      summary = summary || `Moved ${mediaLabel(current)} ${change.move === "earlier" ? "earlier" : "later"}`;
+    }
+  }
+  if (!summary) return { ok: true, store, activity: null };
+  const activity = {
+    id: `portal-${change.kind}-${change.id}-${nowIso}`,
+    at: nowIso,
+    kind: change.kind,
+    summary
+  };
+  return {
+    ok: true,
+    store: { ...store, [storeKey(change.kind)]: prefsFrom(next) },
+    activity
+  };
+}
+function applyPhotoLayout(store, items, layout, nowIso) {
+  const bucket2 = items.filter((item) => item.kind === "photo");
+  const known = new Map(bucket2.map((item) => [item.id, item]));
+  const groupIds = new Set(store.photoGroups.map((group) => group.id));
+  const seen = /* @__PURE__ */ new Set();
+  const next = [];
+  for (const entry2 of layout) {
+    const item = known.get(entry2.id);
+    if (!item || seen.has(entry2.id)) continue;
+    if (entry2.groupId && !groupIds.has(entry2.groupId)) return { ok: false, error: "That group is not on this listing." };
+    seen.add(entry2.id);
+    next.push({ ...item, groupId: entry2.groupId });
+  }
+  if (next.length === 0) return { ok: false, error: "Choose photos to arrange." };
+  for (const item of bucket2) {
+    if (!seen.has(item.id)) next.push(item);
+  }
+  return {
+    ok: true,
+    store: { ...store, photos: prefsFrom(next) },
+    activity: {
+      id: `portal-photo-layout-${nowIso}`,
+      at: nowIso,
+      kind: "photo",
+      summary: "Updated photo order"
+    }
+  };
+}
+function applyPhotoGroup(store, items, change, nowIso) {
+  const photos = items.filter((item) => item.kind === "photo").map((item) => ({ ...item }));
+  const groups = store.photoGroups.map((group) => ({ ...group }));
+  let summary = "";
+  if (change.action === "create") {
+    const name = change.name.trim().slice(0, 60);
+    if (!name) return { ok: false, error: "Name the group." };
+    if (groups.length >= 24) return { ok: false, error: "This listing already has 24 groups." };
+    const chosen = new Set(change.photoIds);
+    if (!photos.some((photo) => chosen.has(photo.id))) return { ok: false, error: "Choose photos for this group." };
+    const id = nextGroupId(groups.map((group) => group.id));
+    groups.push({ id, name, order: groups.length });
+    photos.forEach((photo) => {
+      if (chosen.has(photo.id)) photo.groupId = id;
+    });
+    summary = `Created photo group ${name}`;
+  }
+  if (change.action === "rename") {
+    const group = groups.find((item) => item.id === change.id);
+    const name = change.name.trim().slice(0, 60);
+    if (!group) return { ok: false, error: "That group is not on this listing." };
+    if (!name) return { ok: false, error: "Name the group." };
+    group.name = name;
+    summary = `Renamed photo group to ${name}`;
+  }
+  if (change.action === "remove") {
+    const group = groups.find((item) => item.id === change.id);
+    if (!group) return { ok: false, error: "That group is not on this listing." };
+    photos.forEach((photo) => {
+      if (photo.groupId === group.id) photo.groupId = "";
+    });
+    const remaining = groups.filter((item) => item.id !== group.id);
+    remaining.forEach((item, order) => {
+      item.order = order;
+    });
+    summary = `Removed photo group ${group.name}`;
+    return {
+      ok: true,
+      store: { ...store, photos: prefsFrom(photos), photoGroups: remaining },
+      activity: {
+        id: `portal-photo-group-${nowIso}`,
+        at: nowIso,
+        kind: "photo",
+        summary
+      }
+    };
+  }
+  if (!summary) return { ok: false, error: "That group change is not supported." };
+  return {
+    ok: true,
+    store: { ...store, photos: prefsFrom(photos), photoGroups: groups },
+    activity: {
+      id: `portal-photo-group-${nowIso}`,
+      at: nowIso,
+      kind: "photo",
+      summary
+    }
+  };
+}
+function prefsFrom(items) {
+  const prefs = {};
+  items.forEach((item, order) => {
+    prefs[item.id] = { hidden: item.hidden, order, groupId: item.groupId || "" };
+  });
+  return prefs;
+}
+function nextGroupId(existing) {
+  const taken = new Set(existing);
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const id = `g${Math.random().toString(36).slice(2, 10)}`;
+    if (/^g[a-z0-9]{4,16}$/.test(id) && !taken.has(id)) return id;
+  }
+  const fallback = `g${Date.now().toString(36).slice(-8)}`;
+  return taken.has(fallback) ? `${fallback}a` : fallback;
+}
+function sanitizeWebsiteSettings(value, base = defaultPortalWebsite()) {
+  const row = value && typeof value === "object" ? value : {};
+  const design = text$9(row.design);
+  const font = text$9(row.font);
+  const color = text$9(row.color);
+  const style = text$9(row.style);
+  return {
+    design: WEBSITE_DESIGNS.has(design) ? design : base.design,
+    font: WEBSITE_FONTS.has(font) ? font : base.font,
+    color: WEBSITE_COLORS.has(color) ? color : base.color,
+    style: WEBSITE_STYLES.has(style) ? style : base.style,
+    published: boolOr(row.published, base.published),
+    showPhotos: boolOr(row.showPhotos, base.showPhotos),
+    showVideo: boolOr(row.showVideo, base.showVideo),
+    showTours: boolOr(row.showTours, base.showTours),
+    showFloorplans: boolOr(row.showFloorplans, base.showFloorplans),
+    tileLook: ""
+  };
+}
+function readMediaStore(value) {
+  const row = value && typeof value === "object" ? value : {};
+  return {
+    photos: readPrefs(row.photos),
+    videos: readPrefs(row.videos),
+    floorplans: readPrefs(row.floorplans),
+    tours: readPrefs(row.tours),
+    photoGroups: readPhotoGroups(row.photoGroups)
+  };
+}
+function storeKey(kind) {
+  if (kind === "photo") return "photos";
+  if (kind === "video") return "videos";
+  if (kind === "floorplan") return "floorplans";
+  return "tours";
+}
+function groupIdText(value) {
+  if (typeof value !== "string") return "";
+  const id = value.trim();
+  return /^(?:g|s)[a-z0-9]{4,16}$/.test(id) ? id : "";
+}
+function readPhotoGroups(value) {
+  if (!Array.isArray(value)) return [];
+  const groups = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const item of value) {
+    const row = asRecord$4(item);
+    if (!row) continue;
+    const id = groupIdText(row.id);
+    const name = clipText(row.name, 60);
+    if (!id || !name || seen.has(id)) continue;
+    seen.add(id);
+    groups.push({
+      id,
+      name,
+      order: typeof row.order === "number" && Number.isFinite(row.order) ? row.order : groups.length
+    });
+  }
+  return groups.sort((a, b) => a.order - b.order || a.name.localeCompare(b.name)).slice(0, 24);
+}
+function readPrefs(value) {
+  if (!value || typeof value !== "object") return {};
+  const out = {};
+  for (const [id, prefs] of Object.entries(value)) {
+    if (!id || !prefs || typeof prefs !== "object") continue;
+    const row = prefs;
+    out[id] = {
+      hidden: row.hidden === true,
+      order: typeof row.order === "number" && Number.isFinite(row.order) ? row.order : 0,
+      groupId: groupIdText(row.groupId)
+    };
+  }
+  return out;
+}
+function readWebsite(value) {
+  return sanitizeWebsiteSettings(value, defaultPortalWebsite());
+}
+function text$9(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+function boolOr(value, fallback) {
+  return typeof value === "boolean" ? value : fallback;
+}
+function asRecord$4(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : null;
+}
+function readFact(records, keys) {
+  for (const record2 of records) {
+    const bags = [record2, asRecord$4(record2.property), asRecord$4(record2.propertyDetails), asRecord$4(record2.listingInfo), asRecord$4(record2.details)];
+    for (const bag of bags) {
+      if (!bag) continue;
+      for (const key of keys) {
+        const value = bag[key];
+        if (value == null || value === "") continue;
+        return value;
+      }
+    }
+  }
+  return void 0;
+}
+function factText(value) {
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  if (typeof value === "string" && value.trim()) return value.trim();
+  if (Array.isArray(value)) {
+    const parts = value.map((item) => factText(item)).filter(Boolean);
+    return parts.join(", ");
+  }
+  return "";
+}
+function formatPortalAddress(address) {
+  return [address.line1, address.line2, [address.city, [address.state, address.zip].filter(Boolean).join(" ")].filter(Boolean).join(", ")].filter(Boolean).join(", ");
+}
+function readAddress(records) {
+  const address = {
+    line1: "",
+    line2: "",
+    city: "",
+    state: "",
+    zip: "",
+    formatted: "",
+    lat: null,
+    lng: null,
+    mapUrl: null
+  };
+  for (const record2 of records) {
+    fillAddress(address, addressFromRecord(record2));
+  }
+  address.formatted = formatPortalAddress(address);
+  const geo = address.lat != null && address.lng != null ? { lat: address.lat, lng: address.lng } : null;
+  address.mapUrl = geo ? mapEmbedUrl(geo.lat, geo.lng) : null;
+  return address;
+}
+function fillAddress(target, source) {
+  if (!target.line1 && source.line1) target.line1 = source.line1;
+  if (!target.line2 && source.line2) target.line2 = source.line2;
+  if (!target.city && source.city) target.city = source.city;
+  if (!target.state && source.state) target.state = source.state;
+  if (!target.zip && source.zip) target.zip = source.zip;
+  if (target.lat == null && source.lat != null) target.lat = source.lat;
+  if (target.lng == null && source.lng != null) target.lng = source.lng;
+}
+function addressFromRecord(record2) {
+  const structured = asRecord$4(record2.address) || asRecord$4(record2.shootLocation) || asRecord$4(record2.propertyAddress);
+  const parsed = parseAddressText(
+    text$9(record2.addressLine1) ? "" : addressString(record2.address) || addressString(record2.propertyAddress) || addressString(record2.shootLocation) || text$9(structured?.formatted)
+  );
+  const line1 = firstText(record2, ["addressLine1", "line1", "street", "streetAddress"]) || text$9(structured?.street) || text$9(structured?.line1) || text$9(structured?.addressLine1) || parsed.line1;
+  const line2 = firstText(record2, ["addressLine2", "line2", "unit", "street2"]) || text$9(structured?.line2) || text$9(structured?.unit) || parsed.line2;
+  const split = splitUnit(line1);
+  return {
+    line1: split.line1,
+    line2: line2 || split.line2,
+    city: firstText(record2, ["city"]) || text$9(structured?.city) || parsed.city,
+    state: firstText(record2, ["state"]) || text$9(structured?.state) || parsed.state,
+    zip: firstText(record2, ["zip", "postalCode"]) || text$9(structured?.zip) || text$9(structured?.postalCode) || parsed.zip,
+    formatted: "",
+    lat: readCoord(record2.lat ?? record2.latitude ?? structured?.lat ?? structured?.latitude ?? nestedCoord(record2, "lat"), "lat"),
+    lng: readCoord(record2.lng ?? record2.longitude ?? structured?.lng ?? structured?.longitude ?? nestedCoord(record2, "lng"), "lng"),
+    mapUrl: null
+  };
+}
+function addressString(value) {
+  return addressText(value);
+}
+function firstText(record2, keys) {
+  for (const key of keys) {
+    const value = text$9(record2[key]);
+    if (value) return value;
+  }
+  return "";
+}
+function parseAddressText(raw) {
+  const empty = { line1: "", line2: "", city: "", state: "", zip: "" };
+  if (!raw) return empty;
+  const parts = raw.split(",").map((part) => part.trim()).filter(Boolean).filter((part) => !/^(usa|u\.s\.a\.|united states)$/i.test(part));
+  if (parts.length === 0) return empty;
+  const last = parts[parts.length - 1];
+  const stateZip = last.match(/^([A-Za-z]{2})\s+(\d{5}(?:-\d{4})?)$/);
+  if (!stateZip || parts.length < 2) return { ...empty, line1: raw.replace(/,\s*(usa|united states)$/i, "").trim() };
+  const city = parts[parts.length - 2];
+  const street = parts.slice(0, -2);
+  let line1 = street[0] || "";
+  let line2 = "";
+  if (street.length >= 2 && isUnit(street[1])) {
+    line2 = street[1];
+  } else if (street.length > 1) {
+    line1 = street.join(", ");
+  }
+  return { line1, line2, city, state: stateZip[1].toUpperCase(), zip: stateZip[2] };
+}
+function isUnit(value) {
+  return /^(apt|apartment|unit|suite|ste|bldg|building|floor|#)\b/i.test(value);
+}
+function splitUnit(line1) {
+  const match = line1.match(/^(.*?)(?:,\s*|\s+)((?:apt|apartment|unit|suite|ste|bldg|building|floor|#)\s*\S.*)$/i);
+  if (!match) return { line1, line2: "" };
+  return { line1: match[1].trim(), line2: match[2].trim() };
+}
+function nestedCoord(record2, axis) {
+  const geo = asRecord$4(record2.geo) || asRecord$4(record2.location) || asRecord$4(record2.geometry);
+  if (!geo) return void 0;
+  const location = asRecord$4(geo.location) || geo;
+  if (axis === "lat") return location.lat ?? location.latitude;
+  return location.lng ?? location.longitude;
+}
+function readCoord(value, axis) {
+  const number = typeof value === "number" ? value : typeof value === "string" && value.trim() ? Number(value) : NaN;
+  if (!Number.isFinite(number)) return null;
+  if (axis === "lat" && (number < -90 || number > 90)) return null;
+  if (axis === "lng" && (number < -180 || number > 180)) return null;
+  return number;
+}
+function mapEmbedUrl(lat, lng) {
+  const delta = 8e-3;
+  const bbox = [lng - delta, lat - delta, lng + delta, lat + delta].map((n) => n.toFixed(6)).join("%2C");
+  return `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat.toFixed(6)}%2C${lng.toFixed(6)}`;
+}
+function collectPhotos(listing, galleries, store, savedOrder = false) {
+  return finishMedia("photo", [...rowsFrom(listing.images), ...galleryRows(galleries)], store.photos, (row) => isPhoto(row), savedOrder);
+}
+function collectVideos(listing, galleries, store, savedOrder = false) {
+  return finishMedia(
+    "video",
+    [...rowsFrom(listing.videos), ...rowsFrom(listing.images), ...clientUploadRows(listing, "video"), ...galleryRows(galleries)],
+    store.videos,
+    (row) => isVideo(row),
+    savedOrder
+  );
+}
+function collectClientUploads(listing, kind, savedOrder = false) {
+  return finishMedia(kind === "social" ? "photo" : "floorplan", clientUploadRows(listing, kind), {}, () => true, savedOrder).map((item) => ({ ...item, kind: kind === "social" ? "photo" : "floorplan" }));
+}
+function collectFloorplans(listing, galleries, store, savedOrder = false) {
+  const rows = [
+    ...rowsFrom(listing.floorplans).filter(isRasterFloorplan),
+    ...rowsFrom(listing.designAssets).filter(isFloorplan),
+    ...rowsFrom(listing.cubiCasaImports).filter(isFloorplan),
+    ...galleryRows(galleries).filter(isFloorplan)
+  ];
+  return finishMedia("floorplan", rows, store.floorplans, () => true, savedOrder);
+}
+function collectTours(listing, galleries, store, savedOrder = false) {
+  const rows = [];
+  for (const key of ["tourUrl", "matterportUrl", "virtualTourUrl", "virtualTour", "threeDTourUrl", "tourLink"]) {
+    const url = safeHttpUrl(listing[key]);
+    if (url) rows.push({ id: key, url, name: key });
+  }
+  for (const item of rowsFrom(listing.tours)) rows.push(item);
+  for (const item of galleryRows(galleries)) rows.push(item);
+  const seen = /* @__PURE__ */ new Set();
+  const drafts = [];
+  rows.forEach((row, index) => {
+    if (row.culled === true) return;
+    const url = safeHttpUrl(row.url) || safeHttpUrl(row.shareUrl) || safeHttpUrl(row.href);
+    if (!url || seen.has(url)) return;
+    const provider = providerFor(url, row);
+    const typed = /^(tour|matterport)$/i.test(text$9(row.type)) || provider != null || isTourField(text$9(row.id));
+    if (!typed) return;
+    seen.add(url);
+    const id = mediaId("tour", row, index);
+    const prefs = store.tours[id];
+    const deliveryName = text$9(row.deliveryName);
+    const storedOrder = typeof row.sortOrder === "number" && Number.isFinite(row.sortOrder) ? row.sortOrder : null;
+    drafts.push({
+      id,
+      kind: "tour",
+      name: text$9(row.name) || text$9(row.title) || provider || "Virtual tour",
+      url,
+      contentType: text$9(row.contentType),
+      hidden: prefs?.hidden === true || row.hiddenFromPresentation === true,
+      order: savedOrder ? storedOrder ?? index + 1e5 : prefs?.order ?? index,
+      groupId: "",
+      uploadedAt: portalTimestamp(row.uploadedAt || row.createdAt),
+      ...deliveryName ? { downloadName: deliveryName } : {},
+      provider: provider || "Virtual tour",
+      embedUrl: provider === "Matterport" ? url : null
+    });
+  });
+  return drafts.sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
+}
+function isTourField(id) {
+  return /tour|matterport/i.test(id);
+}
+function finishMedia(kind, rows, prefs, include, savedOrder = false) {
+  const seen = /* @__PURE__ */ new Set();
+  const items = [];
+  rows.forEach((row, index) => {
+    if (row.culled === true || !include(row)) return;
+    const url = safeHttpUrl(row.url) || safeHttpUrl(row.shareUrl);
+    if (!url) return;
+    const id = mediaId(kind, row, index);
+    const key = text$9(row.path) || text$9(row.storagePath) || url;
+    if (seen.has(id) || seen.has(key) || seen.has(url)) return;
+    seen.add(id);
+    seen.add(key);
+    seen.add(url);
+    const pref = prefs[id];
+    const deliveryName = text$9(row.deliveryName);
+    const storedOrder = typeof row.sortOrder === "number" && Number.isFinite(row.sortOrder) ? row.sortOrder : null;
+    const sectionId = groupIdText(row.sectionId);
+    items.push({
+      id,
+      kind,
+      name: text$9(row.name) || text$9(row.fileName) || text$9(row.title) || `${kind} ${items.length + 1}`,
+      url,
+      contentType: text$9(row.contentType).toLowerCase(),
+      hidden: pref?.hidden === true || row.hiddenFromPresentation === true || row.portalHidden === true,
+      order: savedOrder ? storedOrder ?? index + 1e5 : pref?.order ?? index,
+      groupId: kind === "photo" ? savedOrder ? sectionId : groupIdText(pref?.groupId) : "",
+      uploadedAt: portalTimestamp(row.uploadedAt || row.createdAt),
+      ...deliveryName ? { downloadName: deliveryName } : {}
+    });
+  });
+  return items.sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
+}
+function clientUploadRows(listing, kind) {
+  return rowsFrom(listing.clientPortalUploads).filter((row) => text$9(row.kind) === kind);
+}
+function rowsFrom(value) {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item) => item && typeof item === "object");
+}
+function galleryRows(galleries) {
+  const rows = [];
+  for (const gallery of galleries) {
+    rows.push(...rowsFrom(gallery.mediaItems), ...rowsFrom(gallery.images));
+  }
+  return rows;
+}
+function mediaId(kind, row, index) {
+  const raw = text$9(row.id) || text$9(row.path) || text$9(row.storagePath) || text$9(row.url) || text$9(row.shareUrl) || `${kind}-${index}`;
+  return raw.slice(0, 180);
+}
+const RAW_EXT$1 = /\.(cr2|cr3|nef|nrw|arw|srf|sr2|dng|raw|rw2|orf|raf|pef|3fr|fff|iiq|heic)$/i;
+const IMAGE_EXT$1 = /\.(jpe?g|png|webp|gif)$/i;
+const FLOOR_IMAGE = /\.(jpe?g|png)$/i;
+const VIDEO_EXT = /\.(mp4|mov)$/i;
+function fileName(row) {
+  return text$9(row.name) || text$9(row.fileName) || text$9(row.title) || text$9(row.path) || text$9(row.url);
+}
+function isRaw(row) {
+  const path2 = text$9(row.path) || text$9(row.storagePath);
+  const name = fileName(row);
+  return RAW_EXT$1.test(name) || RAW_EXT$1.test(path2) || path2.includes("/raw/");
+}
+function isFloorplan(row) {
+  if (!isRasterFloorplan(row)) return false;
+  const type = text$9(row.type).toLowerCase();
+  const asset = text$9(row.assetType).toLowerCase();
+  const name = fileName(row);
+  return type === "floorplan" || asset === "floorplan" || /floor\s*plan|floorplan/i.test(name) || type === "image" && asset === "floorplan";
+}
+function isRasterFloorplan(row) {
+  const content = text$9(row.contentType).toLowerCase();
+  const declared = text$9(row.type).toLowerCase();
+  const name = fileName(row);
+  const url = text$9(row.url) || text$9(row.shareUrl);
+  if (content === "image/jpeg" || content === "image/png" || declared === "image/jpeg" || declared === "image/png") return true;
+  return FLOOR_IMAGE.test(name) || FLOOR_IMAGE.test(url.split("?")[0]);
+}
+function isVideo(row) {
+  const type = text$9(row.type).toLowerCase();
+  if (type === "tour" || type === "matterport" || type === "floorplan") return false;
+  const content = text$9(row.contentType).toLowerCase();
+  const name = fileName(row);
+  const url = (text$9(row.url) || text$9(row.shareUrl)).split("?")[0];
+  if (content === "video/mp4" || content === "video/quicktime") return true;
+  return VIDEO_EXT.test(name) || VIDEO_EXT.test(url);
+}
+function isPhoto(row) {
+  const declared = text$9(row.type).toLowerCase();
+  const asset = text$9(row.assetType).toLowerCase();
+  if (isVideo(row) || declared === "floorplan" || asset === "floorplan" || isRaw(row)) return false;
+  const type = text$9(row.type).toLowerCase();
+  if (type === "tour" || type === "matterport" || type === "video" || type === "reel" || type === "file" || type === "document") return false;
+  const content = text$9(row.contentType).toLowerCase();
+  const name = fileName(row);
+  const path2 = text$9(row.path) || text$9(row.storagePath);
+  if (content.startsWith("video/")) return false;
+  if (content && !content.startsWith("image/") && !IMAGE_EXT$1.test(name)) return false;
+  return !content || content.startsWith("image/") || IMAGE_EXT$1.test(name) || IMAGE_EXT$1.test(path2);
+}
+function providerFor(url, row) {
+  let host = "";
+  try {
+    host = new URL(url).hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+  if (host.includes("matterport.com") || /matterport/i.test(text$9(row.type)) || /matterport/i.test(text$9(row.name))) return "Matterport";
+  if (host.includes("cloudpano.com")) return "CloudPano";
+  if (host.includes("iguide")) return "iGUIDE";
+  if (host.includes("kuula.co")) return "Kuula";
+  if (host.includes("eyespy360.com")) return "EyeSpy360";
+  if (host.includes("asteroom.com")) return "Asteroom";
+  if (host.includes("zillow.com") && /3d|tour/i.test(url)) return "Zillow 3D";
+  if (/^(tour|matterport)$/i.test(text$9(row.type))) return "Virtual tour";
+  return null;
+}
+function safeHttpUrl(value) {
+  if (typeof value !== "string") return "";
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.startsWith("//") || trimmed.startsWith("/")) return "";
+  try {
+    const url = new URL(trimmed);
+    if (url.protocol !== "https:" && url.protocol !== "http:") return "";
+    return url.toString();
+  } catch {
+    return "";
+  }
+}
+function readInvoices(invoices) {
+  const seen = /* @__PURE__ */ new Set();
+  const summaries = [];
+  for (const invoice of invoices) {
+    const id = text$9(invoice.id);
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    const total = money$2(invoice.total);
+    summaries.push({
+      id,
+      invoiceNumber: orderHistoryInvoiceNumber({
+        invoiceNumber: invoice.invoiceNumber,
+        id,
+        createdAt: invoice.createdAt
+      }),
+      status: text$9(invoice.status) || "draft",
+      total,
+      amountDue: invoice.amountDue == null ? total : money$2(invoice.amountDue)
+    });
+  }
+  return summaries;
+}
+function money$2(value) {
+  const number = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(number) ? number : 0;
+}
+function buildActivity(sources, photos, videos, floorplans, tours, invoices) {
+  const events = [];
+  const push = (event) => {
+    if (!event || !event.summary) return;
+    if (events.some((item) => item.id === event.id)) return;
+    events.push(event);
+  };
+  const request = sources.orderRequest;
+  if (request) {
+    push(eventOf(
+      `booking-${text$9(request.id) || "request"}`,
+      request.submittedAt || request.createdAt,
+      "booking",
+      "Booking request received"
+    ));
+  }
+  for (const appointment of sources.appointments || []) {
+    const when = appointment.createdAt || appointment.scheduledDate;
+    const status2 = text$9(appointment.status);
+    push(eventOf(
+      `appointment-${text$9(appointment.id) || events.length}`,
+      when,
+      "appointment",
+      status2 === "confirmed" ? "Appointment confirmed" : "Appointment requested"
+    ));
+  }
+  const order = sources.order;
+  if (order) {
+    push(eventOf(
+      `order-${text$9(order.id) || "order"}`,
+      order.confirmedAt || order.createdAt,
+      "booking",
+      "Booking confirmed"
+    ));
+  }
+  push(eventOf(
+    `listing-${text$9(sources.listing.id) || "listing"}`,
+    sources.listing.createdAt,
+    "listing",
+    "Listing file created"
+  ));
+  for (const photo of photos) {
+    push(eventOf(`upload-photo-${photo.id}`, photo.uploadedAt, "photo", `Photo uploaded: ${photo.name}`));
+  }
+  for (const video of videos) {
+    push(eventOf(`upload-video-${video.id}`, video.uploadedAt, "video", `Video uploaded: ${video.name}`));
+  }
+  for (const plan of floorplans) {
+    push(eventOf(`upload-floorplan-${plan.id}`, plan.uploadedAt, "floorplan", `Floorplan uploaded: ${plan.name}`));
+  }
+  for (const tour of tours) {
+    push(eventOf(`tour-${tour.id}`, tour.uploadedAt, "tour", `${tour.provider} tour added`));
+  }
+  for (const gallery of sources.galleries || []) {
+    const status2 = text$9(gallery.status).replace(/_/g, " ") || "opened";
+    push(eventOf(
+      `gallery-${text$9(gallery.id) || events.length}`,
+      gallery.updatedAt || gallery.createdAt,
+      "gallery",
+      `Gallery ${status2}`
+    ));
+  }
+  for (const invoice of sources.invoices || []) {
+    const id = text$9(invoice.id);
+    const number = orderHistoryInvoiceNumber({
+      invoiceNumber: invoice.invoiceNumber,
+      id,
+      createdAt: invoice.createdAt
+    });
+    const status2 = text$9(invoice.status) || "draft";
+    const summary = status2 === "paid" ? `Payment recorded on ${number}` : `Invoice ${number} is ${status2.replace(/_/g, " ")}`;
+    push(eventOf(`invoice-${id || number}`, invoice.paidAt || invoice.updatedAt || invoice.createdAt, "invoice", summary));
+  }
+  for (const entry2 of rowsFrom(sources.listing.auditLog)) {
+    const action = text$9(entry2.action);
+    if (!action || /lockbox|internal|password|secret/i.test(action)) continue;
+    push(eventOf(
+      `audit-${text$9(entry2.id) || action}-${text$9(entry2.at)}`,
+      entry2.at || entry2.createdAt,
+      "audit",
+      action
+    ));
+  }
+  for (const entry2 of rowsFrom(sources.listing.portalActivity)) {
+    push({
+      id: text$9(entry2.id) || `portal-activity-${events.length}`,
+      at: portalTimestamp(entry2.at),
+      kind: text$9(entry2.kind) || "listing",
+      summary: text$9(entry2.summary)
+    });
+  }
+  return events.filter((event) => event.summary).sort((a, b) => {
+    if (a.at && b.at) return a.at.localeCompare(b.at);
+    if (a.at) return -1;
+    if (b.at) return 1;
+    return 0;
+  });
+}
+function eventOf(id, when, kind, summary) {
+  const at = portalTimestamp(when);
+  if (!summary) return null;
+  return { id, at, kind, summary };
+}
+function portalTimestamp(value) {
+  if (!value) return "";
+  if (typeof value === "string") {
+    const parsed = Date.parse(value);
+    return Number.isNaN(parsed) ? "" : new Date(parsed).toISOString();
+  }
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? "" : value.toISOString();
+  if (typeof value === "object") {
+    const record2 = value;
+    if (typeof record2.toDate === "function") {
+      try {
+        const date = record2.toDate();
+        return date instanceof Date && !Number.isNaN(date.getTime()) ? date.toISOString() : "";
+      } catch {
+        return "";
+      }
+    }
+    const seconds = typeof record2.seconds === "number" ? record2.seconds : typeof record2._seconds === "number" ? record2._seconds : null;
+    if (seconds != null) {
+      const date = new Date(seconds * 1e3);
+      return Number.isNaN(date.getTime()) ? "" : date.toISOString();
+    }
+  }
+  return "";
+}
+function mediaLabel(item) {
+  return item.name || item.kind;
+}
+const DEFAULT_SITE_ORIGIN = "https://iconicimagestx.vercel.app";
+const CANONICAL_WWW_ORIGIN = "https://www.iconicimagestx.com";
+const OG_IMAGE_PATH = "/media/photos/drone-hero.jpg";
+const GENERIC_TITLE = "Iconic Images - Creative Media Partners";
+const PUBLIC_PAGES = [
+  {
+    path: "/",
+    file: "index.html",
+    title: "Iconic Images | Real Estate Media in Spring, The Woodlands, and Houston",
+    description: "Photography, video, and listing media for real estate agents in Spring, The Woodlands, and Houston."
+  },
+  {
+    path: "/about",
+    file: "seo/about.html",
+    title: "About | Iconic Images",
+    description: "Iconic Images is a Spring, Texas studio for real estate media, serving The Woodlands, Houston, and nearby communities since 2016."
+  },
+  {
+    path: "/pricing",
+    file: "seo/pricing.html",
+    title: "Pricing | Iconic Images",
+    description: "Listing, branding, and media packages from Iconic Images for agents in Spring, The Woodlands, and Houston."
+  },
+  {
+    path: "/studio-105",
+    file: "seo/studio-105.html",
+    title: "Studio 105 | Iconic Images",
+    description: "Studio 105 in Spring has two portrait rooms, Studio Noir and Studio Blanc, for headshots, brand films, and product photos."
+  },
+  {
+    path: "/portfolio",
+    file: "seo/portfolio.html",
+    title: "Portfolio | Iconic Images",
+    description: "Listing photos, aerials, portraits, and virtual staging by Iconic Images in Spring, The Woodlands, and Houston."
+  },
+  {
+    path: "/stock-footage",
+    file: "seo/stock-footage.html",
+    title: "Stock Footage | Iconic Images",
+    description: "Neighborhood photo stills from Iconic Images for agents listing homes in Spring, The Woodlands, and Houston."
+  },
+  {
+    path: "/contact",
+    file: "seo/contact.html",
+    title: "Contact | Iconic Images",
+    description: "Contact Iconic Images in Spring, Texas about real estate photography and video in The Woodlands and Houston."
+  },
+  {
+    path: "/socials",
+    file: "seo/socials.html",
+    title: "Socials | Iconic Images",
+    description: "Instagram, Facebook, and TikTok from Iconic Images, a real estate media studio in Spring, The Woodlands, and Houston."
+  },
+  {
+    path: "/insights",
+    file: "seo/insights.html",
+    title: "Iconic Insights | Iconic Images",
+    description: "Field notes from Iconic Images on listing photography, video, and marketing in Spring, The Woodlands, and Houston."
+  },
+  {
+    path: "/book",
+    file: "seo/book.html",
+    title: "Book a Shoot | Iconic Images",
+    description: "Schedule listing photography or video with Iconic Images in Spring, The Woodlands, or Houston."
+  },
+  {
+    path: "/apprenticeship",
+    file: "seo/apprenticeship.html",
+    title: "The Apprenticeship Program | Iconic Images",
+    description: "Apprentice listing photos in Spring, The Woodlands, and Houston. A short appointment, photos only, and the program rules."
+  },
+  {
+    path: "/senior-living",
+    file: "seo/senior-living.html",
+    title: "Senior Living Virtual Tours & Photography | Iconic Images",
+    description: "Virtual tours and photography for senior living communities in Spring, The Woodlands, and Houston."
+  },
+  {
+    path: "/privacy",
+    file: "seo/privacy.html",
+    title: "Privacy Policy | Iconic Images",
+    description: `Privacy Policy for ${LEGAL_BUSINESS_NAME}, a real estate media studio based in Spring, Texas.`
+  },
+  {
+    path: "/terms",
+    file: "seo/terms.html",
+    title: "Terms and Conditions | Iconic Images",
+    description: "Terms and Conditions for photography, video, and listing media from Iconic Images in Texas."
+  },
+  {
+    path: "/login",
+    file: "seo/login.html",
+    title: "Client Login | Iconic Images",
+    description: "Client sign-in for Iconic Images. View your listings and delivered media."
+  }
+];
+function readConfiguredOrigin() {
+  const nodeOrigin = typeof process !== "undefined" ? process.env?.VITE_SITE_ORIGIN : "";
+  return String(nodeOrigin || "").trim().replace(/\/$/, "");
+}
+const SITE_ORIGIN = readConfiguredOrigin() || DEFAULT_SITE_ORIGIN;
+function hostnameOf(host) {
+  const first = String(host || "").split(",")[0].trim().toLowerCase().replace(/\.$/, "");
+  if (!first) return "";
+  if (first.startsWith("[")) {
+    const end = first.indexOf("]");
+    return end >= 0 ? first.slice(1, end) : first;
+  }
+  return first.replace(/:\d+$/, "");
+}
+function isCustomDomainHost(host) {
+  const name = hostnameOf(host);
+  return name === "iconicimagestx.com" || name === "www.iconicimagestx.com";
+}
+function originForHost(host, fallback = SITE_ORIGIN) {
+  return isCustomDomainHost(host) ? CANONICAL_WWW_ORIGIN : fallback;
+}
+function canonicalUrl(path2, origin = SITE_ORIGIN) {
+  return path2 === "/" ? `${origin}/` : `${origin}${path2}`;
+}
+function ogImageUrl(origin = SITE_ORIGIN) {
+  return `${origin}${OG_IMAGE_PATH}`;
+}
+function escapeHtml$5(value) {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+function isPublicMetaTag(tag) {
+  return /(?:\bname|\bproperty)\s*=\s*["'](?:description|robots|og:[^"']*|twitter:[^"']*)["']/i.test(tag);
+}
+function stripPublicMeta(html) {
+  return html.replace(/<link\b[^>]*rel=["']canonical["'][^>]*\/?>\s*/gi, "").replace(/<meta\b[^>]*\/?>\s*/gi, (tag) => isPublicMetaTag(tag) ? "" : tag);
+}
+function injectHead(html, tags) {
+  let next = stripPublicMeta(html).replace(/<title\b[^>]*>[\s\S]*?<\/title>\s*/gi, "");
+  if (next.includes("</head>")) {
+    return next.replace("</head>", `    ${tags}
+  </head>`);
+  }
+  return `${tags}
+${next}`;
+}
+function sitemapXml(origin = DEFAULT_SITE_ORIGIN) {
+  const urls = PUBLIC_PAGES.map(
+    (page2) => `  <url><loc>${escapeHtml$5(canonicalUrl(page2.path, origin))}</loc></url>`
+  ).join("\n");
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${urls}
+</urlset>
+`;
+}
+function robotsTxt(origin = DEFAULT_SITE_ORIGIN) {
+  return `User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /portal
+Disallow: /owners
+Disallow: /studio/
+Disallow: /gallery/
+Disallow: /api
+Disallow: /invoice
+
+Sitemap: ${origin}/sitemap.xml
+`;
+}
+const PRESENTATION_PREVIEW_TOKEN = "preview";
+const PRESENTATION_PATH = "/present";
+const TOKEN_PATTERN = /^[A-Za-z0-9_-]{22,80}$/;
+const RAW_EXT = /\.(cr2|cr3|nef|nrw|arw|srf|sr2|dng|raw|rw2|orf|raf|pef|3fr|fff|iiq|heic)$/i;
+const IMAGE_EXT = /\.(jpe?g|png|webp|gif)$/i;
+const SKIP_TYPES = /* @__PURE__ */ new Set(["video", "reel", "tour", "matterport", "file", "document"]);
+function presentationPath(token) {
+  return `${PRESENTATION_PATH}/${encodeURIComponent(token)}`;
+}
+function activePresentationPath(record2) {
+  if (!record2 || record2.presentationEnabled === false) return null;
+  const token = typeof record2.presentationToken === "string" ? record2.presentationToken.trim() : "";
+  if (!token || token === PRESENTATION_PREVIEW_TOKEN || !isPresentationToken(token)) return null;
+  return presentationPath(token);
+}
+function isPresentationToken(value) {
+  return value === PRESENTATION_PREVIEW_TOKEN || TOKEN_PATTERN.test(value);
+}
+function createPresentationToken(randomBytes2) {
+  return randomBytes2(18).toString("base64url");
+}
+function text$8(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+function roomFromFields(row, folders) {
+  for (const key of ["room", "roomName", "roomType", "scene"]) {
+    const value = text$8(row[key]);
+    if (value && value.length <= 48 && !IMAGE_EXT.test(value) && !RAW_EXT.test(value)) return value;
+  }
+  const folderId = text$8(row.folderId);
+  if (folderId && folders.has(folderId)) return folders.get(folderId) || "";
+  return "";
+}
+function folderMap(listing) {
+  const map = /* @__PURE__ */ new Map();
+  const folders = listing?.mediaFolders;
+  if (!Array.isArray(folders)) return map;
+  for (const item of folders) {
+    if (!item || typeof item !== "object") continue;
+    const row = item;
+    const id = text$8(row.id);
+    const name = text$8(row.name);
+    if (id && name) map.set(id, name);
+  }
+  return map;
+}
+function isRawPath(path2, name) {
+  return RAW_EXT.test(name) || RAW_EXT.test(path2) || path2.includes("/raw/");
+}
+function pushDraft(drafts, row, index, folders, fallbackRoom = "") {
+  const path2 = text$8(row.path) || text$8(row.storagePath);
+  const name = text$8(row.name) || text$8(row.fileName) || text$8(row.title) || path2.split("/").pop() || "";
+  const type = text$8(row.type).toLowerCase();
+  if (type && SKIP_TYPES.has(type)) return;
+  if (isRawPath(path2, name)) return;
+  const contentType = text$8(row.contentType).toLowerCase();
+  const looksLikeImage = !contentType || contentType.startsWith("image/") || IMAGE_EXT.test(name) || IMAGE_EXT.test(path2);
+  if (!looksLikeImage) return;
+  if (contentType && !contentType.startsWith("image/") && !IMAGE_EXT.test(name)) return;
+  const sourceUrl = rasterShareSource(row);
+  if (!sourceUrl) return;
+  const room = roomFromFields(row, folders) || fallbackRoom;
+  const order = typeof row.order === "number" && Number.isFinite(row.order) ? row.order : index;
+  const final = row.studioApproved === true || text$8(row.studioRole) === "final" || path2.includes("/finals/");
+  drafts.push({
+    id: text$8(row.id) || path2 || sourceUrl,
+    url: sourceUrl,
+    alt: room ? `${room} photograph` : "Listing photograph",
+    room,
+    order,
+    index,
+    path: path2,
+    sourcePath: text$8(row.sourcePath),
+    sourceUrl,
+    final
+  });
+}
+function listingDrafts(listing, hidden) {
+  if (!listing || !Array.isArray(listing.images)) return [];
+  const folders = folderMap(listing);
+  const drafts = [];
+  listing.images.forEach((item, index) => {
+    const frame = frameFromListingImage(item, index);
+    if (!frame || frame.raw || !frame.previewable) return;
+    const row = item && typeof item === "object" ? { ...item } : {};
+    row.url = row.url || frame.url;
+    row.path = row.path || frame.path;
+    row.name = row.name || frame.name;
+    row.contentType = row.contentType || frame.contentType;
+    row.id = row.id || frame.id;
+    if (rowHiddenFromPresentation(row, hidden)) return;
+    pushDraft(drafts, row, index, folders);
+  });
+  return drafts;
+}
+function galleryDrafts(galleries, start, hidden) {
+  const drafts = [];
+  let index = start;
+  for (const gallery of galleries || []) {
+    const buckets = [gallery.mediaItems, gallery.images];
+    for (const bucket2 of buckets) {
+      if (!Array.isArray(bucket2)) continue;
+      for (const item of bucket2) {
+        if (!item || typeof item !== "object") continue;
+        const row = item;
+        if (rowHiddenFromPresentation(row, hidden)) continue;
+        pushDraft(drafts, row, index, /* @__PURE__ */ new Map());
+        index += 1;
+      }
+    }
+  }
+  return drafts;
+}
+function preferFinals(drafts) {
+  const finals = drafts.filter((item) => item.final);
+  if (finals.length === 0) return drafts;
+  const replaced = new Set(finals.map((item) => item.sourcePath).filter(Boolean));
+  const finalPaths = new Set(finals.map((item) => item.path).filter(Boolean));
+  return drafts.filter((item) => {
+    if (item.final) return true;
+    if (item.path && replaced.has(item.path)) return false;
+    if (item.path && finalPaths.has(item.path)) return false;
+    return true;
+  });
+}
+function presentationDrafts(source) {
+  const hidden = hiddenPresentationKeys(source.listing);
+  const fromListing = listingDrafts(source.listing, hidden);
+  const fromGalleries = galleryDrafts(source.galleries, fromListing.length, hidden);
+  const seen = /* @__PURE__ */ new Set();
+  const photos = [];
+  const sorted = [...preferFinals([...fromListing, ...fromGalleries])].sort((a, b) => a.order - b.order || a.index - b.index);
+  for (const item of sorted) {
+    const key = item.path || item.sourceUrl;
+    if (!item.sourceUrl || seen.has(key) || seen.has(item.sourceUrl)) continue;
+    seen.add(key);
+    seen.add(item.sourceUrl);
+    photos.push(item);
+  }
+  return photos.slice(0, 200);
+}
+function presentationDisplayPath(token, index) {
+  return `/api/media/display/p/${encodeURIComponent(token)}/${index}`;
+}
+function collectPresentationPhotos(source) {
+  const drafts = presentationDrafts(source);
+  const tokenRoute = TOKEN_PATTERN.test(source.token);
+  return drafts.map((item, index) => ({
+    id: item.id,
+    url: tokenRoute ? presentationDisplayPath(source.token, index) : item.sourceUrl,
+    alt: item.alt,
+    room: item.room
+  }));
+}
+function presentationRooms(photos) {
+  const rooms = [];
+  for (const photo of photos) {
+    const name = photo.room.trim();
+    if (!name) continue;
+    const last = rooms[rooms.length - 1];
+    if (last && last.name.toLowerCase() === name.toLowerCase()) last.count += 1;
+    else rooms.push({ name, count: 1 });
+  }
+  return rooms;
+}
+function addressParts$1(listing) {
+  const source = listing?.address ?? listing?.shootLocation ?? listing?.propertyAddress;
+  if (typeof source === "string" && source.trim()) {
+    return { address: source.trim(), street: source.trim(), locality: "" };
+  }
+  if (source && typeof source === "object") {
+    const row = source;
+    const street = text$8(row.street);
+    const locality = [text$8(row.city), [text$8(row.state), text$8(row.zip)].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+    const formatted = text$8(row.formatted);
+    const address = formatted || [street, locality].filter(Boolean).join(", ");
+    if (address) return { address, street: street || address, locality: street ? locality : "" };
+  }
+  const property = text$8(listing?.propertyAddress);
+  if (property) return { address: property, street: property, locality: "" };
+  const labeled = listingAddressLabel({
+    address: listing?.address,
+    shootLocation: listing?.shootLocation
+  });
+  if (labeled !== "Untitled listing") return { address: labeled, street: labeled, locality: "" };
+  return { address: "", street: "", locality: "" };
+}
+function agentNameOf(listing) {
+  if (!listing) return "";
+  const direct = text$8(listing.agentName) || text$8(listing.listingAgent);
+  if (direct) return direct;
+  const agent = listing.agent;
+  if (agent && typeof agent === "object") return text$8(agent.name);
+  if (typeof agent === "string") return agent.trim();
+  return "";
+}
+function priceOf(listing) {
+  const raw = listing?.listPrice ?? listing?.price;
+  if (typeof raw === "number" && Number.isFinite(raw) && raw > 0) {
+    return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(raw);
+  }
+  const value = text$8(raw);
+  if (!value) return "";
+  if (value.startsWith("$")) return value;
+  const numeric2 = Number(value.replace(/[$,]/g, ""));
+  if (Number.isFinite(numeric2) && numeric2 > 0) {
+    return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(numeric2);
+  }
+  return "";
+}
+function countOf(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  const raw = text$8(value);
+  return raw;
+}
+function absoluteUrl(origin, url) {
+  if (!url) return "";
+  if (url.startsWith("/")) return `${origin.replace(/\/$/, "")}${url}`;
+  return url;
+}
+function buildPresentation(source) {
+  const listing = source.listing || null;
+  if (listing && listing.presentationEnabled === false) return null;
+  const photos = collectPresentationPhotos(source);
+  const { address, street, locality } = addressParts$1(listing);
+  const agentName = agentNameOf(listing);
+  const clientName2 = "";
+  const origin = source.origin || "";
+  const path2 = presentationPath(source.token);
+  const pageUrl = origin ? `${origin.replace(/\/$/, "")}${path2}` : path2;
+  const titleAddress = address || "Private presentation";
+  const description = photos.length ? `${photos.length} photograph${photos.length === 1 ? "" : "s"}${address ? ` of ${address}` : ""}. A private presentation from Iconic Images.` : "A private listing presentation from Iconic Images.";
+  return {
+    token: source.token,
+    listingId: text$8(listing?.id) || null,
+    seeded: false,
+    enabled: true,
+    address,
+    street,
+    locality,
+    agentName,
+    clientName: clientName2,
+    price: priceOf(listing),
+    beds: countOf(listing?.bedrooms),
+    baths: countOf(listing?.bathrooms),
+    photos,
+    rooms: presentationRooms(photos),
+    meta: {
+      title: `${titleAddress} · Iconic Images`,
+      description,
+      image: absoluteUrl(origin, photos[0]?.url || ""),
+      url: pageUrl
+    }
+  };
+}
+const SEEDED_PHOTOS = [
+  { src: "/media/photos/luxury-exterior.jpg", room: "Exterior", alt: "Twilight exterior of a luxury home" },
+  { src: "/media/photos/drone-hero.jpg", room: "Aerial", alt: "Aerial view over the property" },
+  { src: "/media/before-after/aerial-estate.jpg", room: "Grounds", alt: "Aerial view of the estate and grounds" },
+  { src: "/media/before-after/twilight-pool-lifestyle.jpg", room: "Rear pool", alt: "Rear pool and patio at twilight" },
+  { src: "/media/before-after/pavilion-lifestyle.jpg", room: "Pavilion", alt: "Pool pavilion and outdoor lounge" },
+  { src: "/media/photos/luxury-interior.jpg", room: "Interior", alt: "Interior of the home" },
+  { src: "/media/photos/listing-living-01.jpg", room: "Living room", alt: "Living room" },
+  { src: "/media/photos/listing-living-02.jpg", room: "Living room", alt: "Living room" },
+  { src: "/media/photos/listing-living-03.jpg", room: "Living room", alt: "Living room" },
+  { src: "/media/photos/listing-living-04.jpg", room: "Living room", alt: "Living room" },
+  { src: "/media/photos/staged-living-room.jpg", room: "Living room", alt: "Staged living room" },
+  { src: "/media/before-after/living-declutter.jpg", room: "Living room", alt: "Living room prepared for the listing" },
+  { src: "/media/before-after/primary-suite-staged.jpg", room: "Primary suite", alt: "Primary suite" },
+  { src: "/media/before-after/aerial-estate-close.jpg", room: "Aerial", alt: "Closer aerial of the home" }
+];
+function seededPresentation(origin = "") {
+  const photos = SEEDED_PHOTOS.map((item, index) => ({
+    id: `seed-${index + 1}`,
+    url: item.src,
+    alt: item.alt,
+    room: item.room
+  }));
+  const path2 = presentationPath(PRESENTATION_PREVIEW_TOKEN);
+  const pageUrl = origin ? `${origin.replace(/\/$/, "")}${path2}` : path2;
+  return {
+    token: PRESENTATION_PREVIEW_TOKEN,
+    listingId: null,
+    seeded: true,
+    enabled: true,
+    address: "",
+    street: "",
+    locality: "",
+    agentName: "",
+    clientName: "",
+    price: "",
+    beds: "",
+    baths: "",
+    photos,
+    rooms: presentationRooms(photos),
+    meta: {
+      title: "Sample presentation · Iconic Images",
+      description: `${photos.length} photographs. A private presentation from Iconic Images.`,
+      image: absoluteUrl(origin, photos[0]?.url || ""),
+      url: pageUrl
+    }
+  };
+}
+function injectPresentationMeta(html, meta) {
+  const tags = [
+    `<title>${escapeHtml$4(meta.title)}</title>`,
+    `<meta name="description" content="${escapeHtml$4(meta.description)}" />`,
+    `<meta name="robots" content="noindex, nofollow" />`,
+    `<meta property="og:type" content="website" />`,
+    `<meta property="og:title" content="${escapeHtml$4(meta.title)}" />`,
+    `<meta property="og:description" content="${escapeHtml$4(meta.description)}" />`,
+    `<meta property="og:url" content="${escapeHtml$4(meta.url)}" />`,
+    meta.image ? `<meta property="og:image" content="${escapeHtml$4(meta.image)}" />` : "",
+    `<meta name="twitter:card" content="summary_large_image" />`,
+    `<meta name="twitter:title" content="${escapeHtml$4(meta.title)}" />`,
+    `<meta name="twitter:description" content="${escapeHtml$4(meta.description)}" />`,
+    meta.image ? `<meta name="twitter:image" content="${escapeHtml$4(meta.image)}" />` : ""
+  ].filter(Boolean).join("\n    ");
+  let next = stripPublicMeta(html).replace(/<title>[\s\S]*?<\/title>/gi, "");
+  if (next.includes("</head>")) {
+    next = next.replace("</head>", `    ${tags}
+  </head>`);
+  } else {
+    next = `${tags}
+${next}`;
+  }
+  return next;
+}
+function escapeHtml$4(value) {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
 const db$m = () => admin.firestore();
-function text$a(value) {
+function text$7(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function docRecord(snap) {
@@ -16049,7 +17703,7 @@ async function galleryById(id) {
 }
 async function relatedForListing(listing) {
   const related = await galleriesWhere("listingId", listing.id);
-  const extras = [text$a(listing.galleryId), text$a(listing.playtestGalleryId)];
+  const extras = [text$7(listing.galleryId), text$7(listing.playtestGalleryId)];
   for (const galleryId of extras) {
     if (!galleryId || related.some((doc) => doc.id === galleryId)) continue;
     const extra = await galleryById(galleryId);
@@ -16098,8 +17752,8 @@ async function resolveClientGalleryLink(id) {
   const order = docRecord(orderSnap);
   const orderRequest = docRecord(requestSnap);
   const galleriesByOrderId = order ? await galleriesWhere("orderId", id) : [];
-  const pointedGalleryId = text$a(orderRequest?.galleryId) || text$a(order?.galleryId);
-  const pointedListingId = text$a(orderRequest?.listingId) || text$a(order?.listingId);
+  const pointedGalleryId = text$7(orderRequest?.galleryId) || text$7(order?.galleryId);
+  const pointedListingId = text$7(orderRequest?.listingId) || text$7(order?.listingId);
   const pointedGallery = pointedGalleryId ? await galleryById(pointedGalleryId) : null;
   let pointedListing = null;
   let pointedRelated = relatedGalleries;
@@ -16121,7 +17775,7 @@ async function resolveClientGalleryLink(id) {
 }
 async function invoiceForListing(listing) {
   const load = (id) => db$m().collection("invoices").doc(id).get();
-  const invoiceId = text$a(listing.invoiceId);
+  const invoiceId = text$7(listing.invoiceId);
   if (invoiceId) {
     const doc = await readInvoiceDoc(load, invoiceId);
     if (doc && !invoiceRedirectTarget(doc.data)) return { id: doc.id, ...doc.data };
@@ -16133,7 +17787,7 @@ async function invoiceForListing(listing) {
     const doc = await readInvoiceDoc(load, legacyId);
     if (doc && !invoiceRedirectTarget(doc.data)) return { id: doc.id, ...doc.data };
   }
-  const orderId = text$a(listing.orderId);
+  const orderId = text$7(listing.orderId);
   if (!orderId) return null;
   try {
     const snap = await db$m().collection("invoices").where("orderId", "==", orderId).limit(1).get();
@@ -16181,47 +17835,47 @@ async function readStudioCaller(req) {
     return null;
   }
 }
-function sharePlaybackOpen(listing, invoice, related) {
-  return studioDownloadsUnlocked({
-    listing: {
-      id: listing.id,
-      invoiceStatus: listing.invoiceStatus,
-      paymentStatus: listing.paymentStatus,
-      invoice: listing.invoice,
-      downloadEnabled: listing.downloadEnabled === true || related.some((doc) => doc.downloadEnabled === true),
-      downloadsReleased: listing.downloadsReleased === true || related.some((doc) => doc.downloadsReleased === true),
-      lockDownloads: listing.lockDownloads
-    },
-    galleries: [],
-    invoice
-  });
+const STUDIO_SIGN_IN = "Sign in to open this studio.";
+const STUDIO_OTHER_CLIENT = "This studio belongs to another client.";
+function forbiddenStudio() {
+  return { ok: false, httpStatus: 403, code: "studio_forbidden", message: STUDIO_OTHER_CLIENT };
 }
-async function finishGalleryLink(result, caller) {
-  if (!result.ok || result.kind !== "listing") return result;
+async function callerCanOpenGallery(gallery, caller) {
+  if (callerCanOpenPrivateStudio(gallery, caller)) return true;
+  const listingId = text$7(gallery.listingId);
+  if (!listingId || listingId === gallery.id) return false;
+  const listing = docRecord(await db$m().collection("listings").doc(listingId).get());
+  return Boolean(listing && callerCanOpenPrivateStudio(listing, caller));
+}
+async function finishGalleryLink(id, result, caller) {
+  if (result.ok === false) {
+    if (result.code === "studio_locked" || result.code === "studio_disabled") {
+      const subjectId = result.subjectId || id;
+      const listing2 = docRecord(await db$m().collection("listings").doc(subjectId).get());
+      if (!listing2 || !callerCanOpenPrivateStudio(listing2, caller)) return forbiddenStudio();
+    }
+    return result;
+  }
+  if (result.kind === "gallery") {
+    const gallery = await galleryById(result.galleryId);
+    if (!gallery || !await callerCanOpenGallery(gallery, caller)) return forbiddenStudio();
+    return result;
+  }
   const listing = docRecord(await db$m().collection("listings").doc(result.project.id).get());
-  if (!listing) return result;
+  if (!listing || !callerCanOpenPrivateStudio(listing, caller)) return forbiddenStudio();
   const [invoice, related] = await Promise.all([
     invoiceForListing(listing),
     relatedForListing(listing)
   ]);
-  if (!callerCanOpenPrivateStudio(listing, caller)) {
-    if (result.project.view !== "public") return result;
-    return {
-      ...result,
-      project: {
-        ...result.project,
-        videos: publicShareVideos(listing, sharePlaybackOpen(listing, invoice, related))
-      }
-    };
-  }
   if (result.project.view !== "public") return result;
   const project = ownerStudioProject(listing, result.project, {
     invoice: invoice ?? null,
     downloadEnabled: listing.downloadEnabled === true || related.some((doc) => doc.downloadEnabled === true),
     downloadsReleased: listing.downloadsReleased === true || related.some((doc) => doc.downloadsReleased === true),
-    staffAccess: Boolean(caller?.staffRole)
+    staffAccess: Boolean(caller.staffRole)
   });
-  return { ...result, project };
+  const sharePath = activePresentationPath(listing);
+  return sharePath ? { ...result, project, sharePath } : { ...result, project };
 }
 const handlePublicGalleryLink = async (req, res) => {
   const id = String(req.params.id || "");
@@ -16233,8 +17887,12 @@ const handlePublicGalleryLink = async (req, res) => {
     const message = "Gallery lookup is not configured on this server (Firebase Admin). This is not a missing gallery id.";
     return res.status(503).json({ code: "lookup_unavailable", error: message, message });
   }
+  const caller = await readStudioCaller(req);
+  if (!caller) {
+    return res.status(401).json({ code: "auth_required", error: STUDIO_SIGN_IN, message: STUDIO_SIGN_IN });
+  }
   try {
-    const result = await finishGalleryLink(await resolveClientGalleryLink(id), await readStudioCaller(req));
+    const result = await finishGalleryLink(id, await resolveClientGalleryLink(id), caller);
     if (result.ok === false) {
       return res.status(result.httpStatus).json({
         code: result.code,
@@ -16242,7 +17900,8 @@ const handlePublicGalleryLink = async (req, res) => {
         message: result.message
       });
     }
-    return res.json(result);
+    const { subjectId: _subjectId, ...body } = result;
+    return res.json(body);
   } catch (err) {
     console.error("[Galleries] Link resolve error:", err);
     const message = "Could not resolve this gallery link.";
@@ -16315,7 +17974,19 @@ async function downloadGateForGallery(gallery) {
     lockDownloads: listing.lockDownloads
   };
 }
-function clientGalleryPayload(id, gallery, gate2) {
+async function presentationSharePath(gallery) {
+  const listingId = typeof gallery.listingId === "string" ? gallery.listingId.trim() : "";
+  if (!listingId) return null;
+  try {
+    const snap = await db$l().collection("listings").doc(listingId).get();
+    if (!snap.exists) return null;
+    return activePresentationPath(snap.data() || {});
+  } catch (err) {
+    console.warn("[Galleries] Presentation link lookup skipped.", err);
+    return null;
+  }
+}
+function clientGalleryPayload(id, gallery, gate2, sharePath) {
   const unlocked = clientGalleryDownloadsUnlocked(gate2);
   const invoice = gate2.invoice;
   const showMedia = ["delivered", "approved"].includes(String(gallery.status || ""));
@@ -16342,7 +18013,8 @@ function clientGalleryPayload(id, gallery, gate2) {
     invoiceStatus: invoice?.status || null,
     lockTitle: unlocked ? null : ICONIC_DOWNLOAD_LOCK.title,
     lockMessage: unlocked ? null : ICONIC_DOWNLOAD_LOCK.message,
-    mediaItems: showMedia ? lockedClientGalleryMedia(id, media, unlocked) : []
+    mediaItems: showMedia ? lockedClientGalleryMedia(id, media, unlocked) : [],
+    sharePath
   };
 }
 router$s.get("/", requireStaff, async (req, res) => {
@@ -16446,8 +18118,11 @@ router$s.get("/public/:id", async (req, res) => {
       return publicGalleryNotFound(res);
     }
     const gallery = doc.data();
-    const gate2 = await downloadGateForGallery(gallery);
-    return res.json(clientGalleryPayload(doc.id, gallery, gate2));
+    const [gate2, sharePath] = await Promise.all([
+      downloadGateForGallery(gallery),
+      presentationSharePath(gallery)
+    ]);
+    return res.json(clientGalleryPayload(doc.id, gallery, gate2, sharePath));
   } catch (err) {
     console.error("[Galleries] Public fetch error:", err);
     const code = err.code;
@@ -16471,9 +18146,12 @@ router$s.get("/:id", requireAuth, async (req, res) => {
       if (!["delivered", "approved"].includes(gallery.status)) {
         return res.status(403).json({ error: "Gallery not yet available." });
       }
-      const gate2 = await downloadGateForGallery(gallery);
+      const [gate2, sharePath] = await Promise.all([
+        downloadGateForGallery(gallery),
+        presentationSharePath(gallery)
+      ]);
       return res.json({
-        ...clientGalleryPayload(doc.id, gallery, gate2),
+        ...clientGalleryPayload(doc.id, gallery, gate2, sharePath),
         clientName: gallery.clientName || null
       });
     }
@@ -16731,11 +18409,11 @@ function buildPaymentReceipt(input) {
     fees,
     totalPaid
   });
-  const galleryId = text$9(input.galleryId) || text$9(input.invoice.galleryId);
+  const galleryId = text$6(input.galleryId) || text$6(input.invoice.galleryId);
   const galleryUrl = galleryId ? publicClientUrl(`/gallery/${encodeURIComponent(galleryId)}`, input.env) : "";
   const presentationUrl = input.presentationUrl === void 0 ? presentationLinkForReceipt(input.listing) || "" : input.presentationUrl || "";
   return renderPaymentReceipt({
-    clientName: text$9(input.invoice.clientName) || "there",
+    clientName: text$6(input.invoice.clientName) || "there",
     invoiceNumber: receiptEmailNumber({
       invoiceNumber: input.invoice.invoiceNumber,
       id: input.invoiceId,
@@ -16760,7 +18438,7 @@ function finite(value) {
   const amount = Number(value);
   return Number.isFinite(amount) ? amount : null;
 }
-function text$9(value) {
+function text$6(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function payTokenMatches(stored, presented, equal = timingSafeEqual$1) {
@@ -17097,7 +18775,7 @@ function invoiceProvider(invoice) {
   const channel = String(invoice.channel || invoice.brand || invoice.bookingType || "").toLowerCase();
   return channel.includes("studio noir") || channel.includes("studionoir") ? "stripe" : "square";
 }
-function money$2(value) {
+function money$1(value) {
   return `$${(Number(value) || 0).toFixed(2)}`;
 }
 function invoiceNotFound(res) {
@@ -17269,9 +18947,9 @@ function squarePaymentHistory({
   email,
   squarePaymentId
 }) {
-  const paidLabel = money$2(amount);
+  const paidLabel = money$1(amount);
   const action = unlocked ? `Payment received ${paidLabel} via Square; downloads unlocked` : `Payment received ${paidLabel} via Square`;
-  const balanceNote = !unlocked && balance > 0 ? ` Balance due ${money$2(balance)}.` : "";
+  const balanceNote = !unlocked && balance > 0 ? ` Balance due ${money$1(balance)}.` : "";
   const mail = email === "allowlist" ? " Email sent via the test allowlist." : email === "sent" ? " Email sent." : email === "failed" ? " Receipt email failed." : " Email suppressed by the notify gate.";
   return {
     action,
@@ -17427,18 +19105,18 @@ async function deliverPaymentReceipt(invoice, invoiceId, amountPaid, balance, un
     text: rendered.text,
     variables: {
       clientName: String(invoice.clientName || ""),
-      amount: money$2(amountPaid),
+      amount: money$1(amountPaid),
       invoiceNumber: receiptEmailNumber({
         invoiceNumber: invoice.invoiceNumber,
         id: invoiceId,
         createdAt: invoice.createdAt
       }),
-      balance: money$2(balance),
-      processing: money$2(processingAmount),
-      subtotal: money$2(subtotal),
-      promotions: money$2(promotions),
-      fees: money$2(fees),
-      totalPaid: money$2(amountPaid),
+      balance: money$1(balance),
+      processing: money$1(processingAmount),
+      subtotal: money$1(subtotal),
+      promotions: money$1(promotions),
+      fees: money$1(fees),
+      totalPaid: money$1(amountPaid),
       paidAt: "",
       galleryUrl: typeof invoice.galleryId === "string" && invoice.galleryId ? publicClientUrl(`/gallery/${encodeURIComponent(invoice.galleryId)}`) : "",
       dotOptInUrl: offer.url || ""
@@ -17669,8 +19347,8 @@ router$r.post("/send-invoice", requireCoordinator, async (req, res) => {
           id: invoiceDoc.id,
           createdAt: invoice.createdAt
         }),
-        amount: money$2(invoice.total),
-        processing: money$2(invoice.processing ?? 0),
+        amount: money$1(invoice.total),
+        processing: money$1(invoice.processing ?? 0),
         paymentUrl,
         dueDate: bookingDateLabel(invoice.dueDate, "Upon receipt")
       }
@@ -18796,1196 +20474,6 @@ router$p.get("/unread/count", requireStaff, async (_req, res) => {
     return res.status(500).json({ error: "Failed to get unread count." });
   }
 });
-const PHOTO_EDIT_NOTE_LIMIT = 2e3;
-const PHOTO_EDIT_REQUEST_LIMIT = 100;
-const PHOTO_EDIT_REPLACEMENT_TYPES = ["image/jpeg", "image/png", "image/webp"];
-const STATUSES = /* @__PURE__ */ new Set(["requested", "sent_out", "received_back"]);
-const REPLACEMENT_TYPES$1 = new Set(PHOTO_EDIT_REPLACEMENT_TYPES);
-function text$8(value, limit) {
-  if (typeof value !== "string") return "";
-  return value.replace(/\s+/g, " ").trim().slice(0, limit);
-}
-function noteText(value) {
-  if (typeof value !== "string") return "";
-  return value.replace(/\r\n/g, "\n").trim().slice(0, PHOTO_EDIT_NOTE_LIMIT);
-}
-function stamp(value) {
-  if (typeof value !== "string") return "";
-  const trimmed = value.trim();
-  if (!trimmed || trimmed.length > 40) return "";
-  const parsed = Date.parse(trimmed);
-  return Number.isFinite(parsed) ? new Date(parsed).toISOString() : "";
-}
-function idText(value, limit = 80) {
-  const id = text$8(value, limit);
-  return /^[A-Za-z0-9_-]{8,80}$/.test(id) ? id : "";
-}
-function photoIdText(value) {
-  if (typeof value !== "string") return "";
-  const id = value.trim().slice(0, 180);
-  if (!id || /[\u0000-\u001f]/.test(id)) return "";
-  return id;
-}
-function sortRequests(requests) {
-  return [...requests].sort((a, b) => b.createdAt.localeCompare(a.createdAt) || a.id.localeCompare(b.id));
-}
-function timelineEntry(value) {
-  const row = value && typeof value === "object" ? value : null;
-  if (!row || !STATUSES.has(row.status)) return null;
-  const at = stamp(row.at);
-  const actorId = text$8(row.actorId, 128);
-  if (!at || !actorId) return null;
-  if (row.actor !== "client" && row.actor !== "staff") return null;
-  return { status: row.status, at, actor: row.actor, actorId };
-}
-function replacementEntry(value, listingId) {
-  if (!value || typeof value !== "object") return null;
-  const row = value;
-  const name = text$8(row.name, 180);
-  const path2 = typeof row.path === "string" ? row.path.trim() : "";
-  const contentType = typeof row.contentType === "string" ? row.contentType.trim().toLowerCase() : "";
-  const attachedAt = stamp(row.attachedAt);
-  const attachedBy = text$8(row.attachedBy, 128);
-  const url = httpsUrl(row.url);
-  if (!name || !attachedAt || !attachedBy || !url || !REPLACEMENT_TYPES$1.has(contentType)) return null;
-  if (!replacementPath(listingId, path2)) return null;
-  return {
-    name,
-    url,
-    path: path2,
-    contentType,
-    attachedAt,
-    attachedBy
-  };
-}
-function httpsUrl(value) {
-  if (typeof value !== "string" || value.length > 2e3) return "";
-  try {
-    const url = new URL(value.trim());
-    if (url.protocol !== "https:") return "";
-    return url.toString();
-  } catch {
-    return "";
-  }
-}
-function replacementPath(listingId, storagePath) {
-  if (!listingId || storagePath.includes("..") || storagePath.includes("\\") || storagePath.startsWith("/")) return false;
-  const prefix = `listings/${listingId}/replacements/`;
-  if (!storagePath.startsWith(prefix)) return false;
-  const rest = storagePath.slice(prefix.length);
-  return rest.length > 0 && !rest.includes("/");
-}
-function parseRequest(value) {
-  const row = value && typeof value === "object" ? value : null;
-  if (!row) return null;
-  const id = idText(row.id);
-  const listingId = idText(row.listingId, 128) || text$8(row.listingId, 128);
-  const photoId = photoIdText(row.photoId);
-  const note = noteText(row.note);
-  const clientId2 = text$8(row.clientId, 128);
-  const createdAt = stamp(row.createdAt);
-  const updatedAt = stamp(row.updatedAt);
-  if (!id || !listingId || !photoId || !note || !clientId2 || !createdAt || !updatedAt) return null;
-  if (!/^[A-Za-z0-9_-]{4,128}$/.test(listingId)) return null;
-  if (!STATUSES.has(row.status)) return null;
-  const timeline = Array.isArray(row.timeline) ? row.timeline.map(timelineEntry).filter((entry2) => Boolean(entry2)) : [];
-  if (timeline.length === 0) return null;
-  return {
-    id,
-    listingId,
-    photoId,
-    photoName: text$8(row.photoName, 180) || "Photo",
-    photoUrl: httpsUrl(row.photoUrl),
-    note,
-    status: row.status,
-    timeline,
-    replacement: replacementEntry(row.replacement, listingId),
-    clientId: clientId2,
-    createdAt,
-    updatedAt
-  };
-}
-function readPhotoEditRequests(value) {
-  if (!Array.isArray(value)) return [];
-  const seen = /* @__PURE__ */ new Set();
-  const requests = [];
-  for (const item of value) {
-    const request = parseRequest(item);
-    if (!request || seen.has(request.id)) continue;
-    seen.add(request.id);
-    requests.push(request);
-  }
-  return sortRequests(requests);
-}
-function openPhotoEditForPhoto(requests, photoId) {
-  return requests.find((request) => request.photoId === photoId && request.status !== "received_back") || null;
-}
-function createPhotoEditRequest(input) {
-  const id = idText(input.id);
-  const listingId = text$8(input.listingId, 128);
-  const photoId = photoIdText(input.photoId);
-  const note = noteText(input.note);
-  const clientId2 = text$8(input.clientId, 128);
-  const at = stamp(input.at);
-  if (!id) return { ok: false, status: 400, error: "Could not save that edit request." };
-  if (!/^[A-Za-z0-9_-]{4,128}$/.test(listingId)) return { ok: false, status: 400, error: "Listing id is not valid." };
-  if (!photoId || !input.knownPhotoIds.includes(photoId)) {
-    return { ok: false, status: 400, error: "That file is not on this listing." };
-  }
-  if (!note) return { ok: false, status: 400, error: "Add a note for the change you want." };
-  if (!clientId2) return { ok: false, status: 400, error: "Sign in again before requesting an edit." };
-  if (!at) return { ok: false, status: 400, error: "Could not save that edit request." };
-  if (input.existing.length >= PHOTO_EDIT_REQUEST_LIMIT) {
-    return { ok: false, status: 409, error: "This listing already has the maximum number of photo edit requests." };
-  }
-  if (openPhotoEditForPhoto(input.existing, photoId)) {
-    return { ok: false, status: 409, error: "This file already has an open edit request." };
-  }
-  const request = {
-    id,
-    listingId,
-    photoId,
-    photoName: text$8(input.photoName, 180) || "Photo",
-    photoUrl: httpsUrl(input.photoUrl),
-    note,
-    status: "requested",
-    timeline: [{ status: "requested", at, actor: "client", actorId: clientId2 }],
-    replacement: null,
-    clientId: clientId2,
-    createdAt: at,
-    updatedAt: at
-  };
-  return { ok: true, request, requests: sortRequests([...input.existing, request]) };
-}
-function advancePhotoEditRequest(input) {
-  const requestId = idText(input.requestId);
-  const actorId = text$8(input.actorId, 128);
-  const at = stamp(input.at);
-  if (!requestId || !actorId || !at) return { ok: false, status: 400, error: "Could not update that edit request." };
-  const current = input.requests.find((request2) => request2.id === requestId);
-  if (!current) return { ok: false, status: 404, error: "Edit request not found." };
-  if (input.to === "sent_out" && current.status !== "requested") {
-    return {
-      ok: false,
-      status: 400,
-      error: current.status === "sent_out" ? "This request is already sent out." : "This request is already received back."
-    };
-  }
-  if (input.to === "received_back" && current.status !== "sent_out") {
-    return {
-      ok: false,
-      status: 400,
-      error: current.status === "requested" ? "Mark this request sent out before marking it received back." : "This request is already received back."
-    };
-  }
-  const request = {
-    ...current,
-    status: input.to,
-    updatedAt: at,
-    timeline: [...current.timeline, { status: input.to, at, actor: "staff", actorId }]
-  };
-  return {
-    ok: true,
-    request,
-    requests: sortRequests(input.requests.map((item) => item.id === request.id ? request : item))
-  };
-}
-function attachPhotoEditReplacement(input) {
-  const requestId = idText(input.requestId);
-  const current = input.requests.find((request2) => request2.id === requestId);
-  if (!current) return { ok: false, status: 404, error: "Edit request not found." };
-  if (current.listingId !== input.listingId) return { ok: false, status: 404, error: "Edit request not found." };
-  const replacement = replacementEntry(input.replacement, input.listingId);
-  if (!replacement) return { ok: false, status: 400, error: "Attach a JPG, PNG, or WebP file." };
-  const request = {
-    ...current,
-    replacement,
-    updatedAt: replacement.attachedAt
-  };
-  return {
-    ok: true,
-    request,
-    requests: sortRequests(input.requests.map((item) => item.id === request.id ? request : item))
-  };
-}
-const PORTAL_ADDRESS_LIMITS = {
-  line1: 240,
-  line2: 240,
-  city: 120,
-  state: 50,
-  zip: 20
-};
-const PORTAL_FACT_TEXT_LIMIT = 1e3;
-const PORTAL_WEBSITE_DESIGNS = [
-  "issue",
-  "premiere",
-  "product-drop",
-  "gallery-wall",
-  "field-guide",
-  "two-up",
-  "golden-hour",
-  "index",
-  "dossier",
-  "stories"
-];
-const EMPTY = "Not on file yet";
-const FACT_DEFS = [
-  { id: "beds", label: "Beds", keys: ["bedrooms", "beds"] },
-  { id: "baths", label: "Baths", keys: ["bathrooms", "baths"] },
-  { id: "sqft", label: "Sqft", keys: ["squareFeet", "squareFootage", "sqft"] },
-  { id: "yearBuilt", label: "Year built", keys: ["yearBuilt"] },
-  { id: "pool", label: "Pool", keys: ["pool", "hasPool"] },
-  { id: "lotSize", label: "Lot size", keys: ["lotSize"] },
-  { id: "stories", label: "Stories", keys: ["stories", "levels"] },
-  { id: "neighborhood", label: "Neighborhood", keys: ["neighborhood", "subdivision"] },
-  { id: "schools", label: "Schools", keys: ["schools", "schoolDistrict"] },
-  { id: "amenities", label: "Amenities", keys: ["amenities"] },
-  { id: "flexSpaces", label: "Flex spaces", keys: ["flexSpaces", "flexSpace"] },
-  { id: "office", label: "Office", keys: ["office", "hasOffice"] }
-];
-const PORTAL_MARKETING_KIT = [
-  {
-    id: "flyer",
-    title: "Flyer",
-    status: "not_connected",
-    note: "Design tools are not connected yet. A flyer for this listing will be chosen here."
-  },
-  {
-    id: "social",
-    title: "Social post",
-    status: "not_connected",
-    note: "Design tools are not connected yet. Social posts for this listing will be chosen here."
-  },
-  {
-    id: "reel",
-    title: "Reel / short",
-    status: "not_connected",
-    note: "Design tools are not connected yet. Reels and shorts for this listing will be chosen here."
-  }
-];
-const WEBSITE_DESIGNS = new Set(PORTAL_WEBSITE_DESIGNS);
-const WEBSITE_FONTS = /* @__PURE__ */ new Set(["sans", "serif", "modern"]);
-const WEBSITE_COLORS = /* @__PURE__ */ new Set(["ink", "teal", "warm"]);
-const WEBSITE_STYLES = /* @__PURE__ */ new Set(["classic", "editorial", "minimal"]);
-const PORTAL_LISTING_ID = /^[A-Za-z0-9_-]{4,128}$/;
-function portalListingId(value) {
-  const id = text$7(value);
-  return PORTAL_LISTING_ID.test(id) ? id : "";
-}
-function isInvoiceOrPaymentActivity(event) {
-  if (/^(invoice|payment)$/i.test(event.kind)) return true;
-  return /\binvoice\b|\bpayment\b|\bamount due\b/i.test(event.summary);
-}
-function visitorPortalListingDetail(detail) {
-  return {
-    ...detail,
-    photos: detail.photos.filter((item) => !item.hidden),
-    videos: detail.videos.filter((item) => !item.hidden),
-    tours: detail.tours.filter((item) => !item.hidden),
-    floorplans: detail.floorplans.filter((item) => !item.hidden),
-    socialAssets: [],
-    clientFiles: [],
-    invoices: [],
-    activity: detail.activity.filter((event) => !isInvoiceOrPaymentActivity(event)),
-    photoEditRequests: []
-  };
-}
-function defaultPortalWebsite() {
-  return {
-    design: "index",
-    font: "sans",
-    color: "ink",
-    style: "classic",
-    published: false,
-    showPhotos: true,
-    showVideo: true,
-    showTours: true,
-    showFloorplans: true,
-    tileLook: ""
-  };
-}
-function hiddenPresentationKeys(listing) {
-  const keys = /* @__PURE__ */ new Set();
-  const photos = readMediaStore(listing?.portalMedia).photos;
-  for (const [id, prefs] of Object.entries(photos)) {
-    if (prefs.hidden && id) keys.add(id);
-  }
-  const arrangement = readMediaArrangement(listing?.mediaArrangement);
-  for (const section of arrangement.sections) {
-    if (section.hideFromListingSites) keys.add(`section:${section.id}`);
-  }
-  const buckets = [listing?.images, listing?.videos, listing?.floorplans, listing?.floorPlans, listing?.files, listing?.tours];
-  for (const bucket2 of buckets) {
-    if (!Array.isArray(bucket2)) continue;
-    for (const item of bucket2) {
-      if (!item || typeof item !== "object") continue;
-      const row = item;
-      if (!isHiddenFromListingSites(listing, row)) continue;
-      for (const key of [row.id, row.path, row.storagePath, row.url, row.shareUrl]) {
-        if (typeof key === "string" && key.trim()) keys.add(key.trim());
-      }
-    }
-  }
-  return keys;
-}
-function rowHiddenFromPresentation(row, hiddenKeys) {
-  if (row.culled === true) return true;
-  if (row.hiddenFromPresentation === true || row.portalHidden === true) return true;
-  const sectionId = text$7(row.sectionId);
-  if (sectionId && hiddenKeys.has(`section:${sectionId}`)) return true;
-  const id = text$7(row.id);
-  const path2 = text$7(row.path) || text$7(row.storagePath);
-  const url = text$7(row.url) || text$7(row.shareUrl);
-  return [id, path2, url].some((key) => Boolean(key) && hiddenKeys.has(key));
-}
-function buildPortalListingDetail(sources) {
-  const listing = sources.listing || {};
-  const id = text$7(listing.id);
-  const records = [listing, sources.order, sources.orderRequest].filter(Boolean);
-  const address = readAddress(records);
-  const store = readMediaStore(listing.portalMedia);
-  const savedOrder = arrangementActive(readMediaArrangement(listing.mediaArrangement));
-  const galleries = sources.galleries || [];
-  const photos = collectPhotos(listing, galleries, store, savedOrder);
-  const videos = collectVideos(listing, galleries, store, savedOrder);
-  const tours = collectTours(listing, galleries, store, savedOrder);
-  const floorplans = collectFloorplans(listing, galleries, store, savedOrder);
-  const socialAssets = collectClientUploads(listing, "social", savedOrder);
-  const clientFiles = collectClientUploads(listing, "file", savedOrder);
-  const website = readWebsite(listing.portalWebsite);
-  const invoices = readInvoices(sources.invoices || []);
-  const activity = buildActivity(sources, photos, videos, floorplans, tours);
-  const status2 = text$7(listing.status) || text$7(sources.order?.status) || text$7(sources.orderRequest?.status) || "open";
-  return applyStoredPortalData({
-    id,
-    title: address.formatted || "Listing",
-    status: status2,
-    address,
-    facts: FACT_DEFS.map((fact) => {
-      const value = factText(readFact(records, fact.keys));
-      return { id: fact.id, label: fact.label, value: value || EMPTY, empty: !value };
-    }),
-    photos,
-    videos,
-    tours,
-    floorplans,
-    photoGroups: savedOrder ? readMediaArrangement(listing.mediaArrangement).sections.filter((section) => photos.some((photo) => photo.groupId === section.id)).map((section) => ({ id: section.id, name: section.name, order: section.order })) : store.photoGroups,
-    socialAssets,
-    clientFiles,
-    marketing: PORTAL_MARKETING_KIT,
-    website,
-    invoices,
-    activity,
-    photoEditRequests: readPhotoEditRequests(listing.photoEditRequests)
-  }, listing.portalData);
-}
-function portalFactsDraftFromDetail(detail) {
-  const facts = {};
-  for (const fact of FACT_DEFS) {
-    const shown = detail.facts.find((item) => item.id === fact.id);
-    facts[fact.id] = shown && !shown.empty ? shown.value : "";
-  }
-  return {
-    address: {
-      line1: detail.address.line1,
-      line2: detail.address.line2,
-      city: detail.address.city,
-      state: detail.address.state,
-      zip: detail.address.zip
-    },
-    facts
-  };
-}
-function sanitizePortalListingFacts(value) {
-  const row = asRecord$4(value);
-  if (!row) return null;
-  const addressRow = asRecord$4(row.address);
-  const factsRow = asRecord$4(row.facts);
-  if (!addressRow || !factsRow) return null;
-  const facts = {};
-  for (const fact of FACT_DEFS) {
-    facts[fact.id] = Object.prototype.hasOwnProperty.call(factsRow, fact.id) ? clipText(factsRow[fact.id], PORTAL_FACT_TEXT_LIMIT) : "";
-  }
-  return { address: normalizeAddressLines(addressRow), facts };
-}
-function portalListingFactsWrite(detail, body, nowIso) {
-  const next = sanitizePortalListingFacts(body);
-  const current = sanitizePortalListingFacts(portalFactsDraftFromDetail(detail));
-  if (!next || !current) return { ok: false, error: "Say which listing facts to save." };
-  if (JSON.stringify(next) === JSON.stringify(current)) return { ok: true, changed: false };
-  return {
-    ok: true,
-    changed: true,
-    portalData: next,
-    activity: {
-      id: `portal-data-${nowIso}`,
-      at: nowIso,
-      kind: "data",
-      summary: "Listing facts updated"
-    }
-  };
-}
-function applyStoredPortalData(detail, stored) {
-  const saved = readStoredPortalData(stored);
-  if (!saved) return detail;
-  const address = saved.address ? {
-    ...detail.address,
-    ...saved.address,
-    formatted: formatPortalAddress(saved.address)
-  } : detail.address;
-  const facts = detail.facts.map((fact) => {
-    if (!Object.prototype.hasOwnProperty.call(saved.facts, fact.id)) return fact;
-    const value = saved.facts[fact.id];
-    return { ...fact, value: value || EMPTY, empty: !value };
-  });
-  return {
-    ...detail,
-    title: address.formatted || "Listing",
-    address,
-    facts
-  };
-}
-function readStoredPortalData(value) {
-  const row = asRecord$4(value);
-  if (!row) return null;
-  const addressRow = asRecord$4(row.address);
-  const factsRow = asRecord$4(row.facts);
-  if (!addressRow && !factsRow) return null;
-  const facts = {};
-  if (factsRow) {
-    for (const fact of FACT_DEFS) {
-      if (!Object.prototype.hasOwnProperty.call(factsRow, fact.id)) continue;
-      facts[fact.id] = clipText(factsRow[fact.id], PORTAL_FACT_TEXT_LIMIT);
-    }
-  }
-  return {
-    address: addressRow ? normalizeAddressLines(addressRow) : null,
-    facts
-  };
-}
-function normalizeAddressLines(row) {
-  return {
-    line1: clipText(row.line1, PORTAL_ADDRESS_LIMITS.line1),
-    line2: clipText(row.line2, PORTAL_ADDRESS_LIMITS.line2),
-    city: clipText(row.city, PORTAL_ADDRESS_LIMITS.city),
-    state: clipText(row.state, PORTAL_ADDRESS_LIMITS.state),
-    zip: clipText(row.zip, PORTAL_ADDRESS_LIMITS.zip)
-  };
-}
-function clipText(value, max) {
-  let raw = "";
-  if (typeof value === "string") raw = value;
-  else if (typeof value === "number" && Number.isFinite(value)) raw = String(value);
-  else if (typeof value === "boolean") raw = value ? "Yes" : "No";
-  else return "";
-  return raw.replace(/\u0000/g, "").trim().slice(0, max);
-}
-function applyPortalMediaChange(store, items, change, nowIso) {
-  if ("layout" in change) return applyPhotoLayout(store, items, change.layout, nowIso);
-  if ("group" in change) return applyPhotoGroup(store, items, change.group, nowIso);
-  const bucket2 = items.filter((item) => item.kind === change.kind).sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
-  const index = bucket2.findIndex((item) => item.id === change.id);
-  if (index < 0) return { ok: false, error: "That file is not on this listing." };
-  const next = bucket2.map((item) => ({ ...item }));
-  const current = next[index];
-  let summary = "";
-  if ("hidden" in change && current.hidden !== change.hidden) {
-    current.hidden = change.hidden;
-    summary = change.hidden ? `Hid ${mediaLabel(current)} from the presentation` : `Restored ${mediaLabel(current)} to the presentation`;
-  }
-  if ("move" in change) {
-    const swapWith = change.move === "earlier" ? index - 1 : index + 1;
-    if (swapWith >= 0 && swapWith < next.length) {
-      const other = next[swapWith];
-      next[swapWith] = current;
-      next[index] = other;
-      summary = summary || `Moved ${mediaLabel(current)} ${change.move === "earlier" ? "earlier" : "later"}`;
-    }
-  }
-  if (!summary) return { ok: true, store, activity: null };
-  const activity = {
-    id: `portal-${change.kind}-${change.id}-${nowIso}`,
-    at: nowIso,
-    kind: change.kind,
-    summary
-  };
-  return {
-    ok: true,
-    store: { ...store, [storeKey(change.kind)]: prefsFrom(next) },
-    activity
-  };
-}
-function applyPhotoLayout(store, items, layout, nowIso) {
-  const bucket2 = items.filter((item) => item.kind === "photo");
-  const known = new Map(bucket2.map((item) => [item.id, item]));
-  const groupIds = new Set(store.photoGroups.map((group) => group.id));
-  const seen = /* @__PURE__ */ new Set();
-  const next = [];
-  for (const entry2 of layout) {
-    const item = known.get(entry2.id);
-    if (!item || seen.has(entry2.id)) continue;
-    if (entry2.groupId && !groupIds.has(entry2.groupId)) return { ok: false, error: "That group is not on this listing." };
-    seen.add(entry2.id);
-    next.push({ ...item, groupId: entry2.groupId });
-  }
-  if (next.length === 0) return { ok: false, error: "Choose photos to arrange." };
-  for (const item of bucket2) {
-    if (!seen.has(item.id)) next.push(item);
-  }
-  return {
-    ok: true,
-    store: { ...store, photos: prefsFrom(next) },
-    activity: {
-      id: `portal-photo-layout-${nowIso}`,
-      at: nowIso,
-      kind: "photo",
-      summary: "Updated photo order"
-    }
-  };
-}
-function applyPhotoGroup(store, items, change, nowIso) {
-  const photos = items.filter((item) => item.kind === "photo").map((item) => ({ ...item }));
-  const groups = store.photoGroups.map((group) => ({ ...group }));
-  let summary = "";
-  if (change.action === "create") {
-    const name = change.name.trim().slice(0, 60);
-    if (!name) return { ok: false, error: "Name the group." };
-    if (groups.length >= 24) return { ok: false, error: "This listing already has 24 groups." };
-    const chosen = new Set(change.photoIds);
-    if (!photos.some((photo) => chosen.has(photo.id))) return { ok: false, error: "Choose photos for this group." };
-    const id = nextGroupId(groups.map((group) => group.id));
-    groups.push({ id, name, order: groups.length });
-    photos.forEach((photo) => {
-      if (chosen.has(photo.id)) photo.groupId = id;
-    });
-    summary = `Created photo group ${name}`;
-  }
-  if (change.action === "rename") {
-    const group = groups.find((item) => item.id === change.id);
-    const name = change.name.trim().slice(0, 60);
-    if (!group) return { ok: false, error: "That group is not on this listing." };
-    if (!name) return { ok: false, error: "Name the group." };
-    group.name = name;
-    summary = `Renamed photo group to ${name}`;
-  }
-  if (change.action === "remove") {
-    const group = groups.find((item) => item.id === change.id);
-    if (!group) return { ok: false, error: "That group is not on this listing." };
-    photos.forEach((photo) => {
-      if (photo.groupId === group.id) photo.groupId = "";
-    });
-    const remaining = groups.filter((item) => item.id !== group.id);
-    remaining.forEach((item, order) => {
-      item.order = order;
-    });
-    summary = `Removed photo group ${group.name}`;
-    return {
-      ok: true,
-      store: { ...store, photos: prefsFrom(photos), photoGroups: remaining },
-      activity: {
-        id: `portal-photo-group-${nowIso}`,
-        at: nowIso,
-        kind: "photo",
-        summary
-      }
-    };
-  }
-  if (!summary) return { ok: false, error: "That group change is not supported." };
-  return {
-    ok: true,
-    store: { ...store, photos: prefsFrom(photos), photoGroups: groups },
-    activity: {
-      id: `portal-photo-group-${nowIso}`,
-      at: nowIso,
-      kind: "photo",
-      summary
-    }
-  };
-}
-function prefsFrom(items) {
-  const prefs = {};
-  items.forEach((item, order) => {
-    prefs[item.id] = { hidden: item.hidden, order, groupId: item.groupId || "" };
-  });
-  return prefs;
-}
-function nextGroupId(existing) {
-  const taken = new Set(existing);
-  for (let attempt = 0; attempt < 8; attempt += 1) {
-    const id = `g${Math.random().toString(36).slice(2, 10)}`;
-    if (/^g[a-z0-9]{4,16}$/.test(id) && !taken.has(id)) return id;
-  }
-  const fallback = `g${Date.now().toString(36).slice(-8)}`;
-  return taken.has(fallback) ? `${fallback}a` : fallback;
-}
-function sanitizeWebsiteSettings(value, base = defaultPortalWebsite()) {
-  const row = value && typeof value === "object" ? value : {};
-  const design = text$7(row.design);
-  const font = text$7(row.font);
-  const color = text$7(row.color);
-  const style = text$7(row.style);
-  return {
-    design: WEBSITE_DESIGNS.has(design) ? design : base.design,
-    font: WEBSITE_FONTS.has(font) ? font : base.font,
-    color: WEBSITE_COLORS.has(color) ? color : base.color,
-    style: WEBSITE_STYLES.has(style) ? style : base.style,
-    published: boolOr(row.published, base.published),
-    showPhotos: boolOr(row.showPhotos, base.showPhotos),
-    showVideo: boolOr(row.showVideo, base.showVideo),
-    showTours: boolOr(row.showTours, base.showTours),
-    showFloorplans: boolOr(row.showFloorplans, base.showFloorplans),
-    tileLook: ""
-  };
-}
-function readMediaStore(value) {
-  const row = value && typeof value === "object" ? value : {};
-  return {
-    photos: readPrefs(row.photos),
-    videos: readPrefs(row.videos),
-    floorplans: readPrefs(row.floorplans),
-    tours: readPrefs(row.tours),
-    photoGroups: readPhotoGroups(row.photoGroups)
-  };
-}
-function storeKey(kind) {
-  if (kind === "photo") return "photos";
-  if (kind === "video") return "videos";
-  if (kind === "floorplan") return "floorplans";
-  return "tours";
-}
-function groupIdText(value) {
-  if (typeof value !== "string") return "";
-  const id = value.trim();
-  return /^(?:g|s)[a-z0-9]{4,16}$/.test(id) ? id : "";
-}
-function readPhotoGroups(value) {
-  if (!Array.isArray(value)) return [];
-  const groups = [];
-  const seen = /* @__PURE__ */ new Set();
-  for (const item of value) {
-    const row = asRecord$4(item);
-    if (!row) continue;
-    const id = groupIdText(row.id);
-    const name = clipText(row.name, 60);
-    if (!id || !name || seen.has(id)) continue;
-    seen.add(id);
-    groups.push({
-      id,
-      name,
-      order: typeof row.order === "number" && Number.isFinite(row.order) ? row.order : groups.length
-    });
-  }
-  return groups.sort((a, b) => a.order - b.order || a.name.localeCompare(b.name)).slice(0, 24);
-}
-function readPrefs(value) {
-  if (!value || typeof value !== "object") return {};
-  const out = {};
-  for (const [id, prefs] of Object.entries(value)) {
-    if (!id || !prefs || typeof prefs !== "object") continue;
-    const row = prefs;
-    out[id] = {
-      hidden: row.hidden === true,
-      order: typeof row.order === "number" && Number.isFinite(row.order) ? row.order : 0,
-      groupId: groupIdText(row.groupId)
-    };
-  }
-  return out;
-}
-function readWebsite(value) {
-  return sanitizeWebsiteSettings(value, defaultPortalWebsite());
-}
-function text$7(value) {
-  return typeof value === "string" ? value.trim() : "";
-}
-function boolOr(value, fallback) {
-  return typeof value === "boolean" ? value : fallback;
-}
-function asRecord$4(value) {
-  return value && typeof value === "object" && !Array.isArray(value) ? value : null;
-}
-function readFact(records, keys) {
-  for (const record2 of records) {
-    const bags = [record2, asRecord$4(record2.property), asRecord$4(record2.propertyDetails), asRecord$4(record2.listingInfo), asRecord$4(record2.details)];
-    for (const bag of bags) {
-      if (!bag) continue;
-      for (const key of keys) {
-        const value = bag[key];
-        if (value == null || value === "") continue;
-        return value;
-      }
-    }
-  }
-  return void 0;
-}
-function factText(value) {
-  if (typeof value === "boolean") return value ? "Yes" : "No";
-  if (typeof value === "number" && Number.isFinite(value)) return String(value);
-  if (typeof value === "string" && value.trim()) return value.trim();
-  if (Array.isArray(value)) {
-    const parts = value.map((item) => factText(item)).filter(Boolean);
-    return parts.join(", ");
-  }
-  return "";
-}
-function formatPortalAddress(address) {
-  return [address.line1, address.line2, [address.city, [address.state, address.zip].filter(Boolean).join(" ")].filter(Boolean).join(", ")].filter(Boolean).join(", ");
-}
-function readAddress(records) {
-  const address = {
-    line1: "",
-    line2: "",
-    city: "",
-    state: "",
-    zip: "",
-    formatted: "",
-    lat: null,
-    lng: null,
-    mapUrl: null
-  };
-  for (const record2 of records) {
-    fillAddress(address, addressFromRecord(record2));
-  }
-  address.formatted = formatPortalAddress(address);
-  const geo = address.lat != null && address.lng != null ? { lat: address.lat, lng: address.lng } : null;
-  address.mapUrl = geo ? mapEmbedUrl(geo.lat, geo.lng) : null;
-  return address;
-}
-function fillAddress(target, source) {
-  if (!target.line1 && source.line1) target.line1 = source.line1;
-  if (!target.line2 && source.line2) target.line2 = source.line2;
-  if (!target.city && source.city) target.city = source.city;
-  if (!target.state && source.state) target.state = source.state;
-  if (!target.zip && source.zip) target.zip = source.zip;
-  if (target.lat == null && source.lat != null) target.lat = source.lat;
-  if (target.lng == null && source.lng != null) target.lng = source.lng;
-}
-function addressFromRecord(record2) {
-  const structured = asRecord$4(record2.address) || asRecord$4(record2.shootLocation) || asRecord$4(record2.propertyAddress);
-  const parsed = parseAddressText(
-    text$7(record2.addressLine1) ? "" : addressString(record2.address) || addressString(record2.propertyAddress) || addressString(record2.shootLocation) || text$7(structured?.formatted)
-  );
-  const line1 = firstText(record2, ["addressLine1", "line1", "street", "streetAddress"]) || text$7(structured?.street) || text$7(structured?.line1) || text$7(structured?.addressLine1) || parsed.line1;
-  const line2 = firstText(record2, ["addressLine2", "line2", "unit", "street2"]) || text$7(structured?.line2) || text$7(structured?.unit) || parsed.line2;
-  const split = splitUnit(line1);
-  return {
-    line1: split.line1,
-    line2: line2 || split.line2,
-    city: firstText(record2, ["city"]) || text$7(structured?.city) || parsed.city,
-    state: firstText(record2, ["state"]) || text$7(structured?.state) || parsed.state,
-    zip: firstText(record2, ["zip", "postalCode"]) || text$7(structured?.zip) || text$7(structured?.postalCode) || parsed.zip,
-    formatted: "",
-    lat: readCoord(record2.lat ?? record2.latitude ?? structured?.lat ?? structured?.latitude ?? nestedCoord(record2, "lat"), "lat"),
-    lng: readCoord(record2.lng ?? record2.longitude ?? structured?.lng ?? structured?.longitude ?? nestedCoord(record2, "lng"), "lng"),
-    mapUrl: null
-  };
-}
-function addressString(value) {
-  return addressText(value);
-}
-function firstText(record2, keys) {
-  for (const key of keys) {
-    const value = text$7(record2[key]);
-    if (value) return value;
-  }
-  return "";
-}
-function parseAddressText(raw) {
-  const empty = { line1: "", line2: "", city: "", state: "", zip: "" };
-  if (!raw) return empty;
-  const parts = raw.split(",").map((part) => part.trim()).filter(Boolean).filter((part) => !/^(usa|u\.s\.a\.|united states)$/i.test(part));
-  if (parts.length === 0) return empty;
-  const last = parts[parts.length - 1];
-  const stateZip = last.match(/^([A-Za-z]{2})\s+(\d{5}(?:-\d{4})?)$/);
-  if (!stateZip || parts.length < 2) return { ...empty, line1: raw.replace(/,\s*(usa|united states)$/i, "").trim() };
-  const city = parts[parts.length - 2];
-  const street = parts.slice(0, -2);
-  let line1 = street[0] || "";
-  let line2 = "";
-  if (street.length >= 2 && isUnit(street[1])) {
-    line2 = street[1];
-  } else if (street.length > 1) {
-    line1 = street.join(", ");
-  }
-  return { line1, line2, city, state: stateZip[1].toUpperCase(), zip: stateZip[2] };
-}
-function isUnit(value) {
-  return /^(apt|apartment|unit|suite|ste|bldg|building|floor|#)\b/i.test(value);
-}
-function splitUnit(line1) {
-  const match = line1.match(/^(.*?)(?:,\s*|\s+)((?:apt|apartment|unit|suite|ste|bldg|building|floor|#)\s*\S.*)$/i);
-  if (!match) return { line1, line2: "" };
-  return { line1: match[1].trim(), line2: match[2].trim() };
-}
-function nestedCoord(record2, axis) {
-  const geo = asRecord$4(record2.geo) || asRecord$4(record2.location) || asRecord$4(record2.geometry);
-  if (!geo) return void 0;
-  const location = asRecord$4(geo.location) || geo;
-  if (axis === "lat") return location.lat ?? location.latitude;
-  return location.lng ?? location.longitude;
-}
-function readCoord(value, axis) {
-  const number = typeof value === "number" ? value : typeof value === "string" && value.trim() ? Number(value) : NaN;
-  if (!Number.isFinite(number)) return null;
-  if (axis === "lat" && (number < -90 || number > 90)) return null;
-  if (axis === "lng" && (number < -180 || number > 180)) return null;
-  return number;
-}
-function mapEmbedUrl(lat, lng) {
-  const delta = 8e-3;
-  const bbox = [lng - delta, lat - delta, lng + delta, lat + delta].map((n) => n.toFixed(6)).join("%2C");
-  return `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat.toFixed(6)}%2C${lng.toFixed(6)}`;
-}
-function collectPhotos(listing, galleries, store, savedOrder = false) {
-  return finishMedia("photo", [...rowsFrom(listing.images), ...galleryRows(galleries)], store.photos, (row) => isPhoto(row), savedOrder);
-}
-function collectVideos(listing, galleries, store, savedOrder = false) {
-  return finishMedia(
-    "video",
-    [...rowsFrom(listing.videos), ...rowsFrom(listing.images), ...clientUploadRows(listing, "video"), ...galleryRows(galleries)],
-    store.videos,
-    (row) => isVideo(row),
-    savedOrder
-  );
-}
-function collectClientUploads(listing, kind, savedOrder = false) {
-  return finishMedia(kind === "social" ? "photo" : "floorplan", clientUploadRows(listing, kind), {}, () => true, savedOrder).map((item) => ({ ...item, kind: kind === "social" ? "photo" : "floorplan" }));
-}
-function collectFloorplans(listing, galleries, store, savedOrder = false) {
-  const rows = [
-    ...rowsFrom(listing.floorplans).filter(isRasterFloorplan),
-    ...rowsFrom(listing.designAssets).filter(isFloorplan),
-    ...rowsFrom(listing.cubiCasaImports).filter(isFloorplan),
-    ...galleryRows(galleries).filter(isFloorplan)
-  ];
-  return finishMedia("floorplan", rows, store.floorplans, () => true, savedOrder);
-}
-function collectTours(listing, galleries, store, savedOrder = false) {
-  const rows = [];
-  for (const key of ["tourUrl", "matterportUrl", "virtualTourUrl", "virtualTour", "threeDTourUrl", "tourLink"]) {
-    const url = safeHttpUrl(listing[key]);
-    if (url) rows.push({ id: key, url, name: key });
-  }
-  for (const item of rowsFrom(listing.tours)) rows.push(item);
-  for (const item of galleryRows(galleries)) rows.push(item);
-  const seen = /* @__PURE__ */ new Set();
-  const drafts = [];
-  rows.forEach((row, index) => {
-    if (row.culled === true) return;
-    const url = safeHttpUrl(row.url) || safeHttpUrl(row.shareUrl) || safeHttpUrl(row.href);
-    if (!url || seen.has(url)) return;
-    const provider = providerFor(url, row);
-    const typed = /^(tour|matterport)$/i.test(text$7(row.type)) || provider != null || isTourField(text$7(row.id));
-    if (!typed) return;
-    seen.add(url);
-    const id = mediaId("tour", row, index);
-    const prefs = store.tours[id];
-    const deliveryName = text$7(row.deliveryName);
-    const storedOrder = typeof row.sortOrder === "number" && Number.isFinite(row.sortOrder) ? row.sortOrder : null;
-    drafts.push({
-      id,
-      kind: "tour",
-      name: text$7(row.name) || text$7(row.title) || provider || "Virtual tour",
-      url,
-      contentType: text$7(row.contentType),
-      hidden: prefs?.hidden === true || row.hiddenFromPresentation === true,
-      order: savedOrder ? storedOrder ?? index + 1e5 : prefs?.order ?? index,
-      groupId: "",
-      uploadedAt: portalTimestamp(row.uploadedAt || row.createdAt),
-      ...deliveryName ? { downloadName: deliveryName } : {},
-      provider: provider || "Virtual tour",
-      embedUrl: provider === "Matterport" ? url : null
-    });
-  });
-  return drafts.sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
-}
-function isTourField(id) {
-  return /tour|matterport/i.test(id);
-}
-function finishMedia(kind, rows, prefs, include, savedOrder = false) {
-  const seen = /* @__PURE__ */ new Set();
-  const items = [];
-  rows.forEach((row, index) => {
-    if (row.culled === true || !include(row)) return;
-    const url = safeHttpUrl(row.url) || safeHttpUrl(row.shareUrl);
-    if (!url) return;
-    const id = mediaId(kind, row, index);
-    const key = text$7(row.path) || text$7(row.storagePath) || url;
-    if (seen.has(id) || seen.has(key) || seen.has(url)) return;
-    seen.add(id);
-    seen.add(key);
-    seen.add(url);
-    const pref = prefs[id];
-    const deliveryName = text$7(row.deliveryName);
-    const storedOrder = typeof row.sortOrder === "number" && Number.isFinite(row.sortOrder) ? row.sortOrder : null;
-    const sectionId = groupIdText(row.sectionId);
-    items.push({
-      id,
-      kind,
-      name: text$7(row.name) || text$7(row.fileName) || text$7(row.title) || `${kind} ${items.length + 1}`,
-      url,
-      contentType: text$7(row.contentType).toLowerCase(),
-      hidden: pref?.hidden === true || row.hiddenFromPresentation === true || row.portalHidden === true,
-      order: savedOrder ? storedOrder ?? index + 1e5 : pref?.order ?? index,
-      groupId: kind === "photo" ? savedOrder ? sectionId : groupIdText(pref?.groupId) : "",
-      uploadedAt: portalTimestamp(row.uploadedAt || row.createdAt),
-      ...deliveryName ? { downloadName: deliveryName } : {}
-    });
-  });
-  return items.sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
-}
-function clientUploadRows(listing, kind) {
-  return rowsFrom(listing.clientPortalUploads).filter((row) => text$7(row.kind) === kind);
-}
-function rowsFrom(value) {
-  if (!Array.isArray(value)) return [];
-  return value.filter((item) => item && typeof item === "object");
-}
-function galleryRows(galleries) {
-  const rows = [];
-  for (const gallery of galleries) {
-    rows.push(...rowsFrom(gallery.mediaItems), ...rowsFrom(gallery.images));
-  }
-  return rows;
-}
-function mediaId(kind, row, index) {
-  const raw = text$7(row.id) || text$7(row.path) || text$7(row.storagePath) || text$7(row.url) || text$7(row.shareUrl) || `${kind}-${index}`;
-  return raw.slice(0, 180);
-}
-const RAW_EXT$1 = /\.(cr2|cr3|nef|nrw|arw|srf|sr2|dng|raw|rw2|orf|raf|pef|3fr|fff|iiq|heic)$/i;
-const IMAGE_EXT$1 = /\.(jpe?g|png|webp|gif)$/i;
-const FLOOR_IMAGE = /\.(jpe?g|png)$/i;
-const VIDEO_EXT = /\.(mp4|mov)$/i;
-function fileName(row) {
-  return text$7(row.name) || text$7(row.fileName) || text$7(row.title) || text$7(row.path) || text$7(row.url);
-}
-function isRaw(row) {
-  const path2 = text$7(row.path) || text$7(row.storagePath);
-  const name = fileName(row);
-  return RAW_EXT$1.test(name) || RAW_EXT$1.test(path2) || path2.includes("/raw/");
-}
-function isFloorplan(row) {
-  if (!isRasterFloorplan(row)) return false;
-  const type = text$7(row.type).toLowerCase();
-  const asset = text$7(row.assetType).toLowerCase();
-  const name = fileName(row);
-  return type === "floorplan" || asset === "floorplan" || /floor\s*plan|floorplan/i.test(name) || type === "image" && asset === "floorplan";
-}
-function isRasterFloorplan(row) {
-  const content = text$7(row.contentType).toLowerCase();
-  const declared = text$7(row.type).toLowerCase();
-  const name = fileName(row);
-  const url = text$7(row.url) || text$7(row.shareUrl);
-  if (content === "image/jpeg" || content === "image/png" || declared === "image/jpeg" || declared === "image/png") return true;
-  return FLOOR_IMAGE.test(name) || FLOOR_IMAGE.test(url.split("?")[0]);
-}
-function isVideo(row) {
-  const type = text$7(row.type).toLowerCase();
-  if (type === "tour" || type === "matterport" || type === "floorplan") return false;
-  const content = text$7(row.contentType).toLowerCase();
-  const name = fileName(row);
-  const url = (text$7(row.url) || text$7(row.shareUrl)).split("?")[0];
-  if (content === "video/mp4" || content === "video/quicktime") return true;
-  return VIDEO_EXT.test(name) || VIDEO_EXT.test(url);
-}
-function isPhoto(row) {
-  const declared = text$7(row.type).toLowerCase();
-  const asset = text$7(row.assetType).toLowerCase();
-  if (isVideo(row) || declared === "floorplan" || asset === "floorplan" || isRaw(row)) return false;
-  const type = text$7(row.type).toLowerCase();
-  if (type === "tour" || type === "matterport" || type === "video" || type === "reel" || type === "file" || type === "document") return false;
-  const content = text$7(row.contentType).toLowerCase();
-  const name = fileName(row);
-  const path2 = text$7(row.path) || text$7(row.storagePath);
-  if (content.startsWith("video/")) return false;
-  if (content && !content.startsWith("image/") && !IMAGE_EXT$1.test(name)) return false;
-  return !content || content.startsWith("image/") || IMAGE_EXT$1.test(name) || IMAGE_EXT$1.test(path2);
-}
-function providerFor(url, row) {
-  let host = "";
-  try {
-    host = new URL(url).hostname.toLowerCase();
-  } catch {
-    return null;
-  }
-  if (host.includes("matterport.com") || /matterport/i.test(text$7(row.type)) || /matterport/i.test(text$7(row.name))) return "Matterport";
-  if (host.includes("cloudpano.com")) return "CloudPano";
-  if (host.includes("iguide")) return "iGUIDE";
-  if (host.includes("kuula.co")) return "Kuula";
-  if (host.includes("eyespy360.com")) return "EyeSpy360";
-  if (host.includes("asteroom.com")) return "Asteroom";
-  if (host.includes("zillow.com") && /3d|tour/i.test(url)) return "Zillow 3D";
-  if (/^(tour|matterport)$/i.test(text$7(row.type))) return "Virtual tour";
-  return null;
-}
-function safeHttpUrl(value) {
-  if (typeof value !== "string") return "";
-  const trimmed = value.trim();
-  if (!trimmed || trimmed.startsWith("//") || trimmed.startsWith("/")) return "";
-  try {
-    const url = new URL(trimmed);
-    if (url.protocol !== "https:" && url.protocol !== "http:") return "";
-    return url.toString();
-  } catch {
-    return "";
-  }
-}
-function readInvoices(invoices) {
-  const seen = /* @__PURE__ */ new Set();
-  const summaries = [];
-  for (const invoice of invoices) {
-    const id = text$7(invoice.id);
-    if (!id || seen.has(id)) continue;
-    seen.add(id);
-    const total = money$1(invoice.total);
-    summaries.push({
-      id,
-      invoiceNumber: orderHistoryInvoiceNumber({
-        invoiceNumber: invoice.invoiceNumber,
-        id,
-        createdAt: invoice.createdAt
-      }),
-      status: text$7(invoice.status) || "draft",
-      total,
-      amountDue: invoice.amountDue == null ? total : money$1(invoice.amountDue)
-    });
-  }
-  return summaries;
-}
-function money$1(value) {
-  const number = typeof value === "number" ? value : Number(value);
-  return Number.isFinite(number) ? number : 0;
-}
-function buildActivity(sources, photos, videos, floorplans, tours, invoices) {
-  const events = [];
-  const push = (event) => {
-    if (!event || !event.summary) return;
-    if (events.some((item) => item.id === event.id)) return;
-    events.push(event);
-  };
-  const request = sources.orderRequest;
-  if (request) {
-    push(eventOf(
-      `booking-${text$7(request.id) || "request"}`,
-      request.submittedAt || request.createdAt,
-      "booking",
-      "Booking request received"
-    ));
-  }
-  for (const appointment of sources.appointments || []) {
-    const when = appointment.createdAt || appointment.scheduledDate;
-    const status2 = text$7(appointment.status);
-    push(eventOf(
-      `appointment-${text$7(appointment.id) || events.length}`,
-      when,
-      "appointment",
-      status2 === "confirmed" ? "Appointment confirmed" : "Appointment requested"
-    ));
-  }
-  const order = sources.order;
-  if (order) {
-    push(eventOf(
-      `order-${text$7(order.id) || "order"}`,
-      order.confirmedAt || order.createdAt,
-      "booking",
-      "Booking confirmed"
-    ));
-  }
-  push(eventOf(
-    `listing-${text$7(sources.listing.id) || "listing"}`,
-    sources.listing.createdAt,
-    "listing",
-    "Listing file created"
-  ));
-  for (const photo of photos) {
-    push(eventOf(`upload-photo-${photo.id}`, photo.uploadedAt, "photo", `Photo uploaded: ${photo.name}`));
-  }
-  for (const video of videos) {
-    push(eventOf(`upload-video-${video.id}`, video.uploadedAt, "video", `Video uploaded: ${video.name}`));
-  }
-  for (const plan of floorplans) {
-    push(eventOf(`upload-floorplan-${plan.id}`, plan.uploadedAt, "floorplan", `Floorplan uploaded: ${plan.name}`));
-  }
-  for (const tour of tours) {
-    push(eventOf(`tour-${tour.id}`, tour.uploadedAt, "tour", `${tour.provider} tour added`));
-  }
-  for (const gallery of sources.galleries || []) {
-    const status2 = text$7(gallery.status).replace(/_/g, " ") || "opened";
-    push(eventOf(
-      `gallery-${text$7(gallery.id) || events.length}`,
-      gallery.updatedAt || gallery.createdAt,
-      "gallery",
-      `Gallery ${status2}`
-    ));
-  }
-  for (const invoice of sources.invoices || []) {
-    const id = text$7(invoice.id);
-    const number = orderHistoryInvoiceNumber({
-      invoiceNumber: invoice.invoiceNumber,
-      id,
-      createdAt: invoice.createdAt
-    });
-    const status2 = text$7(invoice.status) || "draft";
-    const summary = status2 === "paid" ? `Payment recorded on ${number}` : `Invoice ${number} is ${status2.replace(/_/g, " ")}`;
-    push(eventOf(`invoice-${id || number}`, invoice.paidAt || invoice.updatedAt || invoice.createdAt, "invoice", summary));
-  }
-  for (const entry2 of rowsFrom(sources.listing.auditLog)) {
-    const action = text$7(entry2.action);
-    if (!action || /lockbox|internal|password|secret/i.test(action)) continue;
-    push(eventOf(
-      `audit-${text$7(entry2.id) || action}-${text$7(entry2.at)}`,
-      entry2.at || entry2.createdAt,
-      "audit",
-      action
-    ));
-  }
-  for (const entry2 of rowsFrom(sources.listing.portalActivity)) {
-    push({
-      id: text$7(entry2.id) || `portal-activity-${events.length}`,
-      at: portalTimestamp(entry2.at),
-      kind: text$7(entry2.kind) || "listing",
-      summary: text$7(entry2.summary)
-    });
-  }
-  return events.filter((event) => event.summary).sort((a, b) => {
-    if (a.at && b.at) return a.at.localeCompare(b.at);
-    if (a.at) return -1;
-    if (b.at) return 1;
-    return 0;
-  });
-}
-function eventOf(id, when, kind, summary) {
-  const at = portalTimestamp(when);
-  if (!summary) return null;
-  return { id, at, kind, summary };
-}
-function portalTimestamp(value) {
-  if (!value) return "";
-  if (typeof value === "string") {
-    const parsed = Date.parse(value);
-    return Number.isNaN(parsed) ? "" : new Date(parsed).toISOString();
-  }
-  if (value instanceof Date) return Number.isNaN(value.getTime()) ? "" : value.toISOString();
-  if (typeof value === "object") {
-    const record2 = value;
-    if (typeof record2.toDate === "function") {
-      try {
-        const date = record2.toDate();
-        return date instanceof Date && !Number.isNaN(date.getTime()) ? date.toISOString() : "";
-      } catch {
-        return "";
-      }
-    }
-    const seconds = typeof record2.seconds === "number" ? record2.seconds : typeof record2._seconds === "number" ? record2._seconds : null;
-    if (seconds != null) {
-      const date = new Date(seconds * 1e3);
-      return Number.isNaN(date.getTime()) ? "" : date.toISOString();
-    }
-  }
-  return "";
-}
-function mediaLabel(item) {
-  return item.name || item.kind;
-}
 const LISTING_SITE_DESIGNS = PORTAL_WEBSITE_DESIGNS;
 new Set(LISTING_SITE_DESIGNS);
 const SLUG$1 = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -19999,22 +20487,22 @@ function listingSiteSlug(input) {
 function isListingSiteSlug(value) {
   return typeof value === "string" && value.length <= 80 && SLUG$1.test(value);
 }
-function text$6(value) {
+function text$5(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function record$1(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : null;
 }
-function addressParts$1(listing) {
+function addressParts(listing) {
   const portal = record$1(listing.portalData);
   const saved = record$1(portal?.address);
   const structured = record$1(listing.address) || record$1(listing.shootLocation) || record$1(listing.propertyAddress);
-  const line1 = text$6(saved?.line1) || text$6(structured?.street) || text$6(structured?.line1) || text$6(listing.addressLine1);
-  const city = text$6(saved?.city) || text$6(structured?.city) || text$6(listing.city);
-  const state = text$6(saved?.state) || text$6(structured?.state) || text$6(listing.state);
-  const zip = text$6(saved?.zip) || text$6(structured?.zip) || text$6(listing.zip);
+  const line1 = text$5(saved?.line1) || text$5(structured?.street) || text$5(structured?.line1) || text$5(listing.addressLine1);
+  const city = text$5(saved?.city) || text$5(structured?.city) || text$5(listing.city);
+  const state = text$5(saved?.state) || text$5(structured?.state) || text$5(listing.state);
+  const zip = text$5(saved?.zip) || text$5(structured?.zip) || text$5(listing.zip);
   if (!line1 && typeof listing.address === "string") {
-    const raw = text$6(listing.address);
+    const raw = text$5(listing.address);
     const parts = raw.split(",").map((part) => part.trim()).filter(Boolean);
     return { line1: parts[0] || raw, city: parts.length >= 3 ? parts[parts.length - 2] : "", formatted: raw };
   }
@@ -20025,7 +20513,7 @@ function money(value) {
   if (typeof value === "number" && Number.isFinite(value) && value > 0) {
     return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(value);
   }
-  const raw = text$6(value);
+  const raw = text$5(value);
   if (!raw || raw === "0") return "";
   if (raw.startsWith("$")) return raw;
   const numeric2 = Number(raw.replace(/[$,]/g, ""));
@@ -20036,7 +20524,7 @@ function money(value) {
 }
 function count(value) {
   if (typeof value === "number" && Number.isFinite(value)) return String(value);
-  return text$6(value);
+  return text$5(value);
 }
 function factValue(listing, keys) {
   const portal = record$1(listing.portalData);
@@ -20051,18 +20539,18 @@ function factValue(listing, keys) {
 }
 function agentOf(listing) {
   const agent = record$1(listing.agent);
-  const name = text$6(listing.agentName) || text$6(listing.listingAgent) || text$6(agent?.name);
+  const name = text$5(listing.agentName) || text$5(listing.listingAgent) || text$5(agent?.name);
   const profile = listing.clientHubProfile ? profileFromClient({ hubProfile: listing.clientHubProfile, ...record$1(listing.clientContact) }) : null;
   return applyProfileToAgent({
     name,
-    brokerage: text$6(listing.brokerage) || text$6(listing.brokerageName) || text$6(agent?.brokerage),
-    license: text$6(listing.licenseNumber) || text$6(listing.agentLicense) || text$6(agent?.license),
-    phone: text$6(listing.agentPhone) || text$6(agent?.phone),
-    email: text$6(listing.agentEmail) || text$6(agent?.email),
-    headshotUrl: text$6(agent?.headshotUrl),
-    companyLogoUrl: text$6(agent?.companyLogoUrl),
-    brokerageLogoUrl: text$6(agent?.brokerageLogoUrl),
-    website: text$6(agent?.website),
+    brokerage: text$5(listing.brokerage) || text$5(listing.brokerageName) || text$5(agent?.brokerage),
+    license: text$5(listing.licenseNumber) || text$5(listing.agentLicense) || text$5(agent?.license),
+    phone: text$5(listing.agentPhone) || text$5(agent?.phone),
+    email: text$5(listing.agentEmail) || text$5(agent?.email),
+    headshotUrl: text$5(agent?.headshotUrl),
+    companyLogoUrl: text$5(agent?.companyLogoUrl),
+    brokerageLogoUrl: text$5(agent?.brokerageLogoUrl),
+    website: text$5(agent?.website),
     socials: Array.isArray(agent?.socials) ? agent.socials : []
   }, profile);
 }
@@ -20083,7 +20571,7 @@ function tourUrl(listing) {
   const blockedUrls = /* @__PURE__ */ new Set();
   const direct = [];
   for (const key of ["matterportUrl", "virtualTourUrl", "tourUrl"]) {
-    const url = text$6(listing[key]);
+    const url = text$5(listing[key]);
     if (!url) continue;
     if (isHiddenFromListingSites(listing, { id: key, url })) blockedUrls.add(url);
     else direct.push(url);
@@ -20092,7 +20580,7 @@ function tourUrl(listing) {
   for (const tour of tours) {
     const row = record$1(tour);
     if (!row) continue;
-    const url = text$6(row.embedUrl) || text$6(row.url);
+    const url = text$5(row.embedUrl) || text$5(row.url);
     if (!url) continue;
     if (isHiddenFromListingSites(listing, row)) blockedUrls.add(url);
     else direct.push(url);
@@ -20121,10 +20609,10 @@ function hiddenSources(listing) {
     for (const item of items) {
       const row = record$1(item);
       if (!row) continue;
-      const id = text$6(row.id);
+      const id = text$5(row.id);
       const sectionHidden = isHiddenFromListingSites(listing, row);
       if (!sectionHidden && (!id || !prefs[id]?.hidden)) continue;
-      const source = rasterShareSource(row) || videoPlaceholderSource(row) || text$6(row.url);
+      const source = rasterShareSource(row) || videoPlaceholderSource(row) || text$5(row.url);
       if (source) hidden.add(source);
     }
   }
@@ -20134,9 +20622,9 @@ function buildPublicListingSite(listing) {
   if (!listing) return null;
   const website = sanitizeWebsiteSettings(listing.portalWebsite);
   if (!website.published) return null;
-  const id = text$6(listing.id);
+  const id = text$5(listing.id);
   if (!/^[A-Za-z0-9_-]{4,128}$/.test(id)) return null;
-  const address = addressParts$1(listing);
+  const address = addressParts(listing);
   const slug = listingSiteSlug({ line1: address.line1, city: address.city });
   if (!slug) return null;
   const share = listing;
@@ -20473,7 +20961,7 @@ function adminReady$4(res) {
 function listingIdFrom(value) {
   return portalListingId(value);
 }
-function text$5(value) {
+function text$4(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function sendKnownError$3(res, err, fallback) {
@@ -20524,7 +21012,7 @@ function unique(records) {
   const out = [];
   for (const record2 of records) {
     if (!record2) continue;
-    const id = text$5(record2.id);
+    const id = text$4(record2.id);
     if (id && seen.has(id)) continue;
     if (id) seen.add(id);
     out.push(record2);
@@ -20532,35 +21020,35 @@ function unique(records) {
   return out;
 }
 async function loadSources(listingId, listing) {
-  const requestId = text$5(listing.orderRequestId);
+  const requestId = text$4(listing.orderRequestId);
   const requests = unique([
     await readDoc$1("orderRequests", requestId),
     ...await readWhere("orderRequests", "listingId", listingId)
   ]);
   const orderRequest = requests.find((record2) => record2.id === requestId) || requests[0] || null;
-  const orderId = text$5(listing.orderId) || text$5(orderRequest?.convertedToOrderId) || text$5(orderRequest?.orderId);
+  const orderId = text$4(listing.orderId) || text$4(orderRequest?.convertedToOrderId) || text$4(orderRequest?.orderId);
   const orders = unique([
     await readDoc$1("orders", orderId),
     ...await readWhere("orders", "listingId", listingId)
   ]);
   const order = orders.find((record2) => record2.id === orderId) || orders[0] || null;
-  const invoiceIds = [text$5(listing.invoiceId), text$5(order?.invoiceId), text$5(orderRequest?.invoiceId)].filter(Boolean);
+  const invoiceIds = [text$4(listing.invoiceId), text$4(order?.invoiceId), text$4(orderRequest?.invoiceId)].filter(Boolean);
   const legacyIds = [
-    ...legacyInvoiceDocIds({ orderRequestId: text$5(orderRequest?.id), listingId }),
-    ...legacyInvoiceDocIds({ orderRequestId: text$5(order?.orderRequestId), listingId: text$5(order?.listingId) || listingId })
+    ...legacyInvoiceDocIds({ orderRequestId: text$4(orderRequest?.id), listingId }),
+    ...legacyInvoiceDocIds({ orderRequestId: text$4(order?.orderRequestId), listingId: text$4(order?.listingId) || listingId })
   ].filter((id) => !invoiceIds.includes(id));
-  const galleryId = text$5(listing.galleryId) || text$5(orderRequest?.galleryId) || text$5(order?.galleryId);
+  const galleryId = text$4(listing.galleryId) || text$4(orderRequest?.galleryId) || text$4(order?.galleryId);
   const [invoiceDocs, legacyDocs, invoicesByListing, invoicesByOrder, invoicesByRequest, galleryDoc, galleriesByListing, galleriesByOrder, appointmentsByRequest, appointmentsByOrder, appointmentsByListing] = await Promise.all([
     Promise.all(invoiceIds.map((id) => readLiveInvoice(id))),
     Promise.all(legacyIds.map((id) => readLiveInvoice(id))),
     readWhere("invoices", "listingId", listingId),
-    readWhere("invoices", "orderId", text$5(order?.id)),
-    readWhere("invoices", "orderRequestId", text$5(orderRequest?.id)),
+    readWhere("invoices", "orderId", text$4(order?.id)),
+    readWhere("invoices", "orderRequestId", text$4(orderRequest?.id)),
     readDoc$1("galleries", galleryId),
     readWhere("galleries", "listingId", listingId),
-    readWhere("galleries", "orderId", text$5(order?.id)),
-    readWhere("appointments", "orderRequestId", text$5(orderRequest?.id)),
-    readWhere("appointments", "orderId", text$5(order?.id)),
+    readWhere("galleries", "orderId", text$4(order?.id)),
+    readWhere("appointments", "orderRequestId", text$4(orderRequest?.id)),
+    readWhere("appointments", "orderId", text$4(order?.id)),
     readWhere("appointments", "listingId", listingId)
   ]);
   return {
@@ -20590,29 +21078,29 @@ async function authorizedListing(req, listingId) {
 }
 function mediaChange(body) {
   const row = body && typeof body === "object" ? body : {};
-  const kind = text$5(row.kind);
+  const kind = text$4(row.kind);
   if (kind === "photo" && Array.isArray(row.layout)) {
     const layout = row.layout.flatMap((entry2) => {
       const item = entry2 && typeof entry2 === "object" ? entry2 : null;
-      const id2 = text$5(item?.id);
+      const id2 = text$4(item?.id);
       if (!id2) return [];
-      const groupId = text$5(item?.groupId);
+      const groupId = text$4(item?.groupId);
       return [{ id: id2, groupId }];
     });
     if (layout.length) return { kind: "photo", layout };
   }
   if (kind === "photo" && row.group && typeof row.group === "object") {
     const group = row.group;
-    const action = text$5(group.action);
-    const name = text$5(group.name).slice(0, 60);
-    const id2 = text$5(group.id);
-    const photoIds = Array.isArray(group.photoIds) ? group.photoIds.map((item) => text$5(item)).filter(Boolean).slice(0, 200) : [];
+    const action = text$4(group.action);
+    const name = text$4(group.name).slice(0, 60);
+    const id2 = text$4(group.id);
+    const photoIds = Array.isArray(group.photoIds) ? group.photoIds.map((item) => text$4(item)).filter(Boolean).slice(0, 200) : [];
     if (action === "create" && name && photoIds.length) return { kind: "photo", group: { action: "create", name, photoIds } };
     if (action === "rename" && id2 && name) return { kind: "photo", group: { action: "rename", id: id2, name } };
     if (action === "remove" && id2) return { kind: "photo", group: { action: "remove", id: id2 } };
     return null;
   }
-  const id = text$5(row.id);
+  const id = text$4(row.id);
   if (!KINDS.has(kind) || !id) return null;
   if (typeof row.hidden === "boolean") return { kind, id, hidden: row.hidden };
   if (row.move === "earlier" || row.move === "later") return { kind, id, move: row.move };
@@ -20758,7 +21246,7 @@ const handleCreatePhotoEditRequest = async (req, res) => {
   const listingId = listingIdFrom(req.params.id);
   if (!listingId) return res.status(400).json({ error: "Listing id is not valid." });
   const body = req.body && typeof req.body === "object" ? req.body : {};
-  const photoId = text$5(body.photoId);
+  const photoId = text$4(body.photoId);
   const note = typeof body.note === "string" ? body.note : "";
   if (!photoId) return res.status(400).json({ error: "Choose a file." });
   try {
@@ -24120,14 +24608,14 @@ const GMASS_LINK_OUT = [
   "Webhooks. The webhook route is for Zapier, and end users manage webhooks in the dashboard."
 ];
 const MERGE = /\{([A-Za-z]+)(?:\|([^}]*))?\}/g;
-function escapeHtml$5(value) {
+function escapeHtml$3(value) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 function applyMerge(template, values) {
   return template.replace(MERGE, (full, key, fallback) => {
     const value = values[key];
-    if (value) return key === "UnsubscribeUrl" ? value : escapeHtml$5(value);
-    if (fallback !== void 0) return escapeHtml$5(fallback);
+    if (value) return key === "UnsubscribeUrl" ? value : escapeHtml$3(value);
+    if (fallback !== void 0) return escapeHtml$3(fallback);
     return full;
   });
 }
@@ -24156,7 +24644,7 @@ function list(value) {
   }
   return [];
 }
-function text$4(row, key) {
+function text$3(row, key) {
   const value = row[key] ?? row[key[0].toUpperCase() + key.slice(1)];
   return value == null ? "" : String(value);
 }
@@ -24173,12 +24661,12 @@ function summarizeGmassReport(input) {
   const unsubscribes = list(input.unsubscribes);
   const replies = list(input.replies);
   const sent = recipients.length || Number(input.aggregate?.recipients || 0);
-  const bounceEmails = new Set(bounces.map((row) => text$4(row, "emailAddress").toLowerCase()).filter(Boolean));
-  const blockEmails = new Set(blocks.map((row) => text$4(row, "emailAddress").toLowerCase()).filter(Boolean));
+  const bounceEmails = new Set(bounces.map((row) => text$3(row, "emailAddress").toLowerCase()).filter(Boolean));
+  const blockEmails = new Set(blocks.map((row) => text$3(row, "emailAddress").toLowerCase()).filter(Boolean));
   const delivered = Math.max(0, sent - (/* @__PURE__ */ new Set([...bounceEmails, ...blockEmails])).size);
-  const uniqueOpens = new Set(opens.map((row) => text$4(row, "emailAddress").toLowerCase()).filter(Boolean)).size || (recipients.length ? 0 : Number(input.aggregate?.opens || 0));
+  const uniqueOpens = new Set(opens.map((row) => text$3(row, "emailAddress").toLowerCase()).filter(Boolean)).size || (recipients.length ? 0 : Number(input.aggregate?.opens || 0));
   const openTotal = opens.reduce((sum, row) => sum + Number(row.openCount || row.OpenCount || 1), 0) || uniqueOpens;
-  const clickEmails = new Set(clicks.map((row) => text$4(row, "emailAddress").toLowerCase()).filter(Boolean));
+  const clickEmails = new Set(clicks.map((row) => text$3(row, "emailAddress").toLowerCase()).filter(Boolean));
   const uniqueClicks = clickEmails.size || (recipients.length ? 0 : Number(input.aggregate?.clicks || 0));
   const replyCount = replies.length || Number(input.aggregate?.replies || 0);
   const bounceCount = bounces.length || Number(input.aggregate?.bounces || 0);
@@ -24186,10 +24674,10 @@ function summarizeGmassReport(input) {
   const unsubCount = unsubscribes.length || Number(input.aggregate?.unsubscribes || 0);
   const linkMap = /* @__PURE__ */ new Map();
   for (const row of clicks) {
-    const url = text$4(row, "url") || "(unknown link)";
+    const url = text$3(row, "url") || "(unknown link)";
     const current = linkMap.get(url) || { clicks: 0, emails: /* @__PURE__ */ new Set() };
     current.clicks += 1;
-    const email = text$4(row, "emailAddress").toLowerCase();
+    const email = text$3(row, "emailAddress").toLowerCase();
     if (email) current.emails.add(email);
     linkMap.set(url, current);
   }
@@ -24203,41 +24691,41 @@ function summarizeGmassReport(input) {
     return byEmail.get(key);
   };
   for (const row of recipients) {
-    const item = ensure(text$4(row, "emailAddress"));
-    if (item) item.sentAt = text$4(row, "sentTime");
+    const item = ensure(text$3(row, "emailAddress"));
+    if (item) item.sentAt = text$3(row, "sentTime");
   }
   for (const row of opens) {
-    const item = ensure(text$4(row, "emailAddress"));
+    const item = ensure(text$3(row, "emailAddress"));
     if (item) item.opens = Number(row.openCount || row.OpenCount || 1);
   }
   for (const row of clicks) {
-    const item = ensure(text$4(row, "emailAddress"));
+    const item = ensure(text$3(row, "emailAddress"));
     if (item) item.clicks += 1;
   }
   for (const row of replies) {
-    const item = ensure(text$4(row, "emailAddress"));
+    const item = ensure(text$3(row, "emailAddress"));
     if (item) item.replied = true;
   }
   for (const row of bounces) {
-    const item = ensure(text$4(row, "emailAddress"));
+    const item = ensure(text$3(row, "emailAddress"));
     if (item) item.bounced = true;
   }
   for (const row of blocks) {
-    const item = ensure(text$4(row, "emailAddress"));
+    const item = ensure(text$3(row, "emailAddress"));
     if (item) item.blocked = true;
   }
   for (const row of unsubscribes) {
-    const item = ensure(text$4(row, "emailAddress"));
+    const item = ensure(text$3(row, "emailAddress"));
     if (item) item.unsubscribed = true;
   }
   const timeline = [
-    ...recipients.map((row) => ({ at: text$4(row, "sentTime"), type: "sent", email: text$4(row, "emailAddress"), detail: "Sent" })),
-    ...opens.map((row) => ({ at: text$4(row, "lastOpenTime"), type: "open", email: text$4(row, "emailAddress"), detail: `${row.openCount || 1} opens` })),
-    ...clicks.map((row) => ({ at: text$4(row, "clickTime"), type: "click", email: text$4(row, "emailAddress"), detail: text$4(row, "url") })),
-    ...replies.map((row) => ({ at: text$4(row, "replyTime"), type: "reply", email: text$4(row, "emailAddress"), detail: "Replied" })),
-    ...bounces.map((row) => ({ at: text$4(row, "bounceTime"), type: "bounce", email: text$4(row, "emailAddress"), detail: text$4(row, "bounceReason") || "Bounced" })),
-    ...blocks.map((row) => ({ at: text$4(row, "blockTime"), type: "block", email: text$4(row, "emailAddress"), detail: text$4(row, "blockReason") || "Blocked" })),
-    ...unsubscribes.map((row) => ({ at: text$4(row, "unsubscribeTime"), type: "unsubscribe", email: text$4(row, "emailAddress"), detail: "Unsubscribed" }))
+    ...recipients.map((row) => ({ at: text$3(row, "sentTime"), type: "sent", email: text$3(row, "emailAddress"), detail: "Sent" })),
+    ...opens.map((row) => ({ at: text$3(row, "lastOpenTime"), type: "open", email: text$3(row, "emailAddress"), detail: `${row.openCount || 1} opens` })),
+    ...clicks.map((row) => ({ at: text$3(row, "clickTime"), type: "click", email: text$3(row, "emailAddress"), detail: text$3(row, "url") })),
+    ...replies.map((row) => ({ at: text$3(row, "replyTime"), type: "reply", email: text$3(row, "emailAddress"), detail: "Replied" })),
+    ...bounces.map((row) => ({ at: text$3(row, "bounceTime"), type: "bounce", email: text$3(row, "emailAddress"), detail: text$3(row, "bounceReason") || "Bounced" })),
+    ...blocks.map((row) => ({ at: text$3(row, "blockTime"), type: "block", email: text$3(row, "emailAddress"), detail: text$3(row, "blockReason") || "Blocked" })),
+    ...unsubscribes.map((row) => ({ at: text$3(row, "unsubscribeTime"), type: "unsubscribe", email: text$3(row, "emailAddress"), detail: "Unsubscribed" }))
   ].filter((item) => item.at).sort((a, b) => b.at.localeCompare(a.at));
   const bounceRate = sent ? bounceCount / sent : 0;
   return {
@@ -26732,7 +27220,7 @@ const db$4 = () => admin.firestore();
 function httpError(status2, message) {
   return Object.assign(new Error(message), { status: status2 });
 }
-function text$3(value) {
+function text$2(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 const PRIVATE_KEY = /email|phone|sms|token|secret|password/i;
@@ -26744,15 +27232,15 @@ function previewListing(id, data) {
   return row;
 }
 function previewStudioJob(data) {
-  const listingId = text$3(data.listingId);
+  const listingId = text$2(data.listingId);
   if (!listingId) return null;
   return {
     listingId,
-    status: text$3(data.status),
-    origin: text$3(data.origin),
-    sourcePath: text$3(data.sourcePath),
-    type: text$3(data.type),
-    label: text$3(data.label)
+    status: text$2(data.status),
+    origin: text$2(data.origin),
+    sourcePath: text$2(data.sourcePath),
+    type: text$2(data.type),
+    label: text$2(data.label)
   };
 }
 async function loadPhotographerPreview(staffId) {
@@ -26770,12 +27258,12 @@ async function loadPhotographerPreview(staffId) {
   const merged = /* @__PURE__ */ new Map();
   for (const doc of [...byUid.docs, ...byIds.docs]) merged.set(doc.id, doc);
   const listings = [...merged.values()].map((doc) => previewListing(doc.id, doc.data() || {}));
-  const allowed = new Set(listings.map((listing) => text$3(listing.id)));
+  const allowed = new Set(listings.map((listing) => text$2(listing.id)));
   const studioJobs = jobSnap.docs.map((doc) => previewStudioJob(doc.data() || {})).filter((job) => Boolean(job && allowed.has(job.listingId)));
   return {
     photographer: {
       id: staffId,
-      firstName: text$3(staff.firstName) || "Photographer",
+      firstName: text$2(staff.firstName) || "Photographer",
       payRate: typeof staff.payRate === "number" && staff.payRate > 0 ? staff.payRate : 75
     },
     listings,
@@ -28159,7 +28647,7 @@ function parseLiveChatBody(body) {
 function oneLine(value) {
   return value.replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim();
 }
-function escapeHtml$4(value) {
+function escapeHtml$2(value) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 function liveChatSmsBody(input) {
@@ -28195,10 +28683,10 @@ async function deliverLiveChat(input) {
       audience: "staff",
       subject: `Live chat from ${oneLine(input.name).slice(0, 80)}`,
       variables: {
-        senderName: escapeHtml$4(input.name),
-        senderEmail: escapeHtml$4(input.email || "Not provided"),
-        senderPhone: escapeHtml$4(input.phone || "Not provided"),
-        message: escapeHtml$4(input.message)
+        senderName: escapeHtml$2(input.name),
+        senderEmail: escapeHtml$2(input.email || "Not provided"),
+        senderPhone: escapeHtml$2(input.phone || "Not provided"),
+        message: escapeHtml$2(input.message)
       }
     });
     emailDelivered = emailResult.sent;
@@ -28570,7 +29058,7 @@ const SOCIALS = [
   { id: "social-tiktok", title: "TikTok", detail: "TikTok DMs and comments" },
   { id: "social-google-business", title: "Google Business", detail: "Google Business DMs and comments" }
 ];
-function text$2(value) {
+function text$1(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function emailOf(value) {
@@ -28599,18 +29087,18 @@ function byTimeDesc(left, right) {
   return (Date.parse(right.updatedAt) || 0) - (Date.parse(left.updatedAt) || 0);
 }
 function messageFrom(raw, index) {
-  const senderType = text$2(raw.senderType) || "client";
-  const direction = text$2(raw.direction) === "outbound" || senderType === "staff" ? "outbound" : "inbound";
+  const senderType = text$1(raw.senderType) || "client";
+  const direction = text$1(raw.direction) === "outbound" || senderType === "staff" ? "outbound" : "inbound";
   return {
-    id: text$2(raw.id) || `msg-${index}`,
-    direction: text$2(raw.direction) === "inbound" || text$2(raw.direction) === "outbound" ? text$2(raw.direction) : direction,
-    senderId: text$2(raw.senderId),
-    senderName: text$2(raw.senderName) || (senderType === "staff" ? "Iconic Images" : "Client"),
+    id: text$1(raw.id) || `msg-${index}`,
+    direction: text$1(raw.direction) === "inbound" || text$1(raw.direction) === "outbound" ? text$1(raw.direction) : direction,
+    senderId: text$1(raw.senderId),
+    senderName: text$1(raw.senderName) || (senderType === "staff" ? "Iconic Images" : "Client"),
     senderType,
-    body: text$2(raw.content) || text$2(raw.body) || text$2(raw.text),
-    channel: text$2(raw.channel) || "in-app",
+    body: text$1(raw.content) || text$1(raw.body) || text$1(raw.text),
+    channel: text$1(raw.channel) || "in-app",
     createdAt: timeOf(raw.createdAt),
-    delivery: text$2(raw.delivery)
+    delivery: text$1(raw.delivery)
   };
 }
 function socialThreads() {
@@ -28675,12 +29163,12 @@ function buildUnifiedThreads(snapshot) {
   for (const [index, raw] of (snapshot.messages || []).entries()) {
     const message = messageFrom(raw, index);
     if (!message.body && !message.senderName) continue;
-    const orderId = text$2(raw.orderId);
-    const explicit = text$2(raw.threadId);
+    const orderId = text$1(raw.orderId);
+    const explicit = text$1(raw.threadId);
     const id = explicit || (orderId ? `order:${orderId}` : `message:${message.id}`);
     const senderType = message.senderType;
-    const clientId2 = text$2(raw.clientId) || (senderType === "client" && !explicit.startsWith("contact:") && !explicit.startsWith("lead:") ? message.senderId : "");
-    const photographerId = text$2(raw.photographerId) || (senderType === "photographer" ? message.senderId : "");
+    const clientId2 = text$1(raw.clientId) || (senderType === "client" && !explicit.startsWith("contact:") && !explicit.startsWith("lead:") ? message.senderId : "");
+    const photographerId = text$1(raw.photographerId) || (senderType === "photographer" ? message.senderId : "");
     const audiences = [];
     if (explicit.startsWith("contact:") || explicit.startsWith("lead:")) {
       audiences.push("leads");
@@ -28695,10 +29183,10 @@ function buildUnifiedThreads(snapshot) {
       id,
       audiences,
       source: "messages",
-      title: text$2(raw.clientName) || message.senderName || "Conversation",
-      subtitle: orderId ? `Order ${orderId.slice(0, 8)}` : text$2(raw.channel) || "Message",
-      email: emailOf(text$2(raw.email) || text$2(raw.recipient)),
-      phone: text$2(raw.phone),
+      title: text$1(raw.clientName) || message.senderName || "Conversation",
+      subtitle: orderId ? `Order ${orderId.slice(0, 8)}` : text$1(raw.channel) || "Message",
+      email: emailOf(text$1(raw.email) || text$1(raw.recipient)),
+      phone: text$1(raw.phone),
       orderId,
       clientId: clientId2,
       photographerId,
@@ -28713,47 +29201,47 @@ function buildUnifiedThreads(snapshot) {
     }
   }
   for (const raw of snapshot.conversations || []) {
-    const id = `conversation:${text$2(raw.id) || text$2(raw.conversationSid)}`;
-    const clientId2 = text$2(raw.clientId);
-    const photographerId = text$2(raw.photographerId);
+    const id = `conversation:${text$1(raw.id) || text$1(raw.conversationSid)}`;
+    const clientId2 = text$1(raw.clientId);
+    const photographerId = text$1(raw.photographerId);
     ensure(threadShell({
       id,
       audiences: ["clients", "photographers"],
       source: "conversations",
-      title: `${text$2(raw.photographerName) || "Photographer"} ↔ ${text$2(raw.clientName) || "Client"}`,
+      title: `${text$1(raw.photographerName) || "Photographer"} ↔ ${text$1(raw.clientName) || "Client"}`,
       subtitle: "Masked SMS",
-      preview: text$2(raw.status) === "closed" ? "Closed bridge" : "Twilio masked number",
+      preview: text$1(raw.status) === "closed" ? "Closed bridge" : "Twilio masked number",
       updatedAt: timeOf(raw.createdAt),
-      email: text$2(raw.clientEmail),
-      phone: text$2(raw.clientPhone),
-      orderId: text$2(raw.orderId),
+      email: text$1(raw.clientEmail),
+      phone: text$1(raw.clientPhone),
+      orderId: text$1(raw.orderId),
       clientId: clientId2,
       photographerId,
-      photographerPhone: text$2(raw.photographerPhone),
+      photographerPhone: text$1(raw.photographerPhone),
       participantIds: [clientId2, photographerId].filter(Boolean)
     }));
   }
   const mirrored = new Set(
-    (snapshot.messages || []).map((raw) => `${text$2(raw.orderId)}|${text$2(raw.content) || text$2(raw.body)}`)
+    (snapshot.messages || []).map((raw) => `${text$1(raw.orderId)}|${text$1(raw.content) || text$1(raw.body)}`)
   );
   for (const [index, raw] of (snapshot.smsLogs || []).entries()) {
-    const body = text$2(raw.body) || text$2(raw.content);
-    const orderId = text$2(raw.orderId);
+    const body = text$1(raw.body) || text$1(raw.content);
+    const orderId = text$1(raw.orderId);
     if (orderId && mirrored.has(`${orderId}|${body}`)) continue;
-    const message = messageFrom({ ...raw, content: body, channel: "sms", senderType: text$2(raw.senderType) || (text$2(raw.direction) === "outbound" ? "staff" : "client") }, index);
-    const senderType = text$2(raw.senderType);
-    const id = orderId ? `order:${orderId}` : `sms:${text$2(raw.id) || message.id}`;
+    const message = messageFrom({ ...raw, content: body, channel: "sms", senderType: text$1(raw.senderType) || (text$1(raw.direction) === "outbound" ? "staff" : "client") }, index);
+    const senderType = text$1(raw.senderType);
+    const id = orderId ? `order:${orderId}` : `sms:${text$1(raw.id) || message.id}`;
     const audiences = senderType === "photographer" ? ["photographers"] : orderId ? ["clients"] : ["leads"];
     const thread = ensure(threadShell({
       id,
       audiences,
       source: orderId ? "messages" : "sms",
-      title: text$2(raw.clientName) || text$2(raw.from) || text$2(raw.to) || "Text message",
+      title: text$1(raw.clientName) || text$1(raw.from) || text$1(raw.to) || "Text message",
       subtitle: "SMS",
-      phone: text$2(raw.to) || text$2(raw.from) || text$2(raw.phone),
+      phone: text$1(raw.to) || text$1(raw.from) || text$1(raw.phone),
       orderId,
-      clientId: text$2(raw.clientId),
-      photographerId: text$2(raw.photographerId) || (senderType === "photographer" ? text$2(raw.senderId) : ""),
+      clientId: text$1(raw.clientId),
+      photographerId: text$1(raw.photographerId) || (senderType === "photographer" ? text$1(raw.senderId) : ""),
       updatedAt: message.createdAt
     }));
     if (body) thread.messages.push(message);
@@ -28787,9 +29275,9 @@ function buildUnifiedThreads(snapshot) {
     }));
   }
   for (const raw of snapshot.orderRequests || []) {
-    const id = `lead:${text$2(raw.id)}`;
-    const name = text$2(raw.clientName) || [text$2(raw.firstName), text$2(raw.lastName)].filter(Boolean).join(" ") || text$2(raw.name) || "Order request";
-    const body = text$2(raw.message) || text$2(raw.notes) || text$2(raw.services) || text$2(raw.address) || text$2(raw.propertyAddress) || "New order request";
+    const id = `lead:${text$1(raw.id)}`;
+    const name = text$1(raw.clientName) || [text$1(raw.firstName), text$1(raw.lastName)].filter(Boolean).join(" ") || text$1(raw.name) || "Order request";
+    const body = text$1(raw.message) || text$1(raw.notes) || text$1(raw.services) || text$1(raw.address) || text$1(raw.propertyAddress) || "New order request";
     const createdAt = timeOf(raw.createdAt) || timeOf(raw.submittedAt);
     ensure(threadShell({
       id,
@@ -28799,14 +29287,14 @@ function buildUnifiedThreads(snapshot) {
       subtitle: "Order request",
       preview: body,
       updatedAt: createdAt,
-      email: text$2(raw.email) || text$2(raw.clientEmail),
-      phone: text$2(raw.phone) || text$2(raw.clientPhone),
-      orderId: text$2(raw.id),
-      clientId: text$2(raw.clientId),
+      email: text$1(raw.email) || text$1(raw.clientEmail),
+      phone: text$1(raw.phone) || text$1(raw.clientPhone),
+      orderId: text$1(raw.id),
+      clientId: text$1(raw.clientId),
       messages: [{
         id: `${id}-note`,
         direction: "inbound",
-        senderId: text$2(raw.clientId),
+        senderId: text$1(raw.clientId),
         senderName: name,
         senderType: "lead",
         body,
@@ -29314,496 +29802,6 @@ const handleListingPhotoUpload = async (req, res) => {
     });
   }
 };
-const DEFAULT_SITE_ORIGIN = "https://iconicimagestx.vercel.app";
-const CANONICAL_WWW_ORIGIN = "https://www.iconicimagestx.com";
-const OG_IMAGE_PATH = "/media/photos/drone-hero.jpg";
-const GENERIC_TITLE = "Iconic Images - Creative Media Partners";
-const PUBLIC_PAGES = [
-  {
-    path: "/",
-    file: "index.html",
-    title: "Iconic Images | Real Estate Media in Spring, The Woodlands, and Houston",
-    description: "Photography, video, and listing media for real estate agents in Spring, The Woodlands, and Houston."
-  },
-  {
-    path: "/about",
-    file: "seo/about.html",
-    title: "About | Iconic Images",
-    description: "Iconic Images is a Spring, Texas studio for real estate media, serving The Woodlands, Houston, and nearby communities since 2016."
-  },
-  {
-    path: "/pricing",
-    file: "seo/pricing.html",
-    title: "Pricing | Iconic Images",
-    description: "Listing, branding, and media packages from Iconic Images for agents in Spring, The Woodlands, and Houston."
-  },
-  {
-    path: "/studio-105",
-    file: "seo/studio-105.html",
-    title: "Studio 105 | Iconic Images",
-    description: "Studio 105 in Spring has two portrait rooms, Studio Noir and Studio Blanc, for headshots, brand films, and product photos."
-  },
-  {
-    path: "/portfolio",
-    file: "seo/portfolio.html",
-    title: "Portfolio | Iconic Images",
-    description: "Listing photos, aerials, portraits, and virtual staging by Iconic Images in Spring, The Woodlands, and Houston."
-  },
-  {
-    path: "/stock-footage",
-    file: "seo/stock-footage.html",
-    title: "Stock Footage | Iconic Images",
-    description: "Neighborhood photo stills from Iconic Images for agents listing homes in Spring, The Woodlands, and Houston."
-  },
-  {
-    path: "/contact",
-    file: "seo/contact.html",
-    title: "Contact | Iconic Images",
-    description: "Contact Iconic Images in Spring, Texas about real estate photography and video in The Woodlands and Houston."
-  },
-  {
-    path: "/socials",
-    file: "seo/socials.html",
-    title: "Socials | Iconic Images",
-    description: "Instagram, Facebook, and TikTok from Iconic Images, a real estate media studio in Spring, The Woodlands, and Houston."
-  },
-  {
-    path: "/insights",
-    file: "seo/insights.html",
-    title: "Iconic Insights | Iconic Images",
-    description: "Field notes from Iconic Images on listing photography, video, and marketing in Spring, The Woodlands, and Houston."
-  },
-  {
-    path: "/book",
-    file: "seo/book.html",
-    title: "Book a Shoot | Iconic Images",
-    description: "Schedule listing photography or video with Iconic Images in Spring, The Woodlands, or Houston."
-  },
-  {
-    path: "/apprenticeship",
-    file: "seo/apprenticeship.html",
-    title: "The Apprenticeship Program | Iconic Images",
-    description: "Apprentice listing photos in Spring, The Woodlands, and Houston. A short appointment, photos only, and the program rules."
-  },
-  {
-    path: "/senior-living",
-    file: "seo/senior-living.html",
-    title: "Senior Living Virtual Tours & Photography | Iconic Images",
-    description: "Virtual tours and photography for senior living communities in Spring, The Woodlands, and Houston."
-  },
-  {
-    path: "/privacy",
-    file: "seo/privacy.html",
-    title: "Privacy Policy | Iconic Images",
-    description: `Privacy Policy for ${LEGAL_BUSINESS_NAME}, a real estate media studio based in Spring, Texas.`
-  },
-  {
-    path: "/terms",
-    file: "seo/terms.html",
-    title: "Terms and Conditions | Iconic Images",
-    description: "Terms and Conditions for photography, video, and listing media from Iconic Images in Texas."
-  },
-  {
-    path: "/login",
-    file: "seo/login.html",
-    title: "Client Login | Iconic Images",
-    description: "Client sign-in for Iconic Images. View your listings and delivered media."
-  }
-];
-function readConfiguredOrigin() {
-  const nodeOrigin = typeof process !== "undefined" ? process.env?.VITE_SITE_ORIGIN : "";
-  return String(nodeOrigin || "").trim().replace(/\/$/, "");
-}
-const SITE_ORIGIN = readConfiguredOrigin() || DEFAULT_SITE_ORIGIN;
-function hostnameOf(host) {
-  const first = String(host || "").split(",")[0].trim().toLowerCase().replace(/\.$/, "");
-  if (!first) return "";
-  if (first.startsWith("[")) {
-    const end = first.indexOf("]");
-    return end >= 0 ? first.slice(1, end) : first;
-  }
-  return first.replace(/:\d+$/, "");
-}
-function isCustomDomainHost(host) {
-  const name = hostnameOf(host);
-  return name === "iconicimagestx.com" || name === "www.iconicimagestx.com";
-}
-function originForHost(host, fallback = SITE_ORIGIN) {
-  return isCustomDomainHost(host) ? CANONICAL_WWW_ORIGIN : fallback;
-}
-function canonicalUrl(path2, origin = SITE_ORIGIN) {
-  return path2 === "/" ? `${origin}/` : `${origin}${path2}`;
-}
-function ogImageUrl(origin = SITE_ORIGIN) {
-  return `${origin}${OG_IMAGE_PATH}`;
-}
-function escapeHtml$3(value) {
-  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-}
-function isPublicMetaTag(tag) {
-  return /(?:\bname|\bproperty)\s*=\s*["'](?:description|robots|og:[^"']*|twitter:[^"']*)["']/i.test(tag);
-}
-function stripPublicMeta(html) {
-  return html.replace(/<link\b[^>]*rel=["']canonical["'][^>]*\/?>\s*/gi, "").replace(/<meta\b[^>]*\/?>\s*/gi, (tag) => isPublicMetaTag(tag) ? "" : tag);
-}
-function injectHead(html, tags) {
-  let next = stripPublicMeta(html).replace(/<title\b[^>]*>[\s\S]*?<\/title>\s*/gi, "");
-  if (next.includes("</head>")) {
-    return next.replace("</head>", `    ${tags}
-  </head>`);
-  }
-  return `${tags}
-${next}`;
-}
-function sitemapXml(origin = DEFAULT_SITE_ORIGIN) {
-  const urls = PUBLIC_PAGES.map(
-    (page2) => `  <url><loc>${escapeHtml$3(canonicalUrl(page2.path, origin))}</loc></url>`
-  ).join("\n");
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${urls}
-</urlset>
-`;
-}
-function robotsTxt(origin = DEFAULT_SITE_ORIGIN) {
-  return `User-agent: *
-Allow: /
-Disallow: /admin
-Disallow: /portal
-Disallow: /owners
-Disallow: /studio/
-Disallow: /gallery/
-Disallow: /api
-Disallow: /invoice
-
-Sitemap: ${origin}/sitemap.xml
-`;
-}
-const PRESENTATION_PREVIEW_TOKEN = "preview";
-const PRESENTATION_PATH = "/present";
-const TOKEN_PATTERN = /^[A-Za-z0-9_-]{22,80}$/;
-const RAW_EXT = /\.(cr2|cr3|nef|nrw|arw|srf|sr2|dng|raw|rw2|orf|raf|pef|3fr|fff|iiq|heic)$/i;
-const IMAGE_EXT = /\.(jpe?g|png|webp|gif)$/i;
-const SKIP_TYPES = /* @__PURE__ */ new Set(["video", "reel", "tour", "matterport", "file", "document"]);
-function presentationPath(token) {
-  return `${PRESENTATION_PATH}/${encodeURIComponent(token)}`;
-}
-function isPresentationToken(value) {
-  return value === PRESENTATION_PREVIEW_TOKEN || TOKEN_PATTERN.test(value);
-}
-function createPresentationToken(randomBytes2) {
-  return randomBytes2(18).toString("base64url");
-}
-function text$1(value) {
-  return typeof value === "string" ? value.trim() : "";
-}
-function roomFromFields(row, folders) {
-  for (const key of ["room", "roomName", "roomType", "scene"]) {
-    const value = text$1(row[key]);
-    if (value && value.length <= 48 && !IMAGE_EXT.test(value) && !RAW_EXT.test(value)) return value;
-  }
-  const folderId = text$1(row.folderId);
-  if (folderId && folders.has(folderId)) return folders.get(folderId) || "";
-  return "";
-}
-function folderMap(listing) {
-  const map = /* @__PURE__ */ new Map();
-  const folders = listing?.mediaFolders;
-  if (!Array.isArray(folders)) return map;
-  for (const item of folders) {
-    if (!item || typeof item !== "object") continue;
-    const row = item;
-    const id = text$1(row.id);
-    const name = text$1(row.name);
-    if (id && name) map.set(id, name);
-  }
-  return map;
-}
-function isRawPath(path2, name) {
-  return RAW_EXT.test(name) || RAW_EXT.test(path2) || path2.includes("/raw/");
-}
-function pushDraft(drafts, row, index, folders, fallbackRoom = "") {
-  const path2 = text$1(row.path) || text$1(row.storagePath);
-  const name = text$1(row.name) || text$1(row.fileName) || text$1(row.title) || path2.split("/").pop() || "";
-  const type = text$1(row.type).toLowerCase();
-  if (type && SKIP_TYPES.has(type)) return;
-  if (isRawPath(path2, name)) return;
-  const contentType = text$1(row.contentType).toLowerCase();
-  const looksLikeImage = !contentType || contentType.startsWith("image/") || IMAGE_EXT.test(name) || IMAGE_EXT.test(path2);
-  if (!looksLikeImage) return;
-  if (contentType && !contentType.startsWith("image/") && !IMAGE_EXT.test(name)) return;
-  const sourceUrl = rasterShareSource(row);
-  if (!sourceUrl) return;
-  const room = roomFromFields(row, folders) || fallbackRoom;
-  const order = typeof row.order === "number" && Number.isFinite(row.order) ? row.order : index;
-  const final = row.studioApproved === true || text$1(row.studioRole) === "final" || path2.includes("/finals/");
-  drafts.push({
-    id: text$1(row.id) || path2 || sourceUrl,
-    url: sourceUrl,
-    alt: room ? `${room} photograph` : "Listing photograph",
-    room,
-    order,
-    index,
-    path: path2,
-    sourcePath: text$1(row.sourcePath),
-    sourceUrl,
-    final
-  });
-}
-function listingDrafts(listing, hidden) {
-  if (!listing || !Array.isArray(listing.images)) return [];
-  const folders = folderMap(listing);
-  const drafts = [];
-  listing.images.forEach((item, index) => {
-    const frame = frameFromListingImage(item, index);
-    if (!frame || frame.raw || !frame.previewable) return;
-    const row = item && typeof item === "object" ? { ...item } : {};
-    row.url = row.url || frame.url;
-    row.path = row.path || frame.path;
-    row.name = row.name || frame.name;
-    row.contentType = row.contentType || frame.contentType;
-    row.id = row.id || frame.id;
-    if (rowHiddenFromPresentation(row, hidden)) return;
-    pushDraft(drafts, row, index, folders);
-  });
-  return drafts;
-}
-function galleryDrafts(galleries, start, hidden) {
-  const drafts = [];
-  let index = start;
-  for (const gallery of galleries || []) {
-    const buckets = [gallery.mediaItems, gallery.images];
-    for (const bucket2 of buckets) {
-      if (!Array.isArray(bucket2)) continue;
-      for (const item of bucket2) {
-        if (!item || typeof item !== "object") continue;
-        const row = item;
-        if (rowHiddenFromPresentation(row, hidden)) continue;
-        pushDraft(drafts, row, index, /* @__PURE__ */ new Map());
-        index += 1;
-      }
-    }
-  }
-  return drafts;
-}
-function preferFinals(drafts) {
-  const finals = drafts.filter((item) => item.final);
-  if (finals.length === 0) return drafts;
-  const replaced = new Set(finals.map((item) => item.sourcePath).filter(Boolean));
-  const finalPaths = new Set(finals.map((item) => item.path).filter(Boolean));
-  return drafts.filter((item) => {
-    if (item.final) return true;
-    if (item.path && replaced.has(item.path)) return false;
-    if (item.path && finalPaths.has(item.path)) return false;
-    return true;
-  });
-}
-function presentationDrafts(source) {
-  const hidden = hiddenPresentationKeys(source.listing);
-  const fromListing = listingDrafts(source.listing, hidden);
-  const fromGalleries = galleryDrafts(source.galleries, fromListing.length, hidden);
-  const seen = /* @__PURE__ */ new Set();
-  const photos = [];
-  const sorted = [...preferFinals([...fromListing, ...fromGalleries])].sort((a, b) => a.order - b.order || a.index - b.index);
-  for (const item of sorted) {
-    const key = item.path || item.sourceUrl;
-    if (!item.sourceUrl || seen.has(key) || seen.has(item.sourceUrl)) continue;
-    seen.add(key);
-    seen.add(item.sourceUrl);
-    photos.push(item);
-  }
-  return photos.slice(0, 200);
-}
-function presentationDisplayPath(token, index) {
-  return `/api/media/display/p/${encodeURIComponent(token)}/${index}`;
-}
-function collectPresentationPhotos(source) {
-  const drafts = presentationDrafts(source);
-  const tokenRoute = TOKEN_PATTERN.test(source.token);
-  return drafts.map((item, index) => ({
-    id: item.id,
-    url: tokenRoute ? presentationDisplayPath(source.token, index) : item.sourceUrl,
-    alt: item.alt,
-    room: item.room
-  }));
-}
-function presentationRooms(photos) {
-  const rooms = [];
-  for (const photo of photos) {
-    const name = photo.room.trim();
-    if (!name) continue;
-    const last = rooms[rooms.length - 1];
-    if (last && last.name.toLowerCase() === name.toLowerCase()) last.count += 1;
-    else rooms.push({ name, count: 1 });
-  }
-  return rooms;
-}
-function addressParts(listing) {
-  const source = listing?.address ?? listing?.shootLocation ?? listing?.propertyAddress;
-  if (typeof source === "string" && source.trim()) {
-    return { address: source.trim(), street: source.trim(), locality: "" };
-  }
-  if (source && typeof source === "object") {
-    const row = source;
-    const street = text$1(row.street);
-    const locality = [text$1(row.city), [text$1(row.state), text$1(row.zip)].filter(Boolean).join(" ")].filter(Boolean).join(", ");
-    const formatted = text$1(row.formatted);
-    const address = formatted || [street, locality].filter(Boolean).join(", ");
-    if (address) return { address, street: street || address, locality: street ? locality : "" };
-  }
-  const property = text$1(listing?.propertyAddress);
-  if (property) return { address: property, street: property, locality: "" };
-  const labeled = listingAddressLabel({
-    address: listing?.address,
-    shootLocation: listing?.shootLocation
-  });
-  if (labeled !== "Untitled listing") return { address: labeled, street: labeled, locality: "" };
-  return { address: "", street: "", locality: "" };
-}
-function agentNameOf(listing) {
-  if (!listing) return "";
-  const direct = text$1(listing.agentName) || text$1(listing.listingAgent);
-  if (direct) return direct;
-  const agent = listing.agent;
-  if (agent && typeof agent === "object") return text$1(agent.name);
-  if (typeof agent === "string") return agent.trim();
-  return "";
-}
-function priceOf(listing) {
-  const raw = listing?.listPrice ?? listing?.price;
-  if (typeof raw === "number" && Number.isFinite(raw) && raw > 0) {
-    return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(raw);
-  }
-  const value = text$1(raw);
-  if (!value) return "";
-  if (value.startsWith("$")) return value;
-  const numeric2 = Number(value.replace(/[$,]/g, ""));
-  if (Number.isFinite(numeric2) && numeric2 > 0) {
-    return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(numeric2);
-  }
-  return "";
-}
-function countOf(value) {
-  if (typeof value === "number" && Number.isFinite(value)) return String(value);
-  const raw = text$1(value);
-  return raw;
-}
-function absoluteUrl(origin, url) {
-  if (!url) return "";
-  if (url.startsWith("/")) return `${origin.replace(/\/$/, "")}${url}`;
-  return url;
-}
-function buildPresentation(source) {
-  const listing = source.listing || null;
-  if (listing && listing.presentationEnabled === false) return null;
-  const photos = collectPresentationPhotos(source);
-  const { address, street, locality } = addressParts(listing);
-  const agentName = agentNameOf(listing);
-  const clientName2 = "";
-  const origin = source.origin || "";
-  const path2 = presentationPath(source.token);
-  const pageUrl = origin ? `${origin.replace(/\/$/, "")}${path2}` : path2;
-  const titleAddress = address || "Private presentation";
-  const description = photos.length ? `${photos.length} photograph${photos.length === 1 ? "" : "s"}${address ? ` of ${address}` : ""}. A private presentation from Iconic Images.` : "A private listing presentation from Iconic Images.";
-  return {
-    token: source.token,
-    listingId: text$1(listing?.id) || null,
-    seeded: false,
-    enabled: true,
-    address,
-    street,
-    locality,
-    agentName,
-    clientName: clientName2,
-    price: priceOf(listing),
-    beds: countOf(listing?.bedrooms),
-    baths: countOf(listing?.bathrooms),
-    photos,
-    rooms: presentationRooms(photos),
-    meta: {
-      title: `${titleAddress} · Iconic Images`,
-      description,
-      image: absoluteUrl(origin, photos[0]?.url || ""),
-      url: pageUrl
-    }
-  };
-}
-const SEEDED_PHOTOS = [
-  { src: "/media/photos/luxury-exterior.jpg", room: "Exterior", alt: "Twilight exterior of a luxury home" },
-  { src: "/media/photos/drone-hero.jpg", room: "Aerial", alt: "Aerial view over the property" },
-  { src: "/media/before-after/aerial-estate.jpg", room: "Grounds", alt: "Aerial view of the estate and grounds" },
-  { src: "/media/before-after/twilight-pool-lifestyle.jpg", room: "Rear pool", alt: "Rear pool and patio at twilight" },
-  { src: "/media/before-after/pavilion-lifestyle.jpg", room: "Pavilion", alt: "Pool pavilion and outdoor lounge" },
-  { src: "/media/photos/luxury-interior.jpg", room: "Interior", alt: "Interior of the home" },
-  { src: "/media/photos/listing-living-01.jpg", room: "Living room", alt: "Living room" },
-  { src: "/media/photos/listing-living-02.jpg", room: "Living room", alt: "Living room" },
-  { src: "/media/photos/listing-living-03.jpg", room: "Living room", alt: "Living room" },
-  { src: "/media/photos/listing-living-04.jpg", room: "Living room", alt: "Living room" },
-  { src: "/media/photos/staged-living-room.jpg", room: "Living room", alt: "Staged living room" },
-  { src: "/media/before-after/living-declutter.jpg", room: "Living room", alt: "Living room prepared for the listing" },
-  { src: "/media/before-after/primary-suite-staged.jpg", room: "Primary suite", alt: "Primary suite" },
-  { src: "/media/before-after/aerial-estate-close.jpg", room: "Aerial", alt: "Closer aerial of the home" }
-];
-function seededPresentation(origin = "") {
-  const photos = SEEDED_PHOTOS.map((item, index) => ({
-    id: `seed-${index + 1}`,
-    url: item.src,
-    alt: item.alt,
-    room: item.room
-  }));
-  const path2 = presentationPath(PRESENTATION_PREVIEW_TOKEN);
-  const pageUrl = origin ? `${origin.replace(/\/$/, "")}${path2}` : path2;
-  return {
-    token: PRESENTATION_PREVIEW_TOKEN,
-    listingId: null,
-    seeded: true,
-    enabled: true,
-    address: "",
-    street: "",
-    locality: "",
-    agentName: "",
-    clientName: "",
-    price: "",
-    beds: "",
-    baths: "",
-    photos,
-    rooms: presentationRooms(photos),
-    meta: {
-      title: "Sample presentation · Iconic Images",
-      description: `${photos.length} photographs. A private presentation from Iconic Images.`,
-      image: absoluteUrl(origin, photos[0]?.url || ""),
-      url: pageUrl
-    }
-  };
-}
-function injectPresentationMeta(html, meta) {
-  const tags = [
-    `<title>${escapeHtml$2(meta.title)}</title>`,
-    `<meta name="description" content="${escapeHtml$2(meta.description)}" />`,
-    `<meta name="robots" content="noindex, nofollow" />`,
-    `<meta property="og:type" content="website" />`,
-    `<meta property="og:title" content="${escapeHtml$2(meta.title)}" />`,
-    `<meta property="og:description" content="${escapeHtml$2(meta.description)}" />`,
-    `<meta property="og:url" content="${escapeHtml$2(meta.url)}" />`,
-    meta.image ? `<meta property="og:image" content="${escapeHtml$2(meta.image)}" />` : "",
-    `<meta name="twitter:card" content="summary_large_image" />`,
-    `<meta name="twitter:title" content="${escapeHtml$2(meta.title)}" />`,
-    `<meta name="twitter:description" content="${escapeHtml$2(meta.description)}" />`,
-    meta.image ? `<meta name="twitter:image" content="${escapeHtml$2(meta.image)}" />` : ""
-  ].filter(Boolean).join("\n    ");
-  let next = stripPublicMeta(html).replace(/<title>[\s\S]*?<\/title>/gi, "");
-  if (next.includes("</head>")) {
-    next = next.replace("</head>", `    ${tags}
-  </head>`);
-  } else {
-    next = `${tags}
-${next}`;
-  }
-  return next;
-}
-function escapeHtml$2(value) {
-  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-}
 const router$3 = Router();
 const db = () => admin.firestore();
 function originOf(req) {
@@ -33029,10 +33027,10 @@ function absoluteInsightImage(url, origin = SITE_ORIGIN) {
   return ogImageUrl(origin);
 }
 function insightHeadTags(post, origin = SITE_ORIGIN) {
-  const title = escapeHtml$3(post.seoTitle || `${post.title} | Iconic Insights`);
-  const description = escapeHtml$3(post.seoDescription || post.excerpt);
-  const url = escapeHtml$3(canonicalUrl(`/insights/${post.slug}`, origin));
-  const image = escapeHtml$3(absoluteInsightImage(coverOf(post), origin));
+  const title = escapeHtml$5(post.seoTitle || `${post.title} | Iconic Insights`);
+  const description = escapeHtml$5(post.seoDescription || post.excerpt);
+  const url = escapeHtml$5(canonicalUrl(`/insights/${post.slug}`, origin));
+  const image = escapeHtml$5(absoluteInsightImage(coverOf(post), origin));
   return [
     `<title>${title}</title>`,
     `<meta name="description" content="${description}" />`,
