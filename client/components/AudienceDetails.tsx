@@ -50,12 +50,12 @@ export default function AudienceDetails() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-y-12 gap-x-8 max-w-5xl mx-auto">
           {audiences.map((audience) => (
             <div key={audience.id} className="flex flex-col items-center text-center group">
-              <div className="w-24 h-24 md:w-32 md:h-32 mb-6 relative rounded-full overflow-hidden bg-gray-50 border border-gray-100 shadow-sm transition-transform duration-500 group-hover:scale-105">
+              <div className="relative mb-6 h-40 w-40 overflow-hidden rounded-full border-4 border-white bg-gray-100 shadow-xl ring-1 ring-black/10 transition-transform duration-500 group-hover:scale-105 md:h-52 md:w-52">
                 <img
                   src={audience.image}
                   alt={audience.title}
                   data-site-page="home" data-site-block="audienceDetails" data-site-item={audience.id} data-site-field="image" data-site-kind="image"
-                  className="w-full h-full object-cover grayscale opacity-80 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-500"
+                  className="h-full w-full object-cover object-[center_18%] grayscale opacity-90 transition-all duration-500 group-hover:grayscale-0 group-hover:opacity-100"
                 />
               </div>
               <h3 data-site-page="home" data-site-block="audienceDetails" data-site-item={audience.id} data-site-field="title" data-site-kind="text" className="text-lg font-bold text-black mb-2">{audience.title}</h3>

@@ -1,50 +1,25 @@
 import { useState, useRef, useEffect } from "react";
 import { Play, Volume2, VolumeX, ChevronLeft, ChevronRight } from "lucide-react";
-import { useSiteSettings } from "@/hooks/useSiteSettings";
-import { SNAP_REELS } from "@/lib/snapReels";
 import { itemText, useSiteItems, useSiteText } from "@/content/siteContent";
+import { resolveSolutionLineup } from "@/lib/solutionLineup";
 
 export default function SolutionSection() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isMuted, setIsMuted] = useState(true);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const settings = useSiteSettings();
 
+  const badge = useSiteText("home", "solution", "badge", "Built for Creative Excellence");
+  const title = useSiteText("home", "solution", "title", "Your All-in-One Solution for High-Impact Media Content");
   const customVideos = useSiteItems("home", "solution");
-  const fallbackVideos = [
-    {
-      id: 1,
-      url: "/media/video/product-photography.mp4",
-      aspect: "16/9",
-      title: "Product Photography"
-    },
-    {
-      id: 2,
-      url: "/media/reels/superpower-reel-12s.mp4",
-      aspect: "9/16",
-      title: "Vertical Reel"
-    },
-    {
-      id: 3,
-      url: "/media/video/content-web-clip.mp4",
-      aspect: "9/16",
-      title: "Content Package"
-    },
-    ...SNAP_REELS.map((reel, index) => ({
-      id: 4 + index,
-      url: reel.src,
-      aspect: "9/16" as const,
-      title: `Snap Reel · ${reel.title}`,
-    })),
-  ];
-  const videos = customVideos?.length
-    ? customVideos.map((item, index) => ({
-        id: index + 1,
-        url: itemText(item, "video"),
-        aspect: itemText(item, "video").includes("product-photography") ? "16/9" : "9/16",
-        title: itemText(item, "title"),
-      }))
-    : fallbackVideos;
+  const videos = resolveSolutionLineup(
+    customVideos?.length
+      ? customVideos.map((item) => ({
+          id: item.id,
+          url: itemText(item, "video"),
+          title: itemText(item, "title"),
+        }))
+      : null,
+  );
 
   const nextSlide = () => {
     setCurrentIndex((prev) => (prev + 1) % videos.length);
@@ -61,7 +36,7 @@ export default function SolutionSection() {
     }
   }, [currentIndex]);
 
-  const currentVideo = videos[currentIndex];
+  const currentVideo = videos[currentIndex] ?? videos[0];
 
   return (
     <section className="bg-black pt-12 pb-24 md:pt-16 md:pb-32 border-t border-white/5">
@@ -69,13 +44,13 @@ export default function SolutionSection() {
         {/* Badge */}
         <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-teal-500/10 border border-teal-500/20 mb-8 shadow-lg">
           <span className="text-[12px] font-bold tracking-wider uppercase text-teal-400">
-            <span data-site-page="home" data-site-block="solution" data-site-field="badge" data-site-kind="text">{useSiteText("home", "solution", "badge", "Built for Creative Excellence")}</span>
+            <span data-site-page="home" data-site-block="solution" data-site-field="badge" data-site-kind="text">{badge}</span>
           </span>
         </div>
 
         {/* Headline */}
         <h2 className="text-4xl md:text-5xl lg:text-6xl font-black mb-8 leading-[1.2] tracking-tight text-white max-w-4xl mx-auto uppercase">
-          <span data-site-page="home" data-site-block="solution" data-site-field="title" data-site-kind="text">{useSiteText("home", "solution", "title", "Your All-in-One Solution for High-Impact Media Content")}</span>
+          <span data-site-page="home" data-site-block="solution" data-site-field="title" data-site-kind="text">{title}</span>
         </h2>
 
         {/* Description */}
@@ -97,7 +72,7 @@ export default function SolutionSection() {
             {/* Active Video */}
             <div className="absolute inset-0 flex items-center justify-center">
               <video
-                key={currentVideo.id}
+                key={currentVideo.url}
                 ref={videoRef}
                 src={currentVideo.url}
                 className="w-full h-full object-cover"

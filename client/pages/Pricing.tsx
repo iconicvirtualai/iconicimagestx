@@ -5,6 +5,7 @@ import { Check, X, ArrowRight, Star, ChevronRight, Info, Sparkles, Zap, Trophy, 
 import { useState } from "react";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { itemText, useSiteHref, useSiteItems, useSiteText } from "@/content/siteContent";
+import { lifestyleBrandSrc, pricingHeroVideo } from "@/lib/pricingMedia";
 import {
   APPRENTICESHIP_BRIDGE_COPY,
   APPRENTICESHIP_OVERAGE_LABEL,
@@ -34,8 +35,8 @@ const BRAND_STAGES = [
   {
     id: "lifestyle",
     label: "Iconic Lifestyle",
-    src: "/media/photos/lifestyle-kennedy-mtz01127.jpg",
-    alt: "Warm smiling lifestyle portrait",
+    src: "/media/photos/lifestyle-mtz04655.jpg",
+    alt: "Portrait seated on stone steps",
     treatment: "",
     note: "Alive. Warm. The frame people actually stop for.",
   },
@@ -86,7 +87,9 @@ function BrandTransformation({
         ))}
       </div>
 
-      <div className="relative max-w-md mx-auto aspect-[3/4] rounded-[2rem] overflow-hidden shadow-xl border-4 border-white bg-zinc-200">
+      <div className="relative mx-auto max-w-md">
+        <div className="pointer-events-none absolute inset-x-8 top-8 h-2/3 rounded-full bg-teal-100/80 blur-3xl" aria-hidden="true" />
+      <div className="relative aspect-[3/4] overflow-hidden rounded-[2.75rem] border-4 border-white bg-zinc-200 shadow-xl">
         <img
           src={current.src}
           alt={current.alt}
@@ -99,6 +102,7 @@ function BrandTransformation({
           </div>
           <p data-site-page="pricing" data-site-block="brandStages" data-site-item={current.id} data-site-field="note" data-site-kind="text" className="mt-2 text-sm font-medium text-white">{current.note}</p>
         </div>
+      </div>
       </div>
 
       <label className="mt-6 block max-w-md mx-auto text-left">
@@ -146,6 +150,7 @@ export default function Pricing() {
   const brandAccent = useSiteText("pricing", "brandStages", "titleAccent", "Personal Brand");
   const brandBody = useSiteText("pricing", "brandStages", "body", "Three beats. A stiff standard headshot, a polished Iconic corporate portrait, then a lifestyle frame with some life in it.");
   const brandItems = useSiteItems("pricing", "brandStages");
+  const heroVideo = pricingHeroVideo(useSiteText("pricing", "hero", "background", "/media/about/about_were_here_v1.mp4"));
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
   const [brandStage, setBrandStage] = useState(1);
   const [selectedPhotoPkg, setSelectedPhotoPkg] = useState<string | null>(null);
@@ -471,7 +476,7 @@ export default function Pricing() {
                 playsInline
                 className="w-full h-full object-cover opacity-[0.15]"
               >
-                <source src="/media/video/content-web-clip.mp4" type="video/mp4" />
+                <source src={heroVideo} type="video/mp4" />
               </video>
               {/* Simplified Gradient Overlays for better visibility */}
               <div className="absolute inset-0 bg-gradient-to-b from-[#fafafa] via-transparent to-[#fafafa]"></div>
@@ -936,14 +941,14 @@ export default function Pricing() {
               body={brandBody}
               stages={(brandItems ? BRAND_STAGES.map((stage, index) => {
                 const item = brandItems[index];
-                if (!item) return stage;
-                return {
+                const next = !item ? stage : {
                   ...stage,
                   id: item.id,
                   label: itemText(item, "label", stage.label),
                   src: itemText(item, "image", stage.src),
                   note: itemText(item, "note", stage.note),
                 };
+                return { ...next, src: lifestyleBrandSrc(next.id, next.src) };
               }) : BRAND_STAGES)}
             />
           </section>

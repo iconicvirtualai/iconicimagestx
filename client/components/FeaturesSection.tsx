@@ -1,11 +1,11 @@
-import { Play, ArrowRight, Instagram, Facebook, Linkedin, Youtube, Twitter, MousePointer2, Link as LinkIcon } from "lucide-react";
+import { Play, ArrowRight, Instagram, Facebook, Linkedin, Youtube, Twitter } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { itemText, useSiteItems, useSiteText } from "@/content/siteContent";
 import { FEATURED_SNAP_REEL } from "@/lib/snapReels";
-import { beforeAfterById } from "@/lib/beforeAfter";
+import { VOICE_SAMPLE_SLOTS } from "@/lib/voiceSamples";
 
 const FeatureCard = ({
   title,
@@ -15,6 +15,7 @@ const FeatureCard = ({
   ctaText,
   ctaLink,
   itemId,
+  previewClassName = "h-48",
 }: {
   title: string;
   description: string;
@@ -23,6 +24,7 @@ const FeatureCard = ({
   ctaText?: string;
   ctaLink?: string;
   itemId?: string;
+  previewClassName?: string;
 }) => {
   const settings = useSiteSettings();
   return (
@@ -42,7 +44,7 @@ const FeatureCard = ({
           {description}
         </p>
       </div>
-      <div className="relative rounded-xl overflow-hidden bg-white border border-gray-100 shadow-sm h-48">
+      <div className={`relative overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm ${previewClassName}`}>
         {children}
       </div>
       {ctaLink && (
@@ -59,101 +61,74 @@ const FeatureCard = ({
 };
 
 const AiPhotoEditSnippet = () => {
-  const settings = useSiteSettings();
-  const twilight = beforeAfterById("twilight-pool");
-
   return (
-    <div className="relative h-full flex">
-      <div className="w-1/2 h-full relative border-r border-white/50">
-        <img src={twilight.before.src} className="w-full h-full object-cover" alt={twilight.before.alt} />
-        <span className="absolute top-3 left-3 bg-white/20 backdrop-blur-md text-white text-[8px] font-bold px-2 py-0.5 rounded uppercase border border-white/30">Before</span>
-      </div>
-      <div className="w-1/2 h-full relative">
-        <img src={twilight.after.src} className="w-full h-full object-cover" alt={twilight.after.alt} />
-        <span className="absolute top-3 right-3 backdrop-blur-md text-white text-[8px] font-bold px-2 py-0.5 rounded uppercase" style={{ backgroundColor: `${settings.global.primaryColor}CC` }}>After</span>
-      </div>
-      <div className="absolute left-1/2 top-0 bottom-0 w-[2px] bg-white z-10 flex items-center justify-center -translate-x-1/2">
-        <div className="w-4 h-4 bg-white rounded-full shadow-lg border border-gray-100 flex items-center justify-center">
-          <div className="flex gap-[1px]">
-            <div className="w-[1px] h-2 bg-gray-300"></div>
-            <div className="w-[1px] h-2 bg-gray-300"></div>
-          </div>
-        </div>
-      </div>
+    <div className="relative h-full">
+      <img
+        src="/media/home/hero-16x9.jpg"
+        alt="Twilight front elevation"
+        className="h-full w-full object-cover"
+      />
       <span className="absolute bottom-2 left-1/2 z-10 -translate-x-1/2 rounded-md bg-black/70 px-2 py-1 text-[8px] font-black uppercase tracking-widest text-white">
-        {twilight.label}
+        Twilight
       </span>
     </div>
   );
 };
 
 const VirtualStagingSnippet = () => {
-  const [step, setStep] = useState(0); // 0: initial, 1: dragging, 2: processing, 3: result
-  const settings = useSiteSettings();
-  const lifestyle = beforeAfterById("pavilion-lifestyle");
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setStep((prev) => (prev + 1) % 4);
-    }, 3000);
-    return () => clearInterval(timer);
-  }, []);
-
   return (
-    <div className="relative h-full w-full bg-gray-50 flex items-center justify-center overflow-hidden">
-      {/* Background Room - Empty */}
+    <div className="relative h-full w-full overflow-hidden bg-gray-50">
       <img
-        src={lifestyle.before.src}
-        className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${step === 3 ? 'opacity-0' : 'opacity-100'}`}
-        alt={lifestyle.before.alt}
+        src="/media/photos/staged-living-room.jpg"
+        alt="Virtually staged living room"
+        className="absolute inset-0 h-full w-full object-cover"
       />
-
-      {/* Background Room - Staged */}
-      <img
-        src={lifestyle.after.src}
-        className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${step === 3 ? 'opacity-100' : 'opacity-0'}`}
-        alt={lifestyle.after.alt}
-      />
-
-      {/* Animation Overlay */}
-      <div className="absolute inset-0 z-20 pointer-events-none">
-        {/* Cursor & Photo Icon - Using standard CSS transitions/classes */}
-        <div
-          className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center transition-all duration-700 ${
-            step === 1 ? 'opacity-100 translate-y-0 translate-x-0' : 'opacity-0 translate-y-12 translate-x-12'
-          }`}
-        >
-          <div className="bg-white p-2 rounded-lg shadow-xl border border-gray-100 rotate-6 mb-2">
-            <div className="w-10 h-10 bg-[#f0fdfa] rounded flex items-center justify-center">
-              <LinkIcon className="w-5 h-5" style={{ color: settings.global.primaryColor }} />
-            </div>
-          </div>
-          <MousePointer2 className="w-5 h-5 text-black fill-black" />
-        </div>
-
-        {/* Processing State */}
-        <div
-          className={`absolute inset-0 flex items-center justify-center bg-black/10 backdrop-blur-[1px] transition-opacity duration-500 ${
-            step === 2 ? 'opacity-100' : 'opacity-0'
-          }`}
-        >
-          <div className="bg-white px-3 py-1.5 rounded-full shadow-lg flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full animate-spin" style={{ borderWidth: '2px', borderStyle: 'solid', borderBottomColor: settings.global.primaryColor, borderLeftColor: settings.global.primaryColor, borderRightColor: settings.global.primaryColor, borderTopColor: 'transparent' }}></div>
-            <span className="text-[9px] font-bold text-gray-700">AI STAGING...</span>
-          </div>
-        </div>
-
-        {/* Labels */}
-        <div className="absolute bottom-3 left-3 flex gap-2">
-           <div className="bg-white/90 backdrop-blur-md px-2 py-1 rounded-md text-[8px] font-bold shadow-sm flex items-center gap-1 border border-gray-100">
-            <div className={`w-1 h-1 rounded-full transition-colors duration-500`} style={{ backgroundColor: step === 3 ? settings.global.primaryColor : 'rgb(209 213 219)' }}></div>
-            {step === 3 ? "STAGED RESULT" : "EMPTY SPACE"}
-          </div>
-        </div>
+      <div className="absolute bottom-3 left-3 rounded-md border border-gray-100 bg-white/90 px-2 py-1 text-[8px] font-bold shadow-sm">
+        Staged living room
       </div>
     </div>
   );
 };
+
+const AVATAR_PORTRAITS = [
+  { src: "/media/photos/headshot-gracepoint-4.jpg", alt: "Headshot in front of office windows" },
+  { src: "/media/photos/studio-mtz01691.jpg", alt: "Studio portrait" },
+  { src: "/media/photos/lifestyle-daughtery-mtz00636.jpg", alt: "Lifestyle portrait against a white brick wall" },
+  { src: "/media/photos/lifestyle-logan-dan02309.jpg", alt: "Outdoor portrait" },
+  { src: "/media/photos/holiday-mtz08102.jpg", alt: "Holiday portrait" },
+];
+
+function VoiceSamplePlayer() {
+  const [active, setActive] = useState<string>(VOICE_SAMPLE_SLOTS[0].id);
+  return (
+    <ul className="flex h-full flex-col justify-center gap-1.5 bg-[#f0fdfa]/40 px-3 py-3" aria-label="AI voice samples">
+      {VOICE_SAMPLE_SLOTS.map((sample) => {
+        const selected = active === sample.id;
+        return (
+          <li key={sample.id}>
+            <button
+              type="button"
+              data-voice-sample={sample.id}
+              aria-pressed={selected}
+              onClick={() => setActive(sample.id)}
+              className={`flex w-full items-center gap-2 rounded-full border px-2 py-1 text-left ${selected ? "border-teal-200 bg-white shadow-sm" : "border-transparent bg-white/70"}`}
+            >
+              <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[#0d9488]" aria-hidden="true">
+                <Play className="h-2.5 w-2.5 fill-white text-white" />
+              </span>
+              <span className="text-[10px] font-bold text-black">{sample.label}</span>
+              <span className="ml-auto flex h-4 w-[88px] items-end gap-px" aria-hidden="true">
+                {sample.bars.map((height, index) => (
+                  <span key={index} className="flex-1 rounded-sm bg-[#99f6e4]" style={{ height: `${height}px` }} />
+                ))}
+              </span>
+            </button>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
 
 const FEATURE_TITLE = "Go beyond basic editing with powerful add-on tools";
 const FEATURE_BODY = "Iconic isn't just about reels — enhance your content with smart AI tools designed to polish, extend, and personalize every video.";
@@ -198,10 +173,14 @@ export default function FeaturesSection() {
             {...copy("snap", "Snap Reels", "Turn the listing stills into a 9:16 Snap Reel. A vertical cut buyers can watch before they ever book a showing.")}
             colSpan="md:col-span-2"
           >
-            <div className="flex h-full items-center justify-center p-4 gap-4">
-              <img src="/media/photos/luxury-interior.jpg" className="w-1/2 h-full object-cover rounded-lg border border-gray-100" alt="Listing still" />
-              <ArrowRight className="w-6 h-6 shrink-0" style={{ color: settings.global.primaryColor }} />
-              <div className="w-1/2 h-full relative rounded-lg overflow-hidden border border-gray-100 bg-black">
+            <div className="flex h-full items-center justify-center gap-3 bg-[#f4f7f8] px-3">
+              <img
+                src="/media/launch/kitchen_island_hero.jpg"
+                className="h-[88%] w-auto max-w-[46%] rounded-2xl border border-gray-100 object-cover"
+                alt="Listing kitchen still"
+              />
+              <ArrowRight className="h-5 w-5 shrink-0" style={{ color: settings.global.primaryColor }} />
+              <div className="relative h-[88%] aspect-[9/16] overflow-hidden rounded-[1.15rem] border border-gray-100 bg-black">
                 <video
                   src={FEATURED_SNAP_REEL.src}
                   className="h-full w-full object-cover"
@@ -261,7 +240,7 @@ export default function FeaturesSection() {
               <div className="flex gap-4 mb-4">
                 <div className="flex-1 bg-white border border-gray-100 rounded-lg shadow-sm p-3">
                   <div className="w-full aspect-video bg-gray-100 rounded-md overflow-hidden relative">
-                    <img src="/media/photos/luxury-a7305553.jpg" className="w-full h-full object-cover" alt="Studio preview" />
+                    <img src="/media/photos/studio-mtz01691.jpg" className="h-full w-full object-cover object-[center_18%]" alt="Studio portrait" />
                     <div className="absolute inset-0 flex items-center justify-center">
                       <Play className="w-4 h-4 text-white" />
                     </div>
@@ -284,22 +263,9 @@ export default function FeaturesSection() {
           {/* AI Voiceovers */}
           <FeatureCard
             {...copy("voice", "AI Voiceovers", "Instantly generate natural-sounding narrations from a wide range of voices.")}
+            previewClassName="h-auto min-h-[15.5rem]"
           >
-            <div className="flex flex-col h-full p-4 items-center justify-center gap-4 bg-[#f0fdfa]/30">
-              <div className="w-full bg-white border border-gray-100 rounded-lg p-3 shadow-md flex items-center gap-3">
-                <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ backgroundColor: settings.global.primaryColor }}>
-                  <Play className="w-2 h-2 text-white fill-white ml-0.5" />
-                </div>
-                <div className="flex-1 flex gap-1 items-center">
-                  {[1,3,2,4,3,5,2,4,3].map((h, i) => (
-                    <div key={i} className="flex-1 bg-[#ccfbf1]" style={{height: `${h*4}px`}}></div>
-                  ))}
-                </div>
-              </div>
-              <div className="flex items-center gap-2 text-[10px] font-medium text-gray-500">
-                <span className="px-2 py-0.5 rounded bg-gray-100">Warm English Narrator</span>
-              </div>
-            </div>
+            <VoiceSamplePlayer />
           </FeatureCard>
 
           {/* Social Media Captions */}
@@ -325,16 +291,14 @@ export default function FeaturesSection() {
             {...copy("avatars", "AI Avatars", "Create professional video presentations with AI-generated avatars for a personal touch.")}
             colSpan="md:col-span-2"
           >
-            <div className="flex h-full items-center justify-center p-4 gap-6">
-              {[
-                "/media/photos/lifestyle-mtz04327.jpg",
-                "/media/photos/lifestyle-kennedy-mtz01127.jpg",
-                "/media/photos/headshot-gracepoint-4.jpg",
-                "/media/photos/lifestyle-daughtery-mtz00636.jpg",
-                "/media/photos/headshot-gracepoint-1.jpg",
-              ].map((src, i) => (
-                <div key={src} className="w-16 h-16 md:w-20 md:h-20 rounded-xl border-2 shadow-lg overflow-hidden bg-gray-100 flex-shrink-0 first:ring-2" style={{ borderTopColor: 'white', borderRightColor: 'white', borderBottomColor: 'white', borderLeftColor: i === 0 ? settings.global.primaryColor : 'white', borderStyle: 'solid', boxShadow: i === 0 ? `0 0 0 2px ${settings.global.primaryColor}33, 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)` : undefined }}>
-                  <img src={src} className="w-full h-full object-cover" alt="Iconic portrait" />
+            <div className="flex h-full items-center justify-center gap-3 overflow-hidden bg-[radial-gradient(circle_at_center,_#f0fdfa,_#ffffff_70%)] px-3 md:gap-4">
+              {AVATAR_PORTRAITS.map((portrait, index) => (
+                <div
+                  key={portrait.src}
+                  className="h-12 w-12 flex-shrink-0 overflow-hidden rounded-full border-2 border-white bg-gray-100 shadow-lg sm:h-16 sm:w-16 md:h-20 md:w-20"
+                  style={index === 0 ? { boxShadow: `0 0 0 2px ${settings.global.primaryColor}` } : undefined}
+                >
+                  <img src={portrait.src} className="h-full w-full object-cover object-[center_15%]" alt={portrait.alt} />
                 </div>
               ))}
             </div>

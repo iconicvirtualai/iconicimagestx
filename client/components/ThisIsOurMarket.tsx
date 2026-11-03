@@ -69,12 +69,12 @@ export default function ThisIsOurMarket() {
                 whileInView={{ opacity: 1, scale: 1 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.8 }}
-                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[400px] md:w-[350px] md:h-[450px] rounded-3xl overflow-hidden shadow-2xl z-20 border-8 border-[#111]"
+                className="absolute top-1/2 left-1/2 -translate-x-[58%] -translate-y-1/2 h-[280px] w-[280px] md:h-[340px] md:w-[340px] overflow-hidden rounded-full border-8 border-[#111] shadow-2xl z-20"
               >
                 <img
-                  src="/media/photos/lifestyle-kennedy-mtz01127.jpg"
-                  alt="Iconic lifestyle portrait"
-                  className="w-full h-full object-cover grayscale brightness-90 group-hover:grayscale-0 transition-all duration-700"
+                  src="/media/photos/lifestyle-mtz04802.jpg"
+                  alt="Iconic portrait on location"
+                  className="h-full w-full object-cover object-[center_18%]"
                 />
               </motion.div>
 
@@ -84,12 +84,12 @@ export default function ThisIsOurMarket() {
                 whileInView={{ opacity: 1, x: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.8, delay: 0.2 }}
-                className="absolute top-[10%] -right-10 w-[200px] h-[260px] rounded-2xl overflow-hidden shadow-2xl z-30 border-4 border-[#222]"
+                className="absolute top-[8%] -right-6 h-[150px] w-[210px] overflow-hidden rounded-[1.75rem] border-4 border-[#222] shadow-2xl z-30 md:h-[170px] md:w-[240px]"
               >
                 <img
-                  src="/media/photos/drone-hero.jpg"
-                  alt="Iconic drone photograph of a luxury home"
-                  className="w-full h-full object-cover"
+                  src="/media/launch/hero_day_exterior_front.jpg"
+                  alt="Iconic listing exterior"
+                  className="h-full w-full object-cover"
                 />
               </motion.div>
 

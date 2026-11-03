@@ -21,24 +21,38 @@ export const SNAP_REELS = [
   },
 ] as const;
 
-/** Homepage strip: three marketing snaps. Logo and #BEICONIC end card stay in the files. */
+/** Homepage strip: three marketing snaps. Logo and #BEICONIC end card stay in the files. Titles stay off property names. */
 export const SNAP_REEL_STRIP = [
   {
     src: "/media/videos/snap-reels/MariasWay_MarketingSnap_v1.mp4",
-    title: "Marias Way",
+    title: "Evening Light",
     vibe: "Evening light through the house, paced for a vertical scroll",
   },
   {
     src: "/media/videos/snap-reels/HeronWing_MarketingSnap_v1.mp4",
-    title: "Heron Wing",
+    title: "Still Water",
     vibe: "Clean lines and still water, cut for the feed",
   },
   {
     src: "/media/videos/snap-reels/BlueLake_MarketingSnap_v1.mp4",
-    title: "Blue Lake",
-    vibe: "Golden hour from the terrace to the lake",
+    title: "Golden Hour",
+    vibe: "Golden hour across the terrace, cut for the feed",
   },
 ] as const;
 
-/** Features bento keeps Grand Arrival. It is not part of the homepage strip. */
-export const FEATURED_SNAP_REEL = SNAP_REELS[3];
+/** Features bento uses a vertical listing tour in a 9:16 frame. It is not part of the homepage strip. */
+export const FEATURED_SNAP_REEL = SNAP_REELS[0];
+
+const ADDRESS_SNAP_COPY: Record<string, { title: string; vibe: string }> = {
+  "marias way": SNAP_REEL_STRIP[0],
+  "maria's way": SNAP_REEL_STRIP[0],
+  "heron wing": SNAP_REEL_STRIP[1],
+  "blue lake": SNAP_REEL_STRIP[2],
+};
+
+/** Published titles that still name a property are shown with the public label. */
+export function scrubSnapCopy(title: string, vibe: string): { title: string; vibe: string } {
+  const mapped = ADDRESS_SNAP_COPY[title.trim().toLowerCase()];
+  if (!mapped) return { title, vibe };
+  return { title: mapped.title, vibe: mapped.vibe };
+}

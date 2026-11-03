@@ -62,12 +62,12 @@ export default function TheNetwork() {
             whileInView={{ opacity: 1, x: 0, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.8, delay: 0.1 }}
-            className="absolute top-0 left-[10%] w-[160px] h-[160px] md:w-[240px] md:h-[240px] rounded-[2rem] overflow-hidden shadow-xl z-20 border-4 border-white rotate-[-3deg]"
+            className="absolute top-0 left-[8%] h-[170px] w-[170px] overflow-hidden rounded-full border-4 border-white shadow-xl z-20 md:h-[230px] md:w-[230px]"
           >
             <img
-              src="/media/photos/lifestyle-logan-dan02309.jpg"
-              alt="Iconic outdoor portrait"
-              className="w-full h-full object-cover grayscale opacity-90 group-hover:grayscale-0 transition-all duration-700"
+              src="/media/photos/family-bryant-mtz09392.jpg"
+              alt="Iconic family portrait outdoors"
+              className="h-full w-full object-cover object-[center_20%]"
             />
           </motion.div>
 
@@ -77,12 +77,12 @@ export default function TheNetwork() {
             whileInView={{ opacity: 1, x: 0, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.8, delay: 0.3 }}
-            className="absolute top-[20%] right-[10%] w-[180px] h-[180px] md:w-[280px] md:h-[280px] rounded-[2rem] overflow-hidden shadow-2xl z-10 border-4 border-white rotate-[4deg]"
+            className="absolute top-[18%] right-[8%] h-[160px] w-[220px] overflow-hidden rounded-[2rem] border-4 border-white shadow-2xl z-10 md:h-[210px] md:w-[300px]"
           >
             <img
-              src="/media/photos/luxury-interior.jpg"
-              alt="Iconic luxury interior"
-              className="w-full h-full object-cover"
+              src="/media/photos/luxury-exterior.jpg"
+              alt="Iconic listing exterior"
+              className="h-full w-full object-cover"
             />
           </motion.div>
 
@@ -92,12 +92,12 @@ export default function TheNetwork() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.8, delay: 0.5 }}
-            className="absolute bottom-0 left-[35%] w-[140px] h-[140px] md:w-[220px] md:h-[220px] rounded-[2rem] overflow-hidden shadow-2xl z-30 border-4 border-white rotate-[-2deg]"
+            className="absolute bottom-0 left-[34%] h-[140px] w-[200px] overflow-hidden rounded-[2rem] border-4 border-white shadow-2xl z-30 md:h-[180px] md:w-[260px]"
           >
             <img
-              src="/media/photos/luxury-a7305553.jpg"
-              alt="Iconic architectural interior"
-              className="w-full h-full object-cover grayscale opacity-80"
+              src="/media/before-after/aerial-estate.jpg"
+              alt="Aerial view of an Iconic estate"
+              className="h-full w-full object-cover"
             />
           </motion.div>
 

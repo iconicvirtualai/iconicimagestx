@@ -3,16 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Star, Zap, Rocket, MapPin, Quote, Award } from "lucide-react";
 import { Link } from "react-router-dom";
 import { itemText, useSiteItems, useSiteText } from "@/content/siteContent";
-
-const ABOUT_TILES = [
-  { img: "/media/about/tiles/01_est_2016.jpg", label: "Est. 2016" },
-  { img: "/media/about/tiles/02_the_engine.jpg", label: "The Engine" },
-  { img: "/media/about/tiles/03_scale.jpg", label: "Scale" },
-  { img: "/media/about/tiles/04_growth.jpg", label: "Growth" },
-  { img: "/media/about/tiles/05_legacy.jpg", label: "Legacy" },
-  { img: "/media/about/tiles/06_cinematic.jpg", label: "Cinematic" },
-  { img: "/media/about/tiles/08_market_lead.jpg", label: "Market Lead" },
-];
+import { framesPeople, resolveAboutTiles } from "@/lib/aboutRetrospective";
 
 export default function About() {
   const badge = useSiteText("about", "hero", "badge", "Decade of Excellence");
@@ -25,7 +16,9 @@ export default function About() {
   const philosophyTitle = useSiteText("about", "hub", "philosophyTitle", "THE ICONIC PHILOSOPHY");
   const philosophy = useSiteText("about", "hub", "philosophy", "We believe the agent is the architect of the deal, but the media is the fuel.");
   const tiles = useSiteItems("about", "hero");
-  const aboutTiles = tiles?.length ? tiles.map((item) => ({ img: itemText(item, "image"), label: itemText(item, "label") })) : ABOUT_TILES;
+  const aboutTiles = resolveAboutTiles(
+    tiles?.length ? tiles.map((item) => ({ img: itemText(item, "image"), label: itemText(item, "label") })) : null,
+  );
   return (
     <Layout>
       <div className="bg-white text-black">
@@ -49,15 +42,25 @@ export default function About() {
             {/* Moving Photo Carousel */}
             <div className="relative w-full overflow-hidden py-12">
               <div className="flex animate-scroll whitespace-nowrap">
-                {[...aboutTiles, ...aboutTiles].map((item, i) => (
-                  <div key={i} className="flex-shrink-0 mx-2 w-[184px] h-[184px] md:w-[268px] md:h-[268px] bg-gray-900 rounded-2xl border border-white/10 flex items-center justify-center relative overflow-hidden group">
-                    <img src={item.img} className="absolute inset-0 w-full h-full object-cover opacity-40 group-hover:scale-110 group-hover:opacity-60 transition-all duration-700" alt={item.label} />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-                    <span className="absolute bottom-6 left-6 z-10 text-[10px] font-bold text-white uppercase tracking-widest opacity-80 group-hover:opacity-100 transition-opacity">
+                {[...aboutTiles, ...aboutTiles].map((item, i) => {
+                  const people = framesPeople(item.img);
+                  return (
+                  <div
+                    key={`${item.img}-${i}`}
+                    className={`group relative mx-3 flex flex-shrink-0 items-center justify-center overflow-hidden border border-white/10 bg-gray-900 ${
+                      people
+                        ? "h-[168px] w-[168px] rounded-full md:h-[220px] md:w-[220px]"
+                        : "h-[184px] w-[220px] rounded-[2rem] md:h-[220px] md:w-[280px]"
+                    }`}
+                  >
+                    <img src={item.img} className={`absolute inset-0 h-full w-full object-cover transition-all duration-700 group-hover:scale-105 ${people ? "object-[center_20%] opacity-90 group-hover:opacity-100" : "opacity-80 group-hover:opacity-100"}`} alt={item.label} />
+                    <div className={`absolute inset-0 ${people ? "bg-gradient-to-t from-black/55 via-transparent to-transparent" : "bg-gradient-to-t from-black/50 to-transparent"}`}></div>
+                    <span className={`absolute z-10 text-[10px] font-bold uppercase tracking-widest text-white ${people ? "bottom-5 left-0 right-0 text-center" : "bottom-5 left-5"}`}>
                       {item.label}
                     </span>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>

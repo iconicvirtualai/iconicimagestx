@@ -50,9 +50,6 @@ const BUILDER_PAIRS: ContentItem[] = [
 
 const STILL_PAIRS: ContentItem[] = [
   pairItem("twilight-pool", "Twilight conversion", "/media/before-after/twilight-pool-day.jpg", "/media/before-after/twilight-pool-lifestyle.jpg"),
-  pairItem("pavilion-lifestyle", "Lifestyle staging", "/media/before-after/pavilion-empty.jpg", "/media/before-after/pavilion-lifestyle.jpg"),
-  pairItem("pasture-lifestyle", "Pasture lifestyle", "/media/before-after/pasture-animals.jpg", "/media/before-after/pasture-lifestyle.jpg"),
-  pairItem("living-declutter", "Virtual declutter", "/media/before-after/living-occupied.jpg", "/media/before-after/living-declutter.jpg"),
 ];
 
 function page(id: string, path: string, label: string, blocks: ContentPage["blocks"], title?: string, description?: string): ContentPage {
@@ -142,13 +139,12 @@ const PAGES: ContentPage[] = [
       textField("title", "Headline", "Your All-in-One Solution for High-Impact Media Content"),
       areaField("body", "Body", "Transform your raw ideas into engaging cinematic media in minutes. Whether you're a high-growth startup serving multiple clients or an established enterprise, Iconic helps you create professional-grade visual content seamlessly."),
     ], [
-      { id: "product", fields: [videoField("video", "Video", "/media/video/product-photography.mp4"), textField("title", "Title", "Product Photography")] },
+      { id: "product", fields: [videoField("video", "Video", "/media/video/product-photography.mp4"), textField("title", "Title", "Product Film")] },
+      { id: "built", fields: [videoField("video", "Video", "/media/blaze/01_BUILT_v2.mp4"), textField("title", "Title", "Brand Film")] },
+      { id: "crew", fields: [videoField("video", "Video", "/media/about/about_were_here_v1.mp4"), textField("title", "Title", "Crew Film")] },
       { id: "vertical", fields: [videoField("video", "Video", "/media/reels/superpower-reel-12s.mp4"), textField("title", "Title", "Vertical Reel")] },
-      { id: "content", fields: [videoField("video", "Video", "/media/video/content-web-clip.mp4"), textField("title", "Title", "Content Package")] },
-      { id: "snap-luxury", fields: [videoField("video", "Video", "/media/videos/snap-reels/snap-reel-01.mp4"), textField("title", "Title", "Snap Reel · Luxury Tour")] },
-      { id: "snap-modern", fields: [videoField("video", "Video", "/media/videos/snap-reels/snap-reel-02.mp4"), textField("title", "Title", "Snap Reel · Modern Living")] },
-      { id: "snap-kitchen", fields: [videoField("video", "Video", "/media/videos/snap-reels/snap-reel-03.mp4"), textField("title", "Title", "Snap Reel · Kitchen Glow")] },
-      { id: "snap-arrival", fields: [videoField("video", "Video", "/media/videos/snap-reels/snap-reel-04.mp4"), textField("title", "Title", "Snap Reel · Grand Arrival")] },
+      { id: "holiday", fields: [videoField("video", "Video", "/media/holiday/hero-web.mp4"), textField("title", "Title", "Holiday Film")] },
+      { id: "listing", fields: [videoField("video", "Video", "/media/videos/snap-reels/snap-reel-01.mp4"), textField("title", "Title", "Listing Tour")] },
     ]),
     block("stats", "Stats", [], [
       { id: "assets", fields: [textField("value", "Value", "100,000+"), textField("label", "Label", "Media assets produced")] },
@@ -188,9 +184,9 @@ const PAGES: ContentPage[] = [
       textField("title", "Headline", "Snap Reels"),
       areaField("body", "Body", "Listing stills, turned into a 9:16 Snap Reel. Same-day vertical video from the photos we already shoot."),
     ], [
-      { id: "marias", fields: [videoField("video", "Video", "/media/videos/snap-reels/MariasWay_MarketingSnap_v1.mp4"), textField("title", "Title", "Marias Way"), textField("vibe", "Caption", "Evening light through the house, paced for a vertical scroll")] },
-      { id: "heron", fields: [videoField("video", "Video", "/media/videos/snap-reels/HeronWing_MarketingSnap_v1.mp4"), textField("title", "Title", "Heron Wing"), textField("vibe", "Caption", "Clean lines and still water, cut for the feed")] },
-      { id: "blue", fields: [videoField("video", "Video", "/media/videos/snap-reels/BlueLake_MarketingSnap_v1.mp4"), textField("title", "Title", "Blue Lake"), textField("vibe", "Caption", "Golden hour from the terrace to the lake")] },
+      { id: "evening", fields: [videoField("video", "Video", "/media/videos/snap-reels/MariasWay_MarketingSnap_v1.mp4"), textField("title", "Title", "Evening Light"), textField("vibe", "Caption", "Evening light through the house, paced for a vertical scroll")] },
+      { id: "water", fields: [videoField("video", "Video", "/media/videos/snap-reels/HeronWing_MarketingSnap_v1.mp4"), textField("title", "Title", "Still Water"), textField("vibe", "Caption", "Clean lines and still water, cut for the feed")] },
+      { id: "golden", fields: [videoField("video", "Video", "/media/videos/snap-reels/BlueLake_MarketingSnap_v1.mp4"), textField("title", "Title", "Golden Hour"), textField("vibe", "Caption", "Golden hour across the terrace, cut for the feed")] },
     ]),
     block("features", "Add-on tools", [
       textField("badge", "Badge", "ADDITIONAL FEATURES"),
@@ -236,7 +232,7 @@ const PAGES: ContentPage[] = [
       textField("titleAccent", "Title accent", "Price"),
       textField("titleTail", "Title tail", "for Your Presence"),
       textField("subtitle", "Subtitle", "Media that moves as fast as you do."),
-      videoField("background", "Background video", "/media/video/content-web-clip.mp4"),
+      videoField("background", "Background video", "/media/about/about_were_here_v1.mp4"),
     ]),
     block("chips", "Section jumps", [], [
       { id: "listings", fields: [textField("label", "Label", "FOR LISTINGS"), textField("anchor", "Anchor", "listings")] },
@@ -269,7 +265,7 @@ const PAGES: ContentPage[] = [
     ], [
       { id: "standard", fields: [textField("label", "Label", "Standard"), imageField("image", "Photo", "/media/photos/standard-headshot.jpg"), textField("note", "Note", "Flat light. A stiff crop. Easy to scroll past.")] },
       { id: "corporate", fields: [textField("label", "Label", "Iconic Corporate"), imageField("image", "Photo", "/media/photos/lifestyle-mtz04327.jpg"), textField("note", "Note", "Polished, confident, and ready for the brand.")] },
-      { id: "lifestyle", fields: [textField("label", "Label", "Iconic Lifestyle"), imageField("image", "Photo", "/media/photos/lifestyle-kennedy-mtz01127.jpg"), textField("note", "Note", "Alive. Warm. The frame people actually stop for.")] },
+      { id: "lifestyle", fields: [textField("label", "Label", "Iconic Lifestyle"), imageField("image", "Photo", "/media/photos/lifestyle-mtz04655.jpg"), textField("note", "Note", "Alive. Warm. The frame people actually stop for.")] },
     ]),
   ]),
 
@@ -315,13 +311,13 @@ const PAGES: ContentPage[] = [
       textField("titleAccent", "Title accent", "Setting the Standard."),
       areaField("body", "Body", "Est. 2016. 10 Years. Thousands of Listings. Millions in Commission Generated for our Partners."),
     ], [
-      { id: "est", fields: [imageField("image", "Photo", "/media/about/tiles/01_est_2016.jpg"), textField("label", "Label", "Est. 2016")] },
-      { id: "engine", fields: [imageField("image", "Photo", "/media/about/tiles/02_the_engine.jpg"), textField("label", "Label", "The Engine")] },
-      { id: "scale", fields: [imageField("image", "Photo", "/media/about/tiles/03_scale.jpg"), textField("label", "Label", "Scale")] },
-      { id: "growth", fields: [imageField("image", "Photo", "/media/about/tiles/04_growth.jpg"), textField("label", "Label", "Growth")] },
-      { id: "legacy", fields: [imageField("image", "Photo", "/media/about/tiles/05_legacy.jpg"), textField("label", "Label", "Legacy")] },
-      { id: "cinematic", fields: [imageField("image", "Photo", "/media/about/tiles/06_cinematic.jpg"), textField("label", "Label", "Cinematic")] },
-      { id: "market", fields: [imageField("image", "Photo", "/media/about/tiles/08_market_lead.jpg"), textField("label", "Label", "Market Lead")] },
+      { id: "listings", fields: [imageField("image", "Photo", "/media/launch/hero_day_exterior_front.jpg"), textField("label", "Label", "Listings")] },
+      { id: "bts", fields: [imageField("image", "Photo", "/media/about/03_gear_bts_camera_16x9.jpg"), textField("label", "Label", "Behind the scenes")] },
+      { id: "crew", fields: [imageField("image", "Photo", "/media/about/06_holiday_group_energy_16x9.jpg"), textField("label", "Label", "The crew")] },
+      { id: "location", fields: [imageField("image", "Photo", "/media/photos/family-bryant-mtz09081.jpg"), textField("label", "Label", "On location")] },
+      { id: "office", fields: [imageField("image", "Photo", "/media/about/05_office_dog_16x9.jpg"), textField("label", "Label", "Around the office")] },
+      { id: "years", fields: [imageField("image", "Photo", "/media/photos/holiday-mtz08102.jpg"), textField("label", "Label", "Ten years in")] },
+      { id: "aerial", fields: [imageField("image", "Photo", "/media/before-after/aerial-estate.jpg"), textField("label", "Label", "From above")] },
     ]),
     block("hub", "Intelligence hub", [
       textField("kicker", "Kicker", "THE INTELLIGENCE HUB: BEYOND THE LENS"),
