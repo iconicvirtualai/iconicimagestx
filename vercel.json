@@ -79,6 +79,36 @@
       "permanent": false
     },
     {
+      "source": "/booking",
+      "destination": "/book",
+      "statusCode": 301
+    },
+    {
+      "source": "/booking/",
+      "destination": "/book",
+      "statusCode": 301
+    },
+    {
+      "source": "/holiday-event",
+      "destination": "/thankful",
+      "statusCode": 302
+    },
+    {
+      "source": "/holiday-event/",
+      "destination": "/thankful",
+      "statusCode": 302
+    },
+    {
+      "source": "/services",
+      "destination": "/pricing",
+      "statusCode": 301
+    },
+    {
+      "source": "/services/",
+      "destination": "/pricing",
+      "statusCode": 301
+    },
+    {
       "source": "/home",
       "destination": "/",
       "statusCode": 301

@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { itemText, useSiteItems, useSiteText } from "@/content/siteContent";
+import { BUSINESS_CONTACT } from "@shared/businessContact";
 
 const ROOMS = [
   {
@@ -78,6 +79,30 @@ export default function Studio105() {
                 </p>
               </article>
             ))}
+          </div>
+        </section>
+
+        <section id="studio-map" aria-labelledby="studio-location" className="scroll-mt-36 pb-24 md:scroll-mt-32">
+          <div className="max-w-[1100px] mx-auto px-6">
+            <h2 id="studio-location" className="text-3xl font-black uppercase tracking-tight md:text-5xl">
+              Find the studio
+            </h2>
+            <p className="mt-4 text-lg text-gray-300">{BUSINESS_CONTACT.address}</p>
+            <a
+              href={BUSINESS_CONTACT.mapsHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-6 inline-flex min-h-12 items-center rounded-full bg-white px-8 text-xs font-black uppercase tracking-widest text-black"
+            >
+              Get directions
+            </a>
+            <iframe
+              title="Map of Studio 105, 26410 Oakridge Dr. Ste 105 - 108, Spring, TX 77380"
+              src={BUSINESS_CONTACT.mapsEmbed}
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+              className="mt-8 h-64 w-full max-w-full rounded-[2rem] border border-white/10 md:h-[420px]"
+            />
           </div>
         </section>
       </div>

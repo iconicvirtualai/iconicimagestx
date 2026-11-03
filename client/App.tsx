@@ -188,6 +188,9 @@ const App = () => (
             <Route path="/studio" element={<Navigate to="/studio-105" replace />} />
             {/* Bare /gallery has no project id. The client portal is the door. */}
             <Route path="/gallery" element={<Navigate to="/portal" replace />} />
+            <Route path="/booking" element={<Navigate to="/book" replace />} />
+            <Route path="/holiday-event" element={<Navigate to="/thankful" replace />} />
+            <Route path="/services" element={<Navigate to="/pricing" replace />} />
             <Route path="/studio/:listingId" element={<ClientStudio />} />
             <Route path="/gallery/:galleryId" element={<PublicGallery />} />
             <Route path="/present/:token" element={<ListingPresentation />} />

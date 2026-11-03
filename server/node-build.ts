@@ -3,7 +3,7 @@ import path from "path";
 import { createServer } from "./index";
 import { handleMediaDisplay } from "./routes/mediaDisplay";
 import * as express from "express";
-import { htmlFileForRequestPath, matchingRedirect, redirectLocation } from "@shared/spaRouting";
+import { htmlFileForRequestPath, matchingRedirect, redirectLocation, redirectStatus } from "@shared/spaRouting";
 import { renderPresentationShell } from "./routes/presentations";
 import { renderListingSiteShell } from "./routes/listingSite";
 
@@ -90,8 +90,8 @@ app.get("/{*splat}", async (req, res) => {
   }
 
   const launchRedirect = matchingRedirect(req.path, req.get("host"));
-  if (launchRedirect && launchRedirect.statusCode === 301) {
-    return res.redirect(301, redirectLocation(launchRedirect, req.path, req.originalUrl));
+  if (launchRedirect && !launchRedirect.has) {
+    return res.redirect(redirectStatus(launchRedirect), redirectLocation(launchRedirect, req.path, req.originalUrl));
   }
 
   const rel = htmlFileForRequestPath(req.path, undefined, req.get("host"));

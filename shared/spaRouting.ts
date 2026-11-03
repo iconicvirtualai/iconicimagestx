@@ -7,6 +7,7 @@
 import { hostnameOf, PUBLIC_PAGES, wwwShellFile } from "./siteSeo";
 import { HEADSHOT_PREVIEW_SOURCES } from "./headshots10";
 import { RE75_PREVIEW_SOURCES } from "./realestate75";
+import { publicAliasRedirects } from "./publicAliases";
 import { wixPathRedirects } from "./wixLaunch";
 
 export type HostCondition = { type: "host"; value: string };
@@ -151,6 +152,7 @@ export function buildVercelRedirects(): Redirect[] {
     { source: "/studio/", destination: "/studio-105", permanent: false },
     { source: "/gallery", destination: "/portal", permanent: false },
     { source: "/gallery/", destination: "/portal", permanent: false },
+    ...publicAliasRedirects(),
     ...wixPathRedirects(),
   ];
 }

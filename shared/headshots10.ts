@@ -58,7 +58,7 @@ export const HEADSHOTS_RESERVE_LINE = "Reserve a time to hold your spot.";
 export const HEADSHOTS_FULL_LINE = "This Tuesday is full. Pick the next one.";
 export const HEADSHOTS_CALENDAR_FALLBACK =
   "Open times are not listed right now. Call or email and we will set the time with you.";
-export const HEADSHOTS_MAPS_QUERY = "26410 Oakridge Dr Ste 105, Spring, TX 77380";
+export const HEADSHOTS_MAPS_QUERY = BUSINESS_CONTACT.address;
 
 export const HEADSHOT_PATHS = {
   home: "/headshots-10",

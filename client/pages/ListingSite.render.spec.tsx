@@ -59,7 +59,8 @@ describe("listing site designs", () => {
       expect(host.querySelector("[data-listing-design]")?.getAttribute("data-listing-design")).toBe(design);
       expect(template?.marker).toBeTruthy();
       expect(html).toContain(template?.marker || "");
-      expect(html).toContain("https://iconicimagestx.com");
+      expect(html).toContain('href="/"');
+      expect(html).not.toContain("iconicimagestx.com");
       expect(html).toContain("Powered by Iconic Images");
       expect(html).toContain("/api/media/display/listing1234/0");
       expect(html).not.toContain("download");

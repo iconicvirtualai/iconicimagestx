@@ -2,7 +2,7 @@ import { defineConfig, loadEnv, Plugin } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { createServer } from "./server";
-import { wixPathRedirects } from "./shared/wixLaunch";
+import { matchingRedirect, redirectLocation, redirectStatus } from "./shared/spaRouting";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
@@ -33,28 +33,9 @@ export default defineConfig(({ mode }) => {
   };
 });
 
-const WIX_DEV_REDIRECTS = new Map(wixPathRedirects().map((rule) => [rule.source, rule.destination]));
-
 function devHostname(host: string | string[] | undefined): string {
   const first = String(Array.isArray(host) ? host[0] : host || "").split(",")[0].trim().toLowerCase();
   return first.replace(/:\d+$/, "");
-}
-
-/** Dev-server mirror of the Vercel host rule and Wix path redirects. */
-function devLaunchRedirect(pathOnly: string, host: string | string[] | undefined): { status: number; location: string } | null {
-  if (devHostname(host) === "iconicimagestx.com") {
-    return { status: 301, location: `https://www.iconicimagestx.com${pathOnly === "/" ? "/" : pathOnly}` };
-  }
-  const location = WIX_DEV_REDIRECTS.get(pathOnly);
-  return location ? { status: 301, location } : null;
-}
-
-function withSearch(location: string, rawUrl: string): string {
-  const queryAt = rawUrl.indexOf("?");
-  if (queryAt < 0 || location.includes("?")) return location;
-  const search = rawUrl.slice(queryAt).split("#")[0];
-  const hashAt = location.indexOf("#");
-  return hashAt >= 0 ? `${location.slice(0, hashAt)}${search}${location.slice(hashAt)}` : `${location}${search}`;
 }
 
 function expressPlugin(): Plugin {
@@ -73,11 +54,10 @@ function expressPlugin(): Plugin {
           res.end();
           return;
         }
-        const launchRedirect = devLaunchRedirect(pathOnly, req.headers.host);
+        const launchRedirect = matchingRedirect(pathOnly, devHostname(req.headers.host));
         if (launchRedirect) {
-          res.statusCode = launchRedirect.status;
-          const raw = req.url || pathOnly;
-          res.setHeader("Location", withSearch(launchRedirect.location, raw));
+          res.statusCode = redirectStatus(launchRedirect);
+          res.setHeader("Location", redirectLocation(launchRedirect, pathOnly, raw));
           res.end();
           return;
         }
