@@ -15,6 +15,7 @@ import {
   ownerSessionSecret,
 } from "../services/ownerGate";
 import { loadOwnerSuite } from "../services/ownerSheets";
+import { listOwnerEditorJobs, readOwnerEditorJob, startOwnerEditorJob, stepOwnerEditorJob } from "../services/ownerEditorJobs";
 import { listOwnerOrders, submitOwnerOrder } from "../services/ownerOrders";
 import { OWNER_WHY } from "../services/ownerWhy";
 import { GENERIC_TITLE, stripPublicMeta } from "../../shared/siteSeo";
@@ -37,6 +38,18 @@ export function mountOwners(app: Express) {
   });
   app.post("/api/owners/orders", (req, res) => {
     void handleOrdersPost(req, res);
+  });
+  app.get("/api/owners/editor/jobs", (req, res) => {
+    void handleEditorJobsGet(req, res);
+  });
+  app.post("/api/owners/editor/jobs", (req, res) => {
+    void handleEditorJobsPost(req, res);
+  });
+  app.get("/api/owners/editor/jobs/:id", (req, res) => {
+    void handleEditorJobGet(req, res);
+  });
+  app.post("/api/owners/editor/jobs/:id/tick", (req, res) => {
+    void handleEditorJobTick(req, res);
   });
   app.post("/api/owners/session", (req, res) => {
     void handleSession(req, res);
@@ -82,6 +95,52 @@ async function handleOrdersPost(req: Request, res: Response) {
     console.error(`[Owners] Orders write failed (${errorStatus(error)})`);
     return res.status(500).json({ error: "The order could not be saved." });
   }
+}
+
+async function handleEditorJobsGet(req: Request, res: Response) {
+  setPrivate(res);
+  const owner = await resolveOwnerIdentity(req.headers);
+  if (!owner) return res.status(404).json(NOT_FOUND);
+  return res.status(200).json({ jobs: listOwnerEditorJobs(owner.email) });
+}
+
+async function handleEditorJobsPost(req: Request, res: Response) {
+  setPrivate(res);
+  const owner = await resolveOwnerIdentity(req.headers);
+  if (!owner) return res.status(404).json(NOT_FOUND);
+  const result = startOwnerEditorJob(req.body, owner.email);
+  if (!result.ok) return res.status(result.status).json({ error: result.error });
+  return res.status(201).json({ job: result.job });
+}
+
+async function handleEditorJobTick(req: Request, res: Response) {
+  setPrivate(res);
+  const id = String(req.params.id || "");
+  if (!/^ed_[a-f0-9]{16}$/.test(id)) return res.status(404).json(NOT_FOUND);
+  const owner = cronAuthorized(req) ? null : await resolveOwnerIdentity(req.headers);
+  if (!cronAuthorized(req) && !owner) return res.status(404).json(NOT_FOUND);
+  if (owner && !readOwnerEditorJob(owner.email, id)) return res.status(404).json(NOT_FOUND);
+  const job = await stepOwnerEditorJob(id);
+  if (!job) return res.status(404).json(NOT_FOUND);
+  return res.status(200).json({ job });
+}
+
+function cronAuthorized(req: Request): boolean {
+  const secret = typeof process.env.CRON_SECRET === "string" ? process.env.CRON_SECRET.trim() : "";
+  const header = req.headers.authorization;
+  const value = Array.isArray(header) ? header[0] : header;
+  return Boolean(secret) && value === `Bearer ${secret}`;
+}
+
+async function handleEditorJobGet(req: Request, res: Response) {
+  setPrivate(res);
+  const owner = await resolveOwnerIdentity(req.headers);
+  if (!owner) return res.status(404).json(NOT_FOUND);
+  const id = String(req.params.id || "");
+  if (!/^ed_[a-f0-9]{16}$/.test(id)) return res.status(404).json(NOT_FOUND);
+  const job = readOwnerEditorJob(owner.email, id);
+  if (!job) return res.status(404).json(NOT_FOUND);
+  return res.status(200).json({ job });
 }
 
 function errorStatus(error: unknown): string {
