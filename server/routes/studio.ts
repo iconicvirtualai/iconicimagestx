@@ -4,6 +4,8 @@
  * POST /ai-edit is a staff override for one frame and calls OpenAI Images.
  * POST /order-edits writes those order jobs and runs the next photo.
  * POST /order-queue/tick runs one queued photo and can chain the next tick.
+ * A test pause or a 25-photo pause does not chain. POST /order-queue/continue
+ * clears a batch pause. Approving the test photo clears the test pause.
  * Approve copies a finished JPEG/PNG/WebP onto the listing finals path.
  * It does not send the gallery or client email. Delivery stays held until
  * the order plan is 100% complete.
@@ -19,11 +21,12 @@ import { isMediaDeliveryStatus } from "../../shared/mediaDelivery";
 import { requireCoordinator, requireStaff, type AuthenticatedRequest } from "../middleware/auth";
 import { loadGalleryReleaseReport } from "../services/galleryReleaseGate";
 import { listMediaDeliveryQueue, moveMediaDelivery } from "../services/mediaDeliveryQueue";
-import { kickStudioQueue } from "../services/studioQueueKick";
+import { kickStudioQueue, studioQueueMayChain } from "../services/studioQueueKick";
 import {
   advanceOrderEditQueue,
   approveStudioFinal,
   assertStudioAccess,
+  continueOrderEditQueue,
   enqueueAiEdit,
   loadStudioWorkspace,
   nextOrderEditListingId,
@@ -183,10 +186,30 @@ router.post("/order-queue/tick", requireStaffOrQueueCron, async (req: Authentica
       createdBy: req.user!.uid,
       retryFailed: false,
     });
-    if (req.body?.chain === true && result.shouldFollowUp) kickStudioQueue(listingId);
+    if (req.body?.chain === true && studioQueueMayChain({
+      shouldFollowUp: result.shouldFollowUp,
+      pause: result.pause,
+    })) {
+      kickStudioQueue(listingId);
+    }
     return res.json(result);
   } catch (err) {
     return sendKnownError(res, err, "Failed to advance the order edit queue.");
+  }
+});
+
+router.post("/order-queue/continue", requireStaff, async (req: AuthenticatedRequest, res) => {
+  const listingId = String(req.body?.listingId || "").trim();
+  if (!/^[A-Za-z0-9_-]{8,128}$/.test(listingId)) {
+    return res.status(400).json({ error: "A valid listing id is required." });
+  }
+  if (!adminReady(res)) return;
+  try {
+    await assertStudioAccess(req.user!.uid, req.staffRole || "", listingId);
+    const result = await continueOrderEditQueue({ listingId });
+    return res.json(result);
+  } catch (err) {
+    return sendKnownError(res, err, "Failed to continue the order edit queue.");
   }
 });
 

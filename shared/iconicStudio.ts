@@ -78,6 +78,10 @@ export const AI_EDIT_TIMEOUT_NOTE =
 
 export const AI_EDIT_READY_NOTE = "OpenAI edit is ready for review.";
 
+/** Edited pixels are the API image scaled up. Untouched pixels stay the original. */
+export const AI_EDIT_UPSCALE_NOTE =
+  "Edited areas are the OpenAI result scaled up from the API size. Untouched areas keep the original pixels.";
+
 export const EMPTY_LISTING_PHOTOS_NOTE = "No listing photos yet.";
 
 /** Staff-facing job notes. Stored dev leftovers stay off the review card. */
@@ -307,7 +311,11 @@ export function realEstateEditPrompt(userPrompt: string): string {
   ].join(" ");
 }
 
-/** Landscape, portrait, or square output. Unknown dimensions stay landscape, the usual listing frame. */
+/**
+ * Largest gpt-image-1 size for this aspect (1536 on the long side, or 1024 square).
+ * The stored file is fitted back to the source dimensions after the edit.
+ * Unknown dimensions stay landscape, the usual listing frame.
+ */
 export function listingPhotoEditSize(width: number, height: number): ListingEditSize {
   if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
     return "1536x1024";

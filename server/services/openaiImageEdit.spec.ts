@@ -6,6 +6,7 @@ import {
   INSPECTION_MISSING_KEY_NOTE,
   OPENAI_CHAT_COMPLETIONS_URL,
   OPENAI_IMAGE_EDIT_MODEL,
+  OPENAI_IMAGE_EDIT_QUALITY,
   OPENAI_IMAGE_EDITS_URL,
   OPENAI_INSPECTION_MODEL,
   OpenAiEditError,
@@ -52,7 +53,8 @@ describe("OpenAI image edit request", () => {
       expect(form.get("model")).toBe(OPENAI_IMAGE_EDIT_MODEL);
       expect(form.get("prompt")).toContain("fireplace");
       expect(form.get("size")).toBe("1536x1024");
-      expect(form.get("quality")).toBe("medium");
+      expect(form.get("quality")).toBe(OPENAI_IMAGE_EDIT_QUALITY);
+      expect(OPENAI_IMAGE_EDIT_QUALITY).toBe("high");
       expect(form.get("output_format")).toBe("jpeg");
       expect(form.get("input_fidelity")).toBe("high");
       expect(form.get("response_format")).toBeNull();

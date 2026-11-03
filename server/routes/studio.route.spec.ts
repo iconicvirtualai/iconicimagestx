@@ -72,6 +72,12 @@ describe("Iconic Studio AI route", () => {
       body: JSON.stringify({ listingId: "project1234" }),
     });
     expect(tick.status).toBe(401);
+    const resume = await fetch(`${baseUrl}/api/studio/order-queue/continue`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ listingId: "project1234" }),
+    });
+    expect(resume.status).toBe(401);
     const queue = await fetch(`${baseUrl}/api/studio/delivery-queue`);
     expect(queue.status).toBe(401);
     const move = await fetch(`${baseUrl}/api/studio/delivery-queue/move`, {

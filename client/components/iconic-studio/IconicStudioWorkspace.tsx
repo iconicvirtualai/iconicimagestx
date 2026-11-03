@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AI_EDIT_PRESETS,
+  AI_EDIT_UPSCALE_NOTE,
   DEFAULT_ADJUSTMENTS,
   RAW_IMPORT_LABEL,
   STUDIO_FLAGS,
@@ -13,6 +14,7 @@ import {
 import type { GalleryReleaseReport } from "@shared/galleryRelease";
 import type { MediaDeliveryStatus } from "@shared/mediaDelivery";
 import type { OrderEditPlan } from "@shared/orderEditPlan";
+import { studioQueuePauseCopy, type StudioEditQueueState } from "@shared/orderEditQueue";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
 import { loadHtmlImage, paintProceduralRoom, renderAdjustedJpeg } from "@/lib/studioCanvas";
@@ -38,6 +40,10 @@ export interface StudioJobView {
     status?: string;
     notes?: string[];
   };
+  apiSize?: string;
+  outputWidth?: number;
+  outputHeight?: number;
+  upscaledRegion?: boolean;
 }
 
 export interface StudioListingOption {
@@ -89,10 +95,12 @@ export default function IconicStudioWorkspace({
   editPlan = null,
   release = null,
   delivery = null,
+  editQueue = null,
   initialTab,
   onSelectListing,
   onAiEdit,
   onRunOrder,
+  onContinueQueue,
   onSaveAdjust,
   onApprove,
   onReject,
@@ -106,10 +114,12 @@ export default function IconicStudioWorkspace({
   editPlan?: OrderEditPlan | null;
   release?: GalleryReleaseReport | null;
   delivery?: StudioDeliveryView | null;
+  editQueue?: StudioEditQueueState | null;
   initialTab?: StudioTab;
   onSelectListing: (id: string) => void;
   onAiEdit: (input: { type: string; prompt: string; frame: StudioFrame }) => Promise<void>;
   onRunOrder?: () => Promise<void>;
+  onContinueQueue?: () => Promise<void>;
   onSaveAdjust: (input: { frame: StudioFrame; adjustments: StudioAdjustments; dataBase64: string }) => Promise<void>;
   onApprove: (input: { frame?: StudioFrame; job?: StudioJobView }) => Promise<void>;
   onReject?: (job: StudioJobView) => Promise<void>;
@@ -329,9 +339,11 @@ export default function IconicStudioWorkspace({
                 }).length}
                 sampleUrl={sampleUrl}
                 editPlan={editPlan}
+                editQueue={editQueue}
                 onPrompt={setPrompt}
                 onEnqueue={enqueue}
                 onRunOrder={onRunOrder ? () => run(onRunOrder) : undefined}
+                onContinueQueue={onContinueQueue ? () => run(onContinueQueue) : undefined}
                 onApprove={(job) => run(() => onApprove({ job, frame: frames.find((item) => item.path === (job.resultPath || job.sourcePath)) }))}
                 onReject={onReject ? (job) => run(() => onReject(job)) : undefined}
               />
@@ -443,9 +455,11 @@ function AiPanel({
   pendingOrder = 0,
   sampleUrl,
   editPlan,
+  editQueue = null,
   onPrompt,
   onEnqueue,
   onRunOrder,
+  onContinueQueue,
   onApprove,
   onReject,
 }: {
@@ -455,9 +469,11 @@ function AiPanel({
   pendingOrder?: number;
   sampleUrl: string;
   editPlan?: OrderEditPlan | null;
+  editQueue?: StudioEditQueueState | null;
   onPrompt: (value: string) => void;
   onEnqueue: (type: string) => void;
   onRunOrder?: () => void;
+  onContinueQueue?: () => void;
   onApprove: (job: StudioJobView) => void;
   onReject?: (job: StudioJobView) => void;
 }) {
@@ -478,6 +494,22 @@ function AiPanel({
             ? `Auto-queue has ${pendingOrder} photo${pendingOrder === 1 ? "" : "s"} left. Each OpenAI edit is its own request.`
             : "Uploads auto-queue one OpenAI edit at a time. Run next stays available as a manual override."}
         </p>
+        {editQueue?.pause ? (
+          <p data-testid="studio-queue-pause" className="mt-1 text-[11px] leading-snug text-gray-500">
+            {studioQueuePauseCopy(editQueue.pause)}
+          </p>
+        ) : null}
+        {editQueue?.pause === "awaiting_batch_review" ? (
+          <button
+            type="button"
+            data-testid="studio-queue-continue"
+            disabled={busy || !onContinueQueue}
+            onClick={onContinueQueue}
+            className="mt-2 rounded-xl border border-black px-3 py-2 text-[10px] font-black uppercase tracking-widest disabled:opacity-40"
+          >
+            Continue
+          </button>
+        ) : null}
         {editPlan && editPlan.deliverables.length > 0 && (
           <p className="mt-1 text-[11px] text-gray-500">
             Not image edits: {editPlan.deliverables.map((item) => item.label).join(", ")}.
@@ -548,6 +580,14 @@ function AiPanel({
                 </div>
                 {note ? (
                   <p className={`mt-2 text-[11px] leading-snug ${job.status === "failed" ? "text-red-700" : "text-gray-500"}`}>{note}</p>
+                ) : null}
+                {job.upscaledRegion ? (
+                  <p data-testid="studio-upscale-note" className="mt-2 text-[11px] leading-snug text-gray-500">
+                    {AI_EDIT_UPSCALE_NOTE}
+                    {job.apiSize && job.outputWidth && job.outputHeight
+                      ? ` API size ${job.apiSize}. Saved at ${job.outputWidth}×${job.outputHeight}.`
+                      : ""}
+                  </p>
                 ) : null}
                 {inspectionNotes.length > 0 && (
                   <div data-testid="studio-inspection-notes" className="mt-2">

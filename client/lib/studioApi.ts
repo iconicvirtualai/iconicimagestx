@@ -2,6 +2,7 @@ import type { GalleryReleaseReport } from "@shared/galleryRelease";
 import type { StudioAdjustments } from "@shared/iconicStudio";
 import type { MediaDeliveryStatus } from "@shared/mediaDelivery";
 import type { OrderEditPlan } from "@shared/orderEditPlan";
+import type { StudioEditQueueState } from "@shared/orderEditQueue";
 
 type TokenGetter = () => Promise<string>;
 
@@ -29,6 +30,7 @@ export interface StudioWorkspaceResponse {
       label: string;
     } | null;
     images: Array<Record<string, unknown>>;
+    editQueue?: StudioEditQueueState;
   } | null;
 }
 
@@ -37,6 +39,7 @@ export interface OrderQueueTickResult {
   remaining: number;
   waiting: number;
   shouldFollowUp: boolean;
+  pause?: StudioEditQueueState["pause"];
   ran: {
     jobId: string;
     status: string;
@@ -87,6 +90,7 @@ export async function postStudioOrderEdits(getToken: TokenGetter, listingId: str
     prepared: number;
     remaining: number;
     waiting: number;
+    pause?: StudioEditQueueState["pause"];
     ran: {
       jobId: string;
       status: string;
@@ -96,6 +100,16 @@ export async function postStudioOrderEdits(getToken: TokenGetter, listingId: str
       note: string;
     } | null;
   }>;
+}
+
+export async function postStudioOrderQueueContinue(getToken: TokenGetter, listingId: string) {
+  const headers = await authorizedHeaders(getToken);
+  const res = await fetch("/api/studio/order-queue/continue", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ listingId }),
+  });
+  return readJson(res) as Promise<StudioEditQueueState>;
 }
 
 export async function postStudioOrderQueueTick(getToken: TokenGetter, listingId: string) {

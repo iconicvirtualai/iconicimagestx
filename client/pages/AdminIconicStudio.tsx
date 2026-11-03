@@ -10,6 +10,7 @@ import {
   postStudioAiEdit,
   postStudioApprove,
   postStudioOrderEdits,
+  postStudioOrderQueueContinue,
   postStudioReject,
   drainOrderEditQueue,
 } from "@/lib/studioApi";
@@ -22,6 +23,7 @@ import {
 } from "@shared/iconicStudio";
 import { assessGalleryRelease, type GalleryReleaseReport } from "@shared/galleryRelease";
 import { planOrderEdits, type OrderEditPlan } from "@shared/orderEditPlan";
+import type { StudioEditQueueState } from "@shared/orderEditQueue";
 import { toast } from "sonner";
 import { PresentationSharePanel } from "@/components/PresentationSharePanel";
 
@@ -71,6 +73,7 @@ export default function AdminIconicStudio() {
   const [editPlan, setEditPlan] = useState<OrderEditPlan | null>(null);
   const [release, setRelease] = useState<GalleryReleaseReport | null>(null);
   const [delivery, setDelivery] = useState<StudioDeliveryView | null>(null);
+  const [editQueue, setEditQueue] = useState<StudioEditQueueState | null>(null);
   const draining = useRef(false);
   const drainFailed = useRef(false);
 
@@ -89,6 +92,7 @@ export default function AdminIconicStudio() {
       deliveryStatus: "undelivered",
       label: "Undelivered",
     });
+    setEditQueue(null);
   }, []);
 
   const load = useCallback(async () => {
@@ -106,6 +110,7 @@ export default function AdminIconicStudio() {
       setEditPlan(data.listing?.editPlan || null);
       setRelease(data.listing?.release || null);
       setDelivery(data.listing?.delivery || null);
+      setEditQueue(data.listing?.editQueue || null);
       if (!listingId && data.listings?.[0]?.id) {
         navigate(iconicStudioHref(data.listings[0].id), { replace: true });
       }
@@ -123,6 +128,7 @@ export default function AdminIconicStudio() {
         setEditPlan(null);
         setRelease(null);
         setDelivery(null);
+        setEditQueue(null);
       }
     } finally {
       setLoading(false);
@@ -139,6 +145,7 @@ export default function AdminIconicStudio() {
 
   useEffect(() => {
     if (loading || demo || !listingId || draining.current || drainFailed.current) return;
+    if (editQueue?.pause) return;
     const pending = jobs.some((job) => (
       job.listingId === listingId
       && job.origin === "order"
@@ -165,7 +172,7 @@ export default function AdminIconicStudio() {
     return () => {
       cancelled = true;
     };
-  }, [demo, getToken, jobs, listingId, load, loading]);
+  }, [demo, editQueue?.pause, getToken, jobs, listingId, load, loading]);
 
   const onSelectListing = (id: string) => {
     if (!id) {
@@ -197,7 +204,17 @@ export default function AdminIconicStudio() {
           editPlan={editPlan}
           release={release}
           delivery={delivery}
+          editQueue={editQueue}
           onSelectListing={onSelectListing}
+          onContinueQueue={async () => {
+            if (demo) {
+              toast.message("Sample queue", { description: "A live listing continues the next batch after the test photo is approved." });
+              return;
+            }
+            await postStudioOrderQueueContinue(getToken, listingId);
+            toast.success("Queue continued.");
+            await load();
+          }}
           onRunOrder={async () => {
             if (demo) {
               toast.message("Sample order", { description: "A live listing runs the next order edit through OpenAI. The gallery is not sent." });
@@ -205,7 +222,14 @@ export default function AdminIconicStudio() {
             }
             const result = await postStudioOrderEdits(getToken, listingId);
             if (!result.ran) {
-              toast.message("Order queue", { description: result.waiting ? "Waiting for an exterior filename before twilight can run." : "No photo is waiting to edit." });
+              const paused = result.pause === "awaiting_test_approval"
+                ? "The queue is paused until that photo is approved."
+                : result.pause === "awaiting_batch_review"
+                  ? "This batch is paused. Continue when you want the next batch."
+                  : result.waiting
+                    ? "Waiting for an exterior filename before twilight can run."
+                    : "No photo is waiting to edit.";
+              toast.message("Order queue", { description: paused });
             } else if (result.ran.status === "failed") {
               toast.error(result.ran.note);
             } else {
