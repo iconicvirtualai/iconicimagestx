@@ -1,4 +1,5 @@
 import { itemText, useSiteItems } from "@/content/siteContent";
+import ResponsiveStill from "@/components/ResponsiveStill";
 
 const FALLBACK_AUDIENCES = [
     {
@@ -19,7 +20,7 @@ const FALLBACK_AUDIENCES = [
     {
       title: "Developers & Builders",
       description: "Showcase new construction and development projects with cinematic fly-throughs.",
-      image: "/media/photos/luxury-exterior.jpg",
+      image: "/media/photos/forest-heights-twilight-front.jpg",
     },
     {
       title: "Small Business Owners",
@@ -51,7 +52,7 @@ export default function AudienceDetails() {
           {audiences.map((audience) => (
             <div key={audience.id} className="flex flex-col items-center text-center group">
               <div className="w-24 h-24 md:w-32 md:h-32 mb-6 relative rounded-full overflow-hidden bg-gray-50 border border-gray-100 shadow-sm transition-transform duration-500 group-hover:scale-105">
-                <img
+                <ResponsiveStill
                   src={audience.image}
                   alt={audience.title}
                   data-site-page="home" data-site-block="audienceDetails" data-site-item={audience.id} data-site-field="image" data-site-kind="image"

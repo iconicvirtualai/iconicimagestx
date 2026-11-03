@@ -1,4 +1,4 @@
-import { SNAP_REEL_STRIP } from "@/lib/snapReels";
+import { SNAP_REEL_STRIP, snapPoster } from "@/lib/snapReels";
 import { itemText, useSiteItems, useSiteText } from "@/content/siteContent";
 
 export default function SnapReelsStrip() {
@@ -23,12 +23,13 @@ export default function SnapReelsStrip() {
             {body}
           </p>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-8">
           {reels.map((reel) => (
-            <figure key={reel.id} className="mx-auto w-full max-w-[280px]">
+            <figure key={reel.id} className="mx-auto w-full max-w-[280px] sm:max-w-none">
               <div className="overflow-hidden rounded-[1.75rem] border border-black/10 bg-black shadow-xl">
                 <video
                   src={reel.src}
+                  poster={snapPoster(reel.src)}
                   data-site-page="home" data-site-block="snapReels" data-site-item={reel.id} data-site-field="video" data-site-kind="video"
                   className="aspect-[9/16] w-full object-cover"
                   autoPlay

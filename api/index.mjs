@@ -31947,10 +31947,10 @@ const PAGES = [
       { id: "product", fields: [videoField("video", "Video", "/media/video/product-photography.mp4"), textField("title", "Title", "Product Photography")] },
       { id: "vertical", fields: [videoField("video", "Video", "/media/reels/superpower-reel-12s.mp4"), textField("title", "Title", "Vertical Reel")] },
       { id: "content", fields: [videoField("video", "Video", "/media/video/content-web-clip.mp4"), textField("title", "Title", "Content Package")] },
-      { id: "snap-luxury", fields: [videoField("video", "Video", "/media/videos/snap-reels/snap-reel-01.mp4"), textField("title", "Title", "Snap Reel · Luxury Tour")] },
+      { id: "snap-luxury", fields: [videoField("video", "Video", "/media/videos/snap-reels/bayonne-snap.mp4"), textField("title", "Title", "Snap Reel · Luxury Tour")] },
       { id: "snap-modern", fields: [videoField("video", "Video", "/media/videos/snap-reels/snap-reel-02.mp4"), textField("title", "Title", "Snap Reel · Modern Living")] },
-      { id: "snap-kitchen", fields: [videoField("video", "Video", "/media/videos/snap-reels/snap-reel-03.mp4"), textField("title", "Title", "Snap Reel · Kitchen Glow")] },
-      { id: "snap-arrival", fields: [videoField("video", "Video", "/media/videos/snap-reels/snap-reel-04.mp4"), textField("title", "Title", "Snap Reel · Grand Arrival")] }
+      { id: "snap-kitchen", fields: [videoField("video", "Video", "/media/videos/snap-reels/stoney-brook-blaze.mp4"), textField("title", "Title", "Snap Reel · Kitchen Glow")] },
+      { id: "snap-arrival", fields: [videoField("video", "Video", "/media/videos/snap-reels/hereford-way-snap.mp4"), textField("title", "Title", "Snap Reel · Grand Arrival")] }
     ]),
     block("stats", "Stats", [], [
       { id: "assets", fields: [textField("value", "Value", "100,000+"), textField("label", "Label", "Media assets produced")] },
@@ -31981,7 +31981,7 @@ const PAGES = [
       { id: "realtors", fields: [textField("title", "Title", "Realtors & Brokers"), areaField("body", "Body", "Attract leads, close faster, and win more listings with engaging property videos."), imageField("image", "Image", "/media/photos/lifestyle-mtz04327.jpg")] },
       { id: "photographers", fields: [textField("title", "Title", "Photographers"), areaField("body", "Body", "Upsell AI videos with every order. More profit, no effort."), imageField("image", "Image", "/media/photos/studio-mtz01691.jpg")] },
       { id: "media", fields: [textField("title", "Title", "Real Estate Media Companies"), areaField("body", "Body", "Scale your business and stay competitive with AI property videos — no extra overhead."), imageField("image", "Image", "/media/photos/drone-hero.jpg")] },
-      { id: "developers", fields: [textField("title", "Title", "Developers & Builders"), areaField("body", "Body", "Showcase new construction and development projects with cinematic fly-throughs."), imageField("image", "Image", "/media/photos/luxury-exterior.jpg")] },
+      { id: "developers", fields: [textField("title", "Title", "Developers & Builders"), areaField("body", "Body", "Showcase new construction and development projects with cinematic fly-throughs."), imageField("image", "Image", "/media/photos/forest-heights-twilight-front.jpg")] },
       { id: "business", fields: [textField("title", "Title", "Small Business Owners"), areaField("body", "Body", "Professional media content to tell your brand story and engage your local community."), imageField("image", "Image", "/media/photos/lifestyle-daughtery-mtz00636.jpg")] },
       { id: "online", fields: [textField("title", "Title", "Online Appearance"), areaField("body", "Body", "High-impact visual identity for anyone looking to dominate their digital space."), imageField("image", "Image", "/media/photos/headshot-gracepoint-1.jpg")] }
     ]),
@@ -31990,9 +31990,10 @@ const PAGES = [
       textField("title", "Headline", "Snap Reels"),
       areaField("body", "Body", "Listing stills, turned into a 9:16 Snap Reel. Same-day vertical video from the photos we already shoot.")
     ], [
-      { id: "marias", fields: [videoField("video", "Video", "/media/videos/snap-reels/MariasWay_MarketingSnap_v1.mp4"), textField("title", "Title", "Marias Way"), textField("vibe", "Caption", "Evening light through the house, paced for a vertical scroll")] },
-      { id: "heron", fields: [videoField("video", "Video", "/media/videos/snap-reels/HeronWing_MarketingSnap_v1.mp4"), textField("title", "Title", "Heron Wing"), textField("vibe", "Caption", "Clean lines and still water, cut for the feed")] },
-      { id: "blue", fields: [videoField("video", "Video", "/media/videos/snap-reels/BlueLake_MarketingSnap_v1.mp4"), textField("title", "Title", "Blue Lake"), textField("vibe", "Caption", "Golden hour from the terrace to the lake")] }
+      { id: "forest", fields: [videoField("video", "Video", "/media/videos/snap-reels/forest-heights-blaze.mp4"), textField("title", "Title", "Forest Heights"), textField("vibe", "Caption", "Front elevation, paced for a vertical scroll")] },
+      { id: "arcane", fields: [videoField("video", "Video", "/media/videos/snap-reels/arcane-court-blaze.mp4"), textField("title", "Title", "Arcane Court"), textField("vibe", "Caption", "A wide front elevation, cut for the feed")] },
+      { id: "tall", fields: [videoField("video", "Video", "/media/videos/snap-reels/tall-trees-blaze.mp4"), textField("title", "Title", "Tall Trees"), textField("vibe", "Caption", "Stone entry, cut for the feed")] },
+      { id: "heron", fields: [videoField("video", "Video", "/media/videos/snap-reels/heron-wing-blaze.mp4"), textField("title", "Title", "Heron Wing"), textField("vibe", "Caption", "Clean lines and still water, cut for the feed")] }
     ]),
     block("features", "Add-on tools", [
       textField("badge", "Badge", "ADDITIONAL FEATURES"),
@@ -32154,7 +32155,7 @@ const PAGES = [
       textField("stillsTitle", "Stills heading", "Selected stills")
     ], [
       { id: "drone", fields: [imageField("image", "Photo", "/media/photos/drone-hero.jpg"), textField("caption", "Caption", "Aerial still from an Iconic listing shoot.")] },
-      { id: "pool", fields: [imageField("image", "Photo", "/media/before-after/twilight-pool-lifestyle.jpg"), textField("caption", "Caption", "Twilight conversion of a rear pool.")] },
+      { id: "pool", fields: [imageField("image", "Photo", "/media/photos/rear-pool-twilight.jpg"), textField("caption", "Caption", "Twilight conversion of a rear pool.")] },
       { id: "interior", fields: [imageField("image", "Photo", "/media/photos/luxury-interior.jpg"), textField("caption", "Caption", "Listing interior from the Iconic library.")] }
     ])
   ]),
