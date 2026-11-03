@@ -40,6 +40,14 @@ export interface BookingLineItem {
   category?: string;
   bookingKind?: string;
   tier?: string;
+  /** Parent package id when the line was chosen from the catalog. */
+  catalogId?: string;
+  /** Priced version of that package, when the line is a variant. */
+  variantId?: string;
+  /** Appointment length copied from the catalog choice. */
+  durationMinutes?: number;
+  /** Staff typed this line. It is not a catalog id. */
+  custom?: boolean;
 }
 
 function chargeCatalog(input: BookingPriceInput): StaffCatalogPackage[] {
@@ -258,6 +266,13 @@ export function normalizeBookingLineItems(items: unknown): BookingLineItem[] {
     if (bookingKind) line.bookingKind = bookingKind;
     const tier = optionalLineText(item.tier);
     if (tier) line.tier = tier;
+    const catalogId = optionalLineText(item.catalogId);
+    if (catalogId) line.catalogId = catalogId;
+    const variantId = optionalLineText(item.variantId);
+    if (variantId) line.variantId = variantId;
+    const duration = Number(item.durationMinutes);
+    if (Number.isFinite(duration) && duration > 0) line.durationMinutes = Math.round(duration);
+    if (item.custom === true) line.custom = true;
     return line;
   });
 }

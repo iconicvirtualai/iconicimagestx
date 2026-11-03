@@ -11,6 +11,7 @@ export interface OrderServiceLine {
   name: string;
   qty: number;
   price: number;
+  durationMinutes?: number;
 }
 
 const PACKAGE_LABEL_KEYS = [
@@ -142,6 +143,7 @@ function toOrderLine(item: BookingLineItem): OrderServiceLine {
     price: item.price,
   };
   if (item.id) line.id = item.id;
+  if (item.durationMinutes && item.durationMinutes > 0) line.durationMinutes = item.durationMinutes;
   return line;
 }
 
