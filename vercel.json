@@ -11,6 +11,14 @@
     {
       "path": "/api/apprenticeship/release-holds",
       "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/holy-grail/sync",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/holy-grail/har",
+      "schedule": "20 14 * * *"
     }
   ],
   "functions": {
