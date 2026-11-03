@@ -9,6 +9,7 @@ import { AI_EDIT_TIMEOUT_NOTE, listingPhotoEditSize, type ListingEditSize } from
 
 export const OPENAI_IMAGE_EDITS_URL = "https://api.openai.com/v1/images/edits";
 export const OPENAI_IMAGE_EDIT_MODEL = "gpt-image-1";
+export const OPENAI_IMAGE_EDIT_QUALITY = "high";
 export const OPENAI_IMAGE_EDIT_TIMEOUT_MS = 45_000;
 export const OPENAI_CHAT_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions";
 export const OPENAI_INSPECTION_MODEL = "gpt-4o-mini";
@@ -172,7 +173,7 @@ export async function editListingPhotoWithOpenAI(input: {
   }
   form.append("n", "1");
   form.append("size", editSizeForImage(input.bytes));
-  form.append("quality", "medium");
+  form.append("quality", OPENAI_IMAGE_EDIT_QUALITY);
   form.append("output_format", "jpeg");
   form.append("output_compression", "85");
   form.append("input_fidelity", "high");

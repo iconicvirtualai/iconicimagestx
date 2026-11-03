@@ -9,6 +9,7 @@ import twilio from "twilio";
 import { google } from "googleapis";
 import crypto, { randomBytes, createHmac, timingSafeEqual, randomUUID } from "crypto";
 import crypto$1, { createHmac as createHmac$1, timingSafeEqual as timingSafeEqual$1, randomUUID as randomUUID$1, randomBytes as randomBytes$1, createHash } from "node:crypto";
+import sharp from "sharp";
 import Stripe from "stripe";
 import * as XLSX from "xlsx";
 import fs$1 from "node:fs";
@@ -12788,6 +12789,7 @@ const AI_EDIT_PRESETS = [
 const AI_EDIT_MISSING_KEY_NOTE = "OPENAI_API_KEY is not configured on the server, so this photo was not edited.";
 const AI_EDIT_TIMEOUT_NOTE = "OpenAI took too long to edit this photo. The job was marked failed. Queue it again.";
 const AI_EDIT_READY_NOTE = "OpenAI edit is ready for review.";
+const AI_EDIT_UPSCALE_NOTE = "Edited areas are the OpenAI result scaled up from the API size. Untouched areas keep the original pixels.";
 const RAW_EXT$2 = /\.(cr2|cr3|nef|nrw|arw|srf|sr2|dng|raw|rw2|orf|raf|pef|3fr|fff|iiq)$/i;
 const PREVIEW_EXT = /\.(jpe?g|png|webp|gif)$/i;
 function ingestJobId(listingId) {
@@ -14086,6 +14088,28 @@ function buildMediaDeliveryQueue(input) {
 }
 const ORDER_EDIT_RUN_PER_REQUEST = 1;
 const ORDER_EDIT_STALE_MS = 3 * 60 * 1e3;
+const ORDER_EDIT_BATCH_LIMIT = 25;
+const IDLE_STUDIO_EDIT_QUEUE = {
+  pause: null,
+  testApproved: false,
+  batchProcessed: 0,
+  testJobId: null
+};
+function readStudioEditQueue(value) {
+  const row = value && typeof value === "object" ? value : {};
+  const pause = row.pause === "awaiting_test_approval" || row.pause === "awaiting_batch_review" ? row.pause : null;
+  const batch = Number(row.batchProcessed);
+  const testJobId = typeof row.testJobId === "string" && row.testJobId.trim() ? row.testJobId.trim() : null;
+  return {
+    pause,
+    testApproved: row.testApproved === true,
+    batchProcessed: Number.isFinite(batch) && batch > 0 ? Math.floor(batch) : 0,
+    testJobId
+  };
+}
+function listingQueueAcceptsKick(queue) {
+  return queue.pause == null;
+}
 function orderEditClaimable(job, now = Date.now()) {
   if (job.status === "pending") return true;
   if (job.status !== "processing") return false;
@@ -14098,17 +14122,113 @@ function runnableOrderEdits(jobs, now = Date.now()) {
     return rank(a) - rank(b);
   });
 }
-function orderQueueAdvancePlan(jobs, now = Date.now()) {
-  const runnable = runnableOrderEdits(jobs, now);
-  const next = runnable[0] || null;
-  const remainingAfter = next ? Math.max(0, runnable.length - ORDER_EDIT_RUN_PER_REQUEST) : 0;
-  return {
-    nextId: next?.id || null,
+function orderQueueAdvancePlan(jobs, now = Date.now(), queue = IDLE_STUDIO_EDIT_QUEUE, onlyId) {
+  let runnable = runnableOrderEdits(jobs, now);
+  if (onlyId) runnable = runnable.filter((job) => job.id === onlyId);
+  const held = queue.pause ? {
+    nextId: null,
     runnable: runnable.length,
-    remainingAfter,
-    shouldFollowUp: remainingAfter > 0,
-    perRequest: ORDER_EDIT_RUN_PER_REQUEST
+    remainingAfter: 0,
+    shouldFollowUp: false,
+    perRequest: ORDER_EDIT_RUN_PER_REQUEST,
+    pause: queue.pause,
+    pauseAfter: queue.pause,
+    batchProcessedAfter: queue.batchProcessed
+  } : null;
+  if (held) return held;
+  if (!queue.testApproved) {
+    const next2 = runnable[0] || null;
+    return {
+      nextId: next2?.id || null,
+      runnable: runnable.length,
+      remainingAfter: 0,
+      shouldFollowUp: false,
+      perRequest: ORDER_EDIT_RUN_PER_REQUEST,
+      pause: null,
+      pauseAfter: next2 ? "awaiting_test_approval" : null,
+      batchProcessedAfter: 0
+    };
+  }
+  const processed = queue.batchProcessed;
+  if (processed >= ORDER_EDIT_BATCH_LIMIT) {
+    return {
+      nextId: null,
+      runnable: runnable.length,
+      remainingAfter: 0,
+      shouldFollowUp: false,
+      perRequest: ORDER_EDIT_RUN_PER_REQUEST,
+      pause: null,
+      pauseAfter: runnable.length > 0 ? "awaiting_batch_review" : null,
+      batchProcessedAfter: processed
+    };
+  }
+  const next = runnable[0] || null;
+  if (!next) {
+    return {
+      nextId: null,
+      runnable: 0,
+      remainingAfter: 0,
+      shouldFollowUp: false,
+      perRequest: ORDER_EDIT_RUN_PER_REQUEST,
+      pause: null,
+      pauseAfter: null,
+      batchProcessedAfter: processed
+    };
+  }
+  const processedAfter = processed + 1;
+  const others = runnable.length - 1;
+  const hitCap = processedAfter >= ORDER_EDIT_BATCH_LIMIT && others > 0;
+  return {
+    nextId: next.id,
+    runnable: runnable.length,
+    remainingAfter: hitCap ? 0 : others,
+    shouldFollowUp: others > 0 && !hitCap,
+    perRequest: ORDER_EDIT_RUN_PER_REQUEST,
+    pause: null,
+    pauseAfter: hitCap ? "awaiting_batch_review" : null,
+    batchProcessedAfter: processedAfter
   };
+}
+function queueStateAfterRun(queue, plan, jobId) {
+  if (!queue.testApproved) {
+    return {
+      pause: "awaiting_test_approval",
+      testApproved: false,
+      batchProcessed: 0,
+      testJobId: jobId
+    };
+  }
+  return {
+    pause: plan.pauseAfter,
+    testApproved: true,
+    batchProcessed: plan.batchProcessedAfter,
+    testJobId: queue.testJobId
+  };
+}
+function unblockQueueAfterTestApproval(queue) {
+  return {
+    pause: null,
+    testApproved: true,
+    batchProcessed: 0,
+    testJobId: queue.testJobId
+  };
+}
+function continueStudioEditQueue(queue) {
+  if (queue.pause === "awaiting_test_approval" || !queue.testApproved) {
+    return { ok: false, error: "Approve the test photo before the queue can continue." };
+  }
+  if (queue.pause === "awaiting_batch_review") {
+    return {
+      ok: true,
+      queue: {
+        pause: null,
+        testApproved: true,
+        batchProcessed: 0,
+        testJobId: queue.testJobId
+      }
+    };
+  }
+  return { ok: true, queue: { ...queue, pause: null } };
 }
 function jsonSafe(value) {
   if (value == null) return value;
@@ -14764,6 +14884,7 @@ function serializeDoc(id, data) {
 }
 const OPENAI_IMAGE_EDITS_URL = "https://api.openai.com/v1/images/edits";
 const OPENAI_IMAGE_EDIT_MODEL = "gpt-image-1";
+const OPENAI_IMAGE_EDIT_QUALITY = "high";
 const OPENAI_IMAGE_EDIT_TIMEOUT_MS = 45e3;
 const OPENAI_CHAT_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions";
 const OPENAI_INSPECTION_MODEL = "gpt-4o-mini";
@@ -14894,7 +15015,7 @@ async function editListingPhotoWithOpenAI(input) {
   }
   form.append("n", "1");
   form.append("size", editSizeForImage(input.bytes));
-  form.append("quality", "medium");
+  form.append("quality", OPENAI_IMAGE_EDIT_QUALITY);
   form.append("output_format", "jpeg");
   form.append("output_compression", "85");
   form.append("input_fidelity", "high");
@@ -15019,6 +15140,114 @@ async function inspectFinishedListingJpeg(input) {
     return deliveryInspection("flag", [INSPECTION_FAILED_NOTE]);
   }
   return parseDeliveryInspection(body) || deliveryInspection("flag", [INSPECTION_FAILED_NOTE]);
+}
+const NATIVE_JPEG_QUALITY = 98;
+const NATIVE_JPEG_CHROMA = "4:4:4";
+const EDIT_CHANGE_THRESHOLD = 28;
+const EDIT_DIFF_BLUR_SIGMA = 1.4;
+const EDIT_MASK_FEATHER_SIGMA = 1.6;
+const MAX_PIXELS = 9e7;
+function letterboxRect(srcW, srcH, canvasW, canvasH) {
+  const scale = Math.min(canvasW / srcW, canvasH / srcH);
+  const width = srcW * scale;
+  const height = srcH * scale;
+  return {
+    left: (canvasW - width) / 2,
+    top: (canvasH - height) / 2,
+    width,
+    height,
+    scale
+  };
+}
+function contentExtract(rect, canvasW, canvasH) {
+  const left = Math.max(0, Math.ceil(rect.left - 1e-6));
+  const top = Math.max(0, Math.ceil(rect.top - 1e-6));
+  const right = Math.min(canvasW, Math.floor(rect.left + rect.width + 1e-6));
+  const bottom = Math.min(canvasH, Math.floor(rect.top + rect.height + 1e-6));
+  const width = right - left;
+  const height = bottom - top;
+  if (width < 1 || height < 1) return null;
+  if (left === 0 && top === 0 && width === canvasW && height === canvasH) return null;
+  return { left, top, width, height };
+}
+async function decodeOrientedRgb(bytes) {
+  const decoded = await sharp(bytes, { limitInputPixels: MAX_PIXELS, failOn: "none" }).rotate().toColorspace("srgb").removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  if (decoded.info.channels !== 3 || !decoded.info.width || !decoded.info.height) {
+    throw new OpenAiEditError("Studio could not read this photo in color.");
+  }
+  return { raw: decoded.data, width: decoded.info.width, height: decoded.info.height };
+}
+async function fittedCandidate(candidate, srcW, srcH) {
+  const apiMeta = await sharp(candidate, { limitInputPixels: MAX_PIXELS, failOn: "none" }).rotate().metadata();
+  const apiWidth = apiMeta.width || 0;
+  const apiHeight = apiMeta.height || 0;
+  if (apiWidth < 1 || apiHeight < 1) throw new OpenAiEditError("OpenAI returned an image with no dimensions.");
+  const extract = contentExtract(letterboxRect(srcW, srcH, apiWidth, apiHeight), apiWidth, apiHeight);
+  let pipeline = sharp(candidate, { limitInputPixels: MAX_PIXELS, failOn: "none" }).rotate().toColorspace("srgb");
+  if (extract) pipeline = pipeline.extract(extract);
+  const fitted = await pipeline.resize(srcW, srcH, { fit: "fill", kernel: "lanczos3" }).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  if (fitted.info.width !== srcW || fitted.info.height !== srcH || fitted.info.channels !== 3) {
+    throw new OpenAiEditError("Studio could not fit the edit back to the original photo.");
+  }
+  return { raw: fitted.data, apiWidth, apiHeight };
+}
+async function changeMask(source, fitted, width, height) {
+  const pixels = width * height;
+  if (source.length < pixels * 3 || fitted.length < pixels * 3) {
+    throw new OpenAiEditError("Studio could not compare the edit to the original photo.");
+  }
+  const diff = Buffer.alloc(pixels);
+  for (let i = 0, p = 0; i < pixels; i += 1, p += 3) {
+    const dr = Math.abs(source[p] - fitted[p]);
+    const dg = Math.abs(source[p + 1] - fitted[p + 1]);
+    const db2 = Math.abs(source[p + 2] - fitted[p + 2]);
+    diff[i] = dr > dg ? dr > db2 ? dr : db2 : dg > db2 ? dg : db2;
+  }
+  const blurred = await sharp(diff, { raw: { width, height, channels: 1 } }).blur(EDIT_DIFF_BLUR_SIGMA).toColourspace("b-w").raw().toBuffer();
+  if (blurred.length < pixels) throw new OpenAiEditError("Studio could not build the edit mask.");
+  const binary = Buffer.alloc(pixels);
+  for (let i = 0; i < pixels; i += 1) binary[i] = blurred[i] >= EDIT_CHANGE_THRESHOLD ? 255 : 0;
+  const feathered = await sharp(binary, { raw: { width, height, channels: 1 } }).blur(EDIT_MASK_FEATHER_SIGMA).toColourspace("b-w").raw().toBuffer();
+  if (feathered.length < pixels) throw new OpenAiEditError("Studio could not feather the edit mask.");
+  return feathered.subarray(0, pixels);
+}
+function compositeMask(source, fitted, mask, width, height) {
+  const out = Buffer.from(source.subarray(0, width * height * 3));
+  const pixels = width * height;
+  for (let i = 0, p = 0; i < pixels; i += 1, p += 3) {
+    const weight = mask[i];
+    if (!weight) continue;
+    if (weight === 255) {
+      out[p] = fitted[p];
+      out[p + 1] = fitted[p + 1];
+      out[p + 2] = fitted[p + 2];
+      continue;
+    }
+    const keep = 255 - weight;
+    out[p] = Math.round((source[p] * keep + fitted[p] * weight) / 255);
+    out[p + 1] = Math.round((source[p + 1] * keep + fitted[p + 1] * weight) / 255);
+    out[p + 2] = Math.round((source[p + 2] * keep + fitted[p + 2] * weight) / 255);
+  }
+  return out;
+}
+async function encodeListingJpeg(raw, width, height) {
+  return sharp(raw, { raw: { width, height, channels: 3 } }).withIccProfile("srgb").jpeg({ quality: NATIVE_JPEG_QUALITY, chromaSubsampling: NATIVE_JPEG_CHROMA }).toBuffer();
+}
+async function compositeNativeEdit(source, candidate) {
+  const decoded = await decodeOrientedRgb(source);
+  const fitted = await fittedCandidate(candidate, decoded.width, decoded.height);
+  const mask = await changeMask(decoded.raw, fitted.raw, decoded.width, decoded.height);
+  const raw = compositeMask(decoded.raw, fitted.raw, mask, decoded.width, decoded.height);
+  const jpeg = await encodeListingJpeg(raw, decoded.width, decoded.height);
+  return {
+    jpeg,
+    raw,
+    width: decoded.width,
+    height: decoded.height,
+    apiWidth: fitted.apiWidth,
+    apiHeight: fitted.apiHeight,
+    upscaledRegion: true
+  };
 }
 const db$p = () => admin.firestore();
 const bucket$1 = () => admin.storage().bucket();
@@ -15154,9 +15383,19 @@ async function runOpenAiEdit(input) {
     bytes: source.bytes,
     contentType: source.contentType
   });
+  const composited = await compositeNativeEdit(source.bytes, edited.bytes);
   const base = input.fileName.replace(/\.\w+$/, "") || "edit";
-  const saved = await saveListingBytes(input.listingId, `${base}-ai.jpg`, "image/jpeg", "photos", edited.bytes);
-  return { afterUrl: saved.url, resultPath: saved.storagePath, bytes: edited.bytes };
+  const saved = await saveListingBytes(input.listingId, `${base}-ai.jpg`, "image/jpeg", "photos", composited.jpeg);
+  return {
+    afterUrl: saved.url,
+    resultPath: saved.storagePath,
+    bytes: composited.jpeg,
+    apiSize: `${composited.apiWidth}x${composited.apiHeight}`,
+    outputWidth: composited.width,
+    outputHeight: composited.height,
+    upscaledRegion: true,
+    upscaleNote: AI_EDIT_UPSCALE_NOTE
+  };
 }
 async function inspectOrderEditJpeg(bytes) {
   try {
@@ -15260,9 +15499,37 @@ async function prepareOrderEditJobs(input) {
   }
   const jobSnap = await db$p().collection("editJobs").where("listingId", "==", input.listingId).limit(200).get();
   const jobs = queueJobsFromSnap(jobSnap.docs);
-  const advance2 = orderQueueAdvancePlan(jobs);
+  const queue = readStudioEditQueue(listing.data.studioEditQueue);
+  const advance2 = orderQueueAdvancePlan(jobs, Date.now(), queue);
   const waiting = jobs.filter((job) => job.origin === "order" && job.status === "pending" && !job.sourcePath).length;
-  return { plan, prepared, pending: advance2.runnable, waiting, shouldFollowUp: advance2.shouldFollowUp };
+  return {
+    plan,
+    prepared,
+    pending: advance2.runnable,
+    waiting,
+    shouldFollowUp: advance2.shouldFollowUp,
+    pause: queue.pause
+  };
+}
+async function saveStudioEditQueue(listingId, state) {
+  await db$p().collection("listings").doc(listingId).set({
+    studioEditQueue: {
+      pause: state.pause,
+      testApproved: state.testApproved,
+      batchProcessed: state.batchProcessed,
+      testJobId: state.testJobId,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    }
+  }, { merge: true });
+}
+function provenanceFields(saved) {
+  return {
+    apiSize: saved.apiSize,
+    outputWidth: saved.outputWidth,
+    outputHeight: saved.outputHeight,
+    upscaledRegion: saved.upscaledRegion,
+    upscaleNote: AI_EDIT_UPSCALE_NOTE
+  };
 }
 async function claimOrderEdit(ref, now = Date.now()) {
   try {
@@ -15292,18 +15559,70 @@ async function claimOrderEdit(ref, now = Date.now()) {
   }
 }
 async function advanceOrderEditQueue(input) {
-  const prepared = await prepareOrderEditJobs(input);
+  const listingSnap = await db$p().collection("listings").doc(input.listingId).get();
+  let queue = readStudioEditQueue(listingSnap.data()?.studioEditQueue);
+  const manualTestRetry = queue.pause === "awaiting_test_approval" && input.retryFailed === true;
+  if (queue.pause && !manualTestRetry) {
+    const prepared2 = await prepareOrderEditJobs({ ...input, retryFailed: false });
+    return {
+      plan: prepared2.plan,
+      prepared: prepared2.prepared,
+      ran: null,
+      remaining: 0,
+      waiting: prepared2.waiting,
+      shouldFollowUp: false,
+      pause: queue.pause
+    };
+  }
+  if (manualTestRetry && queue.testJobId) {
+    const testRef = db$p().collection("editJobs").doc(queue.testJobId);
+    const testSnap = await testRef.get();
+    const test = testSnap.data() || {};
+    if (testSnap.exists && test.listingId === input.listingId && test.status === "failed") {
+      await testRef.update({
+        status: "pending",
+        note: "Retrying the test photo.",
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+      queue = { ...queue, pause: null };
+    } else {
+      const prepared2 = await prepareOrderEditJobs({ ...input, retryFailed: false });
+      return {
+        plan: prepared2.plan,
+        prepared: prepared2.prepared,
+        ran: null,
+        remaining: 0,
+        waiting: prepared2.waiting,
+        shouldFollowUp: false,
+        pause: "awaiting_test_approval"
+      };
+    }
+  }
+  const prepared = await prepareOrderEditJobs({
+    ...input,
+    retryFailed: manualTestRetry ? false : Boolean(input.retryFailed)
+  });
   const jobSnap = await db$p().collection("editJobs").where("listingId", "==", input.listingId).limit(200).get();
-  const advance2 = orderQueueAdvancePlan(queueJobsFromSnap(jobSnap.docs));
-  const waiting = queueJobsFromSnap(jobSnap.docs).filter((job) => job.origin === "order" && job.status === "pending" && !job.sourcePath).length;
+  const jobs = queueJobsFromSnap(jobSnap.docs);
+  const advance2 = orderQueueAdvancePlan(
+    jobs,
+    Date.now(),
+    queue,
+    manualTestRetry ? queue.testJobId || void 0 : void 0
+  );
+  const waiting = jobs.filter((job) => job.origin === "order" && job.status === "pending" && !job.sourcePath).length;
   if (!advance2.nextId) {
+    if (advance2.pauseAfter && advance2.pauseAfter !== queue.pause) {
+      await saveStudioEditQueue(input.listingId, queueStateAfterRun(queue, advance2, queue.testJobId || ""));
+    }
     return {
       plan: prepared.plan,
       prepared: prepared.prepared,
       ran: null,
       remaining: 0,
       waiting,
-      shouldFollowUp: false
+      shouldFollowUp: false,
+      pause: advance2.pause || advance2.pauseAfter
     };
   }
   const next = jobSnap.docs.find((doc) => doc.id === advance2.nextId) || null;
@@ -15314,20 +15633,26 @@ async function advanceOrderEditQueue(input) {
       ran: null,
       remaining: advance2.runnable,
       waiting,
-      shouldFollowUp: advance2.shouldFollowUp
+      shouldFollowUp: false,
+      pause: queue.pause
     };
   }
   const claimed = await claimOrderEdit(next.ref);
   if (!claimed) {
-    const still = Math.max(0, advance2.runnable - 1);
     return {
       plan: prepared.plan,
       prepared: prepared.prepared,
       ran: null,
-      remaining: still,
+      remaining: advance2.remainingAfter,
       waiting,
-      shouldFollowUp: still > 0
+      shouldFollowUp: advance2.shouldFollowUp,
+      pause: queue.pause
     };
+  }
+  const nextQueue = queueStateAfterRun(queue, advance2, next.id);
+  await saveStudioEditQueue(input.listingId, nextQueue);
+  if (!queue.testApproved) {
+    await next.ref.update({ testPhoto: true });
   }
   const data = next.data() || {};
   const fileName2 = String(data.sourcePath || "").split("/").pop() || "photo.jpg";
@@ -15347,6 +15672,8 @@ async function advanceOrderEditQueue(input) {
       resultPath: saved.resultPath,
       placeholder: false,
       note: AI_EDIT_READY_NOTE,
+      ...provenanceFields(saved),
+      ...queue.testApproved ? {} : { testPhoto: true },
       pipeline: ["pending", "processing", "review"],
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
@@ -15359,13 +15686,13 @@ async function advanceOrderEditQueue(input) {
     } catch (err) {
       console.error("[Studio inspection] The edit is in review, but the inspection note was not stored.", err instanceof Error ? err.message : err);
     }
-    const remaining = Math.max(0, advance2.remainingAfter);
     return {
       plan: prepared.plan,
       prepared: prepared.prepared,
-      remaining,
+      remaining: advance2.remainingAfter,
       waiting,
-      shouldFollowUp: remaining > 0,
+      shouldFollowUp: advance2.shouldFollowUp,
+      pause: nextQueue.pause,
       ran: {
         jobId: next.id,
         status: "review",
@@ -15376,7 +15703,11 @@ async function advanceOrderEditQueue(input) {
         resultPath: saved.resultPath,
         placeholder: false,
         note: AI_EDIT_READY_NOTE,
-        inspection
+        inspection,
+        apiSize: saved.apiSize,
+        outputWidth: saved.outputWidth,
+        outputHeight: saved.outputHeight,
+        upscaledRegion: true
       }
     };
   } catch (err) {
@@ -15387,15 +15718,16 @@ async function advanceOrderEditQueue(input) {
       placeholder: false,
       afterUrl: "",
       note,
+      ...queue.testApproved ? {} : { testPhoto: true },
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
-    const remaining = Math.max(0, advance2.remainingAfter);
     return {
       plan: prepared.plan,
       prepared: prepared.prepared,
-      remaining,
+      remaining: advance2.remainingAfter,
       waiting,
-      shouldFollowUp: remaining > 0,
+      shouldFollowUp: advance2.shouldFollowUp,
+      pause: nextQueue.pause,
       ran: {
         jobId: next.id,
         status: "failed",
@@ -15415,13 +15747,31 @@ async function queueOrderEdits(input) {
 async function enqueueOrderEditsFromUpload(input) {
   return prepareOrderEditJobs({ ...input, retryFailed: false });
 }
+async function continueOrderEditQueue(input) {
+  const listing = await loadListing$1(input.listingId);
+  const queue = readStudioEditQueue(listing.data.studioEditQueue);
+  const next = continueStudioEditQueue(queue);
+  if (next.ok === false) throw httpError$4(409, next.error);
+  await saveStudioEditQueue(input.listingId, next.queue);
+  return {
+    pause: next.queue.pause,
+    testApproved: next.queue.testApproved,
+    batchProcessed: next.queue.batchProcessed,
+    testJobId: next.queue.testJobId
+  };
+}
 async function nextOrderEditListingId() {
   const snap = await db$p().collection("editJobs").where("status", "==", "pending").limit(40).get();
+  const seen = /* @__PURE__ */ new Set();
   for (const doc of snap.docs) {
     const data = doc.data() || {};
-    if (data.origin === "order" && data.sourcePath && typeof data.listingId === "string" && data.listingId) {
-      return data.listingId;
-    }
+    const listingId = typeof data.listingId === "string" ? data.listingId : "";
+    if (data.origin !== "order" || !data.sourcePath || !listingId || seen.has(listingId)) continue;
+    seen.add(listingId);
+    const listing = await db$p().collection("listings").doc(listingId).get();
+    const queue = readStudioEditQueue(listing.data()?.studioEditQueue);
+    if (!listingQueueAcceptsKick(queue)) continue;
+    return listingId;
   }
   return null;
 }
@@ -15466,6 +15816,7 @@ async function enqueueAiEdit(input) {
       resultPath: saved.resultPath,
       placeholder: false,
       note: AI_EDIT_READY_NOTE,
+      ...provenanceFields(saved),
       pipeline: ["pending", "processing", "review"],
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
@@ -15675,7 +16026,10 @@ async function approveStudioFinal(input) {
     sortOrder: sequenced?.sortOrder ?? (typeof source?.sortOrder === "number" ? source.sortOrder : void 0)
   });
   if (input.jobId) {
-    await db$p().collection("editJobs").doc(input.jobId).set({
+    const jobRef = db$p().collection("editJobs").doc(input.jobId);
+    const jobSnap = await jobRef.get();
+    const job = jobSnap.data() || {};
+    await jobRef.set({
       status: "approved",
       resultPath: copied.storagePath,
       resultUrl: copied.url,
@@ -15683,6 +16037,11 @@ async function approveStudioFinal(input) {
       approvedBy: input.uploadedBy,
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     }, { merge: true });
+    const current = readStudioEditQueue(listing.data.studioEditQueue);
+    const approvesTest = job.testPhoto === true || current.pause === "awaiting_test_approval" && current.testJobId === input.jobId;
+    if (approvesTest) {
+      await saveStudioEditQueue(input.listingId, unblockQueueAfterTestApproval(current));
+    }
   }
   return {
     image: registered.image,
@@ -15721,6 +16080,7 @@ async function loadStudioWorkspace(input) {
       iconicPolish: loaded.data.iconicPolish === true,
       images,
       editPlan,
+      editQueue: readStudioEditQueue(loaded.data.studioEditQueue),
       delivery: await listingDelivery(loaded.id, loaded.data)
     };
   }
@@ -22525,6 +22885,10 @@ function studioQueueTickRequest(env, listingId) {
     }
   };
 }
+function studioQueueMayChain(input) {
+  if (input.pause) return false;
+  return input.shouldFollowUp === true;
+}
 function kickStudioQueue(listingId, env = process.env) {
   const request = studioQueueTickRequest(env, listingId);
   if (!request) return { dispatched: false };
@@ -26614,10 +26978,29 @@ router$e.post("/order-queue/tick", requireStaffOrQueueCron, async (req, res) => 
       createdBy: req.user.uid,
       retryFailed: false
     });
-    if (req.body?.chain === true && result.shouldFollowUp) kickStudioQueue(listingId);
+    if (req.body?.chain === true && studioQueueMayChain({
+      shouldFollowUp: result.shouldFollowUp,
+      pause: result.pause
+    })) {
+      kickStudioQueue(listingId);
+    }
     return res.json(result);
   } catch (err) {
     return sendKnownError$1(res, err, "Failed to advance the order edit queue.");
+  }
+});
+router$e.post("/order-queue/continue", requireStaff, async (req, res) => {
+  const listingId = String(req.body?.listingId || "").trim();
+  if (!/^[A-Za-z0-9_-]{8,128}$/.test(listingId)) {
+    return res.status(400).json({ error: "A valid listing id is required." });
+  }
+  if (!adminReady$1(res)) return;
+  try {
+    await assertStudioAccess(req.user.uid, req.staffRole || "", listingId);
+    const result = await continueOrderEditQueue({ listingId });
+    return res.json(result);
+  } catch (err) {
+    return sendKnownError$1(res, err, "Failed to continue the order edit queue.");
   }
 });
 router$e.post("/iconic-polish", requireStaff, async (req, res) => {
@@ -32412,8 +32795,8 @@ function bucketName() {
   return process.env.FIREBASE_STORAGE_BUCKET || process.env.VITE_FIREBASE_STORAGE_BUCKET || "";
 }
 async function optimizeImage(bytes) {
-  const sharp = (await import("sharp")).default;
-  const body = await sharp(bytes, { failOn: "none" }).rotate().resize({ width: 2e3, withoutEnlargement: true }).webp({ quality: 82 }).toBuffer();
+  const sharp2 = (await import("sharp")).default;
+  const body = await sharp2(bytes, { failOn: "none" }).rotate().resize({ width: 2e3, withoutEnlargement: true }).webp({ quality: 82 }).toBuffer();
   return { body, type: "image/webp", ext: "webp" };
 }
 async function saveObject(pageId, ext, body, type) {

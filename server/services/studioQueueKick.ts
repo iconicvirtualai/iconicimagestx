@@ -50,6 +50,12 @@ export function studioQueueTickRequest(
   };
 }
 
+/** A stored pause is not a signal to start the next photo. */
+export function studioQueueMayChain(input: { shouldFollowUp: boolean; pause?: string | null }): boolean {
+  if (input.pause) return false;
+  return input.shouldFollowUp === true;
+}
+
 export function kickStudioQueue(listingId: string, env: NodeJS.ProcessEnv = process.env) {
   const request = studioQueueTickRequest(env, listingId);
   if (!request) return { dispatched: false as const };

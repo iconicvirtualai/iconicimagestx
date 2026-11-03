@@ -77,6 +77,70 @@ describe("Iconic Studio staff shell", () => {
     expect(html).not.toContain("After · placeholder");
   });
 
+  it("shows a paused batch with continue, and says edited areas were scaled up", () => {
+    const html = renderToString(
+      <IconicStudioWorkspace
+        listings={[{ id: "sampledemo", address: "100 Sample Lane", imageCount: 1 }]}
+        jobs={[{
+          id: "job-1",
+          listingId: "sampledemo",
+          origin: "order",
+          type: "photo",
+          label: "Listing photo",
+          status: "review",
+          beforeUrl: "https://cdn.example/before.jpg",
+          afterUrl: "https://cdn.example/after.jpg",
+          placeholder: false,
+          note: "OpenAI edit is ready for review.",
+          upscaledRegion: true,
+          apiSize: "1536x1024",
+          outputWidth: 6140,
+          outputHeight: 4096,
+        }]}
+        listingId="sampledemo"
+        address="100 Sample Lane"
+        frames={sampleStudioFrames()}
+        editQueue={{ pause: "awaiting_batch_review", testApproved: true, batchProcessed: 25, testJobId: "job-1" }}
+        initialTab="ai"
+        onSelectListing={() => undefined}
+        onAiEdit={async () => undefined}
+        onRunOrder={async () => undefined}
+        onContinueQueue={async () => undefined}
+        onSaveAdjust={async () => undefined}
+        onApprove={async () => undefined}
+      />,
+    );
+    expect(html).toContain("studio-queue-pause");
+    expect(html).toContain("paused after 25");
+    expect(html).toContain("studio-queue-continue");
+    expect(html).toContain("Continue");
+    expect(html).toContain("studio-upscale-note");
+    expect(html).toContain("scaled up from the API size");
+    expect(html).toContain("1536x1024");
+    expect(html).toContain("6140×4096");
+    expect(html).not.toMatch(/no quality loss/i);
+  });
+
+  it("shows the test pause without a continue button", () => {
+    const html = renderToString(
+      <IconicStudioWorkspace
+        listings={[{ id: "sampledemo", address: "100 Sample Lane", imageCount: 1 }]}
+        jobs={[]}
+        listingId="sampledemo"
+        address="100 Sample Lane"
+        frames={sampleStudioFrames()}
+        editQueue={{ pause: "awaiting_test_approval", testApproved: false, batchProcessed: 0, testJobId: "job-1" }}
+        initialTab="ai"
+        onSelectListing={() => undefined}
+        onAiEdit={async () => undefined}
+        onSaveAdjust={async () => undefined}
+        onApprove={async () => undefined}
+      />,
+    );
+    expect(html).toContain("paused until that photo is approved");
+    expect(html).not.toContain("studio-queue-continue");
+  });
+
   it("shows inspection notes on a flagged review job and still leaves approval to staff", () => {
     const html = renderToString(
       <IconicStudioWorkspace

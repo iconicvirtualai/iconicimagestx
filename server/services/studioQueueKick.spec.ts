@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   PHOTOGRAPHER_UPLOAD_BROWSER_DRAINS_QUEUE,
+  studioQueueMayChain,
   studioQueueTickRequest,
   uploadQueueKickDecision,
 } from "./studioQueueKick";
@@ -21,6 +22,15 @@ describe("studio queue follow-up", () => {
     expect(studioQueueTickRequest({ APP_URL: "https://iconicimagestx.com" }, "listing1234")).toBeNull();
     expect(studioQueueTickRequest({ CRON_SECRET: "cron-secret" }, "listing1234")).toBeNull();
     expect(studioQueueTickRequest({ APP_URL: "https://iconicimagestx.com", CRON_SECRET: "cron-secret" }, "  ")).toBeNull();
+  });
+});
+
+describe("studio queue pause", () => {
+  it("does not chain a kick while the test or the batch is paused", () => {
+    expect(studioQueueMayChain({ shouldFollowUp: true, pause: "awaiting_test_approval" })).toBe(false);
+    expect(studioQueueMayChain({ shouldFollowUp: true, pause: "awaiting_batch_review" })).toBe(false);
+    expect(studioQueueMayChain({ shouldFollowUp: false, pause: null })).toBe(false);
+    expect(studioQueueMayChain({ shouldFollowUp: true, pause: null })).toBe(true);
   });
 });
 

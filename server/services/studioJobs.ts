@@ -9,6 +9,7 @@ import admin from "firebase-admin";
 import {
   AI_EDIT_MISSING_KEY_NOTE,
   AI_EDIT_READY_NOTE,
+  AI_EDIT_UPSCALE_NOTE,
   clampAdjustments,
   finalsObjectPath,
   frameFromListingImage,
@@ -26,8 +27,14 @@ import {
 import { MEDIA_DELIVERY_LABELS, mediaDeliveryFromGalleryStatus } from "../../shared/mediaDelivery";
 import { isListingStoragePath, safeStorageFileName, contentTypeForUpload } from "../../shared/listingAccess";
 import {
+  continueStudioEditQueue,
+  listingQueueAcceptsKick,
   orderQueueAdvancePlan,
+  queueStateAfterRun,
+  readStudioEditQueue,
+  unblockQueueAfterTestApproval,
   type OrderQueueJob,
+  type StudioEditQueueState,
 } from "../../shared/orderEditQueue";
 import {
   orderEditDocId,
@@ -48,6 +55,7 @@ import {
   readOpenAiApiKey,
   type DeliveryInspection,
 } from "./openaiImageEdit";
+import { compositeNativeEdit } from "./nativeEditComposite";
 
 const db = () => admin.firestore();
 const bucket = () => admin.storage().bucket();
@@ -206,9 +214,19 @@ async function runOpenAiEdit(input: {
     bytes: source.bytes,
     contentType: source.contentType,
   });
+  const composited = await compositeNativeEdit(source.bytes, edited.bytes);
   const base = input.fileName.replace(/\.\w+$/, "") || "edit";
-  const saved = await saveListingBytes(input.listingId, `${base}-ai.jpg`, "image/jpeg", "photos", edited.bytes);
-  return { afterUrl: saved.url, resultPath: saved.storagePath, bytes: edited.bytes };
+  const saved = await saveListingBytes(input.listingId, `${base}-ai.jpg`, "image/jpeg", "photos", composited.jpeg);
+  return {
+    afterUrl: saved.url,
+    resultPath: saved.storagePath,
+    bytes: composited.jpeg,
+    apiSize: `${composited.apiWidth}x${composited.apiHeight}`,
+    outputWidth: composited.width,
+    outputHeight: composited.height,
+    upscaledRegion: true as const,
+    upscaleNote: AI_EDIT_UPSCALE_NOTE,
+  };
 }
 
 /** Inspection never fails the edit that already saved. */
@@ -329,9 +347,44 @@ export async function prepareOrderEditJobs(input: { listingId: string; createdBy
 
   const jobSnap = await db().collection("editJobs").where("listingId", "==", input.listingId).limit(200).get();
   const jobs = queueJobsFromSnap(jobSnap.docs);
-  const advance = orderQueueAdvancePlan(jobs);
+  const queue = readStudioEditQueue(listing.data.studioEditQueue);
+  const advance = orderQueueAdvancePlan(jobs, Date.now(), queue);
   const waiting = jobs.filter((job) => job.origin === "order" && job.status === "pending" && !job.sourcePath).length;
-  return { plan, prepared, pending: advance.runnable, waiting, shouldFollowUp: advance.shouldFollowUp };
+  return {
+    plan,
+    prepared,
+    pending: advance.runnable,
+    waiting,
+    shouldFollowUp: advance.shouldFollowUp,
+    pause: queue.pause,
+  };
+}
+
+async function saveStudioEditQueue(listingId: string, state: StudioEditQueueState) {
+  await db().collection("listings").doc(listingId).set({
+    studioEditQueue: {
+      pause: state.pause,
+      testApproved: state.testApproved,
+      batchProcessed: state.batchProcessed,
+      testJobId: state.testJobId,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    },
+  }, { merge: true });
+}
+
+function provenanceFields(saved: {
+  apiSize: string;
+  outputWidth: number;
+  outputHeight: number;
+  upscaledRegion: true;
+}) {
+  return {
+    apiSize: saved.apiSize,
+    outputWidth: saved.outputWidth,
+    outputHeight: saved.outputHeight,
+    upscaledRegion: saved.upscaledRegion,
+    upscaleNote: AI_EDIT_UPSCALE_NOTE,
+  };
 }
 
 async function claimOrderEdit(ref: FirebaseFirestore.DocumentReference, now = Date.now()) {
@@ -364,14 +417,69 @@ async function claimOrderEdit(ref: FirebaseFirestore.DocumentReference, now = Da
 
 /**
  * Prepare order jobs, then run exactly one OpenAI edit.
- * remaining / shouldFollowUp tell the caller to tick again.
+ * The first photo pauses for approval. Later photos pause after 25.
+ * remaining / shouldFollowUp tell the caller to tick again. A pause never does.
  */
 export async function advanceOrderEditQueue(input: { listingId: string; createdBy: string; retryFailed?: boolean }) {
-  const prepared = await prepareOrderEditJobs(input);
+  const listingSnap = await db().collection("listings").doc(input.listingId).get();
+  let queue = readStudioEditQueue(listingSnap.data()?.studioEditQueue);
+  const manualTestRetry = queue.pause === "awaiting_test_approval" && input.retryFailed === true;
+
+  if (queue.pause && !manualTestRetry) {
+    const prepared = await prepareOrderEditJobs({ ...input, retryFailed: false });
+    return {
+      plan: prepared.plan,
+      prepared: prepared.prepared,
+      ran: null,
+      remaining: 0,
+      waiting: prepared.waiting,
+      shouldFollowUp: false,
+      pause: queue.pause,
+    };
+  }
+
+  if (manualTestRetry && queue.testJobId) {
+    const testRef = db().collection("editJobs").doc(queue.testJobId);
+    const testSnap = await testRef.get();
+    const test = testSnap.data() || {};
+    if (testSnap.exists && test.listingId === input.listingId && test.status === "failed") {
+      await testRef.update({
+        status: "pending",
+        note: "Retrying the test photo.",
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      queue = { ...queue, pause: null };
+    } else {
+      const prepared = await prepareOrderEditJobs({ ...input, retryFailed: false });
+      return {
+        plan: prepared.plan,
+        prepared: prepared.prepared,
+        ran: null,
+        remaining: 0,
+        waiting: prepared.waiting,
+        shouldFollowUp: false,
+        pause: "awaiting_test_approval" as const,
+      };
+    }
+  }
+
+  const prepared = await prepareOrderEditJobs({
+    ...input,
+    retryFailed: manualTestRetry ? false : Boolean(input.retryFailed),
+  });
   const jobSnap = await db().collection("editJobs").where("listingId", "==", input.listingId).limit(200).get();
-  const advance = orderQueueAdvancePlan(queueJobsFromSnap(jobSnap.docs));
-  const waiting = queueJobsFromSnap(jobSnap.docs).filter((job) => job.origin === "order" && job.status === "pending" && !job.sourcePath).length;
+  const jobs = queueJobsFromSnap(jobSnap.docs);
+  const advance = orderQueueAdvancePlan(
+    jobs,
+    Date.now(),
+    queue,
+    manualTestRetry ? queue.testJobId || undefined : undefined,
+  );
+  const waiting = jobs.filter((job) => job.origin === "order" && job.status === "pending" && !job.sourcePath).length;
   if (!advance.nextId) {
+    if (advance.pauseAfter && advance.pauseAfter !== queue.pause) {
+      await saveStudioEditQueue(input.listingId, queueStateAfterRun(queue, advance, queue.testJobId || ""));
+    }
     return {
       plan: prepared.plan,
       prepared: prepared.prepared,
@@ -379,6 +487,7 @@ export async function advanceOrderEditQueue(input: { listingId: string; createdB
       remaining: 0,
       waiting,
       shouldFollowUp: false,
+      pause: advance.pause || advance.pauseAfter,
     };
   }
 
@@ -390,21 +499,28 @@ export async function advanceOrderEditQueue(input: { listingId: string; createdB
       ran: null,
       remaining: advance.runnable,
       waiting,
-      shouldFollowUp: advance.shouldFollowUp,
+      shouldFollowUp: false,
+      pause: queue.pause,
     };
   }
 
   const claimed = await claimOrderEdit(next.ref);
   if (!claimed) {
-    const still = Math.max(0, advance.runnable - 1);
     return {
       plan: prepared.plan,
       prepared: prepared.prepared,
       ran: null,
-      remaining: still,
+      remaining: advance.remainingAfter,
       waiting,
-      shouldFollowUp: still > 0,
+      shouldFollowUp: advance.shouldFollowUp,
+      pause: queue.pause,
     };
+  }
+
+  const nextQueue = queueStateAfterRun(queue, advance, next.id);
+  await saveStudioEditQueue(input.listingId, nextQueue);
+  if (!queue.testApproved) {
+    await next.ref.update({ testPhoto: true });
   }
 
   const data = next.data() || {};
@@ -425,6 +541,8 @@ export async function advanceOrderEditQueue(input: { listingId: string; createdB
       resultPath: saved.resultPath,
       placeholder: false,
       note: AI_EDIT_READY_NOTE,
+      ...provenanceFields(saved),
+      ...(queue.testApproved ? {} : { testPhoto: true }),
       pipeline: ["pending", "processing", "review"],
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
@@ -437,13 +555,13 @@ export async function advanceOrderEditQueue(input: { listingId: string; createdB
     } catch (err) {
       console.error("[Studio inspection] The edit is in review, but the inspection note was not stored.", err instanceof Error ? err.message : err);
     }
-    const remaining = Math.max(0, advance.remainingAfter);
     return {
       plan: prepared.plan,
       prepared: prepared.prepared,
-      remaining,
+      remaining: advance.remainingAfter,
       waiting,
-      shouldFollowUp: remaining > 0,
+      shouldFollowUp: advance.shouldFollowUp,
+      pause: nextQueue.pause,
       ran: {
         jobId: next.id,
         status: "review" as const,
@@ -455,6 +573,10 @@ export async function advanceOrderEditQueue(input: { listingId: string; createdB
         placeholder: false,
         note: AI_EDIT_READY_NOTE,
         inspection,
+        apiSize: saved.apiSize,
+        outputWidth: saved.outputWidth,
+        outputHeight: saved.outputHeight,
+        upscaledRegion: true as const,
       },
     };
   } catch (err) {
@@ -465,15 +587,16 @@ export async function advanceOrderEditQueue(input: { listingId: string; createdB
       placeholder: false,
       afterUrl: "",
       note,
+      ...(queue.testApproved ? {} : { testPhoto: true }),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
-    const remaining = Math.max(0, advance.remainingAfter);
     return {
       plan: prepared.plan,
       prepared: prepared.prepared,
-      remaining,
+      remaining: advance.remainingAfter,
       waiting,
-      shouldFollowUp: remaining > 0,
+      shouldFollowUp: advance.shouldFollowUp,
+      pause: nextQueue.pause,
       ran: {
         jobId: next.id,
         status: "failed" as const,
@@ -498,14 +621,34 @@ export async function enqueueOrderEditsFromUpload(input: { listingId: string; cr
   return prepareOrderEditJobs({ ...input, retryFailed: false });
 }
 
-/** Next listing with a pending order edit that has a source photo. Used by the cron tick. */
+/** Staff clears a batch pause. Approving the test photo is the other unblock. */
+export async function continueOrderEditQueue(input: { listingId: string }) {
+  const listing = await loadListing(input.listingId);
+  const queue = readStudioEditQueue(listing.data.studioEditQueue);
+  const next = continueStudioEditQueue(queue);
+  if (next.ok === false) throw httpError(409, next.error);
+  await saveStudioEditQueue(input.listingId, next.queue);
+  return {
+    pause: next.queue.pause,
+    testApproved: next.queue.testApproved,
+    batchProcessed: next.queue.batchProcessed,
+    testJobId: next.queue.testJobId,
+  };
+}
+
+/** Next listing with a pending order edit that has a source photo. Paused listings stay put. */
 export async function nextOrderEditListingId(): Promise<string | null> {
   const snap = await db().collection("editJobs").where("status", "==", "pending").limit(40).get();
+  const seen = new Set<string>();
   for (const doc of snap.docs) {
     const data = doc.data() || {};
-    if (data.origin === "order" && data.sourcePath && typeof data.listingId === "string" && data.listingId) {
-      return data.listingId;
-    }
+    const listingId = typeof data.listingId === "string" ? data.listingId : "";
+    if (data.origin !== "order" || !data.sourcePath || !listingId || seen.has(listingId)) continue;
+    seen.add(listingId);
+    const listing = await db().collection("listings").doc(listingId).get();
+    const queue = readStudioEditQueue(listing.data()?.studioEditQueue);
+    if (!listingQueueAcceptsKick(queue)) continue;
+    return listingId;
   }
   return null;
 }
@@ -554,6 +697,7 @@ export async function enqueueAiEdit(input: AiEditRequest & { createdBy: string }
       resultPath: saved.resultPath,
       placeholder: false,
       note: AI_EDIT_READY_NOTE,
+      ...provenanceFields(saved),
       pipeline: ["pending", "processing", "review"],
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
@@ -794,7 +938,10 @@ export async function approveStudioFinal(input: {
     sortOrder: sequenced?.sortOrder ?? (typeof source?.sortOrder === "number" ? source.sortOrder : undefined),
   });
   if (input.jobId) {
-    await db().collection("editJobs").doc(input.jobId).set({
+    const jobRef = db().collection("editJobs").doc(input.jobId);
+    const jobSnap = await jobRef.get();
+    const job = jobSnap.data() || {};
+    await jobRef.set({
       status: "approved",
       resultPath: copied.storagePath,
       resultUrl: copied.url,
@@ -802,6 +949,11 @@ export async function approveStudioFinal(input: {
       approvedBy: input.uploadedBy,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     }, { merge: true });
+    const current = readStudioEditQueue(listing.data.studioEditQueue);
+    const approvesTest = job.testPhoto === true || (current.pause === "awaiting_test_approval" && current.testJobId === input.jobId);
+    if (approvesTest) {
+      await saveStudioEditQueue(input.listingId, unblockQueueAfterTestApproval(current));
+    }
   }
   return {
     image: registered.image,
@@ -851,6 +1003,7 @@ export async function loadStudioWorkspace(input: {
       iconicPolish: loaded.data.iconicPolish === true,
       images,
       editPlan,
+      editQueue: readStudioEditQueue(loaded.data.studioEditQueue),
       delivery: await listingDelivery(loaded.id, loaded.data),
     };
   }

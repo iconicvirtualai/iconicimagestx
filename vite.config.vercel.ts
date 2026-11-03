@@ -9,7 +9,8 @@ import path from "path";
  * TypeScript recompilation (avoiding the @vercel/node ESM resolution issues).
  *
  * External packages are intentionally kept external so Vercel uses the
- * installed node_modules at runtime.
+ * installed node_modules at runtime. sharp stays external; vercel.json
+ * includes the linux libvips binary because studio edits composite with it.
  */
 export default defineConfig({
   publicDir: false, // Don't copy public/ assets into api/

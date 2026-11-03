@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   AI_EDIT_READY_NOTE,
+  AI_EDIT_UPSCALE_NOTE,
   DEFAULT_ADJUSTMENTS,
   STUDIO_FLAGS,
   adjustmentCssFilter,
@@ -176,6 +177,8 @@ describe("Iconic Studio AI jobs", () => {
     expect(prompt).not.toMatch(/TODO/);
     expect(prompt).not.toMatch(/placeholder/);
     expect(AI_EDIT_READY_NOTE).not.toMatch(/TODO/);
+    expect(AI_EDIT_UPSCALE_NOTE).toMatch(/scaled up from the API size/);
+    expect(AI_EDIT_UPSCALE_NOTE).not.toMatch(/no quality loss/i);
     expect(listingPhotoEditSize(1800, 1200)).toBe("1536x1024");
 
     expect(resolveStudioApprovePath({

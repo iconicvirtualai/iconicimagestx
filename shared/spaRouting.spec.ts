@@ -27,10 +27,10 @@ const footer = readFileSync(new URL("../client/components/Footer.tsx", import.me
 const notFound = readFileSync(new URL("../public/404.html", import.meta.url), "utf8");
 
 describe("vercel function split", () => {
-  it("keeps sharp out of the main API function", () => {
+  it("bundles sharp for display images and native studio edits", () => {
     const index = readFileSync(new URL("../api/index.mjs", import.meta.url), "utf8");
     const media = readFileSync(new URL("../api/media-display.mjs", import.meta.url), "utf8");
-    expect(index).not.toMatch(/from ["']sharp["']/);
+    expect(index).toMatch(/from ["']sharp["']/);
     expect(index).not.toContain("handleMediaDisplay");
     expect(index).not.toContain("@img/sharp");
     expect(media).toMatch(/from ["']sharp["']/);
@@ -42,10 +42,10 @@ describe("vercel function split", () => {
     const vercel = JSON.parse(readFileSync(new URL("../vercel.json", import.meta.url), "utf8")) as {
       functions: Record<string, { includeFiles?: string | string[]; excludeFiles?: string }>;
     };
-    expect(vercel.functions["api/index.mjs"].excludeFiles).toContain("sharp");
     expect(typeof vercel.functions["api/index.mjs"].includeFiles).toBe("string");
     expect(typeof vercel.functions["api/media-display.mjs"].includeFiles).toBe("string");
-    expect(vercel.functions["api/index.mjs"].includeFiles).not.toContain("sharp");
+    expect(String(vercel.functions["api/index.mjs"].includeFiles)).toContain("sharp-libvips-linux-x64");
+    expect(String(vercel.functions["api/index.mjs"].excludeFiles)).toContain("sharp-linuxmusl");
     expect(JSON.stringify(vercel.functions["api/media-display.mjs"].includeFiles)).toContain("sharp-libvips");
     expect(vercel.functions["api/media-display.mjs"].excludeFiles).toContain("public/media");
   });
