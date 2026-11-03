@@ -118,6 +118,8 @@ export function buildVercelRewrites(): Rewrite[] {
     spa.push({ source, destination: PRIVATE_SHELL });
   }
   spa.push(
+    { source: "/forgot-password", destination: PRIVATE_SHELL },
+    { source: "/change-password", destination: PRIVATE_SHELL },
     { source: "/studio/:listingId", destination: PRIVATE_SHELL },
     { source: "/gallery/:galleryId", destination: PRIVATE_SHELL },
     { source: "/admin", destination: PRIVATE_SHELL },
@@ -173,6 +175,10 @@ export const NOINDEX_HEADER_SOURCES = [
   "/podcast-guest-prep/",
   "/dev/invoice-template",
   "/dev/invoice-template/",
+  "/forgot-password",
+  "/forgot-password/",
+  "/change-password",
+  "/change-password/",
   ...RE75_PREVIEW_SOURCES.flatMap((source) => [source, `${source}/`]),
   ...HEADSHOT_PREVIEW_SOURCES.flatMap((source) => [source, `${source}/`]),
 ];

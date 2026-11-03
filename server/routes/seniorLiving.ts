@@ -31,6 +31,7 @@ import { clientIp } from "../lib/clientIp";
 import { createRateLimiter } from "../lib/rateLimit";
 import { sendEmail } from "../services/email";
 import { notifyOfficeOfOrder } from "../services/officeOrderNotify";
+import { placedRevenueFields } from "../../shared/revenueCount";
 
 const router = Router();
 
@@ -168,6 +169,7 @@ router.post("/order", async (req, res) => {
       ].filter(Boolean).join("\n"),
       status: "new",
       source: SENIOR_LIVING_ORDER_SOURCE,
+      ...placedRevenueFields(),
       leadSource: "Senior living page",
       createdAt: now,
       submittedAt: now,
@@ -211,6 +213,7 @@ router.post("/order", async (req, res) => {
       notes: value.notes,
       status: "confirmed",
       source: SENIOR_LIVING_ORDER_SOURCE,
+      ...placedRevenueFields(),
       createdAt: now,
       updatedAt: now,
     });
@@ -247,6 +250,7 @@ router.post("/order", async (req, res) => {
       depositPaid: 0,
       status: "draft",
       paymentProvider: "square",
+      ...placedRevenueFields(),
       payToken,
       invoiceNumber,
       orderNumber,

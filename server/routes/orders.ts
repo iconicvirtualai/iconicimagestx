@@ -13,6 +13,8 @@ import { dotOptInResultHtml } from "../../shared/doorsOpenTour";
 import { applyDotOptIn } from "../services/doorsOpenTour";
 import { createRateLimiter } from "../lib/rateLimit";
 import { clientIp } from "../lib/clientIp";
+import { planRevenueAcceptanceUpdates, sumTransactionAmounts } from "../../shared/revenueCount";
+import { loadRevenueDocs } from "../services/revenueAcceptance";
 
 const router = Router();
 const db = () => admin.firestore();
@@ -112,10 +114,7 @@ router.get("/dashboard", requireStaff, async (_req, res) => {
       statusCounts[s] = (statusCounts[s] || 0) + 1;
     });
 
-    const monthRevenue = monthTransactions.docs.reduce(
-      (sum, d) => sum + (d.data().amount || 0),
-      0
-    );
+    const monthRevenue = sumTransactionAmounts(monthTransactions.docs.map((d) => d.data()));
 
     return res.json({
       totalOrders: allOrders.size,
@@ -174,6 +173,39 @@ router.get("/:id", requireStaff, async (req: AuthenticatedRequest, res) => {
   } catch (err) {
     console.error("[Orders] Fetch error:", err);
     return res.status(500).json({ error: "Failed to fetch order." });
+  }
+});
+
+// ─── PATCH /api/orders/:id/revenue — Accept order into revenue ───────────────
+// Does not send email, SMS, Square, or a client notice.
+
+router.patch("/:id/revenue", requireCoordinator, async (req: AuthenticatedRequest, res) => {
+  if (typeof req.body?.countsTowardRevenue !== "boolean") {
+    return res.status(400).json({ error: "countsTowardRevenue must be true or false." });
+  }
+  try {
+    const docs = await loadRevenueDocs(req.params.id);
+    const plan = planRevenueAcceptanceUpdates({
+      docs,
+      id: req.params.id,
+      countsTowardRevenue: req.body.countsTowardRevenue,
+      by: req.user?.email || "admin",
+    });
+    if (!plan.found) return res.status(404).json({ error: "Order not found." });
+    for (const patch of plan.patches) {
+      await db().collection(patch.collection).doc(patch.id).update({
+        ...patch.fields,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+    return res.json({
+      countsTowardRevenue: req.body.countsTowardRevenue,
+      updated: plan.patches.map((patch) => `${patch.collection}/${patch.id}`),
+      notificationsSent: [],
+    });
+  } catch (err) {
+    console.error("[Orders] Revenue acceptance failed:", err);
+    return res.status(500).json({ error: "Could not update revenue acceptance." });
   }
 });
 

@@ -32,6 +32,7 @@ import { cancelOrderRequest } from "@/lib/cancelOrderRequest";
 import { OrderServicesFields } from "@/components/OrderServicesFields";
 import { syncOrderBillingToInvoice } from "@/lib/staffInvoice";
 import { orderBillingFromServicePatch, type OrderServiceSavePatch } from "@shared/orderRequestServices";
+import { recordCountsTowardRevenue } from "@shared/revenueCount";
 
 // ─── Status system ────────────────────────────────────────────────────────────
 const ORDER_STATUSES = [
@@ -80,6 +81,7 @@ export default function AdminOrderDetail() {
   const [releasingDownloads, setReleasingDownloads] = React.useState(false);
   const [mediaLinkForm, setMediaLinkForm] = React.useState({ url: "", title: "", type: "video" });
   const [showCancel, setShowCancel] = React.useState(false);
+  const [revenueSaving, setRevenueSaving] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState<"details"|"invoice"|"gallery"|"history">("details");
   const [release, setRelease] = React.useState<GalleryReleaseReport | null>(null);
   const [linkedRequest, setLinkedRequest] = React.useState<Record<string, unknown> | null>(null);
@@ -262,6 +264,26 @@ export default function AdminOrderDetail() {
   const getToken = async () => {
     if (!user) throw new Error("Please sign in again.");
     return user.getIdToken();
+  };
+
+  const setRevenueAcceptance = async (countsTowardRevenue: boolean) => {
+    if (!id) return;
+    setRevenueSaving(true);
+    try {
+      const token = await getToken();
+      const res = await fetch(`/api/orders/${id}/revenue`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ countsTowardRevenue }),
+      });
+      const result = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(result.error || "Could not update revenue.");
+      toast.success(countsTowardRevenue ? "This order now counts toward revenue." : "This order is no longer in revenue.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not update revenue.");
+    } finally {
+      setRevenueSaving(false);
+    }
   };
 
   const handleSendInvoice = async () => {
@@ -467,6 +489,20 @@ export default function AdminOrderDetail() {
             <Archive className="w-3.5 h-3.5 mr-1.5" /> Archive
           </Button>
         )}
+        {recordCountsTowardRevenue(order) ? null : (
+          <Button onClick={() => setRevenueAcceptance(true)} disabled={revenueSaving} className="rounded-xl text-xs font-bold bg-[#0d9488] hover:bg-[#0f766e] text-white">
+            Accept order
+          </Button>
+        )}
+        <label className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-bold text-gray-700">
+          <input
+            type="checkbox"
+            checked={recordCountsTowardRevenue(order)}
+            disabled={revenueSaving}
+            onChange={(event) => setRevenueAcceptance(event.target.checked)}
+          />
+          Count toward revenue
+        </label>
         <Button onClick={() => setShowCancel(true)} variant="outline" className="rounded-xl text-xs font-bold text-red-500 border-red-200 hover:bg-red-50">
           <X className="w-3.5 h-3.5 mr-1.5" /> Cancel
         </Button>

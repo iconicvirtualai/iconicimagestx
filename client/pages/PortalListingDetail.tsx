@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useParams, useSearchParams } from "react-router-dom";
+import { CHANGE_PASSWORD_PATH } from "@shared/passwordAccount";
 import { useAuth } from "@/contexts/AuthContext";
 import { loadPortalListingView } from "@/lib/portalListingRead";
 import {
@@ -236,7 +237,7 @@ export default function PortalListingDetail() {
   const { listingId = "" } = useParams();
   const id = portalListingId(listingId);
   const [searchParams, setSearchParams] = useSearchParams();
-  const { user, userType, loading, signOutUser } = useAuth();
+  const { user, userType, loading, mustChangePassword, signOutUser } = useAuth();
   const [detail, setDetail] = useState<PortalListingDetailModel | null>(null);
   const [website, setWebsite] = useState<PortalWebsiteSettings | null>(null);
   const [error, setError] = useState("");
@@ -329,6 +330,9 @@ export default function PortalListingDetail() {
     return () => { cancelled = true; };
   }, [exampleListing, mode, user]);
 
+  if (!exampleListing && !loading && user && mustChangePassword) {
+    return <Navigate to={CHANGE_PASSWORD_PATH} replace />;
+  }
   if (exampleListing && tab === "website") return <ExampleWebsitePreview />;
   if (exampleListing) return <ExampleListingFile />;
   if (!id || missing) return <NotFound />;

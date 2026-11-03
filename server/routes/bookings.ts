@@ -22,6 +22,7 @@ import { processingEnabled } from "../../shared/invoiceProcessing";
 import { nextSequentialInvoiceNumber, planInvoiceLink } from "../../shared/orderProjectInvoice";
 import { clientInvoiceUrl } from "../../shared/invoicePayLink";
 import { publicClientUrl } from "../../shared/publicSiteUrl";
+import { placedRevenueFields, revenueAcceptanceForRequest } from "../../shared/revenueCount";
 import { chargedServiceLines, normalizeBookingLineItems, orderTotalLabel, resolveSubmittedBooking, sumLineItemPrices, unpricedCatalogBookingError } from "../../shared/bookingPricing";
 import { applyServerTravel, isTravelFeeLine, travelInvoiceLine, travelSummaryText, type TravelAssessment } from "../../shared/travelZones";
 import { planOrderPackageRepair } from "../../shared/orderPackageRepair";
@@ -251,7 +252,7 @@ router.post("/", async (req, res) => {
         months: req.body.socialMonths,
         now: new Date(),
       });
-      if (!quoted.ok) return res.status(400).json({ error: quoted.error });
+      if (quoted.ok === false) return res.status(400).json({ error: quoted.error });
       serviceLines = serviceLines.map((item, index) => (
         index === 0
           ? { ...item, unitPrice: quoted.termDollars, price: quoted.termDollars }
@@ -441,6 +442,7 @@ router.post("/", async (req, res) => {
       dotOptInToken: createPayToken(),
       status: "new",
       source: req.body.source === "portal" ? "portal" : "booking_form",
+      ...placedRevenueFields(),
       ...portalBillingStamp(req.body),
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       submittedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -1244,6 +1246,8 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
       }
     }
 
+    const revenueFields = revenueAcceptanceForRequest(request, req.user?.email || "admin");
+
     // Create Order document
     const orderData = {
       orderRequestId: req.params.id,
@@ -1290,6 +1294,7 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
       confirmedAt: admin.firestore.FieldValue.serverTimestamp(),
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      ...revenueFields,
     };
 
     const orderRef = await db().collection("orders").add(orderData);
@@ -1317,6 +1322,7 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
       notes: request.vibeNote || "",
       internalNotes: internalNotes || "",
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      ...revenueFields,
     };
     const appointmentRef = existingAppointment.empty
       ? db().collection("appointments").doc()
@@ -1423,6 +1429,7 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
           clientEmail: requestEmail,
           ...portalBillingStamp(request),
           ...(listingId ? { listingId } : {}),
+          ...revenueFields,
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
       } else {
@@ -1454,6 +1461,7 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
         galleryId: galleryRef.id,
         ...(listingId ? { listingId } : {}),
         invoiceNumber: await generateInvoiceNumber(),
+        ...revenueFields,
         payToken,
         ...(paymentUrl ? { paymentUrl } : {}),
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -1465,7 +1473,14 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
     await galleryRef.update({
       invoiceId,
       deliveryUrl: publicClientUrl(`/gallery/${galleryRef.id}`),
+      ...revenueFields,
     });
+    if (listingId) {
+      await db().collection("listings").doc(listingId).update({
+        ...revenueFields,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }).catch((err) => console.error("[Bookings] Listing revenue flag failed:", err));
+    }
 
     // Mark request as confirmed
     await requestDoc.ref.update({
@@ -1705,6 +1720,7 @@ async function createBookingInvoiceDraft(input: {
   await invoiceRef.set({
     ...draft,
     ...(input.billing || {}),
+    ...placedRevenueFields(),
     invoiceNumber: await generateInvoiceNumber(),
     payToken,
     ...(paymentUrl ? { paymentUrl } : {}),

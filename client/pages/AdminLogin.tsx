@@ -5,16 +5,17 @@
  */
 
 import { useState, useEffect } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { staffLoginAction } from "@shared/staffAccess";
+import { CHANGE_PASSWORD_PATH } from "@shared/passwordAccount";
 import { openOwnerSession, ownerLoginNext } from "@/lib/openOwnerSession";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 
 export default function AdminLogin() {
-  const { signIn, signOutUser, user, isStaff, staffProfile, loading, resetPassword } = useAuth();
+  const { signIn, signOutUser, user, isStaff, staffProfile, loading, mustChangePassword } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const ownerNext = ownerLoginNext(location.search);
@@ -22,14 +23,16 @@ export default function AdminLogin() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [showReset, setShowReset] = useState(false);
-  const [resetEmail, setResetEmail] = useState("");
 
   // Wait until profile loading finishes. A signed-in user with isStaff still
   // false is only "not staff" after staff/{uid} has been read.
   // Owner access is a separate server check and does not follow staff role.
   useEffect(() => {
     if (loading || !user) return;
+    if (mustChangePassword) {
+      navigate(CHANGE_PASSWORD_PATH, { replace: true });
+      return;
+    }
     let cancelled = false;
     void (async () => {
       const owner = await openOwnerSession(user);
@@ -64,7 +67,7 @@ export default function AdminLogin() {
     };
     // signOutUser identity changes each render; only the auth state should retrigger this.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, isStaff, staffProfile, loading, navigate, ownerNext]);
+  }, [user, isStaff, staffProfile, loading, mustChangePassword, navigate, ownerNext]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,18 +84,6 @@ export default function AdminLogin() {
       toast.error(err instanceof Error ? err.message : "Login failed.");
     } finally {
       setSubmitting(false);
-    }
-  };
-
-  const handleResetPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!resetEmail) return;
-    try {
-      await resetPassword(resetEmail);
-      toast.success("Reset email sent. Check your inbox.");
-      setShowReset(false);
-    } catch {
-      toast.error("Failed to send reset email.");
     }
   };
 
@@ -115,8 +106,7 @@ export default function AdminLogin() {
           </p>
         </div>
 
-        {!showReset ? (
-          <form onSubmit={handleLogin} className="space-y-4">
+        <form onSubmit={handleLogin} className="space-y-4">
             <div>
               <Input
                 type="email"
@@ -156,45 +146,11 @@ export default function AdminLogin() {
             </Button>
 
             <div className="text-center">
-              <button
-                type="button"
-                onClick={() => setShowReset(true)}
-                className="text-zinc-500 hover:text-zinc-300 text-sm transition-colors"
-              >
+              <Link to="/forgot-password" className="text-zinc-500 hover:text-zinc-300 text-sm transition-colors">
                 Forgot password?
-              </button>
+              </Link>
             </div>
           </form>
-        ) : (
-          <form onSubmit={handleResetPassword} className="space-y-4">
-            <p className="text-zinc-400 text-sm text-center">
-              Enter your email to receive a password reset link.
-            </p>
-            <Input
-              type="email"
-              placeholder="Email address"
-              value={resetEmail}
-              onChange={(e) => setResetEmail(e.target.value)}
-              className="bg-zinc-900 border-zinc-700 text-white placeholder:text-zinc-500"
-              required
-            />
-            <Button
-              type="submit"
-              className="w-full bg-white text-black hover:bg-gray-100"
-            >
-              Send Reset Link
-            </Button>
-            <div className="text-center">
-              <button
-                type="button"
-                onClick={() => setShowReset(false)}
-                className="text-zinc-500 hover:text-zinc-300 text-sm"
-              >
-                Back to sign in
-              </button>
-            </div>
-          </form>
-        )}
 
         <p className="text-center text-zinc-700 text-xs mt-8">
           Staff access only. Client portal →{" "}

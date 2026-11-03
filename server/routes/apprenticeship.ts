@@ -22,6 +22,7 @@ import {
   quoteApprenticeship,
 } from "../../shared/apprenticeship";
 import { BUSINESS_CONTACT } from "../../shared/businessContact";
+import { placedRevenueFields } from "../../shared/revenueCount";
 import { createPayToken } from "../../shared/invoicePay";
 import { processingEnabled } from "../../shared/invoiceProcessing";
 import { nextSequentialInvoiceNumber } from "../../shared/orderProjectInvoice";
@@ -300,6 +301,7 @@ router.post("/order", async (req, res) => {
       vibeNote: note,
       status: "new",
       source: APPRENTICESHIP_ORDER_SOURCE,
+      ...placedRevenueFields(),
       leadSource,
       ...(value.gclid ? { gclid: value.gclid } : {}),
       orderNumber,
@@ -341,6 +343,7 @@ router.post("/order", async (req, res) => {
       // Confirmed by the Square deposit webhook once the $25 lands.
       status: APPRENTICESHIP_AWAITING_DEPOSIT_STATUS,
       source: APPRENTICESHIP_ORDER_SOURCE,
+      ...placedRevenueFields(),
       leadSource,
       orderNumber,
       packageName: quote.packageName,
@@ -357,6 +360,7 @@ router.post("/order", async (req, res) => {
       orderId: orderRef.id,
       orderRequestId: requestRef.id,
       source: APPRENTICESHIP_ORDER_SOURCE,
+      ...placedRevenueFields(),
       clientName,
       clientEmail: value.email,
       clientPhone: value.phone,

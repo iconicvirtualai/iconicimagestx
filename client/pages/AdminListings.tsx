@@ -19,6 +19,7 @@ import { recordAddressText } from "@shared/addressText";
 import { filterAssignableStaff, qaStaffAssignmentError, recordAllowsQaStaff } from "@shared/qaStaff";
 import { OrderServicesFields } from "@/components/OrderServicesFields";
 import { orderBillingFromServicePatch, type OrderServiceSavePatch } from "@shared/orderRequestServices";
+import { sumListingRevenue } from "@shared/revenueCount";
 import { choosePortalClient, listingAppointmentDate, scheduleTimeInputValue } from "@shared/listingWrite";
 import { StaffSuggestedTimes } from "@/components/SuggestedAppointments";
 import type { BookingSlotChoice } from "@/components/BookingSlotPicker";
@@ -689,7 +690,7 @@ export default function AdminListings() {
   // ─── Stats summary ─────────────────────────────────────────────────────────
   const stats = React.useMemo(() => {
     const total = filtered.length;
-    const totalRevenue = filtered.reduce((sum, p) => sum + (p.total || 0), 0);
+    const totalRevenue = sumListingRevenue(filtered);
     const paid = filtered.filter(p => p.status === "paid").length;
     const scheduled = filtered.filter(p => p.status === "scheduled" || p.status === "appt_scheduled" || p.status === "consult_scheduled").length;
     return { total, totalRevenue, paid, scheduled };

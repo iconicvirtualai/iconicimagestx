@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
+import { CHANGE_PASSWORD_PATH } from "@shared/passwordAccount";
 import { BOT_ROUTINES } from "@shared/botRoutines";
 import { formatApprovalWhen, ORDER_APPROVAL_STATUSES, type OrderApproval, type OrderApprovalStatus } from "@shared/orderApproval";
 import { OWNER_ORDER_TEXT_MAX, type OwnerOrder, type OwnerOrdersResponse } from "@shared/ownerOrders";
@@ -28,7 +29,7 @@ type LoadState =
 
 export default function OwnersSuite() {
   const navigate = useNavigate();
-  const { isStaff, signOutUser } = useAuth();
+  const { isStaff, signOutUser, user, loading: authLoading, mustChangePassword } = useAuth();
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [refreshing, setRefreshing] = useState(false);
   const [orders, setOrders] = useState<OwnerOrder[]>([]);
@@ -157,6 +158,10 @@ export default function OwnersSuite() {
     await fetch("/api/owners/logout", { method: "POST", credentials: "include" });
     await signOutUser();
     navigate("/admin/login", { replace: true });
+  }
+
+  if (!authLoading && user && mustChangePassword) {
+    return <Navigate to={CHANGE_PASSWORD_PATH} replace />;
   }
 
   if (state.status === "denied") return <NotFound />;
@@ -290,6 +295,9 @@ export function OwnersSuiteView({
             <button type="button" onClick={onRefresh} className="text-[10px] font-black uppercase tracking-[0.16em] text-[#e8c872]">
               {refreshing ? "Updating" : "Refresh"}
             </button>
+            <a href={CHANGE_PASSWORD_PATH} className="text-[10px] font-black uppercase tracking-[0.16em] text-[#e8c872]">
+              Change password
+            </a>
             <button type="button" onClick={onSignOut} className="text-[10px] font-black uppercase tracking-[0.16em] text-[#f7f1e4]">
               Sign out
             </button>

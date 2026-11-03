@@ -1,5 +1,6 @@
 import { ReactNode, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { CHANGE_PASSWORD_PATH } from "@shared/passwordAccount";
 import { useAuth } from "@/contexts/AuthContext";
 import { staffHomePath } from "@shared/staffAccess";
 import { LogOut, Menu, X } from "lucide-react";
@@ -140,6 +141,12 @@ export default function AdminLayout({ children, title, mainClassName }: AdminLay
             </div>
             <p className="text-[10px] text-gray-500 break-all">{user?.email}</p>
           </div>
+          <Link
+            to={CHANGE_PASSWORD_PATH}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white rounded-lg font-bold text-[10px] uppercase tracking-widest transition-colors"
+          >
+            Change password
+          </Link>
           <button
             onClick={handleLogout}
             className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 rounded-lg font-bold text-[10px] uppercase tracking-widest transition-colors"
