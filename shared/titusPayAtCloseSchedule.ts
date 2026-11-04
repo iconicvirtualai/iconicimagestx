@@ -128,21 +128,21 @@ export function estimateTitusPayAtClose(input: {
       unavailable: true,
       overCap: false,
       note: input.property === "manufactured-home" && input.role === "homeowner"
-        ? "Manufactured / mobile homes: Titus lists agent-only eligibility (max $2,500). Run the official estimate."
-        : `This credit tier is not on the standard ${input.role === "agent" ? "agent" : "homeowner"} TX flat-fee schedule. Get an official Titus estimate for eligibility.`,
+        ? "Manufactured / mobile homes: our financing Partner lists agent-only eligibility (max $2,500). Run the Partner estimate."
+        : `This credit tier is not on the standard ${input.role === "agent" ? "agent" : "homeowner"} Texas flat-fee schedule. Get your Partner estimate for eligibility.`,
     };
   }
 
   const fee = media * rate;
   const payoff = media + fee;
   const overCap = media > cap;
-  let note = "Estimate only. Soft credit pull for pre-qualification. Exact fee shown before you accept on Titus.";
+  let note = "Estimate only. Soft credit pull for pre-qualification. The exact fee is shown before you accept with our financing Partner.";
   if (overCap) {
-    note = `Your media total exceeds the typical $${cap.toLocaleString("en-US")} deferral cap for this credit tier. Trim the order or confirm a higher approval on Titus.`;
+    note = `Your media total exceeds the typical $${cap.toLocaleString("en-US")} deferral cap for this credit tier. Trim the order or confirm a higher approval with our Partner.`;
   } else if (media === 0) {
-    note = `Pick packages above. Estimate uses Titus TX ${input.role} flat fees. Soft pull for pre-qualification. Exact fee shown before you accept.`;
+    note = `Pick packages above. This estimate uses our Partner's Texas ${input.role} flat fees. Soft pull for pre-qualification. The exact fee is shown before you accept.`;
   } else {
-    note = `Estimate: $0 due now · ${formatScheduleDollars(payoff)} at close (media + ${titusFeePercentLabel(rate)} Titus flat fee). Term: due at sale or 6 months. Confirm on official estimate.`;
+    note = `Estimate: $0 due now · ${formatScheduleDollars(payoff)} at close (media + ${titusFeePercentLabel(rate)} Partner flat fee). Term: due at sale or 6 months. Confirm on your Partner estimate.`;
   }
 
   return { dueToday, media, rate, fee, payoff, cap, unavailable: false, overCap, note };

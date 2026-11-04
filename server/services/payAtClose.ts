@@ -294,7 +294,7 @@ export function squareExternalPayAtCloseBody(input: {
     note: `Pay at Close ${input.checkoutId} invoiceId:${input.invoiceId}`.slice(0, 500),
     external_details: {
       type: "OTHER",
-      source: "Titus Pay at Close",
+      source: "Pay at Close Partner",
       source_id: input.checkoutId.slice(0, 255),
     },
   };

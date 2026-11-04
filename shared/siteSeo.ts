@@ -248,6 +248,15 @@ export function metaPlan(pathname: string, origin = SITE_ORIGIN): MetaPlan {
   if (path === "/present" || path.startsWith("/present/")) return { kind: "hands-off" };
   if (path.startsWith("/insights/") && path !== "/insights/prep") return { kind: "hands-off" };
   if (path === "/go") return { kind: "preserve-title" };
+  if (path === "/pay-at-close") {
+    return {
+      kind: "public",
+      title: "Pay at Close · Iconic Images",
+      description: "Spoil yourself. Book estate media now and take advantage of our discounts with Pay at Close. Our financing Partner covers Iconic today.",
+      canonical: canonicalUrl(path, origin),
+      image: `${origin.replace(/\/+$/, "")}/media/pay-at-close/luxury/marias/01-front-day.jpg`,
+    };
+  }
   if (isNoIndexPath(path)) return { kind: "noindex", title: GENERIC_TITLE };
   const page = PUBLIC_PAGES.find((item) => item.path === path);
   if (!page) return { kind: "generic", title: GENERIC_TITLE };

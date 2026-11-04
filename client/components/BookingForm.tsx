@@ -1738,7 +1738,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
                      />
                      <span>
                        <span className="block text-sm font-black text-black">Pay at Close</span>
-                       <span className="block text-xs leading-relaxed text-gray-600">Book the full package now. Titus pays Iconic, and you settle when the home closes. One invoice, either way.</span>
+                       <span className="block text-xs leading-relaxed text-gray-600">Spoil yourself and use our discounts. Our financing Partner pays Iconic now, and you settle when the home closes. One invoice, either way.</span>
                      </span>
                    </label>
                  </fieldset>

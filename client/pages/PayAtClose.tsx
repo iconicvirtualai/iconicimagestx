@@ -172,7 +172,7 @@ export default function PayAtClose() {
 
   return (
     <div className="pac-page" data-testid="pay-at-close-landing">
-      <div className="urgency">New · Pay at Close with Titus · <span>{dueToday} due today</span> · Order estate media now</div>
+      <div className="urgency">New · Pay at Close · <span>{dueToday} due today</span> · Spoil yourself</div>
 
       <header className="nav">
         <div className="wrap nav-inner">
@@ -192,11 +192,11 @@ export default function PayAtClose() {
       <section className="hero" style={{ ["--hero" as string]: `url(${LUXURY}/marias/01-front-day.jpg)` }}>
         <div className="hero-bg" aria-hidden="true" />
         <div className="wrap hero-content">
-          <div className="pill">Pay at Close · Powered by Titus</div>
-          <h1>Book now.<br /><em>Pay at closing.</em></h1>
+          <div className="pill">Pay at Close · Our financing Partner</div>
+          <h1>Spoil yourself.<br /><em>Pay at closing.</em></h1>
           <p className="hero-lead">
-            Estate-scale media — Market Leader, Legacy cinema, Showcase aerials — for homes over 6,000 square feet,
-            with <strong>{dueToday} due today</strong>. Titus pays Iconic now. You settle from sale proceeds when the home closes.
+            Estate-scale media — Market Leader, Legacy cinema, Showcase aerials — for homes over 6,000 square feet.
+            Take advantage of our discounts with Pay at Close. <strong>{dueToday} due today.</strong> Our financing Partner covers Iconic now. You settle when the home closes.
           </p>
           <div className="hero-actions">
             <Link className="btn btn-teal" to={bookPayAtCloseHref()}>Order your shoot →</Link>
@@ -205,7 +205,7 @@ export default function PayAtClose() {
           <div className="hero-stats">
             <div className="hero-stat"><strong>{dueToday}</strong><span>Due today</span></div>
             <div className="hero-stat"><strong>Up to {topCap}</strong><span>Defer till close</span></div>
-            <div className="hero-stat"><strong>~2 min</strong><span>Titus application</span></div>
+            <div className="hero-stat"><strong>~2 min</strong><span>Partner application</span></div>
           </div>
         </div>
       </section>
@@ -237,7 +237,7 @@ export default function PayAtClose() {
                       {priceLabel(price)} <small>{slot.priceNote}</small>
                     </div>
                     <p className="pkg-desc">{slot.blurb}</p>
-                    {slot.confirmWithTitus ? <p><span className="confirm-tag">Confirm with Titus / Cadi</span></p> : null}
+                    {slot.confirmWithPartner ? <p><span className="confirm-tag">Confirm with our Partner</span></p> : null}
                     <ul className="pkg-features">
                       {slot.features.map((feature) => <li key={feature}>{feature}</li>)}
                     </ul>
@@ -264,9 +264,9 @@ export default function PayAtClose() {
           <p className="section-kicker">Pay at Close calculator</p>
           <h2 className="section-title">See what you pay<br />when it closes.</h2>
           <p className="section-sub">
-            Mirrors Titus estimate logic for Texas (Iconic’s market). Pick packages, set your credit tier —
-            see <strong>{dueToday} due now</strong> and the flat-fee payoff at close. Exact approval comes from the{" "}
-            <a href={TITUS_ESTIMATE_URL}>GotItUs estimate</a>.
+            Texas estimate for Iconic’s market. Pick packages, set your credit tier —
+            see <strong>{dueToday} due now</strong> and the flat-fee payoff at close. Exact approval comes from your{" "}
+            <a href={TITUS_ESTIMATE_URL}>Partner estimate</a>.
           </p>
           <div className="calc-shell">
             <div className="calc-left">
@@ -291,8 +291,8 @@ export default function PayAtClose() {
                   <option value="TX">Texas (TX)</option>
                 </select>
                 <p className="hint">
-                  TX rates confirmed from Titus web config. Other states:{" "}
-                  <a href={TITUS_ESTIMATE_URL}>run the official estimate</a>.
+                  Texas rates are confirmed for this calculator. Other states:{" "}
+                  <a href={TITUS_ESTIMATE_URL}>get your Partner estimate</a>.
                 </p>
               </div>
               <div className="field-row">
@@ -367,7 +367,7 @@ export default function PayAtClose() {
               </div>
               <div className="result-row"><span>Media total</span><strong data-testid="pac-media">{formatScheduleDollars(estimate.media)}</strong></div>
               <div className="result-row">
-                <span>Titus flat fee <span>{estimate.rate == null ? "(n/a)" : `(${titusFeePercentLabel(estimate.rate)} flat)`}</span></span>
+                <span>Partner flat fee <span>{estimate.rate == null ? "(n/a)" : `(${titusFeePercentLabel(estimate.rate)} flat)`}</span></span>
                 <strong>{estimate.fee == null ? "—" : formatScheduleDollars(estimate.fee)}</strong>
               </div>
               <div className="result-row">
@@ -377,7 +377,7 @@ export default function PayAtClose() {
               <div className="result-row"><span>Max you can defer</span><strong>{estimate.cap == null ? "—" : formatScheduleDollars(estimate.cap)}</strong></div>
               <div className={estimate.unavailable || estimate.overCap ? "result-note warn" : "result-note ok"}>{estimate.note}</div>
               <Link className="btn btn-teal btn-block" to={bookPayAtCloseHref()}>Order this media now</Link>
-              <a className="btn btn-ghost btn-block" href={TITUS_ESTIMATE_URL}>Get official Titus estimate</a>
+              <a className="btn btn-ghost btn-block" href={TITUS_ESTIMATE_URL}>Get your Partner estimate</a>
             </div>
           </div>
         </div>
@@ -387,22 +387,22 @@ export default function PayAtClose() {
         <div className="wrap">
           <p className="section-kicker">Three steps</p>
           <h2 className="section-title">How Pay at Close works</h2>
-          <p className="section-sub">Same flow Titus publishes for Iconic Images Media Marketing.</p>
+          <p className="section-sub">The same three steps our financing Partner uses for Iconic.</p>
           <div className="steps">
             <div className="step">
               <div className="step-num">1</div>
               <h3>Apply in ~2 minutes</h3>
-              <p>Agent or homeowner completes a short Titus application. Soft credit pull — does not ding your score for pre-qualification.</p>
+              <p>Agent or homeowner completes a short application with our financing Partner. Soft credit pull — does not ding your score for pre-qualification.</p>
             </div>
             <div className="step">
               <div className="step-num">2</div>
               <h3>Order Iconic. We get paid.</h3>
-              <p>Once approved, book your shoot. Titus pays Iconic for listing prep. You pay <strong>{dueToday} out of pocket today</strong>.</p>
+              <p>Once approved, book your shoot. Our Partner pays Iconic for the estate media. You pay <strong>{dueToday} out of pocket today</strong>.</p>
             </div>
             <div className="step">
               <div className="step-num">3</div>
               <h3>Settled at closing</h3>
-              <p>At close of escrow, Titus sends a payoff to title/escrow. Repaid from sale proceeds plus a low flat fee. Due at sale or 6 months, whichever comes first.</p>
+              <p>At close of escrow, our Partner sends a payoff to title/escrow. Repaid from sale proceeds plus a low flat fee. Due at sale or 6 months, whichever comes first.</p>
             </div>
           </div>
           <div className="center-actions">
@@ -454,11 +454,11 @@ export default function PayAtClose() {
           <div className="faq">
             <details open>
               <summary>What do I pay Iconic today?</summary>
-              <p><strong>{dueToday}</strong> when you use Titus Pay at Close on an approved order. Titus funds the media. You repay Titus at closing (or within 6 months).</p>
+              <p><strong>{dueToday}</strong> when you use Pay at Close on an approved order. Our financing Partner funds the media. You repay our Partner at closing (or within 6 months).</p>
             </details>
             <details>
-              <summary>How does the Titus fee work?</summary>
-              <p>When the home sells, Titus is repaid for funds used plus a flat fee based on credit tier and state (0%–8%). Example from Titus: media at a 4% fee is that amount plus the fee, due at close. Texas rates in this calculator come from Titus’s published estimate config.</p>
+              <summary>How does the Partner fee work?</summary>
+              <p>When the home sells, our financing Partner is repaid for funds used plus a flat fee based on credit tier and state (0%–8%). Media at a 4% fee is that amount plus the fee, due at close. Texas rates in this calculator follow our Partner’s published estimate.</p>
             </details>
             <details>
               <summary>What’s the most I can defer?</summary>
@@ -466,19 +466,19 @@ export default function PayAtClose() {
             </details>
             <details>
               <summary>What if the home doesn’t sell?</summary>
-              <p>Funds are due six months after first disbursement. Homeowners may repay or extend; extensions use a 16% annual interest rate per Titus. Agents repay directly after the due date.</p>
+              <p>Funds are due six months after first disbursement. Homeowners may repay or extend; extensions use a 16% annual interest rate with our Partner. Agents repay directly after the due date.</p>
             </details>
             <details>
               <summary>Will this hurt my credit?</summary>
-              <p>Titus uses a <strong>soft pull</strong> for pre-qualification. Delinquency after funding may be reported and could affect credit.</p>
+              <p>Our financing Partner uses a <strong>soft pull</strong> for pre-qualification. Delinquency after funding may be reported and could affect credit.</p>
             </details>
             <details>
               <summary>Who qualifies?</summary>
-              <p>Homeowners: own the listed property, signed listing agreement, LTV under Titus limits, minimum credit by state. Agents: active license, signed listing agreement, payment under half of expected commission, minimum credit. Texas is fully supported for agents and homeowners.</p>
+              <p>Homeowners: own the listed property, signed listing agreement, within our Partner’s limits, minimum credit by state. Agents: active license, signed listing agreement, payment under half of expected commission, minimum credit. Texas is fully supported for agents and homeowners.</p>
             </details>
             <details>
               <summary>Is monthly social (Content Partner) eligible?</summary>
-              <p>Pay at Close is built for <strong>listing prep</strong> tied to a subject property. Listing packages are the natural fit. Monthly retainers and brand campaigns may need a confirmed listing context — verify on the Titus estimate. <span className="confirm-tag">Confirm with Titus / Cadi</span></p>
+              <p>Pay at Close is built for <strong>listing prep</strong> tied to a subject property. Listing packages are the natural fit. Monthly retainers and brand campaigns may need a confirmed listing context — verify on your Partner estimate. <span className="confirm-tag">Confirm with our Partner</span></p>
             </details>
           </div>
         </div>
@@ -488,11 +488,11 @@ export default function PayAtClose() {
         <div className="wrap">
           <div className="final-cta" style={{ ["--cta" as string]: `url(${LUXURY}/pool-rd/07-front-day.jpg)` }}>
             <div className="final-cta-bg" aria-hidden="true" />
-            <h2>Stop waiting for the commission check.</h2>
-            <p>Order Market Leader energy for the estate today. Pay when the deal closes. The house looks Iconic while the other listing is still waiting on budget.</p>
+            <h2>Spoil yourself. Pay at close.</h2>
+            <p>Take the estate package. Take advantage of our discounts with Pay at Close. The house looks Iconic while the other listing is still waiting on budget.</p>
             <div className="final-actions">
               <Link className="btn btn-teal" to={bookPayAtCloseHref()}>Order now — pay at close</Link>
-              <a className="btn btn-ghost" href={TITUS_ESTIMATE_URL}>Check my Titus rate</a>
+              <a className="btn btn-ghost" href={TITUS_ESTIMATE_URL}>Get your Partner estimate</a>
             </div>
           </div>
         </div>
@@ -508,8 +508,8 @@ export default function PayAtClose() {
           </div>
         </div>
         <div className="wrap footnote">
-          Pay at Close financing provided by Titus (Aalto, Inc. dba Titus). This page’s calculator is an estimate using Titus’s published Texas flat-fee schedule and Iconic catalog prices; it is not a loan offer. Final rates, caps, and eligibility are set by Titus at application.
-          Iconic Images does not charge you the Titus business network fee on this page.
+          Pay at Close financing is provided by our financing Partner. This calculator is an estimate using that Partner’s published Texas flat-fee schedule and Iconic catalog prices; it is not a loan offer. Final rates, caps, and eligibility are set by our Partner at application.
+          Iconic Images does not charge you the Partner’s business network fee on this page.
           Package prices come from the Iconic booking catalog that the Prices tab edits.
         </div>
       </footer>

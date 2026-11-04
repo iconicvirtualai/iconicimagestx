@@ -15,7 +15,7 @@ export interface PayAtCloseCardSlot {
   badgeGold?: boolean;
   featured?: boolean;
   priceNote: string;
-  confirmWithTitus?: boolean;
+  confirmWithPartner?: boolean;
   image: string;
   imageAlt: string;
   blurb: string;
@@ -89,7 +89,7 @@ export const PAY_AT_CLOSE_CARD_SLOTS: readonly PayAtCloseCardSlot[] = [
     id: "branding-content-partner",
     calcId: "content-partner",
     priceNote: "per month",
-    confirmWithTitus: true,
+    confirmWithPartner: true,
     image: "/media/pay-at-close/luxury/marias/08-kitchen.jpg",
     imageAlt: "Kitchen in a 10,000+ sq ft estate",
     blurb: "30 days of content in 2 hours. Never wonder what to post.",
@@ -105,7 +105,7 @@ export const PAY_AT_CLOSE_CARD_SLOTS: readonly PayAtCloseCardSlot[] = [
     badge: "Campaign",
     badgeGold: true,
     priceNote: "per campaign",
-    confirmWithTitus: true,
+    confirmWithPartner: true,
     image: "/media/pay-at-close/luxury/pool-rd/07-front-day.jpg",
     imageAlt: "Daytime front of a luxury estate",
     blurb: "Market takeover. Your story, told cinematically.",
