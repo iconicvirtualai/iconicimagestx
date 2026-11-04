@@ -541,9 +541,14 @@
   margin-top: 1.5rem;
 }
 @media (min-width: 800px) {
-  .pac-page .estate-row { grid-template-columns: 1.45fr 0.55fr; align-items: stretch; }
+  .pac-page .estate-row:has(.estate-feature):has(.estate-reel-card) {
+    grid-template-columns: 1.45fr 0.55fr;
+    align-items: stretch;
+  }
+  .pac-page .estate-row:has(.estate-feature):has(.estate-reel-card) .estate-feature { grid-column: 1; }
+  .pac-page .estate-row:has(.estate-feature):has(.estate-reel-card) .estate-reel-card { grid-column: 2; }
 }
-.pac-page .estate-tour,
+.pac-page .estate-feature,
 .pac-page .estate-reel-card {
   margin: 0;
   position: relative;
@@ -551,7 +556,7 @@
   overflow: hidden;
   background: #111;
 }
-.pac-page .estate-tour video {
+.pac-page .estate-feature img {
   width: 100%;
   aspect-ratio: 16/9;
   object-fit: cover;
@@ -565,7 +570,7 @@
   display: block;
   background: #111;
 }
-.pac-page .estate-tour figcaption,
+.pac-page .estate-feature figcaption,
 .pac-page .estate-reel-card figcaption {
   position: absolute;
   left: 0;

@@ -6,10 +6,14 @@ import { packagesForStaffEditor, type StaffCatalogPackage } from "@shared/bookin
 import {
   PAY_AT_CLOSE_ADDON_SLOTS,
   PAY_AT_CLOSE_CARD_SLOTS,
+  PAY_AT_CLOSE_ESTATES,
   TITUS_ESTIMATE_URL,
   bookPayAtCloseHref,
   catalogPackage,
   formatCatalogDollars,
+  payAtCloseEstateGallery,
+  payAtCloseFeatureRow,
+  type PayAtCloseEstateReel,
 } from "@shared/payAtClosePage";
 import {
   TITUS_TEXAS_PAY_AT_CLOSE,
@@ -24,17 +28,8 @@ import {
 import "./PayAtClose.css";
 
 const LUXURY = "/media/pay-at-close/luxury";
-/** The vertical reel opens on twilight. Playback starts at the first bright interior. */
-const REEL_BRIGHT_START = 1.2;
 
-const GALLERY = [
-  { src: `${LUXURY}/marias/01-front-day.jpg`, alt: "Daytime front of a 10,000+ sq ft estate", caption: "10,000+ sq ft estate" },
-  { src: `${LUXURY}/shore/01-aerial-lake.jpg`, alt: "Waterfront estate from the air", caption: "Waterfront estate" },
-  { src: `${LUXURY}/pool-rd/07-front-day.jpg`, alt: "Daytime front of a luxury estate", caption: "Estate arrival" },
-  { src: `${LUXURY}/marias/06-aerial-day.jpg`, alt: "Aerial of a luxury estate", caption: "Estate from the air" },
-] as const;
-
-function EstateReel() {
+function EstateReel({ reel }: { reel: PayAtCloseEstateReel }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [bright, setBright] = useState(false);
   useEffect(() => {
@@ -42,17 +37,17 @@ function EstateReel() {
     if (!video) return;
     let seeking = false;
     const jump = () => {
-      if (video.currentTime >= REEL_BRIGHT_START) {
+      if (video.currentTime >= reel.startAt) {
         setBright(true);
         return;
       }
       if (seeking) return;
       seeking = true;
-      video.currentTime = REEL_BRIGHT_START;
+      video.currentTime = reel.startAt;
     };
     const replay = () => {
       seeking = true;
-      video.currentTime = REEL_BRIGHT_START;
+      video.currentTime = reel.startAt;
       void video.play();
     };
     video.addEventListener("loadeddata", jump);
@@ -60,7 +55,7 @@ function EstateReel() {
     video.addEventListener("timeupdate", jump);
     video.addEventListener("seeked", () => {
       seeking = false;
-      if (video.currentTime >= REEL_BRIGHT_START) {
+      if (video.currentTime >= reel.startAt) {
         setBright(true);
         void video.play();
       }
@@ -72,21 +67,21 @@ function EstateReel() {
       video.removeEventListener("timeupdate", jump);
       video.removeEventListener("ended", replay);
     };
-  }, []);
+  }, [reel.startAt]);
   return (
     <>
       {bright ? null : (
-        <img className="estate-reel" src={`${LUXURY}/marias/poster-snap.jpg`} alt="" />
+        <img className="estate-reel" src={reel.poster} alt="" />
       )}
       <video
         ref={videoRef}
         className="estate-reel"
-        src={`${LUXURY}/marias/MariasWay_MarketingSnap_v1.mp4#t=${REEL_BRIGHT_START}`}
-        poster={`${LUXURY}/marias/poster-snap.jpg`}
+        src={`${reel.src}#t=${reel.startAt}`}
+        poster={reel.poster}
         muted
         autoPlay
         playsInline
-        aria-label="Vertical reel of a bright estate interior"
+        aria-label={reel.alt}
         style={bright ? undefined : { position: "absolute", width: 1, height: 1, opacity: 0 }}
       />
     </>
@@ -158,6 +153,8 @@ export default function PayAtClose() {
   }, [selected, addons, credits, catalog]);
 
   const estimate = estimateTitusPayAtClose({ role, tier, property, media });
+  const estateFeatures = payAtCloseFeatureRow(PAY_AT_CLOSE_ESTATES);
+  const estateGallery = payAtCloseEstateGallery(PAY_AT_CLOSE_ESTATES);
   const dueToday = formatScheduleDollars(TITUS_TEXAS_PAY_AT_CLOSE.dueToday);
   const topCap = formatScheduleDollars(titusTopDeferralCap());
 
@@ -415,32 +412,31 @@ export default function PayAtClose() {
         <div className="wrap">
           <p className="section-kicker">Homes over 6,000 square feet</p>
           <h2 className="section-title">Estate scale. Daylight.</h2>
-          <div className="estate-row">
-            <figure className="estate-tour">
-              <video
-                src={`${LUXURY}/shore/shore-tour-30s.mp4`}
-                poster={`${LUXURY}/shore/01-aerial-lake.jpg`}
-                muted
-                autoPlay
-                loop
-                playsInline
-                aria-label="Daytime tour of a waterfront estate"
-              />
-              <figcaption>Waterfront estate tour</figcaption>
-            </figure>
-            <figure className="estate-reel-card">
-              <EstateReel />
-              <figcaption>10,000+ sq ft estate</figcaption>
-            </figure>
-          </div>
-          <div className="gallery">
-            {GALLERY.map((shot) => (
-              <figure key={shot.src}>
-                <img src={shot.src} alt={shot.alt} />
-                <figcaption>{shot.caption}</figcaption>
-              </figure>
-            ))}
-          </div>
+          {estateFeatures.length ? (
+            <div className="estate-row">
+              {estateFeatures.map((item) => item.kind === "still" ? (
+                <figure className="estate-feature" key={item.key}>
+                  <img src={item.still.src} alt={item.still.alt} />
+                  <figcaption>{item.still.caption}</figcaption>
+                </figure>
+              ) : (
+                <figure className="estate-reel-card" key={item.key}>
+                  <EstateReel reel={item.reel} />
+                  <figcaption>{item.reel.caption}</figcaption>
+                </figure>
+              ))}
+            </div>
+          ) : null}
+          {estateGallery.length ? (
+            <div className="gallery">
+              {estateGallery.map((shot) => (
+                <figure key={shot.key}>
+                  <img src={shot.src} alt={shot.alt} />
+                  <figcaption>{shot.caption}</figcaption>
+                </figure>
+              ))}
+            </div>
+          ) : null}
           <div className="center-actions">
             <Link className="btn btn-primary" to={bookPayAtCloseHref()}>Order the look →</Link>
           </div>

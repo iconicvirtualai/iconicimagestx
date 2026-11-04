@@ -177,3 +177,108 @@ export function formatCatalogDollars(amount: number): string {
   if (Number.isInteger(rounded)) return `$${rounded.toLocaleString("en-US")}`;
   return `$${rounded.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
+
+const ESTATE_MEDIA = "/media/pay-at-close/luxury";
+
+export interface PayAtCloseEstateStill {
+  src: string;
+  alt: string;
+  caption: string;
+}
+
+export interface PayAtCloseEstateReel {
+  src: string;
+  poster: string;
+  alt: string;
+  /** Seconds. A reel that opens on twilight must start on a bright frame, never at 0. */
+  startAt: number;
+  caption: string;
+}
+
+export interface PayAtCloseEstate {
+  id: string;
+  /** Wide daylight still in the feature row. Omit for a gallery-only estate. */
+  feature?: PayAtCloseEstateStill;
+  /** Vertical reel in the feature row. Omit when this estate has no reel. */
+  reel?: PayAtCloseEstateReel;
+  /** Gallery stills. An empty list is not rendered. */
+  gallery: readonly PayAtCloseEstateStill[];
+}
+
+/**
+ * Homes on /pay-at-close. Add the next estate by dropping its images into
+ * public/media/pay-at-close/luxury/<id>/ and appending one object here.
+ * Leave feature and reel off when that estate is only stills.
+ */
+export const PAY_AT_CLOSE_ESTATES: readonly PayAtCloseEstate[] = [
+  {
+    id: "marias",
+    reel: {
+      src: `${ESTATE_MEDIA}/marias/MariasWay_MarketingSnap_v1.mp4`,
+      poster: `${ESTATE_MEDIA}/marias/poster-snap.jpg`,
+      alt: "Vertical reel of a bright estate interior",
+      startAt: 1.2,
+      caption: "10,000+ sq ft estate",
+    },
+    gallery: [
+      {
+        src: `${ESTATE_MEDIA}/marias/01-front-day.jpg`,
+        alt: "Daytime front of a 10,000+ sq ft estate",
+        caption: "10,000+ sq ft estate",
+      },
+      {
+        src: `${ESTATE_MEDIA}/marias/06-aerial-day.jpg`,
+        alt: "Aerial of a luxury estate",
+        caption: "Estate from the air",
+      },
+    ],
+  },
+  {
+    id: "shore",
+    gallery: [
+      {
+        src: `${ESTATE_MEDIA}/shore/01-aerial-lake.jpg`,
+        alt: "Waterfront estate from the air",
+        caption: "Waterfront estate",
+      },
+    ],
+  },
+  {
+    id: "pool-rd",
+    feature: {
+      src: `${ESTATE_MEDIA}/pool-rd/02-backyard-pool.jpg`,
+      alt: "Resort backyard at a luxury estate",
+      caption: "Resort backyard",
+    },
+    gallery: [
+      {
+        src: `${ESTATE_MEDIA}/pool-rd/07-front-day.jpg`,
+        alt: "Daytime front of a luxury estate",
+        caption: "Estate arrival",
+      },
+    ],
+  },
+];
+
+export type PayAtCloseFeature =
+  | { kind: "still"; key: string; still: PayAtCloseEstateStill }
+  | { kind: "reel"; key: string; reel: PayAtCloseEstateReel };
+
+/** Wide stills first, then vertical reels. Entries without a src are dropped. */
+export function payAtCloseFeatureRow(estates: readonly PayAtCloseEstate[]): PayAtCloseFeature[] {
+  const stills: PayAtCloseFeature[] = [];
+  const reels: PayAtCloseFeature[] = [];
+  for (const estate of estates) {
+    if (estate.feature?.src) stills.push({ kind: "still", key: `${estate.id}-feature`, still: estate.feature });
+    if (estate.reel?.src && estate.reel.startAt > 0) {
+      reels.push({ kind: "reel", key: `${estate.id}-reel`, reel: estate.reel });
+    }
+  }
+  return [...stills, ...reels];
+}
+
+export function payAtCloseEstateGallery(estates: readonly PayAtCloseEstate[]): Array<PayAtCloseEstateStill & { key: string }> {
+  return estates.flatMap((estate) =>
+    estate.gallery.filter((shot) => shot.src).map((shot, index) => ({ ...shot, key: `${estate.id}-gallery-${index}` })),
+  );
+}

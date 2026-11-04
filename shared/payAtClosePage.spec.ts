@@ -1,7 +1,13 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { packagesForStaffEditor } from "./bookingCatalog.ts";
-import { bookPayAtCloseHref, pricedSlot } from "./payAtClosePage.ts";
+import {
+  PAY_AT_CLOSE_ESTATES,
+  bookPayAtCloseHref,
+  payAtCloseEstateGallery,
+  payAtCloseFeatureRow,
+  pricedSlot,
+} from "./payAtClosePage.ts";
 
 describe("Pay at Close page prices", () => {
   it("reads the catalog and follows a saved edit", () => {
@@ -26,5 +32,34 @@ describe("Pay at Close page prices", () => {
   it("does not hard-code dollar amounts in the page", () => {
     const page = readFileSync(new URL("../client/pages/PayAtClose.tsx", import.meta.url), "utf8");
     expect(page).not.toMatch(/\$\s?\d/);
+    expect(page).not.toMatch(/shore-tour/);
+  });
+
+  it("lists estates as data and skips an empty feature", () => {
+    const joined = JSON.stringify(PAY_AT_CLOSE_ESTATES);
+    expect(joined).not.toMatch(/shore-tour/);
+    expect(joined).toContain("/shore/01-aerial-lake.jpg");
+    const media = new URL("../public/media/pay-at-close/luxury/shore/", import.meta.url);
+    expect(existsSync(new URL("01-aerial-lake.jpg", media))).toBe(true);
+    expect(existsSync(new URL("02-aerial-front.jpg", media))).toBe(true);
+    expect(existsSync(new URL("shore-tour-30s.mp4", media))).toBe(false);
+    const features = payAtCloseFeatureRow(PAY_AT_CLOSE_ESTATES);
+    expect(features.map((item) => item.kind)).toEqual(["still", "reel"]);
+    expect(features[0]?.kind === "still" && features[0].still.src).toContain("pool-rd/02-backyard-pool.jpg");
+    expect(features[1]?.kind === "reel" && features[1].reel.startAt).toBeGreaterThan(0);
+    const gallery = payAtCloseEstateGallery(PAY_AT_CLOSE_ESTATES);
+    expect(gallery.length).toBe(4);
+    const withNext = payAtCloseEstateGallery([
+      ...PAY_AT_CLOSE_ESTATES,
+      { id: "next-estate", gallery: [{ src: "/media/pay-at-close/luxury/next/front.jpg", alt: "Daytime estate", caption: "Next estate" }] },
+    ]);
+    expect(withNext.at(-1)?.caption).toBe("Next estate");
+    expect(payAtCloseFeatureRow([{ id: "bare", gallery: [] }])).toEqual([]);
+    expect(payAtCloseEstateGallery([{ id: "bare", gallery: [] }])).toEqual([]);
+    expect(payAtCloseFeatureRow([{
+      id: "dark-open",
+      gallery: [],
+      reel: { src: "/reel.mp4", poster: "/poster.jpg", alt: "Reel", startAt: 0, caption: "Reel" },
+    }])).toEqual([]);
   });
 });
