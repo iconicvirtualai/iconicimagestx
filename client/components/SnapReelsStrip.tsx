@@ -23,7 +23,7 @@ export default function SnapReelsStrip() {
             {body}
           </p>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
           {reels.map((reel) => (
             <figure key={reel.id} className="mx-auto w-full max-w-[280px] sm:max-w-none">
               <div className="overflow-hidden rounded-[1.75rem] border border-black/10 bg-black shadow-xl">

@@ -14,6 +14,7 @@ export const SNAP_REELS: readonly SnapReel[] = [
   },
   {
     src: "/media/videos/snap-reels/snap-reel-02.mp4",
+    poster: "/media/videos/snap-reels/snap-reel-02.jpg",
     title: "Modern Living",
     vibe: "Open rooms and a calm line through the house",
   },
@@ -31,31 +32,25 @@ export const SNAP_REELS: readonly SnapReel[] = [
   },
 ] as const;
 
-/** Homepage strip. Captions stay free of street names and addresses. */
+/** Homepage strip. Daytime cuts only. Captions stay free of street names. */
 export const SNAP_REEL_STRIP: readonly SnapReel[] = [
   {
-    src: "/media/videos/snap-reels/forest-heights-blaze.mp4",
-    poster: "/media/videos/snap-reels/forest-heights-blaze.jpg",
+    src: "/media/videos/snap-reels/bayonne-snap.mp4",
+    poster: "/media/videos/snap-reels/bayonne-snap.jpg",
     title: "",
-    vibe: "Daylight on brick and stone, the arrival buyers picture first.",
+    vibe: "A sunny lawn and a pool that feels ready for the afternoon.",
   },
   {
-    src: "/media/videos/snap-reels/arcane-court-blaze.mp4",
-    poster: "/media/videos/snap-reels/arcane-court-blaze.jpg",
+    src: "/media/videos/snap-reels/snap-reel-02.mp4",
+    poster: "/media/videos/snap-reels/snap-reel-02.jpg",
     title: "",
-    vibe: "A broad facade in the shade, easy to take in at a glance.",
+    vibe: "An airy living room under a high ceiling, easy to settle into.",
   },
   {
-    src: "/media/videos/snap-reels/tall-trees-blaze.mp4",
-    poster: "/media/videos/snap-reels/tall-trees-blaze.jpg",
+    src: "/media/videos/snap-reels/snap-reel-01.mp4",
+    poster: "/media/videos/snap-reels/snap-reel-01.jpg",
     title: "",
-    vibe: "Stone at the door, with a quiet beat before the interior.",
-  },
-  {
-    src: "/media/videos/snap-reels/heron-wing-blaze.mp4",
-    poster: "/media/videos/snap-reels/heron-wing-blaze.jpg",
-    title: "",
-    vibe: "A covered porch that opens the showing on a welcoming note.",
+    vibe: "Window light over the seating, and the yard just beyond the glass.",
   },
 ] as const;
 
