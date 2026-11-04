@@ -10,7 +10,6 @@ import {
   PAY_AT_CLOSE_ADDON_SLOTS,
   PAY_AT_CLOSE_CARD_SLOTS,
   PAY_AT_CLOSE_ESTATES,
-  TITUS_ESTIMATE_URL,
   bookPayAtCloseHref,
   catalogPackage,
   formatCatalogDollars,
@@ -288,8 +287,7 @@ export default function PayAtClose() {
           <h2 className="section-title">See what you pay<br />when it closes.</h2>
           <p className="section-sub">
             Texas estimate for Iconic’s market. Pick packages, set your credit tier —
-            see <strong>{dueToday} due now</strong> and the flat-fee payoff at close. Exact approval comes from your{" "}
-            <a href={TITUS_ESTIMATE_URL}>Partner estimate</a>.
+            see <strong>{dueToday} due now</strong> and the payoff at close. Final terms are set by our Partner.
           </p>
           <div className="calc-shell">
             <div className="calc-left">
@@ -313,10 +311,7 @@ export default function PayAtClose() {
                 <select id="pac-state" value="TX" aria-label="State" onChange={() => undefined}>
                   <option value="TX">Texas (TX)</option>
                 </select>
-                <p className="hint">
-                  Texas rates are confirmed for this calculator. Other states:{" "}
-                  <a href={TITUS_ESTIMATE_URL}>get your Partner estimate</a>.
-                </p>
+                <p className="hint">Texas rates are confirmed for this calculator. Final terms are set by our Partner.</p>
               </div>
               <div className="field-row">
                 <label className="field-label" htmlFor="pac-property">Property type</label>
@@ -400,7 +395,6 @@ export default function PayAtClose() {
               <div className="result-row"><span>Max you can defer</span><strong>{estimate.cap == null ? "—" : formatScheduleDollars(estimate.cap)}</strong></div>
               <div className={estimate.unavailable || estimate.overCap ? "result-note warn" : "result-note ok"}>{estimate.note}</div>
               <Link className="btn btn-teal btn-block" to={bookPayAtCloseHref()}>Order this media now</Link>
-              <a className="btn btn-ghost btn-block" href={TITUS_ESTIMATE_URL}>Get your Partner estimate</a>
             </div>
           </div>
         </div>
@@ -500,7 +494,7 @@ export default function PayAtClose() {
             </details>
             <details>
               <summary>Is Content Partner eligible?</summary>
-              <p>Pay at Close is built for <strong>listing prep</strong> tied to a subject property. Listing packages are the natural fit. Monthly retainers and brand campaigns may need a confirmed listing context — verify on your Partner estimate. <span className="confirm-tag">Confirm with our Partner</span></p>
+              <p>Pay at Close is built for <strong>listing prep</strong> tied to a subject property. Listing packages are the natural fit. Monthly retainers and brand campaigns may need a confirmed listing context. <span className="confirm-tag">Confirm with our Partner</span></p>
             </details>
           </div>
         </div>
@@ -514,7 +508,6 @@ export default function PayAtClose() {
             <p>Give your sellers the full package with {dueToday} out of pocket. Their listing looks Iconic while the competition is still waiting on budget.</p>
             <div className="final-actions">
               <Link className="btn btn-teal" to={bookPayAtCloseHref()}>Order now — pay at close</Link>
-              <a className="btn btn-ghost" href={TITUS_ESTIMATE_URL}>Get your Partner estimate</a>
             </div>
           </div>
         </div>
