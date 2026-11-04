@@ -36,6 +36,7 @@ describe("Pay at Close page prices", () => {
     const page = readFileSync(new URL("../client/pages/PayAtClose.tsx", import.meta.url), "utf8");
     expect(page).not.toMatch(/\$\s?\d/);
     expect(page).not.toMatch(/shore-tour/);
+    expect(page).not.toMatch(/gotitus|Get your Partner estimate/i);
     expect(page).not.toMatch(/surcharge|\+6%|(?<!\d)6%/i);
   });
 

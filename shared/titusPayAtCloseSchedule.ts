@@ -128,8 +128,8 @@ export function estimateTitusPayAtClose(input: {
       unavailable: true,
       overCap: false,
       note: input.property === "manufactured-home" && input.role === "homeowner"
-        ? "Manufactured / mobile homes: our financing Partner lists agent-only eligibility (max $2,500). Run the Partner estimate."
-        : `This credit tier is not on the standard ${input.role === "agent" ? "agent" : "homeowner"} Texas flat-fee schedule. Get your Partner estimate for eligibility.`,
+        ? "Manufactured / mobile homes: our financing Partner lists agent-only eligibility (max $2,500). Confirm with our Partner."
+        : `This credit tier is not on the standard ${input.role === "agent" ? "agent" : "homeowner"} Texas flat-fee schedule. Confirm with our Partner for eligibility.`,
     };
   }
 
@@ -142,7 +142,7 @@ export function estimateTitusPayAtClose(input: {
   } else if (media === 0) {
     note = `Pick packages above. This estimate uses our Partner's Texas ${input.role} flat fees. Soft pull for prequalification. The exact fee is shown before you accept.`;
   } else {
-    note = `Estimate: $0 due now · ${formatScheduleDollars(payoff)} at close (media + ${titusFeePercentLabel(rate)} Partner flat fee). Term: due at sale or 6 months. Confirm on your Partner estimate.`;
+    note = `Estimate: $0 due now · ${formatScheduleDollars(payoff)} at close (media + ${titusFeePercentLabel(rate)} Partner flat fee). Term: due at sale or 6 months. Final terms are set by our Partner.`;
   }
 
   return { dueToday, media, rate, fee, payoff, cap, unavailable: false, overCap, note };

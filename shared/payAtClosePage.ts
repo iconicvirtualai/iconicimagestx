@@ -6,8 +6,6 @@
 
 import type { StaffCatalogPackage } from "./bookingCatalog.ts";
 
-export const TITUS_ESTIMATE_URL = "https://www.gotitus.com/estimate/iconic-images-media-marketing";
-
 export interface PayAtCloseCardSlot {
   id: string;
   calcId: string;
