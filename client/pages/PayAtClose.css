@@ -489,7 +489,7 @@
     linear-gradient(135deg, rgba(0, 0, 0, 0.72), rgba(13, 148, 136, 0.45)),
     var(--cta) center/cover no-repeat;
 }
-.pac-page .final-cta > * { position: relative; z-index: 1; }
+.pac-page .final-cta > *:not(.final-cta-bg) { position: relative; z-index: 1; }
 .pac-page .final-cta h2 {
   font-size: clamp(2rem, 5vw, 3.4rem);
   font-weight: 900;
