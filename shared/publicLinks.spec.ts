@@ -71,6 +71,7 @@ const HOME_MEDIA = [
   "client/components/ThisIsOurMarket.tsx",
   "client/components/TheNetwork.tsx",
   "client/components/AudienceDetails.tsx",
+  "client/components/ResponsiveStill.tsx",
   "client/components/AudienceSection.tsx",
   "client/components/TestimonialsSection.tsx",
   "client/components/StepsSection.tsx",

@@ -204,6 +204,7 @@ export default function Portfolio() {
                     <div className="overflow-hidden rounded-[1.5rem] border border-white/10 bg-black">
                       <video
                         src={reel.src}
+                        poster={reel.poster}
                         controls
                         playsInline
                         preload="metadata"

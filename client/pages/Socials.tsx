@@ -1,4 +1,5 @@
 import Layout from "@/components/Layout";
+import ResponsiveStill from "@/components/ResponsiveStill";
 import { itemText, useSiteItems, useSiteText } from "@/content/siteContent";
 import { Facebook, Instagram, Share2, ArrowUpRight, Heart } from "lucide-react";
 
@@ -12,7 +13,7 @@ const STILLS = [
   {
     id: 2,
     platform: "Instagram",
-    image: "/media/before-after/twilight-pool-lifestyle.jpg",
+    image: "/media/photos/rear-pool-twilight.jpg",
     description: "Twilight conversion of a rear pool.",
   },
   {
@@ -93,7 +94,7 @@ export default function Socials() {
                 {stills.map((still) => (
                   <figure key={still.id} className="bg-white rounded-[1.8rem] overflow-hidden border border-gray-100 shadow-lg">
                     <div className="relative aspect-[4/5] overflow-hidden">
-                      <img src={still.image} alt={still.description} data-site-page="socials" data-site-block="hero" data-site-item={String(still.id)} data-site-field="image" data-site-kind="image" className="w-full h-full object-cover" />
+                      <ResponsiveStill src={still.image} alt={still.description} data-site-page="socials" data-site-block="hero" data-site-item={String(still.id)} data-site-field="image" data-site-kind="image" className="h-full w-full object-cover" />
                       <div className="absolute top-5 left-5 px-3 py-1 rounded-full bg-white/90 text-[9px] font-bold uppercase tracking-widest text-black">
                         {still.platform}
                       </div>

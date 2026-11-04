@@ -204,6 +204,7 @@ export default function FeaturesSection() {
               <div className="w-1/2 h-full relative rounded-lg overflow-hidden border border-gray-100 bg-black">
                 <video
                   src={FEATURED_SNAP_REEL.src}
+                  poster={FEATURED_SNAP_REEL.poster}
                   className="h-full w-full object-cover"
                   autoPlay
                   muted

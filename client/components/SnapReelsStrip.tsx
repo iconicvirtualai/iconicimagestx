@@ -1,4 +1,4 @@
-import { SNAP_REEL_STRIP } from "@/lib/snapReels";
+import { SNAP_REEL_STRIP, snapPoster, snapStart } from "@/lib/snapReels";
 import { itemText, useSiteItems, useSiteText } from "@/content/siteContent";
 
 export default function SnapReelsStrip() {
@@ -23,12 +23,13 @@ export default function SnapReelsStrip() {
             {body}
           </p>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-8">
           {reels.map((reel) => (
-            <figure key={reel.id} className="mx-auto w-full max-w-[280px]">
+            <figure key={reel.id} className="mx-auto w-full max-w-[280px] sm:max-w-none">
               <div className="overflow-hidden rounded-[1.75rem] border border-black/10 bg-black shadow-xl">
                 <video
                   src={reel.src}
+                  poster={snapPoster(reel.src)}
                   data-site-page="home" data-site-block="snapReels" data-site-item={reel.id} data-site-field="video" data-site-kind="video"
                   className="aspect-[9/16] w-full object-cover"
                   autoPlay
@@ -36,13 +37,21 @@ export default function SnapReelsStrip() {
                   loop
                   playsInline
                   preload="metadata"
-                  aria-label={`Snap Reel — ${reel.title}`}
+                  aria-label="Snap Reel"
+                  onLoadedMetadata={(event) => {
+                    const start = snapStart(reel.src);
+                    if (start > 0 && event.currentTarget.currentTime < start) {
+                      event.currentTarget.currentTime = start;
+                    }
+                  }}
                 />
               </div>
               <figcaption className="mt-4 text-center">
                 <p className="text-[10px] font-black uppercase tracking-[0.22em] text-teal-600">Snap Reel</p>
-                <p data-site-page="home" data-site-block="snapReels" data-site-item={reel.id} data-site-field="title" data-site-kind="text" className="mt-1 text-sm font-bold text-black">{reel.title}</p>
-                <p data-site-page="home" data-site-block="snapReels" data-site-item={reel.id} data-site-field="vibe" data-site-kind="text" className="text-xs text-gray-500">{reel.vibe}</p>
+                {reel.title ? (
+                  <p data-site-page="home" data-site-block="snapReels" data-site-item={reel.id} data-site-field="title" data-site-kind="text" className="mt-1 text-sm font-bold text-black">{reel.title}</p>
+                ) : null}
+                <p data-site-page="home" data-site-block="snapReels" data-site-item={reel.id} data-site-field="vibe" data-site-kind="text" className="mt-1 text-xs text-gray-500">{reel.vibe}</p>
               </figcaption>
             </figure>
           ))}

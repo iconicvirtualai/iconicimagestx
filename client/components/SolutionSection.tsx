@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Play, Volume2, VolumeX, ChevronLeft, ChevronRight } from "lucide-react";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
-import { SNAP_REELS } from "@/lib/snapReels";
+import { SNAP_REELS, snapPoster } from "@/lib/snapReels";
 import { itemText, useSiteItems, useSiteText } from "@/content/siteContent";
 
 export default function SolutionSection() {
@@ -100,11 +100,13 @@ export default function SolutionSection() {
                 key={currentVideo.id}
                 ref={videoRef}
                 src={currentVideo.url}
+                poster={snapPoster(currentVideo.url)}
                 className="w-full h-full object-cover"
                 autoPlay
                 loop
                 muted={isMuted}
                 playsInline
+                preload="metadata"
               />
             </div>
 
