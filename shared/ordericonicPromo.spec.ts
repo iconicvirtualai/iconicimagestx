@@ -24,6 +24,17 @@ describe("ordericonic November promo", () => {
     expect(html).not.toContain("const RATES");
   });
 
+  it("introduces Pay at Close for agents without naming the financing company or a card fee", () => {
+    expect(html).toContain('href="https://iconicimagestx.vercel.app/pay-at-close"');
+    expect(html).toContain("See Pay at Close");
+    expect(html).toContain("Agents, spoil yourselves.");
+    expect(html).toContain("pay $0 today");
+    expect(html).toContain("our Partner");
+    expect(html.toLowerCase()).not.toContain("titus");
+    expect(html.toLowerCase()).not.toContain("gotitus");
+    expect(html.toLowerCase()).not.toContain("card fee");
+  });
+
   it("drops the October twilight ads and keeps bright photos", () => {
     expect(html).not.toContain("October glow-up");
     expect(html).not.toContain("From Day to Night");
