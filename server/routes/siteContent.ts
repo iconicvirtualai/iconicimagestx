@@ -107,7 +107,9 @@ async function workspacePage(id: string): Promise<ContentPage | null> {
 }
 
 router.get("/", async (_req, res) => {
-  const pages = await listPublished();
+  const pages = (await listPublished())
+    .map((page) => mergeContent(page))
+    .filter((page): page is ContentPage => Boolean(page));
   return res.json({ pages });
 });
 

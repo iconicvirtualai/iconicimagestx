@@ -1,109 +1,75 @@
 import { motion } from "framer-motion";
-import { useSiteSettings } from "@/hooks/useSiteSettings";
-import { useSiteText } from "@/content/siteContent";
+import { itemText, useSiteItems, useSiteText } from "@/content/siteContent";
 
-const NETWORK_BODY = "Iconic isn’t here to squeeze the market; we’re here to expand it.";
+const NETWORK_BODY = "We look forward to working with you. Collaborators, creators, producers, podcasters, and photographers are welcome here. Iconic was built to stand beside other media professionals, not to crowd them out.";
+const NETWORK_CLOSER = "Bring your clients and your craft. There is room for the work you already love.";
+
+const FALLBACK_PHOTOS = [
+  { id: "studio", image: "/media/about/06_holiday_group_energy_16x9.jpg", alt: "A bright studio set with the team" },
+  { id: "podcast", image: "/media/photos/headshot-gracepoint-4.jpg", alt: "On-camera portrait, stand-in for a podcast set" },
+  { id: "location", image: "/media/photos/lifestyle-kennedy-mtz01127.jpg", alt: "On location, outdoors in full color" },
+  { id: "wild", image: "/media/photos/drone-hero.jpg", alt: "Out on a property, from the air" },
+];
 
 export default function TheNetwork() {
-  const settings = useSiteSettings();
   const titleLead = useSiteText("home", "network", "titleLead", "Built Bigger Than");
   const titleAccent = useSiteText("home", "network", "titleAccent", "One Brand");
   const body = useSiteText("home", "network", "body", NETWORK_BODY);
+  const closer = useSiteText("home", "network", "closer", NETWORK_CLOSER);
+  const saved = useSiteItems("home", "network");
+  const photos = saved?.length
+    ? saved.map((item) => ({
+      id: item.id,
+      image: itemText(item, "image"),
+      alt: itemText(item, "alt"),
+    })).filter((item) => item.image)
+    : FALLBACK_PHOTOS;
 
   return (
-    <section className="py-24 bg-white relative overflow-hidden">
-      {/* Dynamic Background Patterns */}
-      <div className="absolute top-0 left-0 w-full h-full pointer-events-none opacity-[0.03]">
-        <div 
-          className="w-full h-full"
-          style={{ 
-            backgroundImage: `radial-gradient(${settings.global.primaryColor} 0.5px, transparent 0.5px)`, 
-            backgroundSize: '40px 40px' 
-          }}
-        ></div>
-      </div>
-
-      <div className="container mx-auto px-4 relative z-10">
-        <div className="max-w-4xl mx-auto text-center mb-16">
+    <section className="relative overflow-hidden bg-white py-20 md:py-24">
+      <div className="container relative z-10 mx-auto px-4">
+        <div className="mx-auto mb-14 max-w-3xl text-center">
           <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
+            initial={{ opacity: 1, scale: 1 }}
             whileInView={{ opacity: 1, scale: 1 }}
             viewport={{ once: true }}
             transition={{ duration: 0.8 }}
           >
-            <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-8 tracking-tight text-black">
+            <h2 className="mb-6 text-balance text-4xl font-bold tracking-tight text-black md:text-5xl lg:text-6xl">
               <span data-site-page="home" data-site-block="network" data-site-field="titleLead" data-site-kind="text">{titleLead}</span>{" "}
               <span className="accent-text-bordered" data-site-page="home" data-site-block="network" data-site-field="titleAccent" data-site-kind="text">{titleAccent}</span>
             </h2>
-
-            {body !== NETWORK_BODY ? (
-              <p data-site-page="home" data-site-block="network" data-site-field="body" data-site-kind="text" className="text-xl md:text-2xl text-gray-500 leading-relaxed font-medium">{body}</p>
-            ) : null}
-            <div data-site-page="home" data-site-block="network" data-site-field="body" data-site-kind="text" className={`space-y-6 text-xl md:text-2xl text-gray-500 leading-relaxed font-medium ${body !== NETWORK_BODY ? "hidden" : ""}`}>
-              <p>
-                Iconic isn’t here to squeeze the market;<br />
-                we’re here to <span className="text-black font-bold">expand it.</span>
-              </p>
-              <p className="pt-4 text-lg md:text-xl font-normal text-gray-400">
-                We are the ecosystem supporting aspiring creatives and growing producers to shape what modern media should look like — for the benefit of all.
-              </p>
-              <p className="pt-8 text-2xl md:text-3xl font-bold tracking-tight text-black">
-                When the standard rises, <span style={{ color: settings.global.primaryColor }}>everyone rises.</span>
-              </p>
-            </div>
+            <p data-site-page="home" data-site-block="network" data-site-field="body" data-site-kind="text" className="text-balance text-lg font-medium leading-relaxed text-gray-600 md:text-xl">
+              {body}
+            </p>
+            <p data-site-page="home" data-site-block="network" data-site-field="closer" data-site-kind="text" className="mt-6 text-balance text-lg font-semibold leading-relaxed text-black md:text-xl">
+              {closer}
+            </p>
           </motion.div>
         </div>
 
-        {/* Floating Photo Elements Composition */}
-        <div className="relative h-[300px] md:h-[400px] max-w-5xl mx-auto">
-          {/* Photo 1: Left Top */}
-          <motion.div 
-            initial={{ opacity: 0, x: -20, y: -20 }}
-            whileInView={{ opacity: 1, x: 0, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.8, delay: 0.1 }}
-            className="absolute top-0 left-[10%] w-[160px] h-[160px] md:w-[240px] md:h-[240px] rounded-[2rem] overflow-hidden shadow-xl z-20 border-4 border-white rotate-[-3deg]"
-          >
-            <img
-              src="/media/photos/lifestyle-logan-dan02309.jpg"
-              alt="Iconic outdoor portrait"
-              className="w-full h-full object-cover grayscale opacity-90 group-hover:grayscale-0 transition-all duration-700"
-            />
-          </motion.div>
-
-          {/* Photo 2: Right Middle */}
-          <motion.div 
-            initial={{ opacity: 0, x: 20, y: 10 }}
-            whileInView={{ opacity: 1, x: 0, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.8, delay: 0.3 }}
-            className="absolute top-[20%] right-[10%] w-[180px] h-[180px] md:w-[280px] md:h-[280px] rounded-[2rem] overflow-hidden shadow-2xl z-10 border-4 border-white rotate-[4deg]"
-          >
-            <img
-              src="/media/photos/luxury-interior.jpg"
-              alt="Iconic luxury interior"
-              className="w-full h-full object-cover"
-            />
-          </motion.div>
-
-          {/* Photo 3: Center Bottom */}
-          <motion.div 
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.8, delay: 0.5 }}
-            className="absolute bottom-0 left-[35%] w-[140px] h-[140px] md:w-[220px] md:h-[220px] rounded-[2rem] overflow-hidden shadow-2xl z-30 border-4 border-white rotate-[-2deg]"
-          >
-            <img
-              src="/media/photos/luxury-a7305553.jpg"
-              alt="Iconic architectural interior"
-              className="w-full h-full object-cover grayscale opacity-80"
-            />
-          </motion.div>
-
-          {/* Decorative Accents */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80%] h-px bg-gradient-to-r from-transparent via-gray-100 to-transparent -z-10"></div>
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[80%] w-px bg-gradient-to-b from-transparent via-gray-100 to-transparent -z-10"></div>
+        <div className="mx-auto grid max-w-5xl grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
+          {photos.map((photo, index) => (
+            <motion.figure
+              key={photo.id}
+              initial={{ opacity: 1, y: 12 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6, delay: index * 0.08 }}
+              className={`overflow-hidden rounded-[1.5rem] border-4 border-white shadow-xl ${index % 2 === 0 ? "md:translate-y-6" : ""}`}
+            >
+              <img
+                src={photo.image}
+                alt={photo.alt}
+                data-site-page="home"
+                data-site-block="network"
+                data-site-item={photo.id}
+                data-site-field="image"
+                data-site-kind="image"
+                className="aspect-[3/4] h-full w-full object-cover transition duration-700 motion-safe:hover:scale-105"
+              />
+            </motion.figure>
+          ))}
         </div>
       </div>
     </section>

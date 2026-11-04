@@ -204,8 +204,8 @@ export default function AdminSiteEditor() {
     if (response.ok) await load();
   };
 
-  const upload = async (file: File, field: ContentField) => {
-    if (!page) return;
+  const uploadFile = async (file: File): Promise<string | null> => {
+    if (!page) return null;
     setBusy(true);
     const dataBase64 = await fileToBase64(file);
     const response = await fetch("/api/site-content/media", {
@@ -217,10 +217,30 @@ export default function AdminSiteEditor() {
     setBusy(false);
     if (!response.ok || !data.url) {
       setMessage(data.error || "Upload failed.");
-      return;
+      return null;
     }
-    updateField(field.id, data.url);
     setMessage("File added to the draft.");
+    return String(data.url);
+  };
+
+  const upload = async (file: File, field: ContentField) => {
+    const url = await uploadFile(file);
+    if (url) updateField(field.id, url);
+  };
+
+  const uploadItem = async (itemId: string, fieldId: string, file: File) => {
+    const url = await uploadFile(file);
+    if (!url || !page || !block) return;
+    updatePage({
+      ...page,
+      blocks: page.blocks.map((item) => item.id === block.id ? {
+        ...item,
+        items: (item.items || []).map((row) => row.id === itemId ? {
+          ...row,
+          fields: row.fields.map((entry) => entry.id === fieldId ? { ...entry, value: url } : entry),
+        } : row),
+      } : item),
+    });
   };
 
   const importDropbox = async (field: ContentField) => {
@@ -331,6 +351,7 @@ export default function AdminSiteEditor() {
               onUpload={(file, field) => void upload(file, field)}
               onImport={(field) => void importDropbox(field)}
               onItems={(items) => page && updatePage({ ...page, blocks: page.blocks.map((item) => item.id === block.id ? { ...item, items } : item) })}
+              onItemUpload={(itemId, fieldId, file) => void uploadItem(itemId, fieldId, file)}
               onSeo={(key, value) => page && updatePage({ ...page, [key]: value })}
               seoTitle={page?.seoTitle || ""}
               seoDescription={page?.seoDescription || ""}
@@ -357,6 +378,7 @@ export default function AdminSiteEditor() {
                 onUpload={(file, field) => void upload(file, field)}
                 onImport={(field) => void importDropbox(field)}
                 onItems={(items) => page && updatePage({ ...page, blocks: page.blocks.map((item) => item.id === block.id ? { ...item, items } : item) })}
+                onItemUpload={(itemId, fieldId, file) => void uploadItem(itemId, fieldId, file)}
                 onSeo={(key, value) => page && updatePage({ ...page, [key]: value })}
                 seoTitle={page?.seoTitle || ""}
                 seoDescription={page?.seoDescription || ""}
@@ -426,6 +448,7 @@ function FieldEditor({
   onUpload,
   onImport,
   onItems,
+  onItemUpload,
 }: {
   block: ContentBlock;
   seoTitle: string;
@@ -437,6 +460,7 @@ function FieldEditor({
   onUpload: (file: File, field: ContentField) => void;
   onImport: (field: ContentField) => void;
   onItems: (items: ContentItem[]) => void;
+  onItemUpload: (itemId: string, fieldId: string, file: File) => void;
 }) {
   return (
     <div className="space-y-4">
@@ -483,11 +507,27 @@ function FieldEditor({
       {(block.items || []).map((item, index) => (
         <div key={item.id} className="rounded-xl border border-black/10 p-2">
           <p className="text-xs font-semibold">Item {index + 1}</p>
-          {item.fields.map((field) => (
-            <input key={field.id} className="mt-1 min-h-11 w-full rounded-lg border px-2 text-sm" value={field.value} onChange={(event) => {
-              onItems((block.items || []).map((row) => row.id === item.id ? { ...row, fields: row.fields.map((entry) => entry.id === field.id ? { ...entry, value: event.target.value } : entry) } : row));
-            }} />
-          ))}
+          {item.fields.map((field) => {
+            const write = (value: string) => {
+              onItems((block.items || []).map((row) => row.id === item.id ? { ...row, fields: row.fields.map((entry) => entry.id === field.id ? { ...entry, value } : entry) } : row));
+            };
+            return (
+              <label key={field.id} className="mt-2 block text-xs font-semibold">
+                {field.label}
+                {field.kind === "textarea" ? (
+                  <textarea className="mt-1 w-full rounded-lg border px-2 py-2 text-sm font-normal" rows={3} value={field.value} onChange={(event) => write(event.target.value)} />
+                ) : (
+                  <input className="mt-1 min-h-11 w-full rounded-lg border px-2 text-sm font-normal" value={field.value} onChange={(event) => write(event.target.value)} />
+                )}
+                {field.kind === "image" || field.kind === "video" ? (
+                  <input className="mt-1 block text-sm font-normal" type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime" onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) onItemUpload(item.id, field.id, file);
+                  }} />
+                ) : null}
+              </label>
+            );
+          })}
         </div>
       ))}
     </div>

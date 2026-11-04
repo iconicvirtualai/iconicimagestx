@@ -129,6 +129,7 @@ export default function Pricing() {
   const priceAccent = useSiteText("pricing", "hero", "titleAccent", "Price");
   const priceTail = useSiteText("pricing", "hero", "titleTail", "for Your Presence");
   const priceSubtitle = useSiteText("pricing", "hero", "subtitle", "Media that moves as fast as you do.");
+  const priceVideo = useSiteText("pricing", "hero", "background", "/media/holiday/hero-web.mp4");
   const chipItems = useSiteItems("pricing", "chips");
   const assistantTitle = useSiteText("pricing", "assistant", "title", "Not sure where to start?");
   const assistantSubtitle = useSiteText("pricing", "assistant", "subtitle", "Let our AI guide you");
@@ -469,9 +470,13 @@ export default function Pricing() {
                 loop
                 muted
                 playsInline
+                data-site-page="pricing"
+                data-site-block="hero"
+                data-site-field="background"
+                data-site-kind="video"
                 className="w-full h-full object-cover opacity-[0.15]"
               >
-                <source src="/media/video/content-web-clip.mp4" type="video/mp4" />
+                <source src={priceVideo} type="video/mp4" />
               </video>
               {/* Simplified Gradient Overlays for better visibility */}
               <div className="absolute inset-0 bg-gradient-to-b from-[#fafafa] via-transparent to-[#fafafa]"></div>

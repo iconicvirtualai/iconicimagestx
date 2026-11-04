@@ -29,13 +29,27 @@ describe("client reviews", () => {
       "C.B.",
       "K.W.",
       "A.A.",
+      "W.L.",
     ]);
     for (const review of CLIENT_REVIEWS) {
       expect(review.initials).toMatch(/^[A-Z]\.[A-Z]\.$/);
       expect(review.role === "Google review" || review.role === "Client").toBe(true);
       expect(review.quote.trim().length).toBeGreaterThan(0);
+      expect(review.stars).toBe(5);
     }
     expect(CLIENT_REVIEWS.filter((review) => review.role === "Google review")).toHaveLength(2);
+    expect(CLIENT_REVIEWS.find((review) => review.initials === "H.D.")?.quote).toBe(
+      "Thank you so much, the pictures look great. Thank y'all so much for the quick turn around and wonderful service. My client had nothing but nice things to say about the photos process.",
+    );
+    expect(CLIENT_REVIEWS.find((review) => review.initials === "L.F.")?.quote).toBe(
+      "Thank you so much. You guys always do a great job.",
+    );
+    expect(CLIENT_REVIEWS.find((review) => review.initials === "A.A.")?.quote).toBe("The photos look perfect!");
+    expect(CLIENT_REVIEWS.find((review) => review.initials === "W.L.")?.quote).toBe(
+      "The video looks absolutely FIRE! I love it SO much!",
+    );
+    expect(JSON.stringify(CLIENT_REVIEWS)).not.toContain("paid the invoice");
+    expect(JSON.stringify(CLIENT_REVIEWS)).not.toContain("Outside of those items");
   });
 
   it("features the S.Y. Google review and keeps staff-facing names out of attribution", () => {

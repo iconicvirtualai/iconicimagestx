@@ -1,50 +1,44 @@
-import { useState, useRef, useEffect } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Play, Volume2, VolumeX, ChevronLeft, ChevronRight } from "lucide-react";
-import { useSiteSettings } from "@/hooks/useSiteSettings";
-import { SNAP_REELS, snapPoster } from "@/lib/snapReels";
 import { itemText, useSiteItems, useSiteText } from "@/content/siteContent";
+
+type Slide = {
+  id: string;
+  url: string;
+  aspect: string;
+  title: string;
+};
+
+const FALLBACK_SLIDES: Slide[] = [
+  { id: "slide-1", url: "/media/video/product-photography.mp4", aspect: "16/9", title: "Listing film" },
+  { id: "slide-2", url: "/media/videos/snap-reels/bayonne-snap.mp4", aspect: "9/16", title: "Premium listing" },
+  { id: "slide-3", url: "/media/blaze/02_US_v3.mp4", aspect: "9/16", title: "Emily Aguilar" },
+  { id: "slide-4", url: "/media/videos/snap-reels/forest-heights-blaze.mp4", aspect: "9/16", title: "King Metals" },
+  { id: "slide-5", url: "/media/videos/snap-reels/arcane-court-blaze.mp4", aspect: "9/16", title: "Blaze reel" },
+  { id: "slide-6", url: "/media/videos/snap-reels/tall-trees-blaze.mp4", aspect: "9/16", title: "Aerial" },
+  { id: "slide-7", url: "/media/blaze/01_BUILT_v2.mp4", aspect: "9/16", title: "Agent reel" },
+];
+
+function ratioFromAspect(aspect: string): number {
+  const [w, h] = aspect.split("/").map((part) => Number(part));
+  if (!w || !h) return 9 / 16;
+  return w / h;
+}
 
 export default function SolutionSection() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isMuted, setIsMuted] = useState(true);
+  const [measured, setMeasured] = useState<number | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const settings = useSiteSettings();
-
-  const customVideos = useSiteItems("home", "solution");
-  const fallbackVideos = [
-    {
-      id: 1,
-      url: "/media/video/product-photography.mp4",
-      aspect: "16/9",
-      title: "Product Photography"
-    },
-    {
-      id: 2,
-      url: "/media/reels/superpower-reel-12s.mp4",
-      aspect: "9/16",
-      title: "Vertical Reel"
-    },
-    {
-      id: 3,
-      url: "/media/video/content-web-clip.mp4",
-      aspect: "9/16",
-      title: "Content Package"
-    },
-    ...SNAP_REELS.map((reel, index) => ({
-      id: 4 + index,
-      url: reel.src,
-      aspect: "9/16" as const,
-      title: `Snap Reel · ${reel.title}`,
-    })),
-  ];
-  const videos = customVideos?.length
-    ? customVideos.map((item, index) => ({
-        id: index + 1,
-        url: itemText(item, "video"),
-        aspect: itemText(item, "video").includes("product-photography") ? "16/9" : "9/16",
-        title: itemText(item, "title"),
-      }))
-    : fallbackVideos;
+  const saved = useSiteItems("home", "solution");
+  const videos: Slide[] = saved?.length
+    ? saved.map((item) => ({
+      id: item.id,
+      url: itemText(item, "video"),
+      aspect: itemText(item, "aspect", "9/16"),
+      title: itemText(item, "title"),
+    })).filter((item) => item.url)
+    : FALLBACK_SLIDES;
 
   const nextSlide = () => {
     setCurrentIndex((prev) => (prev + 1) % videos.length);
@@ -55,112 +49,131 @@ export default function SolutionSection() {
   };
 
   useEffect(() => {
-    if (videoRef.current) {
-      videoRef.current.load();
-      videoRef.current.play().catch(e => console.log("Auto-play blocked", e));
-    }
-  }, [currentIndex]);
+    setMeasured(null);
+    const node = videoRef.current;
+    if (!node) return;
+    node.load();
+    node.play().catch(() => undefined);
+  }, [currentIndex, videos.length]);
 
-  const currentVideo = videos[currentIndex];
+  const currentVideo = videos[currentIndex] ?? videos[0];
+  const ratio = measured && measured > 0 ? measured : ratioFromAspect(currentVideo?.aspect || "9/16");
+  const wide = ratio >= 1;
+
+  const badge = useSiteText("home", "solution", "badge", "Built for Creative Excellence");
+  const title = useSiteText("home", "solution", "title", "Your All-in-One Solution for High-Impact Media Content");
+  const body = useSiteText("home", "solution", "body", "Transform your raw ideas into engaging cinematic media in minutes. Whether you're a high-growth startup serving multiple clients or an established enterprise, Iconic helps you create professional-grade visual content seamlessly.");
+
+  if (!currentVideo) return null;
 
   return (
     <section className="bg-black pt-12 pb-24 md:pt-16 md:pb-32 border-t border-white/5">
       <div className="container mx-auto px-4 text-center">
-        {/* Badge */}
-        <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-teal-500/10 border border-teal-500/20 mb-8 shadow-lg">
-          <span className="text-[12px] font-bold tracking-wider uppercase text-teal-400">
-            <span data-site-page="home" data-site-block="solution" data-site-field="badge" data-site-kind="text">{useSiteText("home", "solution", "badge", "Built for Creative Excellence")}</span>
+        <div className="mb-8 inline-flex items-center rounded-full border border-teal-500/20 bg-teal-500/10 px-4 py-1.5 shadow-lg">
+          <span data-site-page="home" data-site-block="solution" data-site-field="badge" data-site-kind="text" className="text-[12px] font-bold uppercase tracking-wider text-teal-400">
+            {badge}
           </span>
         </div>
-
-        {/* Headline */}
-        <h2 className="text-4xl md:text-5xl lg:text-6xl font-black mb-8 leading-[1.2] tracking-tight text-white max-w-4xl mx-auto uppercase">
-          <span data-site-page="home" data-site-block="solution" data-site-field="title" data-site-kind="text">{useSiteText("home", "solution", "title", "Your All-in-One Solution for High-Impact Media Content")}</span>
+        <h2 data-site-page="home" data-site-block="solution" data-site-field="title" data-site-kind="text" className="mx-auto mb-8 max-w-4xl text-balance text-4xl font-black uppercase leading-[1.15] tracking-tight text-white md:text-5xl lg:text-6xl">
+          {title}
         </h2>
-
-        {/* Description */}
-        <p className="text-lg md:text-xl text-gray-400 mb-16 max-w-3xl mx-auto leading-relaxed font-medium">
-          Transform your raw ideas into <strong>engaging cinematic media</strong> in minutes.
-          Whether you're a high-growth startup serving multiple clients or an established
-          enterprise, Iconic helps you create <strong>professional-grade visual content</strong> seamlessly.
+        <p data-site-page="home" data-site-block="solution" data-site-field="body" data-site-kind="text" className="mx-auto mb-16 max-w-3xl text-balance text-lg font-medium leading-relaxed text-gray-400 md:text-xl">
+          {body}
         </p>
-
-        {/* Carousel Container */}
         <div className="relative flex flex-col items-center">
           <div
-            className={`relative rounded-[2rem] md:rounded-[3rem] overflow-hidden shadow-2xl shadow-teal-900/20 border-[6px] md:border-[8px] border-[#111] bg-black group transition-all duration-700 ease-in-out ${
-              currentVideo.aspect === "16/9"
-                ? "w-full max-w-5xl aspect-video"
-                : "w-full max-w-[320px] md:max-w-[360px] aspect-[9/16]"
+            className={`relative overflow-hidden border-[6px] border-[#111] bg-black shadow-2xl shadow-teal-900/20 transition-[max-width] duration-500 ease-out md:border-[8px] ${
+              wide ? "w-full max-w-5xl rounded-[1.5rem] md:rounded-[2rem]" : "w-full max-w-[400px] rounded-[2rem] md:rounded-[2.5rem]"
             }`}
+            style={{ aspectRatio: String(ratio) }}
           >
-            {/* Active Video */}
             <div className="absolute inset-0 flex items-center justify-center">
               <video
                 key={currentVideo.id}
                 ref={videoRef}
                 src={currentVideo.url}
-                poster={snapPoster(currentVideo.url)}
-                className="w-full h-full object-cover"
+                data-site-page="home"
+                data-site-block="solution"
+                data-site-item={currentVideo.id}
+                data-site-field="video"
+                data-site-kind="video"
+                className="h-full w-full object-cover"
                 autoPlay
                 loop
                 muted={isMuted}
                 playsInline
                 preload="metadata"
+                onLoadedMetadata={(event) => {
+                  const node = event.currentTarget;
+                  if (node.videoWidth > 0 && node.videoHeight > 0) {
+                    setMeasured(node.videoWidth / node.videoHeight);
+                  }
+                }}
               />
             </div>
 
-            {/* Mute Toggle */}
             <button
+              type="button"
               onClick={() => setIsMuted(!isMuted)}
-              className="absolute top-4 right-4 md:top-8 md:right-8 z-30 w-8 h-8 md:w-12 md:h-12 bg-black/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/20 text-white transition-all hover:bg-black/40"
+              aria-label={isMuted ? "Unmute video" : "Mute video"}
+              className="absolute top-4 right-4 z-30 flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/20 text-white backdrop-blur-md transition-all hover:bg-black/40 md:top-8 md:right-8 md:h-12 md:w-12"
             >
-              {isMuted ? <VolumeX className="w-4 h-4 md:w-6 md:h-6" /> : <Volume2 className="w-4 h-4 md:w-6 md:h-6" />}
+              {isMuted ? <VolumeX className="h-4 w-4 md:h-6 md:w-6" /> : <Volume2 className="h-4 w-4 md:h-6 md:w-6" />}
             </button>
 
-            {/* Branding Overlay */}
-            <div className="absolute bottom-4 left-4 md:bottom-10 md:left-10 z-30">
-               <div className="bg-white/10 backdrop-blur-xl px-3 py-1.5 md:px-6 md:py-3 rounded-lg md:rounded-2xl border border-white/20 flex items-center gap-2 md:gap-3">
-                  <div className="w-5 h-5 md:w-8 md:h-8 rounded-md md:rounded-lg flex items-center justify-center text-white bg-teal-500">
-                    <Play className="w-2.5 h-2.5 md:w-4 md:h-4 fill-white translate-x-0.5" />
-                  </div>
-                  <span className="text-white font-bold tracking-tight text-[10px] md:text-base">Iconic Media</span>
-               </div>
+            <div className="absolute bottom-4 left-4 z-30 md:bottom-8 md:left-8">
+              <div className="flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 backdrop-blur-xl md:gap-3 md:rounded-2xl md:px-6 md:py-3">
+                <div className="flex h-5 w-5 items-center justify-center rounded-md bg-teal-500 text-white md:h-8 md:w-8 md:rounded-lg">
+                  <Play className="h-2.5 w-2.5 translate-x-0.5 fill-white md:h-4 md:w-4" />
+                </div>
+                <span className="text-[10px] font-bold tracking-tight text-white md:text-base">Iconic Media</span>
+              </div>
             </div>
           </div>
 
-          {/* Navigation Controls */}
-          <div className="flex items-center justify-center mt-8 gap-6 md:gap-8">
+          <div className="mt-8 flex items-center justify-center gap-6 md:gap-8">
             <button
+              type="button"
               onClick={prevSlide}
-              className="p-2 text-gray-500 hover:text-teal-400 transition-colors"
+              aria-label="Previous video"
+              className="p-2 text-gray-500 transition-colors hover:text-teal-400"
             >
-              <ChevronLeft className="w-6 h-6" />
+              <ChevronLeft className="h-6 w-6" />
             </button>
 
-            {/* Pagination Dots */}
-            <div className="flex gap-2">
-              {videos.map((_, idx) => (
+            <div className="flex gap-2" role="tablist" aria-label="Hero videos">
+              {videos.map((video, idx) => (
                 <button
-                  key={idx}
+                  key={video.id}
+                  type="button"
+                  role="tab"
+                  aria-label={`Show ${video.title || `video ${idx + 1}`}`}
+                  aria-selected={idx === currentIndex}
                   onClick={() => setCurrentIndex(idx)}
-                  className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                    idx === currentIndex
-                      ? "w-6 bg-teal-500"
-                      : "bg-gray-800 hover:bg-gray-700"
+                  className={`h-2 rounded-full transition-all duration-300 ${
+                    idx === currentIndex ? "w-6 bg-teal-500" : "w-2 bg-gray-800 hover:bg-gray-700"
                   }`}
                 />
               ))}
             </div>
 
             <button
+              type="button"
               onClick={nextSlide}
-              className="p-2 text-gray-500 hover:text-teal-400 transition-colors"
+              aria-label="Next video"
+              className="p-2 text-gray-500 transition-colors hover:text-teal-400"
             >
-              <ChevronRight className="w-6 h-6" />
+              <ChevronRight className="h-6 w-6" />
             </button>
           </div>
-          <p className="mt-4 text-[11px] font-black uppercase tracking-[0.28em] text-teal-400">
+          <p
+            data-site-page="home"
+            data-site-block="solution"
+            data-site-item={currentVideo.id}
+            data-site-field="title"
+            data-site-kind="text"
+            className="mt-4 text-balance text-[11px] font-black uppercase tracking-[0.28em] text-teal-400"
+          >
             {currentVideo.title}
           </p>
         </div>

@@ -62,6 +62,7 @@ describe("public page meta", () => {
       "/portfolio",
       "/stock-footage",
       "/contact",
+      "/partners",
       "/socials",
       "/insights",
       "/book",

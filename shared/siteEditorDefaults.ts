@@ -3,6 +3,7 @@
  */
 
 import { LEGAL_BUSINESS_NAME } from "./businessContact.ts";
+import { CLIENT_REVIEWS } from "./clientReviews.ts";
 import { PUBLIC_PAGES } from "./siteSeo.ts";
 import {
   type ContentItem,
@@ -65,6 +66,7 @@ const PAGES: ContentPage[] = [
     block("promo", "Promo bar", [
       textField("visible", "Show promo bar", "true"),
       textField("text", "Promo text", "FREE AI STAGING ON YOUR FIRST ORDER - CODE: ICONICAI"),
+      linkField("link", "Promo link", "Free AI staging", "/book"),
     ]),
     block("brand", "Logo and color", [
       textField("logoText", "Logo wordmark", "ICONIC"),
@@ -130,6 +132,7 @@ const PAGES: ContentPage[] = [
       textField("titleAccent", "Title accent", "ARE"),
       textField("titleTail", "Title tail", "the Bar."),
       areaField("body", "Body", "We don’t follow trends. We break patterns. We don’t undercut. We outperform."),
+      videoField("video", "Phone video — only place this clip should appear", "/media/video/content-web-clip.mp4"),
     ]),
     block("market", "Our market", [
       textField("titleLead", "Title lead", "This Is"),
@@ -142,13 +145,13 @@ const PAGES: ContentPage[] = [
       textField("title", "Headline", "Your All-in-One Solution for High-Impact Media Content"),
       areaField("body", "Body", "Transform your raw ideas into engaging cinematic media in minutes. Whether you're a high-growth startup serving multiple clients or an established enterprise, Iconic helps you create professional-grade visual content seamlessly."),
     ], [
-      { id: "product", fields: [videoField("video", "Video", "/media/video/product-photography.mp4"), textField("title", "Title", "Product Photography")] },
-      { id: "vertical", fields: [videoField("video", "Video", "/media/reels/superpower-reel-12s.mp4"), textField("title", "Title", "Vertical Reel")] },
-      { id: "content", fields: [videoField("video", "Video", "/media/video/content-web-clip.mp4"), textField("title", "Title", "Content Package")] },
-      { id: "snap-luxury", fields: [videoField("video", "Video", "/media/videos/snap-reels/bayonne-snap.mp4"), textField("title", "Title", "Snap Reel · Luxury Tour")] },
-      { id: "snap-modern", fields: [videoField("video", "Video", "/media/videos/snap-reels/snap-reel-02.mp4"), textField("title", "Title", "Snap Reel · Modern Living")] },
-      { id: "snap-kitchen", fields: [videoField("video", "Video", "/media/videos/snap-reels/stoney-brook-blaze.mp4"), textField("title", "Title", "Snap Reel · Kitchen Glow")] },
-      { id: "snap-arrival", fields: [videoField("video", "Video", "/media/videos/snap-reels/hereford-way-snap.mp4"), textField("title", "Title", "Snap Reel · Grand Arrival")] },
+      { id: "slide-1", fields: [videoField("video", "Slide 1 video — keep the current listing film", "/media/video/product-photography.mp4"), textField("aspect", "Frame (16/9 or 9/16)", "16/9"), textField("title", "On-screen title", "Listing film")] },
+      { id: "slide-2", fields: [videoField("video", "Slide 2 video — premium listing, horizontal", "/media/videos/snap-reels/bayonne-snap.mp4"), textField("aspect", "Frame (16/9 or 9/16)", "9/16"), textField("title", "On-screen title", "Premium listing"), textField("note", "Editor note (not shown)", "Needs a horizontal premium listing video. Placeholder is a vertical listing reel.")] },
+      { id: "slide-3", fields: [videoField("video", "Slide 3 video — Emily Aguilar, vertical", "/media/blaze/02_US_v3.mp4"), textField("aspect", "Frame (16/9 or 9/16)", "9/16"), textField("title", "On-screen title", "Emily Aguilar"), textField("note", "Editor note (not shown)", "Needs Emily Aguilar's agent reel. Placeholder is a vertical on-camera portrait, not Emily.")] },
+      { id: "slide-4", fields: [videoField("video", "Slide 4 video — King Metals, horizontal", "/media/videos/snap-reels/forest-heights-blaze.mp4"), textField("aspect", "Frame (16/9 or 9/16)", "9/16"), textField("title", "On-screen title", "King Metals"), textField("note", "Editor note (not shown)", "Needs the King Metals commercial, horizontal. Placeholder is a vertical listing reel.")] },
+      { id: "slide-5", fields: [videoField("video", "Slide 5 video — Blaze reel, vertical", "/media/videos/snap-reels/arcane-court-blaze.mp4"), textField("aspect", "Frame (16/9 or 9/16)", "9/16"), textField("title", "On-screen title", "Blaze reel"), textField("note", "Editor note (not shown)", "Placeholder Blaze reel. Swap in the chosen vertical cut when it is ready.")] },
+      { id: "slide-6", fields: [videoField("video", "Slide 6 video — aerial only, horizontal", "/media/videos/snap-reels/tall-trees-blaze.mp4"), textField("aspect", "Frame (16/9 or 9/16)", "9/16"), textField("title", "On-screen title", "Aerial"), textField("note", "Editor note (not shown)", "Needs an aerial-only horizontal video. No aerial video is in the library yet. Placeholder is a vertical exterior reel.")] },
+      { id: "slide-7", fields: [videoField("video", "Slide 7 video — another agent, vertical", "/media/blaze/01_BUILT_v2.mp4"), textField("aspect", "Frame (16/9 or 9/16)", "9/16"), textField("title", "On-screen title", "Agent reel"), textField("note", "Editor note (not shown)", "Needs a second vertical agent reel. Placeholder is an on-location portrait film.")] },
     ]),
     block("stats", "Stats", [], [
       { id: "assets", fields: [textField("value", "Value", "100,000+"), textField("label", "Label", "Media assets produced")] },
@@ -160,28 +163,33 @@ const PAGES: ContentPage[] = [
       textField("title", "Headline", "From vision to viral in minutes, not days"),
       areaField("body", "Body", "Placing an order with Iconic is as simple as it gets. We handle the heavy lifting so you can focus on growth."),
     ], [
-      { id: "step-1", fields: [textField("step", "Step", "STEP 1"), textField("title", "Title", "Book your session"), areaField("body", "Body", "Select your creative service and schedule a time through our seamless partnership portal in just a few clicks.")] },
-      { id: "step-2", fields: [textField("step", "Step", "STEP 2"), textField("title", "Title", "We capture the vision"), areaField("body", "Body", "Our professional creative team arrives on-site with state-of-the-art equipment to capture high-impact raw media.")] },
-      { id: "step-3", fields: [textField("step", "Step", "STEP 3"), textField("title", "Title", "Rapid post-production"), areaField("body", "Body", "Our expert editors transform raw clips into polished, cinematic masterpieces that perfectly align with your brand.")] },
-      { id: "step-4", fields: [textField("step", "Step", "STEP 4"), textField("title", "Title", "Delivery & launch"), areaField("body", "Body", "Receive your ready-to-post assets within 24 hours. Download, publish, and dominate your social feed instantly.")] },
+      { id: "step-1", fields: [textField("step", "Step", "STEP 1"), textField("title", "Title", "Book your session"), areaField("body", "Body", "Select your creative service and schedule a time through our seamless partnership portal in just a few clicks."), imageField("image", "Photo", "/media/photos/lifestyle-mtz04327.jpg")] },
+      { id: "step-2", fields: [textField("step", "Step", "STEP 2"), textField("title", "Title", "We capture the vision"), areaField("body", "Body", "Our professional creative team arrives on-site with state-of-the-art equipment to capture high-impact raw media."), imageField("image", "Photo", "/media/photos/luxury-exterior.jpg")] },
+      { id: "step-3", fields: [textField("step", "Step", "STEP 3"), textField("title", "Title", "Rapid post-production"), areaField("body", "Body", "Our expert editors transform raw clips into polished, cinematic masterpieces that perfectly align with your brand."), imageField("image", "Photo", "/media/photos/luxury-interior.jpg")] },
+      { id: "step-4", fields: [textField("step", "Step", "STEP 4"), textField("title", "Title", "Delivery & launch"), areaField("body", "Body", "Receive your ready-to-post assets within 24 hours. Download, publish, and dominate your social feed instantly."), imageField("image", "Photo", "/media/launch/living_room_bright.jpg")] },
     ]),
     block("network", "The network", [
       textField("titleLead", "Title lead", "Built Bigger Than"),
       textField("titleAccent", "Title accent", "One Brand"),
-      areaField("body", "Body", "Iconic isn’t here to squeeze the market; we’re here to expand it."),
+      areaField("body", "Body", "We look forward to working with you. Collaborators, creators, producers, podcasters, and photographers are welcome here. Iconic was built to stand beside other media professionals, not to crowd them out."),
+      areaField("closer", "Closer", "Bring your clients and your craft. There is room for the work you already love."),
+    ], [
+      { id: "studio", fields: [imageField("image", "Studio photo", "/media/about/06_holiday_group_energy_16x9.jpg"), textField("alt", "Alt text", "A bright studio set with the team")] },
+      { id: "podcast", fields: [imageField("image", "Podcast set photo", "/media/photos/headshot-gracepoint-4.jpg"), textField("alt", "Alt text", "On-camera portrait, stand-in for a podcast set")] },
+      { id: "location", fields: [imageField("image", "On-location photo", "/media/photos/lifestyle-kennedy-mtz01127.jpg"), textField("alt", "Alt text", "On location, outdoors in full color")] },
+      { id: "wild", fields: [imageField("image", "Out in the wild photo", "/media/photos/drone-hero.jpg"), textField("alt", "Alt text", "Out on a property, from the air")] },
     ]),
     block("audience", "Who it’s for", [
       textField("badge", "Badge", "WHO IT'S FOR"),
-      textField("title", "Headline", "Tailored for real estate and visual storytelling professionals"),
-      areaField("body", "Body", "Iconic simplifies media creation for real estate professionals, builders, and business owners — helping you showcase your vision and grow your presence."),
+      textField("title", "Headline", "Who is Iconic for?"),
+      areaField("body", "Body", "We're more than just a company. What's a company anyway? A group of people doing what they do, helping others with what they need."),
     ]),
     block("audienceDetails", "Audiences", [], [
-      { id: "realtors", fields: [textField("title", "Title", "Realtors & Brokers"), areaField("body", "Body", "Attract leads, close faster, and win more listings with engaging property videos."), imageField("image", "Image", "/media/photos/lifestyle-mtz04327.jpg")] },
-      { id: "photographers", fields: [textField("title", "Title", "Photographers"), areaField("body", "Body", "Upsell AI videos with every order. More profit, no effort."), imageField("image", "Image", "/media/photos/studio-mtz01691.jpg")] },
-      { id: "media", fields: [textField("title", "Title", "Real Estate Media Companies"), areaField("body", "Body", "Scale your business and stay competitive with AI property videos — no extra overhead."), imageField("image", "Image", "/media/photos/drone-hero.jpg")] },
-      { id: "developers", fields: [textField("title", "Title", "Developers & Builders"), areaField("body", "Body", "Showcase new construction and development projects with cinematic fly-throughs."), imageField("image", "Image", "/media/photos/forest-heights-twilight-front.jpg")] },
-      { id: "business", fields: [textField("title", "Title", "Small Business Owners"), areaField("body", "Body", "Professional media content to tell your brand story and engage your local community."), imageField("image", "Image", "/media/photos/lifestyle-daughtery-mtz00636.jpg")] },
-      { id: "online", fields: [textField("title", "Title", "Online Appearance"), areaField("body", "Body", "High-impact visual identity for anyone looking to dominate their digital space."), imageField("image", "Image", "/media/photos/headshot-gracepoint-1.jpg")] },
+      { id: "realtors", fields: [textField("title", "Title", "Realtors & Brokers"), areaField("body", "Body", "Your listings deserve more than a photo dump. We help you show the house, the story, and the reason someone should call."), imageField("image", "Image", "/media/photos/lifestyle-kennedy-mtz01127.jpg")] },
+      { id: "developers", fields: [textField("title", "Title", "Developers & Builders"), areaField("body", "Body", "From the dirt lot to the model home, we help you show what you are building before a buyer ever walks the site."), imageField("image", "Image", "/media/photos/forest-heights-twilight-front.jpg")] },
+      { id: "business", fields: [textField("title", "Title", "Small Business Owners"), areaField("body", "Body", "You know your customers. We help you look like the business they already trust, online and in person."), imageField("image", "Image", "/media/photos/lifestyle-daughtery-mtz00636.jpg")] },
+      { id: "online", fields: [textField("title", "Title", "Online Appearance"), areaField("body", "Body", "Personal brands, headshots, and an on-camera presence. For the days you need to be seen, and seen well."), imageField("image", "Image", "/media/photos/headshot-gracepoint-1.jpg")] },
+      { id: "partners", fields: [textField("title", "Title", "Photographers & Real Estate Media Companies"), areaField("body", "Body", "If you already shoot for a living, come work on our platform. Bring your clients. We will help you deliver the rest."), imageField("image", "Image", "/media/photos/drone-hero.jpg"), textField("badge", "Ribbon", "Partners"), textField("cta", "Button", "Learn more"), textField("href", "Button link", "/partners")] },
     ]),
     block("snapReels", "Snap Reels", [
       textField("kicker", "Kicker", "Essentials"),
@@ -196,23 +204,52 @@ const PAGES: ContentPage[] = [
     block("features", "Add-on tools", [
       textField("badge", "Badge", "ADDITIONAL FEATURES"),
       textField("title", "Headline", "Go beyond basic editing with powerful add-on tools"),
-      areaField("body", "Body", "Iconic isn't just about reels — enhance your content with smart AI tools designed to polish, extend, and personalize every video."),
+      areaField("body", "Body", "Turn a still into motion, stage an empty room, finish a photo, and shape the cut in Studio."),
     ], [
-      { id: "snap", fields: [textField("title", "Title", "Snap Reels"), areaField("body", "Body", "Turn the listing stills into a 9:16 Snap Reel. A vertical cut buyers can watch before they ever book a showing.")] },
-      { id: "import", fields: [textField("title", "Title", "One Click Import"), areaField("body", "Body", "Pull listing photos directly from Realtor.com or Zillow to start your video in seconds.")] },
-      { id: "staging", fields: [textField("title", "Title", "AI Virtual Staging"), areaField("body", "Body", "Instantly furnish empty rooms with realistic AI staging to showcase your property's full potential.")] },
-      { id: "edits", fields: [textField("title", "Title", "AI Photo Edits"), areaField("body", "Body", "Make your listing photos stand out with AI-powered enhancements — like twilights, lawn repairs, and other edits that instantly elevate any property.")] },
-      { id: "studio", fields: [textField("title", "Title", "Studio"), areaField("body", "Body", "Iconic's built-in editor that allows you to customize your videos with templates, music, captions, branding, and even your own photos or clips.")] },
-      { id: "voice", fields: [textField("title", "Title", "AI Voiceovers"), areaField("body", "Body", "Instantly generate natural-sounding narrations from a wide range of voices.")] },
-      { id: "captions", fields: [textField("title", "Title", "Social Media Captions"), areaField("body", "Body", "Automatically create captions optimized for Instagram, Facebook, LinkedIn, YouTube, and X.")] },
-      { id: "avatars", fields: [textField("title", "Title", "AI Avatars"), areaField("body", "Body", "Create professional video presentations with AI-generated avatars for a personal touch.")] },
+      { id: "snap", fields: [
+        textField("title", "Title", "Iconic Snap Reels"),
+        areaField("body", "Body", "Photo to video. One listing still on the left, and that same photo in motion on the right."),
+        imageField("still", "Still photo — must match the video", "/media/videos/snap-reels/hereford-way-snap.jpg"),
+        videoField("video", "Motion video — same photo", "/media/videos/snap-reels/hereford-way-snap.mp4"),
+      ] },
+      { id: "staging", fields: [
+        textField("title", "Title", "AI Virtual Staging"),
+        areaField("body", "Body", "Empty room to furnished room, staged by Iconic. Drag the slider, then look across the angles."),
+        imageField("before", "Before", "/media/before-after/pavilion-empty.jpg"),
+        imageField("after", "After", "/media/before-after/pavilion-lifestyle.jpg"),
+        imageField("angle1", "Angle 1", "/media/photos/listing-living-01.jpg"),
+        imageField("angle2", "Angle 2", "/media/photos/listing-living-02.jpg"),
+        imageField("angle3", "Angle 3", "/media/photos/listing-living-03.jpg"),
+        imageField("angle4", "Angle 4", "/media/photos/listing-living-04.jpg"),
+        textField("callout", "Free staging callout", "Iconic clients get FREE staging — info inside"),
+      ] },
+      { id: "edits", fields: [
+        textField("title", "Title", "Bring your photos to life with After Iconic AI renders"),
+        areaField("body", "Body", "Twilight, sky, and the finish that makes a daylight photo feel like the evening a buyer wants to walk into."),
+        imageField("before", "Before", "/media/before-after/twilight-pool-day.jpg"),
+        imageField("after", "After", "/media/before-after/twilight-pool-lifestyle.jpg"),
+      ] },
+      { id: "studio", fields: [
+        textField("title", "Title", "Studio"),
+        areaField("body", "Body", "Iconic's built-in editor for templates, music, captions, branding, and your own photos or clips."),
+        imageField("image", "Studio editor screenshot", "/media/photos/luxury-a7305553.jpg"),
+        textField("note", "Editor note (not shown)", "Needs a real screenshot of Iconic's built-in Studio editor. Placeholder is a listing still."),
+      ] },
     ]),
     block("reviews", "Reviews", [
       textField("badge", "Badge", "TESTIMONIALS"),
       textField("title", "Headline", "What our clients are saying"),
       areaField("body", "Body", "Agents and businesses trust Iconic Images for listing photography, video, and a fast, professional turnaround."),
       linkField("cta", "Button", "Book a shoot", "/book"),
-    ]),
+    ], CLIENT_REVIEWS.map((review, index) => ({
+      id: `review-${index + 1}`,
+      fields: [
+        textField("initials", "Initials", review.initials),
+        textField("role", "Source", review.role),
+        textField("stars", "Stars", String(review.stars)),
+        areaField("quote", "Quote", review.quote),
+      ],
+    }))),
     block("faq", "FAQ", [
       textField("badge", "Badge", "FAQ"),
       textField("title", "Headline", "Got questions? We've got answers."),
@@ -237,7 +274,7 @@ const PAGES: ContentPage[] = [
       textField("titleAccent", "Title accent", "Price"),
       textField("titleTail", "Title tail", "for Your Presence"),
       textField("subtitle", "Subtitle", "Media that moves as fast as you do."),
-      videoField("background", "Background video", "/media/video/content-web-clip.mp4"),
+      videoField("background", "Background video", "/media/holiday/hero-web.mp4"),
     ]),
     block("chips", "Section jumps", [], [
       { id: "listings", fields: [textField("label", "Label", "FOR LISTINGS"), textField("anchor", "Anchor", "listings")] },
@@ -295,6 +332,16 @@ const PAGES: ContentPage[] = [
     block("tour", "Sample tour", [
       textField("title", "Headline", "Sample tour"),
       textField("embedTitle", "Tour title", "Sample tour of a Woodlands-area senior living community"),
+    ]),
+  ]),
+
+  page("partners", "/partners", "Partners", [
+    block("hero", "Hero", [
+      textField("kicker", "Kicker", "Coming soon"),
+      textField("title", "Headline", "Work with Iconic"),
+      areaField("body", "Body", "Photographers and real estate media companies can sign up to work on Iconic's platform. Tell us about your studio. We will be in touch. This note stays with our team, and we do not email you a copy."),
+      textField("success", "Success message", "You're on the list. We'll be in touch."),
+      textField("submit", "Button", "Send my interest"),
     ]),
   ]),
 

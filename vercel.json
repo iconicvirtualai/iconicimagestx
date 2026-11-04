@@ -839,6 +839,26 @@
       ]
     },
     {
+      "source": "/partners",
+      "destination": "/seo/www/partners.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/partners/",
+      "destination": "/seo/www/partners.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.iconicimagestx.com"
+        }
+      ]
+    },
+    {
       "source": "/socials",
       "destination": "/seo/www/socials.html",
       "has": [
@@ -1161,6 +1181,26 @@
     {
       "source": "/contact/",
       "destination": "/seo/www/contact.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/partners",
+      "destination": "/seo/www/partners.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/partners/",
+      "destination": "/seo/www/partners.html",
       "has": [
         {
           "type": "host",
@@ -1547,6 +1587,14 @@
     {
       "source": "/contact/",
       "destination": "/seo/contact.html"
+    },
+    {
+      "source": "/partners",
+      "destination": "/seo/partners.html"
+    },
+    {
+      "source": "/partners/",
+      "destination": "/seo/partners.html"
     },
     {
       "source": "/socials",

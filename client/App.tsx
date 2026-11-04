@@ -30,6 +30,7 @@ import About from "./pages/About";
 import Portfolio from "./pages/Portfolio";
 import Studio105 from "./pages/Studio105";
 import Contact from "./pages/Contact";
+import Partners from "./pages/Partners";
 import Book from "./pages/Book";
 import SeniorLiving from "./pages/SeniorLiving";
 import Apprenticeship from "./pages/Apprenticeship";
@@ -155,6 +156,7 @@ const App = () => (
             <Route path="/portfolio" element={<Portfolio />} />
             <Route path="/studio-105" element={<Studio105 />} />
             <Route path="/contact" element={<Contact />} />
+            <Route path="/partners" element={<Partners />} />
             <Route path="/book" element={<Book />} />
             <Route path="/thankful-rsvp" element={<ThankfulRsvpRedirect />} />
             <Route path="/senior-living" element={<SeniorLiving />} />

@@ -26,14 +26,21 @@ function cleanField(field: ContentField, fallback?: ContentField): ContentField 
   return next;
 }
 
-function cleanItem(item: ContentItem, allowed: Set<string> | null): ContentItem | null {
-  if (!item?.id || !Array.isArray(item.fields)) return null;
-  const fields = item.fields
-    .map((field) => cleanField(field))
-    .filter((field): field is ContentField => Boolean(field))
-    .filter((field) => !allowed || allowed.has(field.id));
-  if (!fields.length) return null;
-  return { id: String(item.id).slice(0, 80), fields };
+/**
+ * Default items are the slots. A saved item with the same id keeps its copy.
+ * Items that are no longer in the defaults drop out, and new slots appear.
+ */
+function mergeItems(saved: ContentItem[] | undefined, fallback: ContentItem[]): ContentItem[] {
+  const savedById = new Map((saved ?? []).map((item) => [item.id, item]));
+  return fallback.slice(0, MAX_ITEMS).map((base) => {
+    const incoming = savedById.get(base.id);
+    if (!incoming) return { id: base.id, fields: base.fields.map((field) => ({ ...field })) };
+    const fields = base.fields.map((field) => {
+      const found = incoming.fields?.find((item) => item.id === field.id);
+      return cleanField(found || field, field)!;
+    });
+    return { id: base.id, fields };
+  });
 }
 
 function cleanBlock(block: ContentBlock, fallback?: ContentBlock): ContentBlock | null {
@@ -43,12 +50,7 @@ function cleanBlock(block: ContentBlock, fallback?: ContentBlock): ContentBlock 
     const incoming = block.fields?.find((item) => item.id === field.id);
     return cleanField(incoming || field, field)!;
   });
-  const allowedItemFields = new Set((fallback?.items ?? []).flatMap((item) => item.fields.map((field) => field.id)));
-  const items = fallback?.items
-    ? (Array.isArray(block.items)
-      ? block.items.map((item) => cleanItem(item, allowedItemFields)).filter((item): item is ContentItem => Boolean(item)).slice(0, MAX_ITEMS)
-      : fallback.items)
-    : undefined;
+  const items = fallback?.items ? mergeItems(block.items, fallback.items) : undefined;
   return {
     id: String(block.id),
     label: String(block.label || fallback?.label || block.id),

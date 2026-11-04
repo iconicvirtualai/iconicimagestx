@@ -10,6 +10,7 @@ export default function RaisingTheStandard() {
   const titleAccent = useSiteText("home", "raising", "titleAccent", "ARE");
   const titleTail = useSiteText("home", "raising", "titleTail", "the Bar.");
   const body = useSiteText("home", "raising", "body", RAISING_BODY);
+  const video = useSiteText("home", "raising", "video", "/media/video/content-web-clip.mp4");
   return (
     <section className="py-24 bg-black overflow-hidden border-t border-white/5">
       <div className="container mx-auto px-4">
@@ -22,7 +23,11 @@ export default function RaisingTheStandard() {
 
               {/* Video Content */}
               <video
-                src="/media/video/content-web-clip.mp4"
+                src={video}
+                data-site-page="home"
+                data-site-block="raising"
+                data-site-field="video"
+                data-site-kind="video"
                 autoPlay
                 loop
                 muted
