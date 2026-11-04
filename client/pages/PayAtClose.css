@@ -535,3 +535,47 @@
 .pac-page .footer-inner { display: flex; flex-wrap: wrap; gap: 1rem; justify-content: space-between; align-items: center; }
 .pac-page .footnote { margin-top: 1rem; font-size: 0.72rem; line-height: 1.45; max-width: 60rem; }
 .pac-page .work { background: var(--bg); padding-top: 3rem; }
+.pac-page .estate-row {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+@media (min-width: 800px) {
+  .pac-page .estate-row { grid-template-columns: 1.45fr 0.55fr; align-items: stretch; }
+}
+.pac-page .estate-tour,
+.pac-page .estate-reel-card {
+  margin: 0;
+  position: relative;
+  border-radius: 1.1rem;
+  overflow: hidden;
+  background: #111;
+}
+.pac-page .estate-tour video {
+  width: 100%;
+  aspect-ratio: 16/9;
+  object-fit: cover;
+  display: block;
+}
+.pac-page .estate-reel {
+  width: 100%;
+  aspect-ratio: 9/16;
+  max-height: 640px;
+  object-fit: cover;
+  display: block;
+  background: #111;
+}
+.pac-page .estate-tour figcaption,
+.pac-page .estate-reel-card figcaption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 1.5rem 0.9rem 0.8rem;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.75));
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -23,12 +23,75 @@ import {
 } from "@shared/titusPayAtCloseSchedule";
 import "./PayAtClose.css";
 
+const LUXURY = "/media/pay-at-close/luxury";
+/** The vertical reel opens on twilight. Playback starts at the first bright interior. */
+const REEL_BRIGHT_START = 1.2;
+
 const GALLERY = [
-  { src: "/media/videos/snap-reels/woodville-blaze-v4.jpg", alt: "Bright daytime listing exterior", caption: "Daylight front" },
-  { src: "/media/videos/snap-reels/heron-wing-blaze-v2.jpg", alt: "Bright kitchen interior", caption: "Bright interior" },
-  { src: "/media/pay-at-close/forest-heights-blaze-poster.jpg", alt: "Blue-sky listing exterior", caption: "Blue sky" },
-  { src: "/media/pay-at-close/daytime-front.jpg", alt: "Daytime listing exterior", caption: "Listing still" },
+  { src: `${LUXURY}/marias/01-front-day.jpg`, alt: "Daytime front of a 10,000+ sq ft estate", caption: "10,000+ sq ft estate" },
+  { src: `${LUXURY}/shore/01-aerial-lake.jpg`, alt: "Waterfront estate from the air", caption: "Waterfront estate" },
+  { src: `${LUXURY}/pool-rd/07-front-day.jpg`, alt: "Daytime front of a luxury estate", caption: "Estate arrival" },
+  { src: `${LUXURY}/marias/06-aerial-day.jpg`, alt: "Aerial of a luxury estate", caption: "Estate from the air" },
 ] as const;
+
+function EstateReel() {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [bright, setBright] = useState(false);
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    let seeking = false;
+    const jump = () => {
+      if (video.currentTime >= REEL_BRIGHT_START) {
+        setBright(true);
+        return;
+      }
+      if (seeking) return;
+      seeking = true;
+      video.currentTime = REEL_BRIGHT_START;
+    };
+    const replay = () => {
+      seeking = true;
+      video.currentTime = REEL_BRIGHT_START;
+      void video.play();
+    };
+    video.addEventListener("loadeddata", jump);
+    video.addEventListener("play", jump);
+    video.addEventListener("timeupdate", jump);
+    video.addEventListener("seeked", () => {
+      seeking = false;
+      if (video.currentTime >= REEL_BRIGHT_START) {
+        setBright(true);
+        void video.play();
+      }
+    });
+    video.addEventListener("ended", replay);
+    return () => {
+      video.removeEventListener("loadeddata", jump);
+      video.removeEventListener("play", jump);
+      video.removeEventListener("timeupdate", jump);
+      video.removeEventListener("ended", replay);
+    };
+  }, []);
+  return (
+    <>
+      {bright ? null : (
+        <img className="estate-reel" src={`${LUXURY}/marias/poster-snap.jpg`} alt="" />
+      )}
+      <video
+        ref={videoRef}
+        className="estate-reel"
+        src={`${LUXURY}/marias/MariasWay_MarketingSnap_v1.mp4#t=${REEL_BRIGHT_START}`}
+        poster={`${LUXURY}/marias/poster-snap.jpg`}
+        muted
+        autoPlay
+        playsInline
+        aria-label="Vertical reel of a bright estate interior"
+        style={bright ? undefined : { position: "absolute", width: 1, height: 1, opacity: 0 }}
+      />
+    </>
+  );
+}
 
 function priceLabel(amount: number | null): string {
   return amount == null ? "—" : formatCatalogDollars(amount);
@@ -109,7 +172,7 @@ export default function PayAtClose() {
 
   return (
     <div className="pac-page" data-testid="pay-at-close-landing">
-      <div className="urgency">New · Pay at Close with Titus · <span>{dueToday} due today</span> · Order your listing media now</div>
+      <div className="urgency">New · Pay at Close with Titus · <span>{dueToday} due today</span> · Order estate media now</div>
 
       <header className="nav">
         <div className="wrap nav-inner">
@@ -126,13 +189,13 @@ export default function PayAtClose() {
         </div>
       </header>
 
-      <section className="hero" style={{ ["--hero" as string]: "url(/media/photos/drone-hero.jpg)" }}>
+      <section className="hero" style={{ ["--hero" as string]: `url(${LUXURY}/marias/01-front-day.jpg)` }}>
         <div className="hero-bg" aria-hidden="true" />
         <div className="wrap hero-content">
           <div className="pill">Pay at Close · Powered by Titus</div>
           <h1>Book now.<br /><em>Pay at closing.</em></h1>
           <p className="hero-lead">
-            Get Market Leader media, Legacy cinema, Showcase aerials — the full Iconic stack —
+            Estate-scale media — Market Leader, Legacy cinema, Showcase aerials — for homes over 6,000 square feet,
             with <strong>{dueToday} due today</strong>. Titus pays Iconic now. You settle from sale proceeds when the home closes.
           </p>
           <div className="hero-actions">
@@ -350,8 +413,26 @@ export default function PayAtClose() {
 
       <section className="work">
         <div className="wrap">
-          <p className="section-kicker">Real Iconic work</p>
-          <h2 className="section-title">This is what buyers feel.</h2>
+          <p className="section-kicker">Homes over 6,000 square feet</p>
+          <h2 className="section-title">Estate scale. Daylight.</h2>
+          <div className="estate-row">
+            <figure className="estate-tour">
+              <video
+                src={`${LUXURY}/shore/shore-tour-30s.mp4`}
+                poster={`${LUXURY}/shore/01-aerial-lake.jpg`}
+                muted
+                autoPlay
+                loop
+                playsInline
+                aria-label="Daytime tour of a waterfront estate"
+              />
+              <figcaption>Waterfront estate tour</figcaption>
+            </figure>
+            <figure className="estate-reel-card">
+              <EstateReel />
+              <figcaption>10,000+ sq ft estate</figcaption>
+            </figure>
+          </div>
           <div className="gallery">
             {GALLERY.map((shot) => (
               <figure key={shot.src}>
@@ -405,10 +486,10 @@ export default function PayAtClose() {
 
       <section>
         <div className="wrap">
-          <div className="final-cta" style={{ ["--cta" as string]: "url(/media/pay-at-close/daytime-front.jpg)" }}>
+          <div className="final-cta" style={{ ["--cta" as string]: `url(${LUXURY}/pool-rd/07-front-day.jpg)` }}>
             <div className="final-cta-bg" aria-hidden="true" />
             <h2>Stop waiting for the commission check.</h2>
-            <p>Order Market Leader energy today. Pay when the deal closes. Your listing looks Iconic while the other guy is still waiting on budget.</p>
+            <p>Order Market Leader energy for the estate today. Pay when the deal closes. The house looks Iconic while the other listing is still waiting on budget.</p>
             <div className="final-actions">
               <Link className="btn btn-teal" to={bookPayAtCloseHref()}>Order now — pay at close</Link>
               <a className="btn btn-ghost" href={TITUS_ESTIMATE_URL}>Check my Titus rate</a>
