@@ -37,13 +37,15 @@ export default function SnapReelsStrip() {
                   loop
                   playsInline
                   preload="metadata"
-                  aria-label={`Snap Reel — ${reel.title}`}
+                  aria-label={reel.title ? `Snap Reel — ${reel.title}` : "Snap Reel"}
                 />
               </div>
               <figcaption className="mt-4 text-center">
                 <p className="text-[10px] font-black uppercase tracking-[0.22em] text-teal-600">Snap Reel</p>
-                <p data-site-page="home" data-site-block="snapReels" data-site-item={reel.id} data-site-field="title" data-site-kind="text" className="mt-1 text-sm font-bold text-black">{reel.title}</p>
-                <p data-site-page="home" data-site-block="snapReels" data-site-item={reel.id} data-site-field="vibe" data-site-kind="text" className="text-xs text-gray-500">{reel.vibe}</p>
+                {reel.title ? (
+                  <p data-site-page="home" data-site-block="snapReels" data-site-item={reel.id} data-site-field="title" data-site-kind="text" className="mt-1 text-sm font-bold text-black">{reel.title}</p>
+                ) : null}
+                <p data-site-page="home" data-site-block="snapReels" data-site-item={reel.id} data-site-field="vibe" data-site-kind="text" className="mt-1 text-xs text-gray-500">{reel.vibe}</p>
               </figcaption>
             </figure>
           ))}

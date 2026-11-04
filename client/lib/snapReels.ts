@@ -15,7 +15,7 @@ export const SNAP_REELS: readonly SnapReel[] = [
   {
     src: "/media/videos/snap-reels/snap-reel-02.mp4",
     title: "Modern Living",
-    vibe: "Clean lines and open rooms, cut for the feed",
+    vibe: "Open rooms and a calm line through the house",
   },
   {
     src: "/media/videos/snap-reels/stoney-brook-blaze.mp4",
@@ -31,34 +31,31 @@ export const SNAP_REELS: readonly SnapReel[] = [
   },
 ] as const;
 
-/**
- * Homepage strip. Cards 1–3 are the newer Blaze cuts.
- * Heron Wing stays, with heron-wing-blaze in place of the MarketingSnap.
- */
+/** Homepage strip. Captions stay free of street names and addresses. */
 export const SNAP_REEL_STRIP: readonly SnapReel[] = [
   {
     src: "/media/videos/snap-reels/forest-heights-blaze.mp4",
     poster: "/media/videos/snap-reels/forest-heights-blaze.jpg",
-    title: "Forest Heights",
-    vibe: "Front elevation, paced for a vertical scroll",
+    title: "",
+    vibe: "Daylight on brick and stone, the arrival buyers picture first.",
   },
   {
     src: "/media/videos/snap-reels/arcane-court-blaze.mp4",
     poster: "/media/videos/snap-reels/arcane-court-blaze.jpg",
-    title: "Arcane Court",
-    vibe: "A wide front elevation, cut for the feed",
+    title: "",
+    vibe: "A broad facade in the shade, easy to take in at a glance.",
   },
   {
     src: "/media/videos/snap-reels/tall-trees-blaze.mp4",
     poster: "/media/videos/snap-reels/tall-trees-blaze.jpg",
-    title: "Tall Trees",
-    vibe: "Stone entry, cut for the feed",
+    title: "",
+    vibe: "Stone at the door, with a quiet beat before the interior.",
   },
   {
     src: "/media/videos/snap-reels/heron-wing-blaze.mp4",
     poster: "/media/videos/snap-reels/heron-wing-blaze.jpg",
-    title: "Heron Wing",
-    vibe: "Clean lines and still water, cut for the feed",
+    title: "",
+    vibe: "A covered porch that opens the showing on a welcoming note.",
   },
 ] as const;
 

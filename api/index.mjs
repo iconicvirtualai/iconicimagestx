@@ -31990,10 +31990,10 @@ const PAGES = [
       textField("title", "Headline", "Snap Reels"),
       areaField("body", "Body", "Listing stills, turned into a 9:16 Snap Reel. Same-day vertical video from the photos we already shoot.")
     ], [
-      { id: "forest", fields: [videoField("video", "Video", "/media/videos/snap-reels/forest-heights-blaze.mp4"), textField("title", "Title", "Forest Heights"), textField("vibe", "Caption", "Front elevation, paced for a vertical scroll")] },
-      { id: "arcane", fields: [videoField("video", "Video", "/media/videos/snap-reels/arcane-court-blaze.mp4"), textField("title", "Title", "Arcane Court"), textField("vibe", "Caption", "A wide front elevation, cut for the feed")] },
-      { id: "tall", fields: [videoField("video", "Video", "/media/videos/snap-reels/tall-trees-blaze.mp4"), textField("title", "Title", "Tall Trees"), textField("vibe", "Caption", "Stone entry, cut for the feed")] },
-      { id: "heron", fields: [videoField("video", "Video", "/media/videos/snap-reels/heron-wing-blaze.mp4"), textField("title", "Title", "Heron Wing"), textField("vibe", "Caption", "Clean lines and still water, cut for the feed")] }
+      { id: "forest", fields: [videoField("video", "Video", "/media/videos/snap-reels/forest-heights-blaze.mp4"), textField("title", "Title", ""), textField("vibe", "Caption", "Daylight on brick and stone, the arrival buyers picture first.")] },
+      { id: "arcane", fields: [videoField("video", "Video", "/media/videos/snap-reels/arcane-court-blaze.mp4"), textField("title", "Title", ""), textField("vibe", "Caption", "A broad facade in the shade, easy to take in at a glance.")] },
+      { id: "tall", fields: [videoField("video", "Video", "/media/videos/snap-reels/tall-trees-blaze.mp4"), textField("title", "Title", ""), textField("vibe", "Caption", "Stone at the door, with a quiet beat before the interior.")] },
+      { id: "heron", fields: [videoField("video", "Video", "/media/videos/snap-reels/heron-wing-blaze.mp4"), textField("title", "Title", ""), textField("vibe", "Caption", "A covered porch that opens the showing on a welcoming note.")] }
     ]),
     block("features", "Add-on tools", [
       textField("badge", "Badge", "ADDITIONAL FEATURES"),
