@@ -136,11 +136,11 @@ export function estimateTitusPayAtClose(input: {
   const fee = media * rate;
   const payoff = media + fee;
   const overCap = media > cap;
-  let note = "Estimate only. Soft credit pull for pre-qualification. The exact fee is shown before you accept with our financing Partner.";
+  let note = "Estimate only. Soft credit pull for prequalification. The exact fee is shown before you accept with our financing Partner.";
   if (overCap) {
     note = `Your media total exceeds the typical $${cap.toLocaleString("en-US")} deferral cap for this credit tier. Trim the order or confirm a higher approval with our Partner.`;
   } else if (media === 0) {
-    note = `Pick packages above. This estimate uses our Partner's Texas ${input.role} flat fees. Soft pull for pre-qualification. The exact fee is shown before you accept.`;
+    note = `Pick packages above. This estimate uses our Partner's Texas ${input.role} flat fees. Soft pull for prequalification. The exact fee is shown before you accept.`;
   } else {
     note = `Estimate: $0 due now · ${formatScheduleDollars(payoff)} at close (media + ${titusFeePercentLabel(rate)} Partner flat fee). Term: due at sale or 6 months. Confirm on your Partner estimate.`;
   }

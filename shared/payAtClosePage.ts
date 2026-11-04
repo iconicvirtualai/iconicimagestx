@@ -218,18 +218,18 @@ export const PAY_AT_CLOSE_ESTATES: readonly PayAtCloseEstate[] = [
       poster: `${ESTATE_MEDIA}/marias/poster-snap.jpg`,
       alt: "Vertical reel of a bright estate interior",
       startAt: 1.2,
-      caption: "10,000+ sq ft estate",
+      caption: "10,065 sq ft reel",
     },
     gallery: [
       {
         src: `${ESTATE_MEDIA}/marias/01-front-day.jpg`,
-        alt: "Daytime front of a 10,000+ sq ft estate",
-        caption: "10,000+ sq ft estate",
+        alt: "Daytime front of a 10,065 sq ft estate",
+        caption: "10,065 sq ft front",
       },
       {
         src: `${ESTATE_MEDIA}/marias/06-aerial-day.jpg`,
-        alt: "Aerial of a luxury estate",
-        caption: "Estate from the air",
+        alt: "Aerial of a 10,065 sq ft estate",
+        caption: "10,065 sq ft aerial",
       },
     ],
   },
@@ -238,8 +238,8 @@ export const PAY_AT_CLOSE_ESTATES: readonly PayAtCloseEstate[] = [
     gallery: [
       {
         src: `${ESTATE_MEDIA}/shore/01-aerial-lake.jpg`,
-        alt: "Waterfront estate from the air",
-        caption: "Waterfront estate",
+        alt: "Aerial of a 7,920 sq ft waterfront estate",
+        caption: "7,920 sq ft lake",
       },
     ],
   },
@@ -247,14 +247,14 @@ export const PAY_AT_CLOSE_ESTATES: readonly PayAtCloseEstate[] = [
     id: "pool-rd",
     feature: {
       src: `${ESTATE_MEDIA}/pool-rd/02-backyard-pool.jpg`,
-      alt: "Resort backyard at a luxury estate",
-      caption: "Resort backyard",
+      alt: "Pool at a 9,061 sq ft estate",
+      caption: "9,061 sq ft pool",
     },
     gallery: [
       {
         src: `${ESTATE_MEDIA}/pool-rd/07-front-day.jpg`,
-        alt: "Daytime front of a luxury estate",
-        caption: "Estate arrival",
+        alt: "Daytime front of a 9,061 sq ft estate",
+        caption: "9,061 sq ft front",
       },
     ],
   },

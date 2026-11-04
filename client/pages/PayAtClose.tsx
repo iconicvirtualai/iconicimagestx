@@ -177,7 +177,9 @@ export default function PayAtClose() {
   const showcasePrice = priceOf("listing-showcase");
   const showcaseAtClose = showcasePrice == null ? null : showcasePrice * 1.04;
   const dueToday = formatScheduleDollars(TITUS_TEXAS_PAY_AT_CLOSE.dueToday);
-  const topCap = formatScheduleDollars(titusTopDeferralCap());
+  const topCapAmount = titusTopDeferralCap();
+  const topCap = formatScheduleDollars(topCapAmount);
+  const topCapShort = topCapAmount >= 1000 && topCapAmount % 1000 === 0 ? `$${topCapAmount / 1000}K` : topCap;
 
   const togglePackage = (id: string) => {
     setSelected((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]));
@@ -190,7 +192,7 @@ export default function PayAtClose() {
 
   return (
     <div className="pac-page" data-testid="pay-at-close-landing">
-      <div className="urgency">New · Pay at Close · <span>{dueToday} due today</span> · Spoil yourself</div>
+      <div className="urgency">Pay at Close · <span>{dueToday} due today</span></div>
 
       <header className="nav">
         <div className="wrap nav-inner">
@@ -221,9 +223,9 @@ export default function PayAtClose() {
             <a className="btn btn-ghost" href="#calculator">Estimate my payoff</a>
           </div>
           <div className="hero-stats">
-            <div className="hero-stat"><strong>{dueToday}</strong><span>Due today</span></div>
-            <div className="hero-stat"><strong>Up to {topCap}</strong><span>Defer till close</span></div>
-            <div className="hero-stat"><strong>~2 min</strong><span>Partner application</span></div>
+            <div className="hero-stat"><strong>{dueToday} today</strong><span>Due now</span></div>
+            <div className="hero-stat"><strong>{topCapShort}</strong><span>Max defer</span></div>
+            <div className="hero-stat"><strong>~2 min</strong><span>To apply</span></div>
           </div>
         </div>
       </section>
@@ -404,13 +406,13 @@ export default function PayAtClose() {
       <section id="how">
         <div className="wrap">
           <p className="section-kicker">Three steps</p>
-          <h2 className="section-title">How Pay at Close works</h2>
+          <h2 className="section-title">How Pay at<br />Close works</h2>
           <p className="section-sub">The same three steps our financing Partner uses for Iconic.</p>
           <div className="steps">
             <div className="step">
               <div className="step-num">1</div>
               <h3>Apply in ~2 minutes</h3>
-              <p>Agent or homeowner completes a short application with our financing Partner. Soft credit pull — does not ding your score for pre-qualification.</p>
+              <p>Agent or homeowner completes a short application with our financing Partner. Soft credit pull — does not ding your score for prequalification.</p>
             </div>
             <div className="step">
               <div className="step-num">2</div>
@@ -487,14 +489,14 @@ export default function PayAtClose() {
             </details>
             <details>
               <summary>Will this hurt my credit?</summary>
-              <p>Our financing Partner uses a <strong>soft pull</strong> for pre-qualification. Delinquency after funding may be reported and could affect credit.</p>
+              <p>Our financing Partner uses a <strong>soft pull</strong> for prequalification. Delinquency after funding may be reported and could affect credit.</p>
             </details>
             <details>
               <summary>Who qualifies?</summary>
               <p>Homeowners: own the listed property, signed listing agreement, within our Partner’s limits, minimum credit by state. Agents: active license, signed listing agreement, payment under half of expected commission, minimum credit. Texas is fully supported for agents and homeowners.</p>
             </details>
             <details>
-              <summary>Is monthly social (Content Partner) eligible?</summary>
+              <summary>Is Content Partner eligible?</summary>
               <p>Pay at Close is built for <strong>listing prep</strong> tied to a subject property. Listing packages are the natural fit. Monthly retainers and brand campaigns may need a confirmed listing context — verify on your Partner estimate. <span className="confirm-tag">Confirm with our Partner</span></p>
             </details>
           </div>
@@ -505,8 +507,8 @@ export default function PayAtClose() {
         <div className="wrap">
           <div className="final-cta" style={{ ["--cta" as string]: `url(${LUXURY}/pool-rd/07-front-day.jpg)` }}>
             <div className="final-cta-bg" aria-hidden="true" />
-            <h2>Spoil yourself. Pay at close.</h2>
-            <p>Take the estate package. Take advantage of our discounts with Pay at Close. The house looks Iconic while the other listing is still waiting on budget.</p>
+            <h2>Spoil yourself.<br />Pay at close.</h2>
+            <p>Take the estate package and our Pay at Close discounts. The house looks Iconic while the other listing is still waiting on budget.</p>
             <div className="final-actions">
               <Link className="btn btn-teal" to={bookPayAtCloseHref()}>Order now — pay at close</Link>
               <a className="btn btn-ghost" href={TITUS_ESTIMATE_URL}>Get your Partner estimate</a>
@@ -518,7 +520,7 @@ export default function PayAtClose() {
       <footer>
         <div className="wrap footer-inner">
           <img src="/media/logos/logo-black-large.png" alt="Iconic Images" style={{ height: 28, width: "auto" }} />
-          <div>
+          <div className="footer-links">
             <Link to={bookPayAtCloseHref()} style={{ fontWeight: 800, color: "var(--teal)" }}>Book</Link>
             {" · "}
             <Link to="/" style={{ fontWeight: 700 }}>Iconic Images</Link>
