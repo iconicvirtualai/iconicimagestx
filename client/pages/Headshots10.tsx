@@ -12,8 +12,10 @@ import {
   HEADSHOTS_DOUBLE_SLOT_AT,
   HEADSHOTS_FACTS,
   HEADSHOTS_FULL_LINE,
+  HEADSHOTS_BOOKING_FEE,
   HEADSHOTS_H1,
   HEADSHOTS_HOLD_MINUTES,
+  HEADSHOTS_UNIT_PRICE,
   HEADSHOTS_MAX_QUANTITY,
   HEADSHOTS_RESERVE_LINE,
   HEADSHOTS_STUDIO_ADDRESS,
@@ -33,6 +35,7 @@ import {
   upcomingHeadshotTuesdays,
 } from "@shared/headshots10";
 import { sanitizeGclid, withGclid } from "@shared/realestate75";
+import { withCurrentDollars } from "@shared/publicPrices";
 
 const GCLID_KEY = "headshots-gclid";
 const DRAFT_KEY = "headshots-draft";
@@ -435,11 +438,11 @@ export default function Headshots10() {
   const chips = [1, 3, 5, 10].filter((count) => count <= maxQuantity);
 
   const faqs: Array<{ q: string; a: string }> = [
-    { q: "How much is a headshot?", a: "Headshots are $10 each. Buy as many as you like." },
+    { q: "How much is a headshot?", a: withCurrentDollars("Headshots are $10 each. Buy as many as you like.", HEADSHOTS_UNIT_PRICE, rates.headshotsUnitPrice) },
     { q: "When is it?", a: "Every Tuesday, 10am to 2pm." },
     { q: "Where is it?", a: `${HEADSHOTS_STUDIO_LINE}.` },
     { q: "Do I need to book?", a: HEADSHOTS_RESERVE_LINE },
-    { q: "Can I pay at the event?", a: HEADSHOT_PAY_FAQ },
+    { q: "Can I pay at the event?", a: rates.headshotsUnitPrice === HEADSHOTS_UNIT_PRICE && rates.headshotsBookingFee === HEADSHOTS_BOOKING_FEE && rates.processingPercent === 2.8 ? HEADSHOT_PAY_FAQ : withCurrentDollars(HEADSHOT_PAY_FAQ, HEADSHOTS_BOOKING_FEE, rates.headshotsBookingFee) },
     { q: "Do you do other photography?", a: "Yes. See all Iconic Images services." },
   ];
 
@@ -465,7 +468,7 @@ export default function Headshots10() {
           <div>
             <div className="mb-4 h-2 w-24 bg-[#00B4C8]" aria-hidden="true" />
             <h1 className="max-w-xl text-[2rem] font-extrabold leading-tight tracking-tight sm:text-5xl">
-              {HEADSHOTS_H1}
+              {withCurrentDollars(HEADSHOTS_H1, HEADSHOTS_UNIT_PRICE, rates.headshotsUnitPrice)}
             </h1>
             <p className="mt-4 max-w-xl text-lg leading-snug">
               Tuesdays 10am-2pm at Iconic Studios in Spring. Buy as many headshots as you like.
@@ -549,7 +552,7 @@ export default function Headshots10() {
         ) : null}
 
         <section id="pricing" className="mx-auto w-full max-w-6xl px-4 pb-14" data-testid="headshots-pricing">
-          <h2 className="text-3xl font-extrabold tracking-tight">$10 per headshot</h2>
+          <h2 className="text-3xl font-extrabold tracking-tight">{withCurrentDollars("$10 per headshot", HEADSHOTS_UNIT_PRICE, rates.headshotsUnitPrice)}</h2>
           <p className="mt-2 text-lg">Buy as many as you like.</p>
           <div className="mt-6 flex flex-wrap items-center gap-3">
             <div className="inline-flex items-center rounded-full border border-[#081228]/20 bg-white" role="group" aria-label="Number of headshots">
@@ -609,7 +612,7 @@ export default function Headshots10() {
           <ol className="mt-6 grid gap-4 sm:grid-cols-2">
             {([
               { title: "Book a Tuesday slot.", body: "Pick a time between 10am and 2pm.", Icon: Calendar },
-              { title: "Choose your quantity.", body: "$10 per headshot. Buy as many as you like.", Icon: Plus },
+              { title: "Choose your quantity.", body: withCurrentDollars("$10 per headshot. Buy as many as you like.", HEADSHOTS_UNIT_PRICE, rates.headshotsUnitPrice), Icon: Plus },
               { title: "Show up.", body: "Iconic Studios, 26410 Oakridge Dr. Ste 105, Spring.", Icon: MapPin },
               { title: "Pick your favorites.", body: "Choose the headshots you want to keep.", Icon: Check },
             ] as const).map(({ title, body, Icon }, index) => (
@@ -699,7 +702,7 @@ export default function Headshots10() {
               <p className="mt-3">
                 {confirmed.paid
                   ? "The booking fee is paid and your Tuesday time is confirmed."
-                  : `Your time is held for ${HEADSHOTS_HOLD_MINUTES} minutes and confirmed once the $10 booking fee is paid.`}
+                  : `Your time is held for ${HEADSHOTS_HOLD_MINUTES} minutes and confirmed once the ${withCurrentDollars("$10", HEADSHOTS_BOOKING_FEE, rates.headshotsBookingFee)} booking fee is paid.`}
               </p>
               {confirmed.orderNumber ? <p className="mt-2 font-semibold">Confirmation {confirmed.orderNumber}</p> : null}
               {confirmed.slotDate ? <p className="mt-3">{dateLabel(confirmed.slotDate)} at {confirmed.slotTime}</p> : null}
@@ -807,7 +810,7 @@ export default function Headshots10() {
                   <p className="mt-3 text-xl font-bold">{quote.dueTodayLine}</p>
                   {quote.balanceLine ? <p className="text-xl font-bold">{quote.balanceLine}</p> : null}
                   {quote.balanceLine ? <p className="mt-1">That balance is {money(quote.balanceTotal)}.</p> : null}
-                  <p className="mt-3 text-sm">The $10 counts toward your headshots. Your time is held for {HEADSHOTS_HOLD_MINUTES} minutes once the booking fee checkout starts.</p>
+                  <p className="mt-3 text-sm">The {withCurrentDollars("$10", HEADSHOTS_BOOKING_FEE, rates.headshotsBookingFee)} counts toward your headshots. Your time is held for {HEADSHOTS_HOLD_MINUTES} minutes once the booking fee checkout starts.</p>
                 </div>
               ) : null}
               <label className="absolute -left-[9999px] h-px w-px overflow-hidden" aria-hidden="true">

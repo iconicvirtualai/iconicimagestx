@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { usePublicCatalog } from "@/lib/usePublicCatalog";
+import { dollars, packageAmount } from "@shared/publicPrices";
 import { visibleStudioNote } from "@shared/iconicStudio";
 import { ICONIC_POLISH_TREATMENTS } from "@shared/orderEditPlan";
 import type { StudioOrderTrayJob } from "@shared/studioOrderTray";
@@ -1091,7 +1093,7 @@ function UploadPrefs({
           {ICONIC_POLISH_TREATMENTS.map((treatment) => (
             <li key={treatment} className="text-[10px] text-gray-400">{treatment}</li>
           ))}
-          <li className="text-[10px] leading-snug text-gray-500">Does not add anyone or move the camera. Grass replacement is a separate $25 add-on, included only on classic packages. It is not this polish.</li>
+          <GrassAddonCopy variant="polish" />
         </ul>
       ) : null}
       {!grassReady ? <p data-testid="scratch-grass-note" className="mt-2 text-[11px] text-gray-400">{grassNote}</p> : null}
@@ -1254,7 +1256,7 @@ function StudioOptions(props: {
         </div>
       ) : null}
       {props.tool === "grass" && !props.grassReady ? <p data-testid="scratch-grass-note" className="mt-2 text-[11px] text-gray-400">{props.grassNote}</p> : null}
-      {props.tool === "grass" ? <p className="mt-2 text-[11px] leading-snug text-gray-500">$25 add-on, included only on classic packages. Not Iconic Polish. The lawn file stays on the server.</p> : null}
+      {props.tool === "grass" ? <GrassAddonCopy variant="tool" /> : null}
       </div>
       <div className="shrink-0 border-t border-white/10 p-3">
       <label className="block">
@@ -1314,4 +1316,13 @@ function ExportButtons({
       </div>
     </details>
   );
+}
+
+function GrassAddonCopy({ variant }: { variant: "polish" | "tool" }) {
+  const price = dollars(packageAmount(usePublicCatalog(), "grass-replacement", 25));
+  const text = variant === "polish"
+    ? `Does not add anyone or move the camera. Grass replacement is a separate ${price} add-on, included only on classic packages. It is not this polish.`
+    : `${price} add-on, included only on classic packages. Not Iconic Polish. The lawn file stays on the server.`;
+  if (variant === "polish") return <li className="text-[10px] leading-snug text-gray-500">{text}</li>;
+  return <p className="mt-2 text-[11px] leading-snug text-gray-500">{text}</p>;
 }

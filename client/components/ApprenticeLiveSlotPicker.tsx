@@ -8,7 +8,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { ApprenticeshipSlot } from "@shared/apprenticeship";
-import { APPRENTICESHIP_CALENDAR_FALLBACK } from "@shared/apprenticeship";
+import { APPRENTICESHIP_BOOKING_FEE, APPRENTICESHIP_CALENDAR_FALLBACK } from "@shared/apprenticeship";
+import { usePricingRates } from "@/lib/usePricingRates";
+import { dollars } from "@shared/publicPrices";
 import { BUSINESS_CONTACT } from "@shared/businessContact";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
@@ -64,6 +66,8 @@ export default function ApprenticeLiveSlotPicker({
 }: Props) {
   const [state, setState] = useState<LiveSlotState>({ available: null, slots: [], fallback: "" });
   const [timesOpen, setTimesOpen] = useState(false);
+  const bookingFee = usePricingRates().apprenticeshipBookingFee;
+  const feeLabel = bookingFee === APPRENTICESHIP_BOOKING_FEE ? "$25" : dollars(bookingFee);
 
   useEffect(() => {
     let cancelled = false;
@@ -145,8 +149,8 @@ export default function ApprenticeLiveSlotPicker({
       <p className="text-sm font-semibold">Date and time</p>
       <p className="mt-1 text-sm leading-relaxed text-neutral-700">
         {state.available === false
-          ? `Tell us a preferred ${length} time. The $25 booking fee holds your request.`
-          : `Pick an open ${length} time from the apprentice calendar. The $25 booking fee holds it.`}
+          ? `Tell us a preferred ${length} time. The ${feeLabel} booking fee holds your request.`
+          : `Pick an open ${length} time from the apprentice calendar. The ${feeLabel} booking fee holds it.`}
       </p>
       {state.available === null ? (
         <p className="mt-3 text-sm text-neutral-600" data-testid="re75-slots-loading">Checking open times…</p>

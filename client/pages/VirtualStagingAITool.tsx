@@ -12,6 +12,8 @@ import { auth, storage } from "@/lib/firebase";
 import { signInAnonymously } from "firebase/auth";
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useSearchParams } from "react-router-dom";
+import { usePricingAdjustments } from "@/lib/usePublicCatalog";
+import { feeAmount, withCurrentDollars } from "@shared/publicPrices";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -90,6 +92,7 @@ function clearSession() {
 
 export default function VirtualStagingAITool() {
   const [searchParams] = useSearchParams();
+  const pricePerPhoto = feeAmount(usePricingAdjustments(), "display-vs-fullres", PRICE_PER_PHOTO);
 
   // Upload
   const [file, setFile]               = useState<File | null>(null);
@@ -593,7 +596,7 @@ export default function VirtualStagingAITool() {
                     </div>
 
                     <div className="flex-shrink-0 font-bold text-gray-900">
-                      ${PRICE_PER_PHOTO}
+                      ${pricePerPhoto}
                     </div>
                   </div>
                 );
@@ -603,7 +606,7 @@ export default function VirtualStagingAITool() {
             <div className="flex items-center justify-between border-t border-gray-100 pt-6">
               <div>
                 <p className="text-sm text-gray-500">{selectedCount} photo{selectedCount !== 1 ? "s" : ""} selected</p>
-                <p className="text-2xl font-bold">${selectedCount * PRICE_PER_PHOTO}.00</p>
+                <p className="text-2xl font-bold">${selectedCount * pricePerPhoto}.00</p>
               </div>
               <Button
                 onClick={confirmReviewAndCheckout}
@@ -645,7 +648,7 @@ export default function VirtualStagingAITool() {
                   Try AI Staging <span className="text-[#0d9488]">for Free</span>
                 </h1>
                 <p className="text-gray-500 mt-2 text-sm">
-                  Upload an empty room — we'll stage it with furniture in seconds. $15/photo for full-res.
+                  {withCurrentDollars("Upload an empty room — we'll stage it with furniture in seconds. $15/photo for full-res.", PRICE_PER_PHOTO, pricePerPhoto)}
                 </p>
               </div>
               <div className="flex items-center gap-3">
@@ -766,7 +769,7 @@ export default function VirtualStagingAITool() {
                   <div className="p-4 rounded-2xl border border-gray-200 bg-white space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Cart ({cart.length})</span>
-                      <span className="text-sm font-bold text-gray-900">${cart.length * PRICE_PER_PHOTO}.00</span>
+                      <span className="text-sm font-bold text-gray-900">${cart.length * pricePerPhoto}.00</span>
                     </div>
                     <div className="flex gap-2 overflow-x-auto pb-1">
                       {cart.map((item, i) => (
@@ -898,7 +901,7 @@ export default function VirtualStagingAITool() {
                         className="w-full bg-black hover:bg-gray-800 text-white py-6 rounded-2xl font-bold text-base flex items-center justify-center gap-2 shadow-xl"
                       >
                         <ShoppingCart className="w-5 h-5" />
-                        Purchase High Resolution Photo — $15
+                        {withCurrentDollars("Purchase High Resolution Photo — $15", PRICE_PER_PHOTO, pricePerPhoto)}
                       </Button>
                     ) : (
                       <Button
@@ -909,7 +912,7 @@ export default function VirtualStagingAITool() {
                         {isCheckingOut ? <RefreshCw className="w-5 h-5 animate-spin" /> : <ShoppingCart className="w-5 h-5" />}
                         Add to Purchase and Checkout
                         <span className="ml-1 bg-white/20 text-white text-xs font-bold px-2 py-0.5 rounded-full">
-                          {cart.length + 1} photos · ${(cart.length + 1) * PRICE_PER_PHOTO}
+                          {cart.length + 1} photos · ${(cart.length + 1) * pricePerPhoto}
                         </span>
                       </Button>
                     )}
@@ -939,7 +942,7 @@ export default function VirtualStagingAITool() {
                       className="w-full bg-black hover:bg-gray-800 text-white py-6 rounded-2xl font-bold text-base flex items-center justify-center gap-2 shadow-xl"
                     >
                       {isCheckingOut ? <RefreshCw className="w-5 h-5 animate-spin" /> : <ShoppingCart className="w-5 h-5" />}
-                      Checkout {cart.length} Photo{cart.length > 1 ? "s" : ""} — ${cart.length * PRICE_PER_PHOTO}
+                      Checkout {cart.length} Photo{cart.length > 1 ? "s" : ""} — ${cart.length * pricePerPhoto}
                     </Button>
                   </div>
                 )}

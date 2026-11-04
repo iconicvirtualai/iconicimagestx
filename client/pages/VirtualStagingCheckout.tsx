@@ -3,10 +3,13 @@ import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { CreditCard, ShieldCheck, ShoppingCart, ArrowLeft, Plus, CheckCircle2, Lock } from "lucide-react";
+import { usePricingAdjustments } from "@/lib/usePublicCatalog";
+import { dollarsFixed, feeAmount } from "@shared/publicPrices";
 
 export default function VirtualStagingCheckout() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const photoPrice = dollarsFixed(feeAmount(usePricingAdjustments(), "display-vs-ai-unit", 5));
 
   const handlePayment = (e: React.FormEvent) => {
     e.preventDefault();
@@ -121,7 +124,7 @@ export default function VirtualStagingCheckout() {
                           Processing...
                         </>
                       ) : (
-                        "Pay $5.00 Securely"
+                        `Pay ${photoPrice} Securely`
                       )}
                     </Button>
                   </form>
@@ -145,18 +148,18 @@ export default function VirtualStagingCheckout() {
                       <div className="flex-1">
                         <h4 className="text-sm font-bold mb-1">AI Staged Photo</h4>
                         <p className="text-xs text-gray-500 mb-2">Modern Style • Living Room</p>
-                        <span className="text-[#0d9488] font-bold">$5.00</span>
+                        <span className="text-[#0d9488] font-bold">{photoPrice}</span>
                       </div>
                     </div>
 
                     <div className="pt-6 border-t border-gray-200 space-y-4">
                       <div className="flex justify-between text-gray-500">
                         <span>Subtotal</span>
-                        <span className="font-bold text-black">$5.00</span>
+                        <span className="font-bold text-black">{photoPrice}</span>
                       </div>
                       <div className="flex justify-between text-lg font-bold">
                         <span>Total Cost</span>
-                        <span className="text-[#0d9488]">$5.00</span>
+                        <span className="text-[#0d9488]">{photoPrice}</span>
                       </div>
                     </div>
                   </div>

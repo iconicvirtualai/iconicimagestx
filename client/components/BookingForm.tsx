@@ -34,9 +34,10 @@ import {
   sumLineItemPrices,
   type BookingPriceInput,
 } from "@shared/bookingPricing";
-import { BOOKING_PROCESSING_LABEL, estimateBookingCharge } from "@shared/invoiceProcessing";
+import { estimateBookingCharge, processingFeeLabel } from "@shared/invoiceProcessing";
 import { taxDollars, type PricingRates } from "@shared/pricingSettings";
 import { readPricingRates, seedPricingRates } from "@/lib/pricingAdjustments";
+import { dollars } from "@shared/publicPrices";
 import {
   assessTravel,
   travelCustomerLine,
@@ -142,10 +143,10 @@ interface BookingFormProps {
   source?: "portal";
 }
 
-function ProcessingEstimateLine({ amount }: { amount: number }) {
+function ProcessingEstimateLine({ amount, label }: { amount: number; label: string }) {
   return (
     <div data-testid="booking-processing-line" className="mb-3 flex items-baseline justify-between gap-3 text-[11px]">
-      <span className="min-w-0 font-bold text-gray-500">{BOOKING_PROCESSING_LABEL}</span>
+      <span className="min-w-0 font-bold text-gray-500">{label}</span>
       <MoneyAmount className="font-black text-black">${amount.toFixed(2)}</MoneyAmount>
     </div>
   );
@@ -743,7 +744,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
     const promo = promoDiscountFor(promoInput, pricing.promos, serviceBase) ?? promoDiscountFor(promoInput);
     if (promo?.code === "ICONICAI") {
       setAppliedPromo(promo); // $35 off (1 free virtual staging)
-      toast.success("Promo code 'ICONICAI' applied! ($35 discount)");
+      toast.success(`Promo code 'ICONICAI' applied! (${dollars(promo.discount)} discount)`);
     } else if (promo?.code === "NEWYEAR") {
       setAppliedPromo(promo);
       toast.success("Promo code applied!");
@@ -869,7 +870,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
           </div>
         )}
         {processingOn && hasBookingSelection(bookingPriceInput()) && (
-          <ProcessingEstimateLine amount={estimate.processing} />
+          <ProcessingEstimateLine amount={estimate.processing} label={processingFeeLabel(pricing.processingPercent)} />
         )}
         <div className="flex justify-between items-center mb-4">
           <span className="text-[10px] font-black uppercase text-gray-400">Total Estimate</span>
@@ -1607,7 +1608,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Order summary</p>
                  <TravelFeeLine travel={travel} />
                  {processingOn && hasBookingSelection(bookingPriceInput()) && (
-                   <ProcessingEstimateLine amount={estimate.processing} />
+                   <ProcessingEstimateLine amount={estimate.processing} label={processingFeeLabel(pricing.processingPercent)} />
                  )}
                  <div className="flex items-baseline justify-between gap-3 border-t border-gray-200 pt-3">
                    <span className="min-w-0 text-[10px] font-black uppercase text-gray-400">Total estimate</span>

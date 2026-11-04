@@ -234,7 +234,55 @@ export function defaultPricingAdjustments(): PricingAdjustment[] {
       sortOrder: 430,
       note: "Percent of the senior living total due to reserve the date.",
     }),
+    seed({
+      id: "apprenticeship-overage",
+      kind: "fee",
+      name: "Apprenticeship overage",
+      active: true,
+      removed: false,
+      mode: "flat",
+      amount: 25,
+      sortOrder: 440,
+      note: "Dollars per 15-minute increment. Shown on the apprenticeship and $75 pages.",
+    }),
+    ...displayFees(),
   ];
+}
+
+/**
+ * Prices that are printed on a public page and are not already a bookable package.
+ * Same current numbers. Editing one here changes the page. It does not add a new /book card.
+ */
+function displayFees(): PricingAdjustment[] {
+  const rows: Array<[string, string, number, string]> = [
+    ["business-professional-suite", "The Professional Suite", 1500, "Shown on /pricing and client package cards. Not a /book card."],
+    ["business-signature-tier", "The Signature Tier", 2800, "Shown on /pricing and client package cards. Not a /book card."],
+    ["business-iconic-partnership", "The Iconic Partnership", 4500, "Shown on /pricing and client package cards. Not a /book card."],
+    ["business-connected-core", "The Connected Core", 2000, "Shown on /pricing and client package cards. Not a /book card."],
+    ["business-authority-stack", "The Authority Stack", 3200, "Shown on /pricing and client package cards. Not a /book card."],
+    ["display-floorplan-card", "Pricing page floor plan", 99, "The $99 floor plan line on /pricing. The booking add-on is floorplan-2d."],
+    ["display-video-from", "Pricing page video from", 350, "Low end of the video add-on range on /pricing."],
+    ["display-video-to", "Pricing page video to", 500, "High end of the video add-on range on /pricing."],
+    ["display-vs-ai-unit", "AI staging per photo", 5, "Shown on /services/virtual-staging and the staging checkout."],
+    ["display-vs-ai-10", "AI staging 10 photos", 45, "Shown on /services/virtual-staging."],
+    ["display-vs-ai-25", "AI staging 25 photos", 100, "Shown on /services/virtual-staging."],
+    ["display-vs-pro-unit", "Pro staging per photo", 25, "Shown on /services/virtual-staging."],
+    ["display-vs-pro-10", "Pro staging 10 photos", 200, "Shown on /services/virtual-staging."],
+    ["display-vs-pro-20", "Pro staging 20 photos", 350, "Shown on /services/virtual-staging."],
+    ["display-vs-fullres", "AI full-resolution photo", 15, "Shown in the AI staging tool."],
+    ["display-referral", "Referral credit", 50, "Shown on the agent page referral banner."],
+  ];
+  return rows.map(([id, name, amount, note], index) => seed({
+    id,
+    kind: "fee",
+    name,
+    active: true,
+    removed: false,
+    mode: "flat",
+    amount,
+    sortOrder: 500 + index,
+    note,
+  }));
 }
 
 export function pricingAdjustmentSeedDocs(): PricingAdjustment[] {
@@ -314,6 +362,11 @@ export function mergePricingAdjustments(
  * Amount on a merged list. A missing seed id was removed, so the charge is 0
  * instead of the original seed. Inactive is 0 as well. Callers pass a merged list.
  */
+/** Amount on a merged list. A removed or inactive seed id is 0. An unknown id uses the fallback. */
+export function adjustmentAmount(items: PricingAdjustment[], id: string, fallback: number): number {
+  return activeAmount(items, id, fallback);
+}
+
 function activeAmount(items: PricingAdjustment[], id: string, fallback: number): number {
   const item = items.find((entry) => entry.id === id);
   if (!item) {

@@ -6,8 +6,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { usePricingRates } from "@/lib/usePricingRates";
 import {
   APPRENTICESHIP_BALANCE_LINE,
-  APPRENTICESHIP_BOOKING_FEE_LINE,
+  APPRENTICESHIP_BOOKING_FEE,
   APPRENTICESHIP_CALENDAR_FALLBACK,
+  apprenticeshipBookingFeeLine,
   apprenticeshipPackageViews,
   quoteApprenticeship,
   usd,
@@ -20,6 +21,8 @@ import {
   packagesForStaffEditor,
 } from "@shared/bookingCatalog";
 import { BUSINESS_CONTACT } from "@shared/businessContact";
+import { usePricingAdjustments } from "@/lib/usePublicCatalog";
+import { apprenticeshipOverageLabel, dollars, feeAmount } from "@shared/publicPrices";
 
 export const apprenticeshipCheckoutNavigation = {
   assign(url: string) {
@@ -66,6 +69,9 @@ export default function Apprenticeship() {
   const [setupNote, setSetupNote] = useState<string | null>(null);
 
   const rates = usePricingRates();
+  const adjustments = usePricingAdjustments();
+  const overageLabel = apprenticeshipOverageLabel(feeAmount(adjustments, "apprenticeship-overage", 25));
+  const bookingFeeLine = apprenticeshipBookingFeeLine(rates.apprenticeshipBookingFee);
   const selected = packages.find((item) => item.id === packageId) || packages[0];
   const quote = useMemo(() => {
     if (!selected) return null;
@@ -218,7 +224,7 @@ export default function Apprenticeship() {
           </h1>
           <p className="mt-4 text-lg leading-relaxed text-neutral-800">{APPRENTICESHIP_BRIDGE_COPY}</p>
           <p className="mt-3 text-base leading-relaxed text-neutral-600">
-            Photos only. The appointment ends when the clock does. Overages are {selected?.overage || "$25 per 15-minute increment"}.
+            Photos only. The appointment ends when the clock does. Overages are {overageLabel}.
           </p>
 
           {received && (
@@ -265,7 +271,7 @@ export default function Apprenticeship() {
                 <li key={rule}>{rule}</li>
               ))}
             </ul>
-            <p className="mt-4 text-sm font-semibold text-neutral-950">Overages: {selected?.overage}.</p>
+            <p className="mt-4 text-sm font-semibold text-neutral-950">Overages: {overageLabel}.</p>
           </section>
 
           {quote && (
@@ -290,7 +296,7 @@ export default function Apprenticeship() {
                 <span>Order total</span>
                 <MoneyAmount>{usd(quote.total)}</MoneyAmount>
               </div>
-              <p className="pt-2 text-base font-semibold text-neutral-950">{APPRENTICESHIP_BOOKING_FEE_LINE}</p>
+              <p className="pt-2 text-base font-semibold text-neutral-950">{bookingFeeLine}</p>
               <p className="text-neutral-700">
                 {APPRENTICESHIP_BALANCE_LINE} Balance {usd(quote.balanceDue)}.
               </p>
@@ -379,7 +385,7 @@ export default function Apprenticeship() {
             {error && <p className="text-sm font-medium text-red-700" role="alert">{error}</p>}
             {savedOrder && (
               <p data-testid="apprenticeship-saved" className="text-base font-semibold">
-                Order {savedOrder} is held for 60 minutes until the $25 booking fee is paid. {APPRENTICESHIP_BOOKING_FEE_LINE}. {APPRENTICESHIP_BALANCE_LINE}
+                Order {savedOrder} is held for 60 minutes until the {rates.apprenticeshipBookingFee === APPRENTICESHIP_BOOKING_FEE ? "$25" : dollars(rates.apprenticeshipBookingFee)} booking fee is paid. {bookingFeeLine}. {APPRENTICESHIP_BALANCE_LINE}
               </p>
             )}
 

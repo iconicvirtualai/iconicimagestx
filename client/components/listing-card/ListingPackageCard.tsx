@@ -4,6 +4,8 @@ import { clientListingPath, type ClientListingCard } from "@shared/clientHome";
 import { packageSkin, type PackageChip, type PackageSkin } from "@shared/packageSkins";
 import { cn } from "@/lib/utils";
 import { skinTheme, type SkinTheme } from "./skinTheme";
+import { usePricingAdjustments, usePublicCatalog } from "@/lib/usePublicCatalog";
+import { livePackageCardPrice } from "@shared/publicPrices";
 
 const TIGHT = "[overflow-wrap:normal] [word-break:normal]";
 const FONT = "Inter, system-ui, sans-serif";
@@ -14,8 +16,11 @@ const FONT = "Inter, system-ui, sans-serif";
  */
 export function ListingPackageCard({ listing }: { listing: ClientListingCard }) {
   const look = listing.look;
+  const catalog = usePublicCatalog();
+  const adjustments = usePricingAdjustments();
   if (!look) return null;
   const skin = packageSkin(look);
+  const priced = livePackageCardPrice(skin, catalog, adjustments);
   const theme = skinTheme(look);
   const street = listing.street || listing.address;
   const city = listing.locality;
@@ -66,7 +71,7 @@ export function ListingPackageCard({ listing }: { listing: ClientListingCard }) 
           ) : null}
           <div className="mt-auto flex items-end justify-between gap-2.5 pt-3">
             <p data-part="price" className={cn("leading-none tracking-[-0.02em]", theme.priceClass)}>
-              {skin.price}
+              {priced.price}
               {skin.priceNote ? (
                 <small className="mt-[3px] block text-[11px] font-semibold opacity-70">{skin.priceNote}</small>
               ) : null}
