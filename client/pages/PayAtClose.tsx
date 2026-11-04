@@ -3,6 +3,9 @@ import { Link } from "react-router-dom";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { packagesForStaffEditor, type StaffCatalogPackage } from "@shared/bookingCatalog";
+import { payAtCloseListedPrice, payAtClosePublicOffer, type PayAtClosePublicOffer } from "@shared/payAtClose";
+import { mergePricingAdjustments } from "@shared/pricingSettings";
+import { readPricingAdjustments } from "@/lib/pricingAdjustments";
 import {
   PAY_AT_CLOSE_ADDON_SLOTS,
   PAY_AT_CLOSE_CARD_SLOTS,
@@ -94,6 +97,7 @@ function priceLabel(amount: number | null): string {
 
 export default function PayAtClose() {
   const [catalog, setCatalog] = useState<StaffCatalogPackage[]>(() => packagesForStaffEditor([]));
+  const [offer, setOffer] = useState<PayAtClosePublicOffer>(() => payAtClosePublicOffer(undefined, mergePricingAdjustments([])));
   const [role, setRole] = useState<TitusBorrowerRole>("agent");
   const [tier, setTier] = useState<TitusCreditTier>("prime");
   const [property, setProperty] = useState<TitusPropertyType>("single-family");
@@ -127,9 +131,24 @@ export default function PayAtClose() {
     };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    readPricingAdjustments()
+      .then((adjustments) => {
+        if (!cancelled) setOffer(payAtClosePublicOffer(undefined, adjustments));
+      })
+      .catch(() => {
+        if (!cancelled) setOffer(payAtClosePublicOffer(undefined, mergePricingAdjustments([])));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const priceOf = (id: string) => {
     const item = catalogPackage(catalog, id);
-    return item && Number.isFinite(item.price) ? item.price : null;
+    if (!item || !Number.isFinite(item.price)) return null;
+    return payAtCloseListedPrice(item.price, offer);
   };
   const nameOf = (id: string, fallback: string) => catalogPackage(catalog, id)?.name || fallback;
 
@@ -150,11 +169,13 @@ export default function PayAtClose() {
       total += addon.credits ? amount * Math.max(0, credits) : amount;
     }
     return total;
-  }, [selected, addons, credits, catalog]);
+  }, [selected, addons, credits, catalog, offer]);
 
   const estimate = estimateTitusPayAtClose({ role, tier, property, media });
   const estateFeatures = payAtCloseFeatureRow(PAY_AT_CLOSE_ESTATES);
   const estateGallery = payAtCloseEstateGallery(PAY_AT_CLOSE_ESTATES);
+  const showcasePrice = priceOf("listing-showcase");
+  const showcaseAtClose = showcasePrice == null ? null : showcasePrice * 1.04;
   const dueToday = formatScheduleDollars(TITUS_TEXAS_PAY_AT_CLOSE.dueToday);
   const topCap = formatScheduleDollars(titusTopDeferralCap());
 
@@ -454,7 +475,7 @@ export default function PayAtClose() {
             </details>
             <details>
               <summary>How does the Partner fee work?</summary>
-              <p>When the home sells, our financing Partner is repaid for funds used plus a flat fee based on credit tier and state (0%–8%). Media at a 4% fee is that amount plus the fee, due at close. Texas rates in this calculator follow our Partner’s published estimate.</p>
+              <p>When the home sells, our financing Partner is repaid for the media plus a flat fee based on credit tier and state (0%–8%).{showcasePrice != null && showcaseAtClose != null ? ` A Showcase at ${formatCatalogDollars(showcasePrice)} with a 4% Partner fee is ${formatScheduleDollars(showcaseAtClose)} at close.` : ""} Texas rates in this calculator follow our Partner’s published estimate.</p>
             </details>
             <details>
               <summary>What’s the most I can defer?</summary>
@@ -503,11 +524,7 @@ export default function PayAtClose() {
             <Link to="/" style={{ fontWeight: 700 }}>Iconic Images</Link>
           </div>
         </div>
-        <div className="wrap footnote">
-          Pay at Close financing is provided by our financing Partner. This calculator is an estimate using that Partner’s published Texas flat-fee schedule and Iconic catalog prices; it is not a loan offer. Final rates, caps, and eligibility are set by our Partner at application.
-          Iconic Images does not charge you the Partner’s business network fee on this page.
-          Package prices come from the Iconic booking catalog that the Prices tab edits.
-        </div>
+        <div className="wrap footnote">Estimates only. Final terms set by our Partner.</div>
       </footer>
 
       <div className="sticky-order">

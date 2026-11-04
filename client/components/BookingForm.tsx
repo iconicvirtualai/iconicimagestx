@@ -903,7 +903,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
         )}
         {payAtCloseFee > 0 && (
           <div className="mb-2 flex justify-between text-xs font-bold text-neutral-700">
-            <span>Pay at Close</span>
+            <span>Pay at Close pricing</span>
             <span>${payAtCloseFee.toFixed(2)}</span>
           </div>
         )}
@@ -1647,7 +1647,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
                  )}
                  {payAtCloseFee > 0 && (
                    <div className="flex justify-between text-xs font-bold text-neutral-700">
-                     <span>Pay at Close</span>
+                     <span>Pay at Close pricing</span>
                      <span>${payAtCloseFee.toFixed(2)}</span>
                    </div>
                  )}

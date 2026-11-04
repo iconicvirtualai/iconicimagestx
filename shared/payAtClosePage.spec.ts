@@ -1,6 +1,9 @@
 import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { packagesForStaffEditor } from "./bookingCatalog.ts";
+import { payAtCloseListedPrice, payAtClosePublicOffer } from "./payAtClose.ts";
+import { mergePricingAdjustments } from "./pricingSettings.ts";
+import { estimateTitusPayAtClose } from "./titusPayAtCloseSchedule.ts";
 import {
   PAY_AT_CLOSE_ESTATES,
   bookPayAtCloseHref,
@@ -33,6 +36,26 @@ describe("Pay at Close page prices", () => {
     const page = readFileSync(new URL("../client/pages/PayAtClose.tsx", import.meta.url), "utf8");
     expect(page).not.toMatch(/\$\s?\d/);
     expect(page).not.toMatch(/shore-tour/);
+    expect(page).not.toMatch(/surcharge|\+6%|(?<!\d)6%/i);
+  });
+
+  it("lists Showcase at the Pay at Close price and adds the Partner fee after that", () => {
+    const offer = payAtClosePublicOffer(undefined, mergePricingAdjustments([]));
+    const showcase = packagesForStaffEditor([]).find((item) => item.id === "listing-showcase");
+    const legacy = packagesForStaffEditor([]).find((item) => item.id === "listing-legacy");
+    expect(showcase?.price).toBe(549);
+    expect(legacy?.price).toBe(899);
+    expect(payAtCloseListedPrice(showcase?.price || 0, offer)).toBe(582);
+    expect(payAtCloseListedPrice(legacy?.price || 0, offer)).toBe(953);
+    const estimate = estimateTitusPayAtClose({
+      role: "agent",
+      tier: "prime",
+      property: "single-family",
+      media: payAtCloseListedPrice(showcase?.price || 0, offer) + payAtCloseListedPrice(legacy?.price || 0, offer),
+    });
+    expect(estimate.media).toBe(1535);
+    expect(Math.round(estimate.fee || 0)).toBe(61);
+    expect(Math.round(estimate.payoff || 0)).toBe(1596);
   });
 
   it("lists estates as data and skips an empty feature", () => {

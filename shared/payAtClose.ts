@@ -8,7 +8,8 @@
  *
  * One Firestore invoice is the invoice of record. Titus orderId is that invoice id.
  * Card processing stays off unless the Prices row "Card processing on Pay at Close" is on.
- * The Pay at Close fee is the "Pay at Close" Prices row. 0 is a real fee of zero.
+ * The Pay at Close uplift is the "Pay at Close" Prices row (percent of the service subtotal, or a flat dollar amount). 0 adds nothing.
+ * An active row does not offer checkout. PAY_AT_CLOSE_LIVE still has to be exactly "true".
  */
 
 import type { BookingLineItem } from "./bookingPricing.ts";
@@ -23,6 +24,7 @@ export const PAY_AT_CLOSE_PENDING_STATUS = "pending - pay at close";
 export const PAY_AT_CLOSE_OFFER_ID = "pay-at-close";
 export const PAY_AT_CLOSE_CARD_PROCESSING_ID = "pay-at-close-card-processing";
 export const PAY_AT_CLOSE_FEE_LINE_ID = "pay-at-close-fee";
+export const PAY_AT_CLOSE_PRICING_LINE_NAME = "Pay at Close pricing";
 export const PAY_AT_CLOSE_WEBHOOK_PATH = "/api/payments/pay-at-close-webhook";
 /** Register this HTTPS URL in the Titus dashboard. Do not point it at a vercel.app redirect. */
 export const PAY_AT_CLOSE_WEBHOOK_URL = `https://www.iconicimagestx.com${PAY_AT_CLOSE_WEBHOOK_PATH}`;
@@ -118,13 +120,31 @@ export function roundPayAtCloseMoney(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
-/** Fee from the Prices row. A rate of 0 adds nothing. */
+/**
+ * Dollars added from the Prices row.
+ * Percent mode rounds the uplifted subtotal to a whole dollar, then the line is the difference.
+ * A rate of 0 adds nothing.
+ */
 export function payAtCloseFeeDollars(rate: number, mode: "flat" | "percent", base: number): number {
   const safeRate = Number(rate);
   const safeBase = Math.max(0, Number(base) || 0);
   if (!Number.isFinite(safeRate) || safeRate <= 0) return 0;
-  if (mode === "percent") return roundPayAtCloseMoney(safeBase * safeRate / 100);
+  if (mode === "percent") {
+    const marked = Math.round(safeBase * (1 + safeRate / 100));
+    return roundPayAtCloseMoney(Math.max(0, marked - safeBase));
+  }
   return roundPayAtCloseMoney(safeRate);
+}
+
+/** Catalog price at the Pay at Close percent, rounded to a whole dollar. Flat mode leaves the catalog price. */
+export function payAtCloseListedPrice(
+  catalogPrice: number,
+  offer: Pick<PayAtClosePublicOffer, "feeRate" | "feeMode">,
+): number {
+  const price = Number(catalogPrice);
+  if (!Number.isFinite(price)) return 0;
+  if (offer.feeMode !== "percent" || offer.feeRate <= 0) return price;
+  return Math.round(price * (1 + offer.feeRate / 100));
 }
 
 function serviceBase(lineItems: BookingLineItem[]): number {
@@ -147,7 +167,7 @@ export function shapePayAtCloseDraft<T extends BookingInvoiceDraft>(
   const lineItems = fee > 0
     ? [...kept, {
       id: PAY_AT_CLOSE_FEE_LINE_ID,
-      name: "Pay at Close",
+      name: PAY_AT_CLOSE_PRICING_LINE_NAME,
       unitPrice: fee,
       qty: 1,
       price: fee,

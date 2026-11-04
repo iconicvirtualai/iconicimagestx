@@ -387,7 +387,7 @@ export default function AdminPricing() {
         {tab === "adjustments" ? (
         <PriceSection title="Adjustments" action="Add an adjustment" onAdd={() => setAddingAdjustment(true)}>
           <p className="text-xs text-gray-500">
-            Tax rate, processing fee, travel zones, promo codes, and the booking fees for headshots, apprenticeship, and senior living. Pay at Close is the row you turn on, and the amount on that row is the fee. Card processing on Pay at Close stays off until you turn that row on. Checkout still hides Pay at Close until PAY_AT_CLOSE_LIVE is true.
+            Tax rate, processing fee, travel zones, promo codes, and the booking fees for headshots, apprenticeship, and senior living. Pay at Close is a percent of that order’s subtotal. It starts on at 6%. Change the amount, or turn the row off, here. Checkout still hides Pay at Close until PAY_AT_CLOSE_LIVE is true. Card processing on Pay at Close stays off until you turn that row on.
           </p>
           {addingAdjustment ? (
             <div className="grid gap-3 rounded-2xl border border-dashed border-gray-200 p-4 sm:grid-cols-2">

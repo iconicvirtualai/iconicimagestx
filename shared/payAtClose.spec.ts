@@ -5,6 +5,7 @@ import { packagesForStaffEditor } from "./bookingCatalog.ts";
 import { mergePricingAdjustments } from "./pricingSettings.ts";
 import {
   PAY_AT_CLOSE_FEE_LINE_ID,
+  PAY_AT_CLOSE_PRICING_LINE_NAME,
   PAY_AT_CLOSE_METHOD,
   PAY_AT_CLOSE_PENDING_STATUS,
   PAY_AT_CLOSE_WEBHOOK_EVENTS,
@@ -16,6 +17,7 @@ import {
   payAtCloseApiBaseUrl,
   payAtCloseBaseUrlDecision,
   payAtCloseFeeDollars,
+  payAtCloseListedPrice,
   payAtCloseLive,
   payAtClosePublicOffer,
   payAtCloseSettlement,
@@ -38,10 +40,18 @@ describe("Pay at Close gates and prices", () => {
     expect(payAtCloseLive({})).toBe(false);
     expect(payAtCloseLive({ PAY_AT_CLOSE_LIVE: "false" })).toBe(false);
     expect(payAtCloseLive({ PAY_AT_CLOSE_LIVE: " true " })).toBe(false);
-    expect(payAtClosePublicOffer({ PAY_AT_CLOSE_LIVE: "true" }, adjustments).offered).toBe(false);
-    const on = mergePricingAdjustments([{ id: "pay-at-close", active: true, amount: 25 }]);
-    expect(payAtClosePublicOffer({}, on).offered).toBe(false);
-    expect(payAtClosePublicOffer({ PAY_AT_CLOSE_LIVE: "true" }, on)).toMatchObject({
+    expect(payAtClosePublicOffer({}, adjustments)).toMatchObject({
+      offered: false,
+      enabledByOffice: true,
+      feeMode: "percent",
+      feeRate: 6,
+    });
+    expect(payAtClosePublicOffer({ PAY_AT_CLOSE_LIVE: "true" }, adjustments).offered).toBe(true);
+    const off = mergePricingAdjustments([{ id: "pay-at-close", active: false }]);
+    expect(payAtClosePublicOffer({ PAY_AT_CLOSE_LIVE: "true" }, off).offered).toBe(false);
+    const flat = mergePricingAdjustments([{ id: "pay-at-close", active: true, mode: "flat", amount: 25 }]);
+    expect(payAtClosePublicOffer({}, flat).offered).toBe(false);
+    expect(payAtClosePublicOffer({ PAY_AT_CLOSE_LIVE: "true" }, flat)).toMatchObject({
       offered: true,
       enabledByOffice: true,
       feeMode: "flat",
@@ -87,9 +97,18 @@ describe("Pay at Close gates and prices", () => {
       feeMode: "percent",
       chargeCardProcessing: false,
     });
-    expect(payAtCloseFeeDollars(10, "percent", 899)).toBe(89.9);
-    expect(withFee.lineItems.find((item) => item.id === PAY_AT_CLOSE_FEE_LINE_ID)?.price).toBe(89.9);
-    expect(withFee.total).toBe(988.9);
+    expect(payAtCloseFeeDollars(10, "percent", 899)).toBe(90);
+    const pricingLine = withFee.lineItems.find((item) => item.id === PAY_AT_CLOSE_FEE_LINE_ID);
+    expect(pricingLine).toMatchObject({ name: PAY_AT_CLOSE_PRICING_LINE_NAME, price: 90 });
+    expect(withFee.total).toBe(989);
+    expect(titusCheckoutBody({
+      invoiceId: "inv-1",
+      amount: withFee.total,
+      description: "Iconic",
+      successUrl: "https://www.iconicimagestx.com/invoice/inv-1",
+      cancelUrl: "https://www.iconicimagestx.com/invoice/inv-1",
+      idempotencyKey: "pac-inv-1",
+    }).amount).toBe(withFee.total);
 
     const withCard = shapePayAtCloseDraft(draft, {
       feeRate: 0,

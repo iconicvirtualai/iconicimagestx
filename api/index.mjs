@@ -7375,12 +7375,12 @@ function defaultPricingAdjustments() {
       id: "pay-at-close",
       kind: "fee",
       name: "Pay at Close",
-      active: false,
+      active: true,
       removed: false,
-      mode: "flat",
-      amount: 0,
+      mode: "percent",
+      amount: 6,
       sortOrder: 500,
-      note: "Turn this on to offer Pay at Close. The amount is the fee added to that invoice. 0 means no extra fee. Flat is dollars. Percent is percent of the service subtotal. Checkout stays hidden until PAY_AT_CLOSE_LIVE is also true."
+      note: "Percent uplift on the Pay at Close order subtotal. On at 6% until you change it. 0 keeps catalog prices. Turning this row off hides checkout. Checkout also stays hidden until PAY_AT_CLOSE_LIVE is true."
     }),
     seed({
       id: "pay-at-close-card-processing",
@@ -7529,6 +7529,7 @@ const PAY_AT_CLOSE_PENDING_STATUS = "pending - pay at close";
 const PAY_AT_CLOSE_OFFER_ID = "pay-at-close";
 const PAY_AT_CLOSE_CARD_PROCESSING_ID = "pay-at-close-card-processing";
 const PAY_AT_CLOSE_FEE_LINE_ID = "pay-at-close-fee";
+const PAY_AT_CLOSE_PRICING_LINE_NAME = "Pay at Close pricing";
 const TITUS_STAGING_API_BASE = "https://api.gotitus.dev";
 const PAY_AT_CLOSE_REPLAY_WINDOW_MS = 5 * 60 * 1e3;
 function payAtCloseLive(env) {
@@ -7573,7 +7574,10 @@ function payAtCloseFeeDollars(rate2, mode, base) {
   const safeRate = Number(rate2);
   const safeBase = Math.max(0, Number(base) || 0);
   if (!Number.isFinite(safeRate) || safeRate <= 0) return 0;
-  if (mode === "percent") return roundPayAtCloseMoney(safeBase * safeRate / 100);
+  if (mode === "percent") {
+    const marked = Math.round(safeBase * (1 + safeRate / 100));
+    return roundPayAtCloseMoney(Math.max(0, marked - safeBase));
+  }
   return roundPayAtCloseMoney(safeRate);
 }
 function serviceBase(lineItems) {
@@ -7585,7 +7589,7 @@ function shapePayAtCloseDraft(draft, offer) {
   const fee = payAtCloseFeeDollars(offer.feeRate, offer.feeMode, serviceBase(kept));
   const lineItems = fee > 0 ? [...kept, {
     id: PAY_AT_CLOSE_FEE_LINE_ID,
-    name: "Pay at Close",
+    name: PAY_AT_CLOSE_PRICING_LINE_NAME,
     unitPrice: fee,
     qty: 1,
     price: fee
