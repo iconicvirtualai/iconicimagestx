@@ -3,6 +3,8 @@ import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { itemText, useSiteItems, useSiteText } from "@/content/siteContent";
 import { BUSINESS_CONTACT } from "@shared/businessContact";
+import { usePublicCatalog } from "@/lib/usePublicCatalog";
+import { dollars, packageAmount } from "@shared/publicPrices";
 
 const ROOMS = [
   {
@@ -30,6 +32,7 @@ const ROOMS = [
 ];
 
 export default function Studio105() {
+  const catalog = usePublicCatalog();
   const kicker = useSiteText("studio105", "hero", "kicker", "The physical studio");
   const title = useSiteText("studio105", "hero", "title", "Studio 105");
   const roomItems = useSiteItems("studio105", "rooms");
@@ -74,6 +77,9 @@ export default function Studio105() {
                 <Button asChild className={`relative mt-8 rounded-full px-8 py-6 font-black uppercase tracking-widest text-xs ${room.button}`}>
                   <Link to={`/book?service=${room.id}`}>Book {room.name}</Link>
                 </Button>
+                {packageAmount(catalog, room.id, 0) > 0 ? (
+                  <p className="relative mt-4 text-2xl font-black">{dollars(packageAmount(catalog, room.id, 0))}</p>
+                ) : null}
                 <p className="relative mt-4 text-xs opacity-60">
                   Request the room and a time. We confirm availability and the rate. This page does not charge a card.
                 </p>

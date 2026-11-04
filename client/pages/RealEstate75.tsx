@@ -5,12 +5,12 @@ import ApprenticeLiveSlotPicker, { type LiveSlotState } from "@/components/Appre
 import PropertyAddressField from "@/components/PropertyAddressField";
 import { trackConversion } from "@/lib/tracking";
 import { usePricingRates } from "@/lib/usePricingRates";
+import { usePricingAdjustments, usePublicCatalog } from "@/lib/usePublicCatalog";
+import { apprenticeshipOverageLabel, dollars, feeAmount, packageAmount } from "@shared/publicPrices";
+import { processingFeeLabel } from "@shared/invoiceProcessing";
 import { BUSINESS_CONTACT, LEGAL_BUSINESS_NAME } from "@shared/businessContact";
-import { APPRENTICESHIP_OVERAGE_LABEL } from "@shared/bookingCatalog";
 import {
   APPRENTICESHIP_BALANCE_LINE,
-  APPRENTICESHIP_BOOKING_FEE,
-  APPRENTICESHIP_BOOKING_FEE_LINE,
   APPRENTICESHIP_DEPOSIT_REQUIRED_LINE,
   apprenticeshipBookingFeeLine,
 } from "@shared/apprenticeship";
@@ -38,6 +38,37 @@ const GCLID_KEY = "re75-gclid";
 const DRAFT_KEY = "re75-booking-draft";
 const CONVERSION_PREFIX = "re75-conversion-";
 const HERO_ALT = "25 listing photos for $75, 20-minute shoot by Iconic apprentices";
+
+function useRe75Display() {
+  const catalog = usePublicCatalog();
+  const rates = usePricingRates();
+  const adjustments = usePricingAdjustments();
+  const packages = RE75_PACKAGES.map((item) => {
+    const subtotal = packageAmount(catalog, item.id, item.subtotal);
+    const name = subtotal === item.subtotal ? item.name : item.name.replace(`$${item.subtotal}`, dollars(subtotal));
+    return { ...item, subtotal, name };
+  });
+  const starter = packages[0];
+  const upgrade = packages[1];
+  return {
+    packages,
+    starter,
+    upgrade,
+    rates,
+    fromText: dollars(starter.subtotal),
+    upgradeText: dollars(upgrade.subtotal),
+    feeText: dollars(rates.apprenticeshipBookingFee),
+    overage: apprenticeshipOverageLabel(feeAmount(adjustments, "apprenticeship-overage", 25)),
+    processingLabel: processingFeeLabel(rates.processingPercent),
+    quote(apply: boolean, id: RealEstate75PackageId) {
+      const chosen = packages.find((item) => item.id === id) || starter;
+      return realEstate75Quote(apply, id, {
+        subtotal: chosen.subtotal,
+        processingPercent: rates.processingPercent,
+      });
+    },
+  };
+}
 /** Where /realestate-75 is embedded. Return from Square lands on /realestate-75/schedule?booking=received. */
 const RETURN_PAGE = "realestate-75";
 /** Wix parent site. Links that leave this landing page open there, not inside the embed. */
@@ -176,8 +207,9 @@ export default function RealEstate75() {
   const [barHidden, setBarHidden] = useState(false);
   const [scheduleVisible, setScheduleVisible] = useState(false);
   const formStarted = useRef(false);
-  const pkg = realEstate75Package(draft.packageId);
-  const quote = useMemo(() => realEstate75Quote(processingOn, pkg.id), [processingOn, pkg.id]);
+  const display = useRe75Display();
+  const pkg = display.packages.find((item) => item.id === draft.packageId) || display.starter;
+  const quote = display.quote(processingOn, pkg.id);
   const area = useMemo(() => classifyRealEstate75Area(draft.address), [draft.address]);
 
   useEffect(() => {
@@ -247,7 +279,7 @@ export default function RealEstate75() {
     const key = `${CONVERSION_PREFIX}${bookingId}`;
     if (sessionStorage.getItem(key)) return;
     sessionStorage.setItem(key, "1");
-    const booked = realEstate75Package(confirmation.packageId);
+    const booked = display.packages.find((item) => item.id === confirmation.packageId) || realEstate75Package(confirmation.packageId);
     trackConversion({
       name: "re75_booking",
       packageId: booked.id,
@@ -441,7 +473,7 @@ export default function RealEstate75() {
       setConfirmation({
         orderNumber: data.orderNumber || "",
         checkoutUrl,
-        error: checkoutUrl ? "" : payError || `Call ${BUSINESS_CONTACT.phoneDisplay} to pay the $25 booking fee and lock in your time.`,
+        error: checkoutUrl ? "" : payError || `Call ${BUSINESS_CONTACT.phoneDisplay} to pay the ${display.feeText} booking fee and lock in your time.`,
         slotLabel: slot ? slot.label : draft.preferredTime.trim(),
         packageId: pkg.id,
       });
@@ -494,6 +526,7 @@ export default function RealEstate75() {
 }
 
 function OfferCta({ scheduleHref }: { scheduleHref: (packageId: RealEstate75PackageId) => string }) {
+  const { fromText } = useRe75Display();
   return (
     <div className="px-4 md:px-8">
       <div className="mx-auto flex max-w-3xl flex-col gap-3 border-t border-neutral-200 py-8 sm:flex-row">
@@ -501,7 +534,7 @@ function OfferCta({ scheduleHref }: { scheduleHref: (packageId: RealEstate75Pack
           to={scheduleHref("apprentice-25")}
           className="inline-flex min-h-12 flex-1 items-center justify-center rounded-xl bg-black px-5 text-base font-semibold text-white hover:bg-neutral-800"
         >
-          Schedule from $75
+          Schedule from {fromText}
         </Link>
         <a
           href={BUSINESS_CONTACT.phoneHref}
@@ -521,15 +554,17 @@ function Hero({
   scheduleHref: (packageId: RealEstate75PackageId) => string;
   processingOn: boolean;
 }) {
-  const starter = realEstate75Quote(processingOn, "apprentice-25");
-  const upgrade = realEstate75Quote(processingOn, "apprentice-50");
+  const { fromText, quote, starter } = useRe75Display();
+  const starterQuote = quote(processingOn, "apprentice-25");
+  const upgradeQuote = quote(processingOn, "apprentice-50");
+  const heroAlt = starter.subtotal === 75 ? HERO_ALT : HERO_ALT.replace("$75", fromText);
   return (
     <section>
       <div className="mx-auto w-full max-w-[1200px]">
-        <Link to={scheduleHref("apprentice-25")} className="block" aria-label="Schedule the $75 shoot">
+        <Link to={scheduleHref("apprentice-25")} className="block" aria-label={`Schedule the ${fromText} shoot`}>
           <img
             src="/realestate-75-hero.png"
-            alt={HERO_ALT}
+            alt={heroAlt}
             width={1200}
             height={628}
             fetchPriority="high"
@@ -543,7 +578,7 @@ function Hero({
             to={scheduleHref("apprentice-25")}
             className="inline-flex min-h-14 flex-1 items-center justify-center rounded-xl bg-black px-6 text-lg font-semibold text-white hover:bg-neutral-800"
           >
-            Schedule from $75
+            Schedule from {fromText}
           </Link>
           <a
             href={BUSINESS_CONTACT.phoneHref}
@@ -553,14 +588,14 @@ function Hero({
           </a>
         </div>
         <h1 className="mt-8 text-4xl font-black leading-[1.05] tracking-tight text-neutral-950 sm:text-5xl">
-          Listing Photos From $75
+          Listing Photos From {fromText}
         </h1>
         <p className="mt-4 text-lg leading-relaxed text-neutral-700">
           Two apprentice options. 25 photos in 20 minutes, or 50 photos in 1 hour. Made for listing refreshes, relists and lease listings in The Woodlands, Spring, Conroe, Willis and Cypress.
         </p>
-        <p className="mt-4 text-base font-semibold text-neutral-950">From $75. {starter.priceLine} Or {upgrade.priceLine}</p>
+        <p className="mt-4 text-base font-semibold text-neutral-950">From {fromText}. {starterQuote.priceLine} Or {upgradeQuote.priceLine}</p>
         <ul className="mt-5 flex flex-wrap gap-2">
-          {["From $75", "25 or 50 photos", "20 minutes or 1 hour", "Shot by Iconic apprentices", "Photos only"].map((item) => (
+          {[`From ${fromText}`, "25 or 50 photos", "20 minutes or 1 hour", "Shot by Iconic apprentices", "Photos only"].map((item) => (
             <li key={item} className="rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1.5 text-sm font-semibold text-neutral-800">
               {item}
             </li>
@@ -578,16 +613,17 @@ function OfferCards({
   scheduleHref: (packageId: RealEstate75PackageId) => string;
   processingOn: boolean;
 }) {
+  const display = useRe75Display();
   return (
     <section id="offers" className="px-4 py-14 md:px-8">
       <div className="mx-auto max-w-6xl">
         <h2 className="text-3xl font-black tracking-tight sm:text-4xl">Pick a package</h2>
         <p className="mt-3 max-w-2xl text-lg leading-relaxed text-neutral-700">
-          From $75. Same apprentices and the same photos-only rules. Choose the option that fits the house.
+          From {display.fromText}. Same apprentices and the same photos-only rules. Choose the option that fits the house.
         </p>
         <div className="mt-8 grid gap-4 md:grid-cols-2">
-          {RE75_PACKAGES.map((item) => {
-            const quote = realEstate75Quote(processingOn, item.id);
+          {display.packages.map((item) => {
+            const quote = display.quote(processingOn, item.id);
             return (
               <article
                 key={item.id}
@@ -646,6 +682,7 @@ function NeedMore({ gclid }: { gclid: string }) {
 }
 
 function Benefits() {
+  const { feeText } = useRe75Display();
   const items = [
     {
       title: "A current look for the listing",
@@ -661,7 +698,7 @@ function Benefits() {
     },
     {
       title: "25 or 50 edited photos",
-      body: "You get the edited photos in the option you schedule. Pick an open time and the $25 booking fee locks it in.",
+      body: `You get the edited photos in the option you schedule. Pick an open time and the ${feeText} booking fee locks it in.`,
     },
   ];
   return (
@@ -682,11 +719,12 @@ function Benefits() {
 }
 
 function WhatYouGet({ processingOn }: { processingOn: boolean }) {
-  const starter = realEstate75Quote(processingOn, "apprentice-25");
-  const upgrade = realEstate75Quote(processingOn, "apprentice-50");
+  const display = useRe75Display();
+  const starter = display.quote(processingOn, "apprentice-25");
+  const upgrade = display.quote(processingOn, "apprentice-50");
   const items = [
-    ["From $75", "25 photos for $75, or 50 photos for $125. Photos only."],
-    ["Two appointment lengths", `20 minutes for 25 photos. 1 hour for 50 photos. Overages are ${APPRENTICESHIP_OVERAGE_LABEL}.`],
+    [`From ${display.fromText}`, `25 photos for ${display.fromText}, or 50 photos for ${display.upgradeText}. Photos only.`],
+    ["Two appointment lengths", `20 minutes for 25 photos. 1 hour for 50 photos. Overages are ${display.overage}.`],
     ["Service area", "The Woodlands, Spring, Conroe, Willis, and Cypress."],
     ["Price", `${starter.priceLine} ${upgrade.priceLine}`],
   ];
@@ -708,8 +746,9 @@ function WhatYouGet({ processingOn }: { processingOn: boolean }) {
 }
 
 function HowItWorks() {
+  const { feeText, overage } = useRe75Display();
   const steps = [
-    "Pick 25 photos or 50 photos, pick an open time, and pay the $25 booking fee to lock it in.",
+    `Pick 25 photos or 50 photos, pick an open time, and pay the ${feeText} booking fee to lock it in.`,
     "Have the home prepped. Lights on, clutter put away, ready when we arrive.",
     "The apprentice shoots for 20 minutes (25 photos) or 1 hour (50 photos). You get the edited photos for that option.",
   ];
@@ -727,7 +766,7 @@ function HowItWorks() {
         </ol>
         <ul className="mt-8 max-w-3xl space-y-2 leading-relaxed text-neutral-700">
           <li>Photos only. No extra trips. No extra edits. Be prepped.</li>
-          <li>Overages are {APPRENTICESHIP_OVERAGE_LABEL}.</li>
+          <li>Overages are {overage}.</li>
           <li>Apprentice photos aren&apos;t eligible for Iconic Polish.</li>
           <li>Apprentices are learning. Graduates become vetted Iconic shooters.</li>
         </ul>
@@ -737,6 +776,7 @@ function HowItWorks() {
 }
 
 function ListingGallery() {
+  const display = useRe75Display();
   const [index, setIndex] = useState<number | null>(null);
   const count = LISTING_GALLERY.length;
   const photo = index == null ? null : LISTING_GALLERY[index];
@@ -787,7 +827,7 @@ function ListingGallery() {
             </li>
           ))}
         </ul>
-        <p className="mt-6 max-w-3xl text-base leading-relaxed text-neutral-800">{RE75_GALLERY_DISCLAIMER}</p>
+        <p className="mt-6 max-w-3xl text-base leading-relaxed text-neutral-800">{display.starter.subtotal === 75 && display.upgrade.subtotal === 125 ? RE75_GALLERY_DISCLAIMER : RE75_GALLERY_DISCLAIMER.replace("$75", display.fromText).replace("$125", display.upgradeText)}</p>
       </div>
       {photo && index != null ? (
         <div
@@ -813,8 +853,9 @@ function ListingGallery() {
 }
 
 function Faq({ processingOn }: { processingOn: boolean }) {
-  const starter = realEstate75Quote(processingOn, "apprentice-25");
-  const upgrade = realEstate75Quote(processingOn, "apprentice-50");
+  const display = useRe75Display();
+  const starter = display.quote(processingOn, "apprentice-25");
+  const upgrade = display.quote(processingOn, "apprentice-50");
   const items = [
     {
       q: "Who takes the photos?",
@@ -822,7 +863,7 @@ function Faq({ processingOn }: { processingOn: boolean }) {
     },
     {
       q: "What is included, and what is not?",
-      a: `25 edited photos from a 20-minute appointment, or 50 edited photos from a 1-hour appointment. Photos only. No extra trips, no extra edits, and no Iconic Polish. Overages are ${APPRENTICESHIP_OVERAGE_LABEL}. Aerials, video, twilight, and full-service packages are on the regular Iconic services.`,
+      a: `25 edited photos from a 20-minute appointment, or 50 edited photos from a 1-hour appointment. Photos only. No extra trips, no extra edits, and no Iconic Polish. Overages are ${display.overage}. Aerials, video, twilight, and full-service packages are on the regular Iconic services.`,
     },
     {
       q: "How should the home be prepped?",
@@ -834,7 +875,7 @@ function Faq({ processingOn }: { processingOn: boolean }) {
     },
     {
       q: "When do I pay?",
-      a: `A $25 booking fee by card when you schedule. It is credited toward your package, and your time is confirmed once it is paid. ${starter.priceLine} ${upgrade.priceLine} The balance is invoiced after the shoot.`,
+      a: `A ${display.feeText} booking fee by card when you schedule. It is credited toward your package, and your time is confirmed once it is paid. ${starter.priceLine} ${upgrade.priceLine} The balance is invoiced after the shoot.`,
     },
     {
       q: "Can I reschedule?",
@@ -881,9 +922,9 @@ function Schedule(props: {
   onPatch: (partial: Partial<Draft>) => void;
 }) {
   const { draft, confirmation, area, pkg } = props;
-  const rates = usePricingRates();
-  const bookingFee = rates.apprenticeshipBookingFee || APPRENTICESHIP_BOOKING_FEE;
-  const bookingFeeLine = apprenticeshipBookingFeeLine(bookingFee) || APPRENTICESHIP_BOOKING_FEE_LINE;
+  const display = useRe75Display();
+  const bookingFee = display.rates.apprenticeshipBookingFee;
+  const bookingFeeLine = apprenticeshipBookingFeeLine(bookingFee);
   const balance = Math.max(0, Math.round((props.quote.total - bookingFee) * 100) / 100);
   return (
     <section id="schedule" className="scroll-mt-4 border-t border-neutral-200 px-4 py-14 md:px-8">
@@ -899,11 +940,11 @@ function Schedule(props: {
           <div className="mt-8 rounded-2xl border-2 border-black p-6" data-testid="re75-deposit-step">
             <p className="text-sm font-bold uppercase tracking-[0.14em] text-[#0d9488]">Step 2 of 2 · Booking fee</p>
             <h3 className="mt-2 text-2xl font-black">
-              {confirmation.checkoutUrl ? "One step left: the $25 booking fee." : "Your time is on hold."}
+              {confirmation.checkoutUrl ? `One step left: the ${display.feeText} booking fee.` : "Your time is on hold."}
             </h3>
             <p className="mt-3 leading-relaxed text-neutral-800">
               {confirmation.orderNumber ? `Order ${confirmation.orderNumber}. ` : ""}
-              {realEstate75Package(confirmation.packageId).name}
+              {(display.packages.find((item) => item.id === confirmation.packageId) || realEstate75Package(confirmation.packageId)).name}
               {confirmation.slotLabel ? ` · ${confirmation.slotLabel}` : ""}. Photographed by an Iconic Images apprentice.
             </p>
             <p className="mt-2 font-semibold text-neutral-950">{APPRENTICESHIP_DEPOSIT_REQUIRED_LINE}</p>
@@ -916,7 +957,7 @@ function Schedule(props: {
                   data-testid="re75-pay-fee"
                   className="mt-5 inline-flex min-h-14 w-full items-center justify-center rounded-xl bg-black px-5 text-lg font-semibold text-white hover:bg-neutral-800"
                 >
-                  Pay $25 booking fee
+                  Pay {display.feeText} booking fee
                 </a>
                 <p className="mt-3 text-sm leading-relaxed text-neutral-700">
                   Secure card checkout by Square. {bookingFeeLine}. Balance after the shoot: ${balance.toFixed(2)}.
@@ -934,7 +975,7 @@ function Schedule(props: {
             <fieldset>
               <legend className="text-sm font-semibold">Package</legend>
               <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                {RE75_PACKAGES.map((item) => (
+                {display.packages.map((item) => (
                   <label
                     key={item.id}
                     className={`flex min-h-14 cursor-pointer flex-col justify-center rounded-xl border px-4 py-3 ${draft.packageId === item.id ? "border-black bg-black text-white" : "border-neutral-300"}`}
@@ -1058,7 +1099,7 @@ function Schedule(props: {
               </p>
               {props.quote.processing > 0 ? (
                 <p className="flex items-center justify-between gap-4">
-                  <span>Processing (2.8%)</span>
+                  <span>{display.processingLabel}</span>
                   <MoneyAmount>${props.quote.processing.toFixed(2)}</MoneyAmount>
                 </p>
               ) : null}
@@ -1087,7 +1128,7 @@ function Schedule(props: {
             </div>
             {props.formError ? <p className="text-sm font-semibold text-red-700" role="alert">{props.formError}</p> : null}
             <button type="submit" disabled={props.pending} className="min-h-14 w-full rounded-xl bg-black px-5 text-lg font-semibold text-white disabled:opacity-60">
-              {props.pending ? "Booking…" : "Book & pay $25 booking fee"}
+              {props.pending ? "Booking…" : `Book & pay ${display.feeText} booking fee`}
             </button>
           </form>
         )}
@@ -1103,12 +1144,13 @@ function FinalCta({
   scheduleHref: (packageId: RealEstate75PackageId) => string;
   processingOn: boolean;
 }) {
-  const starter = realEstate75Quote(processingOn, "apprentice-25");
-  const upgrade = realEstate75Quote(processingOn, "apprentice-50");
+  const display = useRe75Display();
+  const starter = display.quote(processingOn, "apprentice-25");
+  const upgrade = display.quote(processingOn, "apprentice-50");
   return (
     <section className="border-t border-neutral-200 bg-neutral-950 px-4 py-16 text-white md:px-8">
       <div className="mx-auto max-w-3xl text-center">
-        <h2 className="text-3xl font-black tracking-tight sm:text-5xl">Schedule from $75</h2>
+        <h2 className="text-3xl font-black tracking-tight sm:text-5xl">Schedule from {display.fromText}</h2>
         <p className="mt-4 text-lg text-neutral-200">{starter.priceLine}</p>
         <p className="mt-2 text-lg text-neutral-200">{upgrade.priceLine}</p>
         <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
@@ -1116,13 +1158,13 @@ function FinalCta({
             to={scheduleHref("apprentice-25")}
             className="inline-flex min-h-14 items-center justify-center rounded-xl bg-white px-8 text-lg font-semibold text-black hover:bg-neutral-200"
           >
-            Schedule · $75
+            Schedule · {display.fromText}
           </Link>
           <Link
             to={scheduleHref("apprentice-50")}
             className="inline-flex min-h-14 items-center justify-center rounded-xl border border-white/40 px-8 text-lg font-semibold text-white hover:bg-white/10"
           >
-            Schedule · $125
+            Schedule · {display.upgradeText}
           </Link>
           <a
             href={BUSINESS_CONTACT.phoneHref}

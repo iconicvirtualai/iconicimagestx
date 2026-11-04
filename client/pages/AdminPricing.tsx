@@ -276,7 +276,15 @@ export default function AdminPricing() {
   const products = packages.filter((item) => (item.bookingKind === "service" || item.bookingKind === "basic") && matches(item));
   const addOns = packages.filter((item) => (item.bookingKind === "addon" || item.bookingKind === "upgrade") && matches(item));
   const knownIds = new Set(packages.map((item) => item.id));
-  const legacyRows = LEGACY_PRICE_SHEET.filter((row) => !knownIds.has(row.id));
+  const pricedOnTheSite = new Set([
+    "business-professional-suite",
+    "business-signature-tier",
+    "business-iconic-partnership",
+    "business-connected-core",
+    "business-authority-stack",
+    "video-addon",
+  ]);
+  const legacyRows = LEGACY_PRICE_SHEET.filter((row) => !knownIds.has(row.id) && !pricedOnTheSite.has(row.id));
 
   return (
     <AdminLayout title="Prices">

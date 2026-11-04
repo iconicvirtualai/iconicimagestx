@@ -7,12 +7,19 @@ import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { itemText, useSiteHref, useSiteItems, useSiteText } from "@/content/siteContent";
 import {
   APPRENTICESHIP_BRIDGE_COPY,
-  APPRENTICESHIP_OVERAGE_LABEL,
   APPRENTICESHIP_PROGRAM_NAME,
   APPRENTICESHIP_RULES,
-  apprenticeshipPackages,
   isApprenticeshipPackage,
+  type StaffCatalogPackage,
 } from "@shared/bookingCatalog";
+import type { PricingAdjustment } from "@shared/pricingSettings";
+import { usePricingAdjustments, usePublicCatalog } from "@/lib/usePublicCatalog";
+import {
+  apprenticeshipOverageLabel,
+  feeAmount,
+  packageAmount,
+  priceDigits,
+} from "@shared/publicPrices";
 
 const BRAND_STAGES = [
   {
@@ -122,8 +129,24 @@ function BrandTransformation({
   );
 }
 
-export default function Pricing() {
+export default function Pricing({
+  catalog: catalogOverride,
+  adjustments: adjustmentOverride,
+}: {
+  catalog?: StaffCatalogPackage[];
+  adjustments?: PricingAdjustment[];
+} = {}) {
   const settings = useSiteSettings();
+  const liveCatalog = usePublicCatalog();
+  const liveAdjustments = usePricingAdjustments();
+  const catalog = catalogOverride ?? liveCatalog;
+  const adjustments = adjustmentOverride ?? liveAdjustments;
+  const shown = (id: string, fallback: number) => priceDigits(packageAmount(catalog, id, fallback));
+  const shownFee = (id: string, fallback: number) => priceDigits(feeAmount(adjustments, id, fallback));
+  const overageLabel = apprenticeshipOverageLabel(feeAmount(adjustments, "apprenticeship-overage", 25));
+  const apprenticeCards = catalog
+    .filter((item) => isApprenticeshipPackage(item.id))
+    .sort((a, b) => a.sortOrder - b.sortOrder);
   const priceBadge = useSiteText("pricing", "hero", "badge", "Pricing & Packages");
   const priceLead = useSiteText("pricing", "hero", "titleLead", "The Perfect");
   const priceAccent = useSiteText("pricing", "hero", "titleAccent", "Price");
@@ -190,7 +213,7 @@ export default function Pricing() {
     {
       name: "THE ESSENTIALS",
       tagline: "The Fast & Fresh.",
-      price: "249",
+      price: shown("listing-essentials", 249),
       period: "per listing",
       description: "Clean, bright, and ready to post. Perfect for quick turnarounds and keeping your feed active.",
       icon: <Zap className="w-6 h-6" style={{ color: settings.global.primaryColor }} />,
@@ -213,7 +236,7 @@ export default function Pricing() {
     {
       name: "THE SHOWCASE",
       tagline: "The Full Story.",
-      price: "549",
+      price: shown("listing-showcase", 549),
       period: "per listing",
       description: "A complete visual deep-dive. We capture the details, the angles, and the atmosphere that makes your space unique.",
       icon: <Trophy className="w-6 h-6" style={{ color: settings.global.primaryColor }} />,
@@ -239,7 +262,7 @@ export default function Pricing() {
     {
       name: "THE LEGACY",
       tagline: "The Signature Production.",
-      price: "899",
+      price: shown("listing-legacy", 899),
       period: "per listing",
       description: "Our highest level of care. We create a cinematic experience that tells people exactly why your brand (or your home) is the one to choose.",
       icon: <Crown className="w-6 h-6" style={{ color: settings.global.primaryColor }} />,
@@ -267,7 +290,7 @@ export default function Pricing() {
       name: "THE MARKET LEADER",
       tagline: "The Total Takeover",
       subheadline: "Your Full-Cycle Media Partner",
-      price: "1,599",
+      price: shown("listing-market-leader", 1599),
       period: "per listing",
       description: "This isn't just a shoot; it’s a market saturation strategy. We handle the narrative from the first \"Coming Soon\" teaser to the final \"Sold\" success story, ensuring you stay top-of-mind at every stage of the deal.",
       icon: <Box className="w-6 h-6" style={{ color: settings.global.primaryColor }} />,
@@ -296,7 +319,7 @@ export default function Pricing() {
     {
       name: "THE REFRESH",
       tagline: "The Modern Portrait.",
-      price: "349",
+      price: shown("branding-refresh", 349),
       period: "PER SESSION",
       description: "Forget the stiff corporate headshot. We capture you in your element—approachable, professional, and uniquely you.",
       icon: <Camera className="w-6 h-6" style={{ color: settings.global.primaryColor }} />,
@@ -314,7 +337,7 @@ export default function Pricing() {
     {
       name: "THE CONTENT PARTNER",
       tagline: "30 days of content in 2 hours.",
-      price: "999",
+      price: shown("branding-content-partner", 999),
       period: "per month",
       description: "You show up; we build the brand.",
       icon: <Video className="w-6 h-6" style={{ color: settings.global.primaryColor }} />,
@@ -332,7 +355,7 @@ export default function Pricing() {
     {
       name: "THE LOCAL LEGEND",
       tagline: "THE MARKET TAKEOVER CAMPAIGN",
-      price: "2,499",
+      price: shown("branding-local-legend", 2499),
       period: "PER SESSION/CAMPAIGN",
       description: "We spend a full day in your world to build a \"Day in the Life\" cinematic library that makes you the undisputed go-to authority in your chosen neighborhood.",
       icon: <Users className="w-6 h-6" style={{ color: settings.global.primaryColor }} />,
@@ -352,7 +375,7 @@ export default function Pricing() {
   const phase1Tiers = [
     {
       name: "THE BASELINE",
-      price: "500",
+      price: shown("business-baseline", 500),
       period: "per month",
       tagline: "The Professional Foundation.",
       description: "Stop ghosting your audience. We take your raw footage and turn it into a consistent, professional brand presence.",
@@ -367,7 +390,7 @@ export default function Pricing() {
     },
     {
       name: "THE GROWTH ENGINE",
-      price: "850",
+      price: shown("business-growth-engine", 850),
       period: "per month",
       tagline: "Turning Views into Conversations.",
       description: "For the creator ready to start conversations. We don’t just post; we write the hooks that make people stop scrolling and start typing.",
@@ -387,7 +410,7 @@ export default function Pricing() {
   const phase2Tiers = [
     {
       name: "THE PROFESSIONAL SUITE",
-      price: "1,500",
+      price: shownFee("business-professional-suite", 1500),
       period: "per month",
       tagline: "Your Digital Storefront, Fully Managed.",
       description: "Total hands-off management for your professional presence.",
@@ -400,7 +423,7 @@ export default function Pricing() {
     },
     {
       name: "THE SIGNATURE TIER",
-      price: "2,800",
+      price: shownFee("business-signature-tier", 2800),
       period: "per month",
       tagline: "The High-Volume Authority.",
       description: "Total hands-off authority. You show up, we do the rest.",
@@ -414,7 +437,7 @@ export default function Pricing() {
     },
     {
       name: "THE ICONIC PARTNERSHIP",
-      price: "4,500",
+      price: shownFee("business-iconic-partnership", 4500),
       period: "per month",
       tagline: "Your Personal Media Agency.",
       description: "A full-scale media agency in your pocket.",
@@ -428,7 +451,7 @@ export default function Pricing() {
     },
     {
       name: "THE CONNECTED CORE",
-      price: "2,000",
+      price: shownFee("business-connected-core", 2000),
       period: "per month",
       tagline: "Social + Database Penetration.",
       description: "Balanced social and direct-to-SOI marketing.",
@@ -442,7 +465,7 @@ export default function Pricing() {
     },
     {
       name: "THE AUTHORITY STACK",
-      price: "3,200",
+      price: shownFee("business-authority-stack", 3200),
       period: "per month",
       tagline: "Total Audience Ownership.",
       description: "High-frequency content and deep SOI penetration.",
@@ -738,9 +761,9 @@ export default function Pricing() {
                         <h4 className="font-black text-xs uppercase tracking-widest mb-6" style={{ color: settings.global.primaryColor }}>Photo Packages</h4>
                         <div className="space-y-4">
                           {[
-                            { label: "20 Photos", price: "99", id: "photos-20" },
-                            { label: "35 Photos", price: "150", id: "photos-35" },
-                            { label: "50 Photos", price: "200", id: "photos-50" }
+                            { label: "20 Photos", price: shown("photos-20", 99), id: "photos-20" },
+                            { label: "35 Photos", price: shown("photos-35", 150), id: "photos-35" },
+                            { label: "50 Photos", price: shown("photos-50", 200), id: "photos-50" }
                           ].map((pkg) => (
                             <div
                               key={pkg.id}
@@ -791,7 +814,7 @@ export default function Pricing() {
                           The photo packages beside this are the real Iconic shoot. This rate is lower on purpose, and the rules are how it stays that way.
                         </p>
                         <div className="space-y-4">
-                          {apprenticeshipPackages.map((pkg) => (
+                          {apprenticeCards.map((pkg) => (
                             <div
                               key={pkg.id}
                               data-testid={`services-${pkg.id}`}
@@ -811,14 +834,14 @@ export default function Pricing() {
                                   <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">{pkg.kicker}</p>
                                   <span className="block text-2xl font-black leading-none text-black">{pkg.cardTitle}</span>
                                 </div>
-                                <span className="text-2xl font-black leading-none text-black">${pkg.price}</span>
+                                <span className="text-2xl font-black leading-none text-black">${priceDigits(pkg.price)}</span>
                               </div>
                               <p className="mt-2 text-[10px] font-medium leading-snug text-gray-400">{pkg.appointmentLimit}</p>
                               <p className="mt-1 text-[12px] font-medium leading-relaxed text-gray-500">{pkg.aside}</p>
                             </div>
                           ))}
                         </div>
-                        <p className="text-[13px] font-bold text-gray-700">Overages: {APPRENTICESHIP_OVERAGE_LABEL}.</p>
+                        <p className="text-[13px] font-bold text-gray-700">Overages: {overageLabel}.</p>
                         <div data-testid="services-apprenticeship-rules" className="rounded-2xl border border-black bg-white p-4 space-y-3">
                           <p className="text-[10px] font-black uppercase tracking-[0.2em]">The rules</p>
                           <ul className="list-disc space-y-2 pl-4">
@@ -839,14 +862,14 @@ export default function Pricing() {
                         </div>
                         <div className="space-y-4">
                           {[
-                            { label: "Aerial Add-On", price: "99", id: "aerial-addon" },
-                            { label: "Reel Add-On", price: "125", id: "reel-addon" },
-                            { label: "Video Add-On", price: "350-500+", id: "video-addon" },
-                            { label: "3D Matterport", price: "200+", id: "matterport" },
-                            { label: "2D Floorplan Add-On", price: "99", id: "floorplan-addon" },
-                            { label: "Amenity Add-On", price: "50", id: "amenity-addon" },
-                            { label: "Social Media Optimized", price: "85", id: "specialized-social" },
-                            { label: "MLS + Social Media Optimized", price: "125", id: "specialized-both" }
+                            { label: "Aerial Add-On", price: shown("aerial-drone", 99), id: "aerial-addon" },
+                            { label: "Reel Add-On", price: shown("basic-reel", 125), id: "reel-addon" },
+                            { label: "Video Add-On", price: `${shownFee("display-video-from", 350)}-${shownFee("display-video-to", 500)}+`, id: "video-addon" },
+                            { label: "3D Matterport", price: `${shown("matterport-3d", 200)}+`, id: "matterport" },
+                            { label: "2D Floorplan Add-On", price: shownFee("display-floorplan-card", 99), id: "floorplan-addon" },
+                            { label: "Amenity Add-On", price: shown("amenity-addon", 50), id: "amenity-addon" },
+                            { label: "Social Media Optimized", price: shown("specialized-social", 85), id: "specialized-social" },
+                            { label: "MLS + Social Media Optimized", price: shown("specialized-both", 125), id: "specialized-both" }
                           ].map((addon) => (
                             <div
                               key={addon.id}
@@ -883,9 +906,9 @@ export default function Pricing() {
                                   THE ICONIC POLISH{" "}
                                   <span className="inline-block max-w-full">(Premium Upgrade)</span>
                                 </h4>
-                                <span className="shrink-0 whitespace-nowrap text-3xl font-black leading-none text-white">$75</span>
+                                <span className="shrink-0 whitespace-nowrap text-3xl font-black leading-none text-white">${shown("iconic-finish", 75)}</span>
                               </div>
-                              <p className="text-[11px] font-bold text-gray-100">Standard on Market Leader | <span className="whitespace-nowrap">$75</span> Add-on for all other packages (Next Day Delivery)</p>
+                              <p className="text-[11px] font-bold text-gray-100">Standard on Market Leader | <span className="whitespace-nowrap">${shown("iconic-finish", 75)}</span> Add-on for all other packages (Next Day Delivery)</p>
                             </div>
                             <div className="grid grid-cols-1 gap-3">
                               {[

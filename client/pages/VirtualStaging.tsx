@@ -4,6 +4,8 @@ import { Link } from "react-router-dom";
 import { CheckCircle2, Sparkles, UserCheck } from "lucide-react";
 import { beforeAfterById, type BeforeAfterPair } from "@/lib/beforeAfter";
 import { useSiteHref, useSiteText } from "@/content/siteContent";
+import { usePricingAdjustments } from "@/lib/usePublicCatalog";
+import { dollars, feeAmount } from "@shared/publicPrices";
 
 const SHOWCASE: BeforeAfterPair[] = [
   beforeAfterById("pavilion-lifestyle"),
@@ -19,6 +21,8 @@ export default function VirtualStaging() {
   const priceLead = useSiteText("virtualStaging", "pricing", "titleLead", "Flexible");
   const priceAccent = useSiteText("virtualStaging", "pricing", "titleAccent", "Pricing");
   const priceBody = useSiteText("virtualStaging", "pricing", "body", "Choose between our lightning-fast AI tool or professional human edits for the ultimate quality.");
+  const adjustments = usePricingAdjustments();
+  const fee = (id: string, fallback: number) => dollars(feeAmount(adjustments, id, fallback));
   return (
     <Layout>
       <div className="bg-white text-black">
@@ -123,7 +127,7 @@ export default function VirtualStaging() {
                 <div className="mb-8">
                   <h3 className="text-2xl font-bold mb-2">AI Staging</h3>
                   <div className="flex items-baseline gap-1">
-                    <span className="text-4xl font-bold text-[#0d9488]">$5</span>
+                    <span className="text-4xl font-bold text-[#0d9488]">{fee("display-vs-ai-unit", 5)}</span>
                     <span className="text-gray-500">/ photo</span>
                   </div>
                 </div>
@@ -131,11 +135,11 @@ export default function VirtualStaging() {
                 <div className="space-y-4 mb-8">
                   <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
                     <span className="font-medium">10 Photos</span>
-                    <span className="font-bold text-[#0d9488]">$45</span>
+                    <span className="font-bold text-[#0d9488]">{fee("display-vs-ai-10", 45)}</span>
                   </div>
                   <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
                     <span className="font-medium">25 Photos</span>
-                    <span className="font-bold text-[#0d9488]">$100</span>
+                    <span className="font-bold text-[#0d9488]">{fee("display-vs-ai-25", 100)}</span>
                   </div>
                 </div>
 
@@ -169,7 +173,7 @@ export default function VirtualStaging() {
                 <div className="mb-8">
                   <h3 className="text-2xl font-bold mb-2">Submit to Pros</h3>
                   <div className="flex items-baseline gap-1">
-                    <span className="text-4xl font-bold text-[#0d9488]">$25</span>
+                    <span className="text-4xl font-bold text-[#0d9488]">{fee("display-vs-pro-unit", 25)}</span>
                     <span className="text-gray-400">/ photo</span>
                   </div>
                 </div>
@@ -177,11 +181,11 @@ export default function VirtualStaging() {
                 <div className="space-y-4 mb-8">
                   <div className="flex items-center justify-between p-3 bg-white/10 rounded-xl">
                     <span className="font-medium">10 Photos</span>
-                    <span className="font-bold text-[#0d9488]">$200</span>
+                    <span className="font-bold text-[#0d9488]">{fee("display-vs-pro-10", 200)}</span>
                   </div>
                   <div className="flex items-center justify-between p-3 bg-white/10 rounded-xl">
                     <span className="font-medium">20 Photos</span>
-                    <span className="font-bold text-[#0d9488]">$350</span>
+                    <span className="font-bold text-[#0d9488]">{fee("display-vs-pro-20", 350)}</span>
                   </div>
                 </div>
 

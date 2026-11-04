@@ -171,14 +171,25 @@ function money(value: number): string {
 }
 
 /** Same 2.8% line a /book invoice stores. Travel is not part of this quote. */
-export function realEstate75Quote(applyProcessing = true, packageId?: unknown): RealEstate75Quote {
+export function realEstate75Quote(
+  applyProcessing = true,
+  packageId?: unknown,
+  options?: { subtotal?: number; processingPercent?: number },
+): RealEstate75Quote {
   const pkg = realEstate75Package(packageId);
+  const subtotal = options?.subtotal ?? pkg.subtotal;
   const totals = computeInvoiceTotals({
-    subtotal: pkg.subtotal,
+    subtotal,
     applyProcessing,
+    ...(options?.processingPercent != null ? { processingPercent: options.processingPercent } : {}),
   });
+  const shownSubtotal = Number.isInteger(subtotal) ? String(subtotal) : subtotal.toFixed(2);
+  const percent = options?.processingPercent;
+  const percentLabel = percent == null || Math.round(percent * 100) === 280
+    ? "2.8%"
+    : `${Number.isInteger(percent) ? percent : Math.round(percent * 100) / 100}%`;
   const priceLine = applyProcessing
-    ? `$${pkg.subtotal} + 2.8% processing fee (${money(totals.total)} total by card).`
+    ? `$${shownSubtotal} + ${percentLabel} processing fee (${money(totals.total)} total by card).`
     : money(totals.total);
   return {
     packageId: pkg.id,

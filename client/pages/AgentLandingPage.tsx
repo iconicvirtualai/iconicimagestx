@@ -18,8 +18,11 @@ import BookingForm from "@/components/BookingForm";
 import { Button } from "@/components/ui/button";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { useSiteText } from "@/content/siteContent";
+import { usePricingAdjustments } from "@/lib/usePublicCatalog";
+import { dollars, feeAmount } from "@shared/publicPrices";
 
 export default function AgentLandingPage() {
+  const referral = dollars(feeAmount(usePricingAdjustments(), "display-referral", 50));
   const settings = useSiteSettings();
   const badge = useSiteText("agents", "hero", "badge", "Exclusive Offer for Real Estate Agents");
   const titleLead = useSiteText("agents", "hero", "titleLead", "Get");
@@ -189,7 +192,7 @@ export default function AgentLandingPage() {
               <div className="relative z-10 space-y-6">
                 <h2 className="text-3xl lg:text-4xl font-black uppercase tracking-tight">The Agent Referral Program</h2>
                 <p className="text-teal-50 font-medium text-lg max-w-xl mx-auto">
-                  Refer a colleague and you both get <span className="font-black text-white underline">$50 OFF</span> your next shoot. It's our way of saying thanks for growing the Iconic community.
+                  Refer a colleague and you both get <span className="font-black text-white underline">{referral} OFF</span> your next shoot. It's our way of saying thanks for growing the Iconic community.
                 </p>
                 <Button asChild className="bg-white text-teal-600 hover:bg-teal-50 font-black uppercase tracking-widest px-8 py-6 rounded-xl">
                   <Link to="/contact">Ask About Referrals</Link>
