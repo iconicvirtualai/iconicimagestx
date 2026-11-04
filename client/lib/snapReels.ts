@@ -3,6 +3,8 @@ export type SnapReel = {
   poster?: string;
   title: string;
   vibe: string;
+  /** Seconds to skip a dark or labeled opener. */
+  startAt?: number;
 };
 
 export const SNAP_REELS: readonly SnapReel[] = [
@@ -32,25 +34,35 @@ export const SNAP_REELS: readonly SnapReel[] = [
   },
 ] as const;
 
-/** Homepage strip. Daytime cuts only. Captions stay free of street names. */
+/** Homepage strip. Newest Blaze cuts, bright covers, no street names. */
 export const SNAP_REEL_STRIP: readonly SnapReel[] = [
   {
-    src: "/media/videos/snap-reels/bayonne-snap.mp4",
-    poster: "/media/videos/snap-reels/bayonne-snap.jpg",
+    src: "/media/videos/snap-reels/heron-wing-blaze-v2.mp4",
+    poster: "/media/videos/snap-reels/heron-wing-blaze-v2.jpg",
     title: "",
-    vibe: "A sunny lawn and a pool that feels ready for the afternoon.",
+    vibe: "JPGs rendering...",
+    startAt: 2,
   },
   {
-    src: "/media/videos/snap-reels/snap-reel-02.mp4",
-    poster: "/media/videos/snap-reels/snap-reel-02.jpg",
+    src: "/media/videos/snap-reels/woodville-blaze-v4.mp4",
+    poster: "/media/videos/snap-reels/woodville-blaze-v4.jpg",
     title: "",
-    vibe: "An airy living room under a high ceiling, easy to settle into.",
+    vibe: "Files uploading...",
+    startAt: 1,
   },
   {
-    src: "/media/videos/snap-reels/snap-reel-01.mp4",
-    poster: "/media/videos/snap-reels/snap-reel-01.jpg",
+    src: "/media/videos/snap-reels/stoneridge-blaze-v2.mp4",
+    poster: "/media/videos/snap-reels/stoneridge-blaze-v2.jpg",
     title: "",
-    vibe: "Window light over the seating, and the yard just beyond the glass.",
+    vibe: "Ready for Sundown",
+    startAt: 2,
+  },
+  {
+    src: "/media/videos/snap-reels/abbylane-blaze-v4.mp4",
+    poster: "/media/videos/snap-reels/abbylane-blaze-v4.jpg",
+    title: "",
+    vibe: "Once upon a PNG there was a For Sale sign",
+    startAt: 2.1,
   },
 ] as const;
 
@@ -58,6 +70,10 @@ export const SNAP_REEL_STRIP: readonly SnapReel[] = [
 export const FEATURED_SNAP_REEL = SNAP_REELS[3];
 
 export function snapPoster(src: string): string | undefined {
-  const match = [...SNAP_REELS, ...SNAP_REEL_STRIP].find((reel) => reel.src === src);
+  const match = [...SNAP_REEL_STRIP, ...SNAP_REELS].find((reel) => reel.src === src && reel.poster);
   return match?.poster || undefined;
+}
+
+export function snapStart(src: string): number {
+  return SNAP_REEL_STRIP.find((reel) => reel.src === src)?.startAt ?? 0;
 }

@@ -188,9 +188,10 @@ const PAGES: ContentPage[] = [
       textField("title", "Headline", "Snap Reels"),
       areaField("body", "Body", "Listing stills, turned into a 9:16 Snap Reel. Same-day vertical video from the photos we already shoot."),
     ], [
-      { id: "lawn", fields: [videoField("video", "Video", "/media/videos/snap-reels/bayonne-snap.mp4"), textField("title", "Title", ""), textField("vibe", "Caption", "A sunny lawn and a pool that feels ready for the afternoon.")] },
-      { id: "living", fields: [videoField("video", "Video", "/media/videos/snap-reels/snap-reel-02.mp4"), textField("title", "Title", ""), textField("vibe", "Caption", "An airy living room under a high ceiling, easy to settle into.")] },
-      { id: "windows", fields: [videoField("video", "Video", "/media/videos/snap-reels/snap-reel-01.mp4"), textField("title", "Title", ""), textField("vibe", "Caption", "Window light over the seating, and the yard just beyond the glass.")] },
+      { id: "jpg", fields: [videoField("video", "Video", "/media/videos/snap-reels/heron-wing-blaze-v2.mp4"), textField("title", "Title", ""), textField("vibe", "Caption", "JPGs rendering...")] },
+      { id: "upload", fields: [videoField("video", "Video", "/media/videos/snap-reels/woodville-blaze-v4.mp4"), textField("title", "Title", ""), textField("vibe", "Caption", "Files uploading...")] },
+      { id: "sundown", fields: [videoField("video", "Video", "/media/videos/snap-reels/stoneridge-blaze-v2.mp4"), textField("title", "Title", ""), textField("vibe", "Caption", "Ready for Sundown")] },
+      { id: "png", fields: [videoField("video", "Video", "/media/videos/snap-reels/abbylane-blaze-v4.mp4"), textField("title", "Title", ""), textField("vibe", "Caption", "Once upon a PNG there was a For Sale sign")] },
     ]),
     block("features", "Add-on tools", [
       textField("badge", "Badge", "ADDITIONAL FEATURES"),

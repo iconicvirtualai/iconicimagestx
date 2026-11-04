@@ -1,4 +1,4 @@
-import { SNAP_REEL_STRIP, snapPoster } from "@/lib/snapReels";
+import { SNAP_REEL_STRIP, snapPoster, snapStart } from "@/lib/snapReels";
 import { itemText, useSiteItems, useSiteText } from "@/content/siteContent";
 
 export default function SnapReelsStrip() {
@@ -23,7 +23,7 @@ export default function SnapReelsStrip() {
             {body}
           </p>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-8">
           {reels.map((reel) => (
             <figure key={reel.id} className="mx-auto w-full max-w-[280px] sm:max-w-none">
               <div className="overflow-hidden rounded-[1.75rem] border border-black/10 bg-black shadow-xl">
@@ -37,7 +37,13 @@ export default function SnapReelsStrip() {
                   loop
                   playsInline
                   preload="metadata"
-                  aria-label={reel.title ? `Snap Reel — ${reel.title}` : "Snap Reel"}
+                  aria-label="Snap Reel"
+                  onLoadedMetadata={(event) => {
+                    const start = snapStart(reel.src);
+                    if (start > 0 && event.currentTarget.currentTime < start) {
+                      event.currentTarget.currentTime = start;
+                    }
+                  }}
                 />
               </div>
               <figcaption className="mt-4 text-center">
