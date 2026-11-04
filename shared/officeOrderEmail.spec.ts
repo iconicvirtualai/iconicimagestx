@@ -243,4 +243,108 @@ describe("office new order email", () => {
     const plain = officeNewOrderEmail(saved, { catalog });
     expect(plain.subject.startsWith("[TEST]")).toBe(false);
   });
+
+  it("opens a mailto draft to the booking client and does not send from the button", () => {
+    const email = officeNewOrderEmail(saved, { catalog });
+    const draft = replyDraft(email.html);
+    expect(email.replyTo).toBe("sytoya@example.com");
+    expect(draft.email).toBe("sytoya@example.com");
+    expect(draft.subject).toBe("Re: ORD-L-00534 — 123 Main St, Conroe, TX");
+    expect(draft.body).toBe("Hi Sytoya,");
+    expect(email.html).toContain(">Reply to Sytoya</a>");
+    expect(email.html.indexOf(">Reply to Sytoya</a>")).toBeLessThan(email.html.indexOf("<table"));
+    expect(email.html).toContain('href="tel:+12815550100"');
+    expect(email.html).toContain('href="sms:+12815550100"');
+    expect(email.html).toContain("Call 281-555-0100");
+    expect(email.html).toContain("Text 281-555-0100");
+    expect(email.html).not.toContain("<form");
+    expect(email.html).not.toContain("<script");
+    expect(email.text.startsWith("Reply to agent: sytoya@example.com\n")).toBe(true);
+    expect(email.text).toContain("Client email: sytoya@example.com");
+    expect(email.text).toContain("Client phone: 281-555-0100");
+    expect(email.text).toContain("Package: Hollywood");
+  });
+
+  it("prefers clientEmail and clientPhone, and greets the saved first name", () => {
+    const email = officeNewOrderEmail({
+      ...saved,
+      firstName: "Sia",
+      clientEmail: "Sia Agent <sia@harbor.com>",
+      email: "sytoya@example.com",
+      clientPhone: "(713) 555-0142",
+      phone: "281-555-0100",
+    }, { catalog });
+    const draft = replyDraft(email.html);
+    expect(email.replyTo).toBe("sia@harbor.com");
+    expect(draft.email).toBe("sia@harbor.com");
+    expect(draft.body).toBe("Hi Sia,");
+    expect(email.html).toContain(">Reply to Sia</a>");
+    expect(email.html).toContain('href="tel:+17135550142"');
+    expect(email.html).toContain('href="sms:+17135550142"');
+    expect(email.text).toContain("Reply to agent: sia@harbor.com");
+    expect(email.text).not.toContain("Reply to agent: sytoya@example.com");
+  });
+
+  it("uses the name after a TEST ORDER marker", () => {
+    const email = officeNewOrderEmail({
+      ...saved,
+      clientName: "TEST ORDER Sytoya",
+    }, { catalog });
+    expect(replyDraft(email.html).body).toBe("Hi Sytoya,");
+    expect(email.html).toContain(">Reply to Sytoya</a>");
+  });
+
+  it("escapes the first name in the button and still encodes it in the draft", () => {
+    const email = officeNewOrderEmail({
+      ...saved,
+      clientName: "A&B Smith",
+    }, { catalog });
+    expect(email.html).toContain(">Reply to A&amp;B</a>");
+    expect(email.html).not.toContain(">Reply to A&B</a>");
+    expect(replyDraft(email.html).body).toBe("Hi A&B,");
+  });
+
+  it("omits the reply draft when the order has no client email and skips a phone that is not dialable", () => {
+    const email = officeNewOrderEmail({
+      clientName: "Sytoya Harvin",
+      phone: "ask the builder",
+      address: "123 Main St",
+    });
+    expect(email.replyTo).toBeUndefined();
+    expect(email.html).not.toContain("mailto:");
+    expect(email.html).not.toContain("tel:");
+    expect(email.html).not.toContain("sms:");
+    expect(email.text).not.toContain("Reply to agent:");
+    expect(email.text).toContain("Client phone: ask the builder");
+  });
+
+  it("shows call and text links without a reply button when only a phone is saved", () => {
+    const email = officeNewOrderEmail({
+      clientName: "Sytoya Harvin",
+      phone: "281-555-0100",
+    });
+    expect(email.replyTo).toBeUndefined();
+    expect(email.html).not.toContain("mailto:");
+    expect(email.html).toContain('href="tel:+12815550100"');
+    expect(email.html).toContain('href="sms:+12815550100"');
+    expect(email.text).not.toContain("Reply to agent:");
+  });
+
+  it("keeps the office note first and puts the reply line directly under it", () => {
+    const note = "Calendar hold failed for Mike Luna.\nAdd it to the calendar manually.";
+    const email = officeNewOrderEmail({ ...saved, officeNote: note }, { catalog });
+    expect(email.text.startsWith(`Office note: ${note}\nReply to agent: sytoya@example.com\n`)).toBe(true);
+    expect(email.html.indexOf("Reply to Sytoya")).toBeLessThan(email.html.indexOf("Calendar hold failed"));
+  });
 });
+
+function replyDraft(html: string): { email: string; subject: string; body: string } {
+  const match = html.match(/href="(mailto:[^"]+)"/);
+  if (!match) throw new Error("Office email is missing the reply draft link.");
+  const url = new URL(match[1].replace(/&amp;/g, "&"));
+  return {
+    email: decodeURIComponent(url.pathname),
+    subject: url.searchParams.get("subject") || "",
+    body: url.searchParams.get("body") || "",
+  };
+}

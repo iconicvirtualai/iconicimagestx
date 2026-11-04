@@ -63,7 +63,9 @@ interface SendEmailOptions {
   /**
    * "staff" is required for the live_chat office alert and the new-order
    * office alert. Omit for client mail.
-   * Visitor addresses must not be paired with audience "staff".
+   * Visitor addresses must not be paired with audience "staff" in To, Cc, or Bcc.
+   * office_new_order may set replyTo to the booking client. That address is
+   * not a delivery recipient.
    */
   audience?: "client" | "staff";
   variables?: Record<string, string>;
@@ -120,6 +122,10 @@ export async function sendEmail(options: SendEmailOptions): Promise<{ sent: bool
   // Other client mail stays off unless CLIENT_NOTIFY_LIVE is exactly "true"
   // and the zone is not RED. NOTIFY_TEST_ALLOWLIST can still deliver those
   // gated messages, and only to exact addresses on that list, including in RED.
+  // Staff office_new_order is allowed by emailAllowed, so this block does not
+  // run and its Reply-To is kept. That Reply-To may be the booking client.
+  // The client is never a To, Cc, or Bcc on that send. Gated mail still drops
+  // a client Reply-To in narrowGatedClientRecipients. Do not extend that exception.
   if (!emailAllowed(template, process.env, audience)) {
     const narrowed = narrowGatedClientRecipients({ to, cc, bcc, replyTo }, process.env);
     if (!narrowed) {

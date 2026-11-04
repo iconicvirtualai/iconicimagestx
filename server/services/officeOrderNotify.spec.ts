@@ -48,6 +48,11 @@ describe("office new order delivery", () => {
     const message = sendEmailMock.mock.calls[0][0];
     expect(message.to).toBe("office@iconicimagestx.com, coord@iconicimagestx.com");
     expect(message.to).not.toContain("sytoya@example.com");
+    expect(message.cc).toBeUndefined();
+    expect(message.bcc).toBeUndefined();
+    expect(message.replyTo).toBe("sytoya@example.com");
+    expect(message.text).toContain("Reply to agent: sytoya@example.com");
+    expect(message.html).toContain("Reply to Sytoya");
     expect(message.audience).toBe("staff");
     expect(message.template).toBe("office_new_order");
     expect(message.subject).toContain("Hollywood");
@@ -104,6 +109,42 @@ describe("office new order delivery", () => {
     const message = sendEmailMock.mock.calls[0][0];
     expect(message.html).toContain(note);
     expect(message.variables?.body).toContain(`Office note: ${note}`);
+  });
+
+  it("sets Reply-To from a display-name client and still keeps that mailbox out of To, Cc, and Bcc", async () => {
+    await notifyOfficeOfOrder({
+      isNewOrder: true,
+      saved: {
+        ...saved,
+        email: "Sytoya Harvin <sytoya@example.com>",
+        clientEmail: "Sytoya Harvin <sytoya@example.com>",
+      },
+      env: {
+        ADMIN_EMAIL: "office@iconicimagestx.com",
+        COORDINATOR_EMAIL: "Sytoya Harvin <sytoya@example.com>",
+      },
+    });
+    const message = sendEmailMock.mock.calls[0][0];
+    expect(message.replyTo).toBe("sytoya@example.com");
+    expect(message.to).toBe("office@iconicimagestx.com");
+    expect(message.cc).toBeUndefined();
+    expect(message.bcc).toBeUndefined();
+    expect(`${message.to} ${message.cc ?? ""} ${message.bcc ?? ""}`).not.toContain("sytoya@example.com");
+  });
+
+  it("omits Reply-To when the saved order has no client email", async () => {
+    await notifyOfficeOfOrder({
+      isNewOrder: true,
+      saved: { ...saved, email: " ", clientEmail: "" },
+      env: { ADMIN_EMAIL: "office@iconicimagestx.com", COORDINATOR_EMAIL: "coord@iconicimagestx.com" },
+    });
+    const message = sendEmailMock.mock.calls[0][0];
+    expect(message.replyTo).toBeUndefined();
+    expect(message.to).toBe("office@iconicimagestx.com, coord@iconicimagestx.com");
+    expect(message.cc).toBeUndefined();
+    expect(message.bcc).toBeUndefined();
+    expect(message.html).not.toContain("mailto:");
+    expect(message.text).not.toContain("Reply to agent:");
   });
 
   it("does not send when the order is not new", async () => {
