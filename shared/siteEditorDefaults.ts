@@ -132,7 +132,7 @@ const PAGES: ContentPage[] = [
       textField("titleAccent", "Title accent", "ARE"),
       textField("titleTail", "Title tail", "the Bar."),
       areaField("body", "Body", "We don’t follow trends. We break patterns. We don’t undercut. We outperform."),
-      videoField("video", "Phone video — only place this clip should appear", "/media/video/content-web-clip.mp4"),
+      videoField("video", "Phone video", "/media/blaze/02_US_v3.mp4"),
     ]),
     block("market", "Our market", [
       textField("titleLead", "Title lead", "This Is"),
@@ -145,13 +145,13 @@ const PAGES: ContentPage[] = [
       textField("title", "Headline", "Your All-in-One Solution for High-Impact Media Content"),
       areaField("body", "Body", "Transform your raw ideas into engaging cinematic media in minutes. Whether you're a high-growth startup serving multiple clients or an established enterprise, Iconic helps you create professional-grade visual content seamlessly."),
     ], [
-      { id: "slide-1", fields: [videoField("video", "Slide 1 video — keep the current listing film", "/media/video/product-photography.mp4"), textField("aspect", "Frame (16/9 or 9/16)", "16/9"), textField("title", "On-screen title", "Listing film")] },
-      { id: "slide-2", fields: [videoField("video", "Slide 2 video — premium listing, horizontal", "/media/videos/snap-reels/bayonne-snap.mp4"), textField("aspect", "Frame (16/9 or 9/16)", "9/16"), textField("title", "On-screen title", "Premium listing"), textField("note", "Editor note (not shown)", "Needs a horizontal premium listing video. Placeholder is a vertical listing reel.")] },
-      { id: "slide-3", fields: [videoField("video", "Slide 3 video — Emily Aguilar, vertical", "/media/blaze/02_US_v3.mp4"), textField("aspect", "Frame (16/9 or 9/16)", "9/16"), textField("title", "On-screen title", "Emily Aguilar"), textField("note", "Editor note (not shown)", "Needs Emily Aguilar's agent reel. Placeholder is a vertical on-camera portrait, not Emily.")] },
-      { id: "slide-4", fields: [videoField("video", "Slide 4 video — King Metals, horizontal", "/media/videos/snap-reels/forest-heights-blaze.mp4"), textField("aspect", "Frame (16/9 or 9/16)", "9/16"), textField("title", "On-screen title", "King Metals"), textField("note", "Editor note (not shown)", "Needs the King Metals commercial, horizontal. Placeholder is a vertical listing reel.")] },
-      { id: "slide-5", fields: [videoField("video", "Slide 5 video — Blaze reel, vertical", "/media/videos/snap-reels/arcane-court-blaze.mp4"), textField("aspect", "Frame (16/9 or 9/16)", "9/16"), textField("title", "On-screen title", "Blaze reel"), textField("note", "Editor note (not shown)", "Placeholder Blaze reel. Swap in the chosen vertical cut when it is ready.")] },
-      { id: "slide-6", fields: [videoField("video", "Slide 6 video — aerial only, horizontal", "/media/videos/snap-reels/tall-trees-blaze.mp4"), textField("aspect", "Frame (16/9 or 9/16)", "9/16"), textField("title", "On-screen title", "Aerial"), textField("note", "Editor note (not shown)", "Needs an aerial-only horizontal video. No aerial video is in the library yet. Placeholder is a vertical exterior reel.")] },
-      { id: "slide-7", fields: [videoField("video", "Slide 7 video — another agent, vertical", "/media/blaze/01_BUILT_v2.mp4"), textField("aspect", "Frame (16/9 or 9/16)", "9/16"), textField("title", "On-screen title", "Agent reel"), textField("note", "Editor note (not shown)", "Needs a second vertical agent reel. Placeholder is an on-location portrait film.")] },
+      { id: "slide-1", fields: [videoField("video", "Slide 1 video — current listing film", "/media/video/product-photography.mp4"), imageField("poster", "Poster", ""), textField("aspect", "Frame (16/9 or 9/16)", "16/9"), textField("title", "On-screen title", "Listing film"), textField("sound", "Has sound", "false")] },
+      { id: "slide-2", fields: [videoField("video", "Slide 2 video — premium listing, horizontal", "/media/home-v2/slider/02-premium-listing-nubenbrook.mp4"), imageField("poster", "Poster", "/media/home-v2/slider/02-premium-listing-nubenbrook.jpg"), textField("aspect", "Frame (16/9 or 9/16)", "16/9"), textField("title", "On-screen title", "Premium listing"), textField("sound", "Has sound", "false")] },
+      { id: "slide-3", fields: [videoField("video", "Slide 3 video — Emily Aguilar, vertical", "/media/home-v2/slider/03-agent-emily-aguilar.mp4"), imageField("poster", "Poster", "/media/home-v2/slider/03-agent-emily-aguilar.jpg"), textField("aspect", "Frame (16/9 or 9/16)", "9/16"), textField("title", "On-screen title", "Emily Aguilar"), textField("sound", "Has sound", "true")] },
+      { id: "slide-4", fields: [videoField("video", "Slide 4 video — King Metals, horizontal", "/media/home-v2/slider/04-commercial-king-metals.mp4"), imageField("poster", "Poster", "/media/home-v2/slider/04-commercial-king-metals.jpg"), textField("aspect", "Frame (16/9 or 9/16)", "16/9"), textField("title", "On-screen title", "King Metals"), textField("sound", "Has sound", "false")] },
+      { id: "slide-5", fields: [videoField("video", "Slide 5 video — Blaze reel, vertical", "/media/home-v2/slider/05-blaze-reel-stoneybrook.mp4"), imageField("poster", "Poster", "/media/home-v2/slider/05-blaze-reel-stoneybrook.jpg"), textField("aspect", "Frame (16/9 or 9/16)", "9/16"), textField("title", "On-screen title", "Blaze reel"), textField("sound", "Has sound", "false")] },
+      { id: "slide-6", fields: [videoField("video", "Slide 6 video — aerial, horizontal", "/media/home-v2/slider/06-aerial-lakefront.mp4"), imageField("poster", "Poster", "/media/home-v2/slider/06-aerial-lakefront.jpg"), textField("aspect", "Frame (16/9 or 9/16)", "16/9"), textField("title", "On-screen title", "Aerial"), textField("sound", "Has sound", "false")] },
+      { id: "slide-7", fields: [videoField("video", "Slide 7 video — Amy Armstrong, vertical", "/media/home-v2/slider/07-agent-reel-amy-armstrong.mp4"), imageField("poster", "Poster", "/media/home-v2/slider/07-agent-reel-amy-armstrong.jpg"), textField("aspect", "Frame (16/9 or 9/16)", "9/16"), textField("title", "On-screen title", "Amy Armstrong"), textField("sound", "Has sound", "false")] },
     ]),
     block("stats", "Stats", [], [
       { id: "assets", fields: [textField("value", "Value", "100,000+"), textField("label", "Label", "Media assets produced")] },
@@ -196,10 +196,10 @@ const PAGES: ContentPage[] = [
       textField("title", "Headline", "Snap Reels"),
       areaField("body", "Body", "Listing stills, turned into a 9:16 Snap Reel. Same-day vertical video from the photos we already shoot."),
     ], [
-      { id: "jpg", fields: [videoField("video", "Video", "/media/videos/snap-reels/heron-wing-blaze-v2.mp4"), textField("title", "Title", ""), textField("vibe", "Caption", "JPGs rendering...")] },
-      { id: "upload", fields: [videoField("video", "Video", "/media/videos/snap-reels/woodville-blaze-v4.mp4"), textField("title", "Title", ""), textField("vibe", "Caption", "Files uploading...")] },
-      { id: "sundown", fields: [videoField("video", "Video", "/media/videos/snap-reels/stoneridge-blaze-v2.mp4"), textField("title", "Title", ""), textField("vibe", "Caption", "Ready for Sundown")] },
-      { id: "png", fields: [videoField("video", "Video", "/media/videos/snap-reels/abbylane-blaze-v4.mp4"), textField("title", "Title", ""), textField("vibe", "Caption", "Once upon a PNG there was a For Sale sign")] },
+      { id: "jpg", fields: [videoField("video", "JPGs rendering video", "/media/videos/snap-reels/heron-wing-blaze-v2.mp4"), imageField("poster", "Poster", "/media/videos/snap-reels/heron-wing-blaze-v2.jpg"), textField("title", "Title", ""), textField("vibe", "Caption", "JPGs rendering..."), textField("note", "Editor note (not shown)", "Replace with bluelake-blaze.mp4 when that clean cut arrives. This heron-wing cut is temporary.")] },
+      { id: "upload", fields: [videoField("video", "Files uploading video", "/media/home-v2/snap-cards/woodville-blaze-v5.mp4"), imageField("poster", "Poster", "/media/home-v2/snap-cards/woodville-blaze-v5.jpg"), textField("title", "Title", ""), textField("vibe", "Caption", "Files uploading...")] },
+      { id: "sundown", fields: [videoField("video", "Ready for Sundown video", "/media/home-v2/snap-cards/stoneridge-blaze-v3.mp4"), imageField("poster", "Poster", "/media/home-v2/snap-cards/stoneridge-blaze-v3.jpg"), textField("title", "Title", ""), textField("vibe", "Caption", "Ready for Sundown")] },
+      { id: "png", fields: [videoField("video", "Once upon a PNG video", "/media/home-v2/snap-cards/abbylane-blaze-v5.mp4"), imageField("poster", "Poster", "/media/home-v2/snap-cards/abbylane-blaze-v5.jpg"), textField("title", "Title", ""), textField("vibe", "Caption", "Once upon a PNG there was a For Sale sign")] },
     ]),
     block("features", "Add-on tools", [
       textField("badge", "Badge", "ADDITIONAL FEATURES"),
@@ -274,7 +274,7 @@ const PAGES: ContentPage[] = [
       textField("titleAccent", "Title accent", "Price"),
       textField("titleTail", "Title tail", "for Your Presence"),
       textField("subtitle", "Subtitle", "Media that moves as fast as you do."),
-      videoField("background", "Background video", "/media/holiday/hero-web.mp4"),
+      videoField("background", "Background video", "/media/video/content-web-clip.mp4"),
     ]),
     block("chips", "Section jumps", [], [
       { id: "listings", fields: [textField("label", "Label", "FOR LISTINGS"), textField("anchor", "Anchor", "listings")] },

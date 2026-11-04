@@ -129,7 +129,7 @@ export default function Pricing() {
   const priceAccent = useSiteText("pricing", "hero", "titleAccent", "Price");
   const priceTail = useSiteText("pricing", "hero", "titleTail", "for Your Presence");
   const priceSubtitle = useSiteText("pricing", "hero", "subtitle", "Media that moves as fast as you do.");
-  const priceVideo = useSiteText("pricing", "hero", "background", "/media/holiday/hero-web.mp4");
+  const priceVideo = useSiteText("pricing", "hero", "background", "/media/video/content-web-clip.mp4");
   const chipItems = useSiteItems("pricing", "chips");
   const assistantTitle = useSiteText("pricing", "assistant", "title", "Not sure where to start?");
   const assistantSubtitle = useSiteText("pricing", "assistant", "subtitle", "Let our AI guide you");

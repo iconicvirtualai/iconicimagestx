@@ -44,25 +44,22 @@ export const SNAP_REEL_STRIP: readonly SnapReel[] = [
     startAt: 2,
   },
   {
-    src: "/media/videos/snap-reels/woodville-blaze-v4.mp4",
-    poster: "/media/videos/snap-reels/woodville-blaze-v4.jpg",
+    src: "/media/home-v2/snap-cards/woodville-blaze-v5.mp4",
+    poster: "/media/home-v2/snap-cards/woodville-blaze-v5.jpg",
     title: "",
     vibe: "Files uploading...",
-    startAt: 1,
   },
   {
-    src: "/media/videos/snap-reels/stoneridge-blaze-v2.mp4",
-    poster: "/media/videos/snap-reels/stoneridge-blaze-v2.jpg",
+    src: "/media/home-v2/snap-cards/stoneridge-blaze-v3.mp4",
+    poster: "/media/home-v2/snap-cards/stoneridge-blaze-v3.jpg",
     title: "",
     vibe: "Ready for Sundown",
-    startAt: 2,
   },
   {
-    src: "/media/videos/snap-reels/abbylane-blaze-v4.mp4",
-    poster: "/media/videos/snap-reels/abbylane-blaze-v4.jpg",
+    src: "/media/home-v2/snap-cards/abbylane-blaze-v5.mp4",
+    poster: "/media/home-v2/snap-cards/abbylane-blaze-v5.jpg",
     title: "",
     vibe: "Once upon a PNG there was a For Sale sign",
-    startAt: 2.1,
   },
 ] as const;
 

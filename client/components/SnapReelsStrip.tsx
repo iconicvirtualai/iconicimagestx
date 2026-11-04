@@ -7,8 +7,14 @@ export default function SnapReelsStrip() {
   const body = useSiteText("home", "snapReels", "body", "Listing stills, turned into a 9:16 Snap Reel. Same-day vertical video from the photos we already shoot.");
   const items = useSiteItems("home", "snapReels");
   const reels = items
-    ? items.map((item) => ({ id: item.id, src: itemText(item, "video"), title: itemText(item, "title"), vibe: itemText(item, "vibe") }))
-    : SNAP_REEL_STRIP.map((reel) => ({ id: reel.src, src: reel.src, title: reel.title, vibe: reel.vibe }));
+    ? items.map((item) => ({
+      id: item.id,
+      src: itemText(item, "video"),
+      poster: itemText(item, "poster") || snapPoster(itemText(item, "video")),
+      title: itemText(item, "title"),
+      vibe: itemText(item, "vibe"),
+    }))
+    : SNAP_REEL_STRIP.map((reel) => ({ id: reel.src, src: reel.src, poster: reel.poster, title: reel.title, vibe: reel.vibe }));
   return (
     <section className="bg-[#f6f8f8] py-20 md:py-24">
       <div className="container mx-auto px-4 max-w-6xl">
@@ -29,7 +35,7 @@ export default function SnapReelsStrip() {
               <div className="overflow-hidden rounded-[1.75rem] border border-black/10 bg-black shadow-xl">
                 <video
                   src={reel.src}
-                  poster={snapPoster(reel.src)}
+                  poster={reel.poster || snapPoster(reel.src)}
                   data-site-page="home" data-site-block="snapReels" data-site-item={reel.id} data-site-field="video" data-site-kind="video"
                   className="aspect-[9/16] w-full object-cover"
                   autoPlay

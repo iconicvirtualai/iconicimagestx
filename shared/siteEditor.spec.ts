@@ -100,7 +100,7 @@ describe("published merge", () => {
           ...block,
           items: [
             { id: first.id, fields: first.fields.map((field) => field.id === "title" ? { ...field, value: "Kept title" } : field) },
-            { id: "former-employee", fields: [{ id: "video", label: "Video", kind: "video" as const, value: "/media/reels/superpower-reel-12s.mp4" }, { id: "title", label: "Title", kind: "text" as const, value: "Removed" }] },
+            { id: "former-employee", fields: [{ id: "video", label: "Video", kind: "video" as const, value: "/media/reels/removed-reel.mp4" }, { id: "title", label: "Title", kind: "text" as const, value: "Removed" }] },
           ],
         }
         : block),
@@ -108,7 +108,7 @@ describe("published merge", () => {
     const slides = merged?.blocks.find((block) => block.id === "solution")?.items ?? [];
     expect(slides.map((item) => item.id)).toEqual(solution.items?.map((item) => item.id));
     expect(slides[0]?.fields.find((field) => field.id === "title")?.value).toBe("Kept title");
-    expect(JSON.stringify(slides)).not.toContain("superpower-reel");
+    expect(JSON.stringify(slides)).not.toContain("removed-reel");
     expect(JSON.stringify(slides)).not.toContain("former-employee");
   });
 });

@@ -5,18 +5,20 @@ import { itemText, useSiteItems, useSiteText } from "@/content/siteContent";
 type Slide = {
   id: string;
   url: string;
+  poster: string;
   aspect: string;
   title: string;
+  sound: boolean;
 };
 
 const FALLBACK_SLIDES: Slide[] = [
-  { id: "slide-1", url: "/media/video/product-photography.mp4", aspect: "16/9", title: "Listing film" },
-  { id: "slide-2", url: "/media/videos/snap-reels/bayonne-snap.mp4", aspect: "9/16", title: "Premium listing" },
-  { id: "slide-3", url: "/media/blaze/02_US_v3.mp4", aspect: "9/16", title: "Emily Aguilar" },
-  { id: "slide-4", url: "/media/videos/snap-reels/forest-heights-blaze.mp4", aspect: "9/16", title: "King Metals" },
-  { id: "slide-5", url: "/media/videos/snap-reels/arcane-court-blaze.mp4", aspect: "9/16", title: "Blaze reel" },
-  { id: "slide-6", url: "/media/videos/snap-reels/tall-trees-blaze.mp4", aspect: "9/16", title: "Aerial" },
-  { id: "slide-7", url: "/media/blaze/01_BUILT_v2.mp4", aspect: "9/16", title: "Agent reel" },
+  { id: "slide-1", url: "/media/video/product-photography.mp4", poster: "", aspect: "16/9", title: "Listing film", sound: false },
+  { id: "slide-2", url: "/media/home-v2/slider/02-premium-listing-nubenbrook.mp4", poster: "/media/home-v2/slider/02-premium-listing-nubenbrook.jpg", aspect: "16/9", title: "Premium listing", sound: false },
+  { id: "slide-3", url: "/media/home-v2/slider/03-agent-emily-aguilar.mp4", poster: "/media/home-v2/slider/03-agent-emily-aguilar.jpg", aspect: "9/16", title: "Emily Aguilar", sound: true },
+  { id: "slide-4", url: "/media/home-v2/slider/04-commercial-king-metals.mp4", poster: "/media/home-v2/slider/04-commercial-king-metals.jpg", aspect: "16/9", title: "King Metals", sound: false },
+  { id: "slide-5", url: "/media/home-v2/slider/05-blaze-reel-stoneybrook.mp4", poster: "/media/home-v2/slider/05-blaze-reel-stoneybrook.jpg", aspect: "9/16", title: "Blaze reel", sound: false },
+  { id: "slide-6", url: "/media/home-v2/slider/06-aerial-lakefront.mp4", poster: "/media/home-v2/slider/06-aerial-lakefront.jpg", aspect: "16/9", title: "Aerial", sound: false },
+  { id: "slide-7", url: "/media/home-v2/slider/07-agent-reel-amy-armstrong.mp4", poster: "/media/home-v2/slider/07-agent-reel-amy-armstrong.jpg", aspect: "9/16", title: "Amy Armstrong", sound: false },
 ];
 
 function ratioFromAspect(aspect: string): number {
@@ -35,8 +37,10 @@ export default function SolutionSection() {
     ? saved.map((item) => ({
       id: item.id,
       url: itemText(item, "video"),
+      poster: itemText(item, "poster"),
       aspect: itemText(item, "aspect", "9/16"),
       title: itemText(item, "title"),
+      sound: itemText(item, "sound", "false") === "true",
     })).filter((item) => item.url)
     : FALLBACK_SLIDES;
 
@@ -48,6 +52,9 @@ export default function SolutionSection() {
     setCurrentIndex((prev) => (prev - 1 + videos.length) % videos.length);
   };
 
+  const currentVideo = videos[currentIndex] ?? videos[0];
+  const audible = Boolean(currentVideo?.sound) && !isMuted;
+
   useEffect(() => {
     setMeasured(null);
     const node = videoRef.current;
@@ -56,7 +63,10 @@ export default function SolutionSection() {
     node.play().catch(() => undefined);
   }, [currentIndex, videos.length]);
 
-  const currentVideo = videos[currentIndex] ?? videos[0];
+  useEffect(() => {
+    if (videoRef.current) videoRef.current.muted = !audible;
+  }, [audible, currentIndex]);
+
   const ratio = measured && measured > 0 ? measured : ratioFromAspect(currentVideo?.aspect || "9/16");
   const wide = ratio >= 1;
 
@@ -92,6 +102,7 @@ export default function SolutionSection() {
                 key={currentVideo.id}
                 ref={videoRef}
                 src={currentVideo.url}
+                poster={currentVideo.poster || undefined}
                 data-site-page="home"
                 data-site-block="solution"
                 data-site-item={currentVideo.id}
@@ -100,7 +111,7 @@ export default function SolutionSection() {
                 className="h-full w-full object-cover"
                 autoPlay
                 loop
-                muted={isMuted}
+                muted={!audible}
                 playsInline
                 preload="metadata"
                 onLoadedMetadata={(event) => {
