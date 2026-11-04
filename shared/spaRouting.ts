@@ -27,6 +27,7 @@ const NOINDEX = "noindex, nofollow";
 
 /** SPA routes that are not public marketing pages and not a private prefix. */
 const APP_SHELL_SOURCES = [
+  "/pay-at-close",
   "/pricing/ai-assistant",
   "/agents",
   "/unsubscribe",

@@ -48,6 +48,7 @@ export async function attachSquareInvoiceAfterBooking(
       subtotal: data.subtotal,
       processing: data.processing,
       paymentProvider: data.paymentProvider,
+      paymentMethod: data.paymentMethod,
       squareInvoiceId: data.squareInvoiceId,
     },
     { fetchImpl: fetch, env: process.env },

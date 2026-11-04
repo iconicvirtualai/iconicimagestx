@@ -116,6 +116,7 @@ export function createServer() {
   // A parsed object cannot be signed; the route rejects it instead of re-serializing.
   app.use("/api/payments/webhook", express.raw({ type: "application/json" }));
   app.use("/api/payments/square-webhook", express.raw({ type: "application/json" }));
+  app.use("/api/payments/pay-at-close-webhook", express.raw({ type: "application/json" }));
 
   // Site media can carry a video. The public JSON limit stays 10mb.
   app.use("/api/site-content/media", express.json({ limit: "120mb" }));

@@ -7,15 +7,20 @@ import {
   mergePricingAdjustments,
   PRICING_ADJUSTMENTS_COLLECTION,
   pricingRates,
+  type PricingAdjustment,
   type PricingRates,
 } from "../../shared/pricingSettings.ts";
 
-export async function loadPricingRates(): Promise<PricingRates> {
+export async function loadPricingAdjustments(): Promise<PricingAdjustment[]> {
   try {
     const snap = await admin.firestore().collection(PRICING_ADJUSTMENTS_COLLECTION).get();
-    return pricingRates(mergePricingAdjustments(snap.docs.map((entry) => ({ id: entry.id, ...entry.data() }))));
+    return mergePricingAdjustments(snap.docs.map((entry) => ({ id: entry.id, ...entry.data() })));
   } catch (err) {
     console.error("[Pricing] Settings read failed — using the seeded rates", err);
-    return pricingRates(mergePricingAdjustments([]));
+    return mergePricingAdjustments([]);
   }
+}
+
+export async function loadPricingRates(): Promise<PricingRates> {
+  return pricingRates(await loadPricingAdjustments());
 }

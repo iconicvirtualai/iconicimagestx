@@ -29,6 +29,7 @@ export default function ClientInvoice() {
   const [invoice, setInvoice] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
   const [checkingOut, setCheckingOut] = React.useState(false);
+  const [payAtCloseStarting, setPayAtCloseStarting] = React.useState(false);
   const [error, setError] = React.useState("");
 
   React.useEffect(() => {
@@ -79,6 +80,30 @@ export default function ClientInvoice() {
   });
   const face = invoiceFaceFromStored(invoice);
   const address = typeof invoice.billToAddress === "string" ? invoice.billToAddress : "";
+
+  const startPayAtClose = async () => {
+    if (!invoiceId) return;
+    setPayAtCloseStarting(true);
+    try {
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (user) headers.Authorization = `Bearer ${await user.getIdToken()}`;
+      const res = await fetch(`/api/payments/invoice/${encodeURIComponent(invoiceId)}/pay-at-close${payQuery(payToken)}`, {
+        method: "POST",
+        headers,
+      });
+      const result = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(result.error || "Could not start Pay at Close.");
+      if (result.paid) {
+        window.location.reload();
+        return;
+      }
+      if (!result.checkoutUrl) throw new Error("Pay at Close checkout was not created.");
+      window.location.href = result.checkoutUrl;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not start Pay at Close.");
+      setPayAtCloseStarting(false);
+    }
+  };
 
   const startCheckout = async () => {
     if (!invoiceId) return;
@@ -161,8 +186,19 @@ export default function ClientInvoice() {
                       <p className="text-sm font-bold">Square checkout finished. This page unlocks downloads after the payment is confirmed. Refresh in a moment if it still shows due.</p>
                     </div>
                   )}
+                  {invoice.canPayAtClose && (
+                    <Button
+                      type="button"
+                      data-testid="pay-at-close-checkout"
+                      onClick={startPayAtClose}
+                      className="w-full h-12 bg-black hover:bg-zinc-800 text-[#FFD700] rounded-xl font-bold"
+                      disabled={payAtCloseStarting}
+                    >
+                      {payAtCloseStarting ? "Opening Pay at Close..." : "Pay at Close"}
+                    </Button>
+                  )}
                   <Button onClick={startCheckout} className="w-full h-12 bg-[#0d9488] hover:bg-[#0f766e] text-white rounded-xl font-bold" disabled={checkingOut || !invoice.canPayOnline}>
-                    <CreditCard className="w-4 h-4 mr-2" /> {checkingOut ? "Opening Secure Checkout..." : "Pay Securely"}
+                    <CreditCard className="w-4 h-4 mr-2" /> {checkingOut ? "Opening Secure Checkout..." : invoice.paymentMethod === "pay_at_close" ? "Pay by card instead" : "Pay Securely"}
                   </Button>
                   <div className="flex items-start gap-3 text-gray-500 bg-gray-50 border border-gray-100 rounded-xl p-4">
                     <Lock className="w-5 h-5 mt-0.5" />
