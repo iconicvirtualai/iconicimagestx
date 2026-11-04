@@ -5,16 +5,56 @@ import { ChevronLeft, ChevronRight, X, Download, Lock } from "lucide-react";
 import { useState } from "react";
 import { useSiteText } from "@/content/siteContent";
 
+interface GalleryImage {
+  url: string;
+  alt: string;
+}
+
 interface PhotoGallery {
   id: string;
   neighborhood: string;
   price: number;
   imageCount: number;
   thumbnail: string;
-  images: {
-    url: string;
-    alt: string;
-  }[];
+  images: GalleryImage[];
+}
+
+function amenityGallery(
+  id: string,
+  neighborhood: string,
+  photos: { file: string; alt: string }[],
+): PhotoGallery {
+  const images = photos.map((photo) => ({
+    url: `/media/amenities/${id}/${photo.file}`,
+    alt: photo.alt,
+  }));
+  return {
+    id,
+    neighborhood,
+    price: 49.99,
+    imageCount: images.length,
+    thumbnail: images[0].url,
+    images,
+  };
+}
+
+function AmenityImage({
+  src,
+  alt,
+  className,
+  pictureClassName,
+}: {
+  src: string;
+  alt: string;
+  className?: string;
+  pictureClassName?: string;
+}) {
+  return (
+    <picture className={pictureClassName}>
+      <source srcSet={src.replace(/\.jpe?g$/i, ".webp")} type="image/webp" />
+      <img src={src} alt={alt} className={className} />
+    </picture>
+  );
 }
 
 export default function StockFootage() {
@@ -34,72 +74,54 @@ export default function StockFootage() {
   const [smsConsent, setSmsConsent] = useState(false);
 
   const neighborhoods: PhotoGallery[] = [
-    {
-      id: "artavia",
-      neighborhood: "Artavia",
-      price: 49.99,
-      imageCount: 20,
-      thumbnail: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=400&q=80",
-      images: Array.from({ length: 20 }, (_, i) => ({
-        url: `https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&q=80&t=${i}`,
-        alt: `Artavia Property ${i + 1}`
-      }))
-    },
-    {
-      id: "benders-landing",
-      neighborhood: "Bender's Landing",
-      price: 49.99,
-      imageCount: 20,
-      thumbnail: "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=400&q=80",
-      images: Array.from({ length: 20 }, (_, i) => ({
-        url: `https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&q=80&t=${i}`,
-        alt: `Bender's Landing Property ${i + 1}`
-      }))
-    },
-    {
-      id: "carlton-woods",
-      neighborhood: "Carlton Woods",
-      price: 49.99,
-      imageCount: 20,
-      thumbnail: "https://images.unsplash.com/photo-1600047509807-ba8f99d2cdde?w=400&q=80",
-      images: Array.from({ length: 20 }, (_, i) => ({
-        url: `https://images.unsplash.com/photo-1600047509807-ba8f99d2cdde?w=800&q=80&t=${i}`,
-        alt: `Carlton Woods Property ${i + 1}`
-      }))
-    },
-    {
-      id: "memorial",
-      neighborhood: "Memorial",
-      price: 49.99,
-      imageCount: 20,
-      thumbnail: "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?w=400&q=80",
-      images: Array.from({ length: 20 }, (_, i) => ({
-        url: `https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?w=800&q=80&t=${i}`,
-        alt: `Memorial Property ${i + 1}`
-      }))
-    },
-    {
-      id: "uptown",
-      neighborhood: "Uptown",
-      price: 49.99,
-      imageCount: 20,
-      thumbnail: "https://images.unsplash.com/photo-1582321905220-8149df7ee89d?w=400&q=80",
-      images: Array.from({ length: 20 }, (_, i) => ({
-        url: `https://images.unsplash.com/photo-1582321905220-8149df7ee89d?w=800&q=80&t=${i}`,
-        alt: `Uptown Property ${i + 1}`
-      }))
-    },
-    {
-      id: "energy-corridor",
-      neighborhood: "Energy Corridor",
-      price: 49.99,
-      imageCount: 20,
-      thumbnail: "https://images.unsplash.com/photo-1600054528934-e2e29bb94b00?w=400&q=80",
-      images: Array.from({ length: 20 }, (_, i) => ({
-        url: `https://images.unsplash.com/photo-1600054528934-e2e29bb94b00?w=800&q=80&t=${i}`,
-        alt: `Energy Corridor Property ${i + 1}`
-      }))
-    }
+    amenityGallery("artavia", "Artavia", [
+      { file: "A7303322.jpg", alt: "Artavia entrance with a large letter A sculpture" },
+      { file: "A7303323.jpg", alt: "Artavia lake and curved walking path" },
+      { file: "A7303338.jpg", alt: "Artavia covered seating plaza with picnic tables" },
+      { file: "A7303339.jpg", alt: "Artavia amenity buildings along a paved walkway" },
+      { file: "A7303349.jpg", alt: "Artavia sculpture of nested pink frames" },
+      { file: "A7303350.jpg", alt: "Artavia covered deck with picnic tables beside the lake" },
+    ]),
+    amenityGallery("benders-landing", "Bender's Landing", [
+      { file: "DJI_0002_edits.jpg", alt: "Aerial view of a Bender's Landing playground" },
+      { file: "DJI_0005_edits.jpg", alt: "Aerial view of the Bender's Landing pool beside a lake" },
+      { file: "DJI_0009_edits.jpg", alt: "Aerial view of Bender's Landing tennis courts and a basketball court" },
+      { file: "DJI_0021_edits.jpg", alt: "Aerial view of the Bender's Landing pool, dock, and sports fields" },
+      { file: "DJI_0026_edits.jpg", alt: "Aerial view of a Bender's Landing soccer field" },
+      { file: "DSC02422_edits.jpg", alt: "Bender's Landing soccer field with goals" },
+    ]),
+    amenityGallery("carlton-woods", "Carlton Woods", [
+      { file: "MLU07984.jpg", alt: "Carlton Woods outdoor basketball court" },
+      { file: "MLU07990.jpg", alt: "Carlton Woods garden with benches and a stone planter" },
+      { file: "MLU07991.jpg", alt: "Carlton Woods shaded benches around a stone planter" },
+      { file: "MLU08015.jpg", alt: "Carlton Woods playground with a slide" },
+      { file: "MLU08020.jpg", alt: "Carlton Woods tennis courts" },
+      { file: "MLU08024.jpg", alt: "Carlton Woods pavilion overlooking a pond" },
+    ]),
+    amenityGallery("east-shore", "East Shore", [
+      { file: "A6509322.jpg", alt: "East Shore clubhouse and the East Shore Club sign" },
+      { file: "A6509323.jpg", alt: "Front walk to the East Shore clubhouse" },
+      { file: "A6509324.jpg", alt: "East Shore clubhouse porch and stone drive" },
+      { file: "A6509328.jpg", alt: "East Shore lawn between rows of trees" },
+      { file: "A6509329.jpg", alt: "East Shore patio seating in a hedge garden" },
+      { file: "A6509330.jpg", alt: "East Shore stone monument in a circular garden" },
+    ]),
+    amenityGallery("woodlands-waterway", "The Woodlands Waterway", [
+      { file: "DJI_0100.jpg", alt: "The Woodlands Waterway with glass towers, a bridge, and a fountain" },
+      { file: "DJI_0102.jpg", alt: "The Woodlands Waterway glass towers and arched bridge" },
+      { file: "DJI_0105.jpg", alt: "The Woodlands Waterway arched bridge, fountain, and docks" },
+      { file: "DJI_0107.jpg", alt: "The Woodlands Waterway canal beside office buildings" },
+      { file: "DJI_0886.jpg", alt: "The Woodlands Waterway at sunset with lit towers and the bridge" },
+      { file: "DJI_0894.jpg", alt: "The Woodlands Waterway shopping district at sunset" },
+    ]),
+    amenityGallery("woodforest", "Woodforest", [
+      { file: "DJI_0088.jpg", alt: "Aerial view of the Woodforest pool and water slides" },
+      { file: "DJI_0094.jpg", alt: "Aerial view of a Woodforest lap pool and lawn" },
+      { file: "MLU08266.jpg", alt: "Woodforest entrance sign reading Forest Island" },
+      { file: "MLU08273.jpg", alt: "Woodforest lawn with cornhole boards and covered seating" },
+      { file: "MLU08275.jpg", alt: "Woodforest model home with a Discover Woodforest sign" },
+      { file: "MLU08292.jpg", alt: "Woodforest Harvest Market storefront" },
+    ]),
   ];
 
   const selectedGallery = neighborhoods.find(n => n.id === selectedNeighborhood);
@@ -174,10 +196,11 @@ export default function StockFootage() {
                       onClick={() => setSelectedNeighborhood(neighborhood.id)}
                     >
                       <div className="relative aspect-square overflow-hidden rounded-2xl bg-gray-900 mb-4 hover:shadow-2xl transition-all">
-                        <img
+                        <AmenityImage
                           src={neighborhood.thumbnail}
-                          alt={neighborhood.neighborhood}
-                          className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                          alt={neighborhood.images[0].alt}
+                          pictureClassName="absolute inset-0"
+                          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
                         />
                         <div className="absolute inset-0 bg-black/40 group-hover:bg-black/60 transition-colors flex items-center justify-center">
                           <div className="text-center">
@@ -225,10 +248,11 @@ export default function StockFootage() {
 
                   {/* Image Viewer */}
                   <div className="relative aspect-video bg-black rounded-2xl overflow-hidden mb-8 shadow-2xl">
-                    <img
+                    <AmenityImage
                       src={selectedGallery.images[currentImageIndex].url}
                       alt={selectedGallery.images[currentImageIndex].alt}
-                      className="w-full h-full object-cover"
+                      pictureClassName="block h-full w-full"
+                      className="h-full w-full object-cover"
                     />
                     
                     {/* Navigation Arrows */}
@@ -262,10 +286,11 @@ export default function StockFootage() {
                             idx === currentImageIndex ? "border-teal-500 scale-105" : "border-gray-300 hover:border-teal-400"
                           }`}
                         >
-                          <img
+                          <AmenityImage
                             src={img.url}
-                            alt={`Thumbnail ${idx + 1}`}
-                            className="w-full h-full object-cover"
+                            alt={img.alt}
+                            pictureClassName="block h-full w-full"
+                            className="h-full w-full object-cover"
                           />
                         </button>
                       ))}
