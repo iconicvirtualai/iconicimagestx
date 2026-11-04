@@ -7,8 +7,8 @@ import admin from "firebase-admin";
 import nodemailer from "nodemailer";
 import twilio from "twilio";
 import { google } from "googleapis";
-import crypto, { randomBytes, createHmac, timingSafeEqual, randomUUID } from "crypto";
-import crypto$1, { createHmac as createHmac$1, timingSafeEqual as timingSafeEqual$1, randomUUID as randomUUID$1, randomBytes as randomBytes$1, createHash } from "node:crypto";
+import crypto, { randomBytes, createHmac as createHmac$1, timingSafeEqual as timingSafeEqual$1, randomUUID } from "crypto";
+import crypto$1, { timingSafeEqual, createHmac, randomUUID as randomUUID$1, randomBytes as randomBytes$1, createHash } from "node:crypto";
 import Stripe from "stripe";
 import * as XLSX from "xlsx";
 import fs$1 from "node:fs";
@@ -315,16 +315,16 @@ const SETTLED$1 = /* @__PURE__ */ new Set(["paid", "comped"]);
 function isGuessableInvoiceId(id) {
   return id.startsWith("listing_") || id.startsWith("ordreq_") || id.startsWith("playtest-");
 }
-function text$x(value) {
+function text$y(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function settled$1(invoice) {
-  return SETTLED$1.has(text$x(invoice?.status).toLowerCase());
+  return SETTLED$1.has(text$y(invoice?.status).toLowerCase());
 }
 function invoicePayLinkFor(invoice, env, extra) {
   if (!invoice || settled$1(invoice)) return null;
-  const id = text$x(invoice.id);
-  const token = text$x(invoice.payToken);
+  const id = text$y(invoice.id);
+  const token = text$y(invoice.payToken);
   if (!id || !token) return null;
   const url = new URL(`${publicSiteUrl(env)}/invoice/${encodeURIComponent(id)}`);
   url.searchParams.set("t", token);
@@ -335,7 +335,7 @@ function clientInvoiceUrl(invoice, env, extra) {
   const tokenized = invoicePayLinkFor(invoice, env, extra);
   if (tokenized) return tokenized;
   if (!invoice || settled$1(invoice)) return null;
-  const id = text$x(invoice.id);
+  const id = text$y(invoice.id);
   if (!id || isGuessableInvoiceId(id)) return null;
   const url = new URL(`${publicSiteUrl(env)}/invoice/${encodeURIComponent(id)}`);
   applyQuery(url, extra);
@@ -344,7 +344,7 @@ function clientInvoiceUrl(invoice, env, extra) {
 function applyQuery(url, extra) {
   if (!extra) return;
   for (const [key, value] of Object.entries(extra)) {
-    const textValue = text$x(value);
+    const textValue = text$y(value);
     if (textValue && key !== "t") url.searchParams.set(key, textValue);
   }
 }
@@ -1757,8 +1757,8 @@ const TEAL = "#14B8C4";
 const GREEN = "#16A34A";
 const ROW = "#F3F4F6";
 function receiptProcessing(input) {
-  const status2 = text$w(input.invoice.status).toLowerCase();
-  const paymentStatus = text$w(input.invoice.paymentStatus).toLowerCase();
+  const status2 = text$x(input.invoice.status).toLowerCase();
+  const paymentStatus = text$x(input.invoice.paymentStatus).toLowerCase();
   if (status2 === "comped" || paymentStatus === "comped") return 0;
   const base = roundCents(input.subtotal - input.promotions + input.fees);
   const stored = finite$1(input.invoice.processing);
@@ -2047,7 +2047,7 @@ function dollars$1(value) {
   const amount = Number(String(value).replace(/[^0-9.-]/g, ""));
   return Number.isFinite(amount) ? amount : 0;
 }
-function text$w(value) {
+function text$x(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function escapeHtml$9(value) {
@@ -2691,7 +2691,7 @@ function addressText(value) {
   if (typeof value === "string") return value.trim();
   if (typeof value !== "object" || Array.isArray(value)) return "";
   const address = value;
-  const formatted = text$v(address.formatted) || text$v(address.label);
+  const formatted = text$w(address.formatted) || text$w(address.label);
   if (formatted) return formatted;
   return [address.street, address.city, address.state, address.zip].filter((part) => typeof part === "string" && part.trim()).join(", ");
 }
@@ -2704,7 +2704,7 @@ function recordAddressText(record2) {
   }
   return "";
 }
-function text$v(value) {
+function text$w(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 const PLAYTEST_ADDRESS = "100 Playtest Lane, Austin, TX 78701";
@@ -3788,7 +3788,7 @@ function formatShootDateLabel(isoDay, raw) {
 function addressRecords(data) {
   const records = [data];
   for (const key of ["address", "propertyAddress", "shootLocation"]) {
-    const nested2 = asRecord$6(data[key]);
+    const nested2 = asRecord$7(data[key]);
     if (nested2) records.push(nested2);
   }
   return records;
@@ -3847,13 +3847,13 @@ function readRaw(data, keys) {
 function factRecords(data) {
   const records = [data];
   for (const key of ["property", "details", "facts", "propertyFacts", "homeFacts"]) {
-    const nested2 = asRecord$6(data[key]);
+    const nested2 = asRecord$7(data[key]);
     if (nested2) records.push(nested2);
   }
-  const portal = asRecord$6(data.portalData);
+  const portal = asRecord$7(data.portalData);
   if (portal) {
     records.push(portal);
-    const facts = asRecord$6(portal.facts);
+    const facts = asRecord$7(portal.facts);
     if (facts) records.push(facts);
   }
   return records;
@@ -3886,7 +3886,7 @@ function firstText$3(record2, keys) {
   }
   return "";
 }
-function asRecord$6(value) {
+function asRecord$7(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   return value;
 }
@@ -4038,7 +4038,7 @@ function buildClientInvoice(id, data, now = /* @__PURE__ */ new Date()) {
       createdAt: data.createdAt
     }, now),
     status: typeof data.status === "string" && data.status.trim() ? data.status.trim() : "",
-    clientName: text$u(data.clientName),
+    clientName: text$v(data.clientName),
     address: addressText(data.billToAddress || data.address || data.propertyAddress),
     createdAt,
     issuedOn: formatPortalDate(data.createdAt) || formatPortalDate(data.sentAt) || formatPortalDate(data.paidAt),
@@ -4048,7 +4048,7 @@ function buildClientInvoice(id, data, now = /* @__PURE__ */ new Date()) {
     fees: storedAmount(data.fees),
     travel: storedAmount(data.travel),
     promoDiscount: storedAmount(data.promoDiscount),
-    promoCode: text$u(data.promoCode),
+    promoCode: text$v(data.promoCode),
     tax: storedAmount(data.tax),
     total: storedAmount(data.total),
     amountPaid: storedAmount(data.amountPaid),
@@ -4100,15 +4100,15 @@ function storedLines(lineItems, services2) {
     if (typeof item === "string" && item.trim()) return [{ name: item.trim(), qty: null, amount: null }];
     if (!item || typeof item !== "object") return [];
     const record2 = item;
-    const named = text$u(record2.name) || text$u(record2.label);
-    const description = text$u(record2.description);
+    const named = text$v(record2.name) || text$v(record2.label);
+    const description = text$v(record2.description);
     const name = named || description;
     const qty = storedQty(record2.qty ?? record2.quantity);
     const amount = storedAmount(record2.price ?? record2.amount ?? record2.total);
     if (!name && amount == null && qty == null) return [];
     const line = { name: name || "Line item", qty, amount };
-    const id = text$u(record2.id);
-    const category = text$u(record2.category);
+    const id = text$v(record2.id);
+    const category = text$v(record2.category);
     if (id) line.id = id;
     if (category) line.category = category;
     if (named && description) line.description = description;
@@ -4144,7 +4144,7 @@ function isoStamp(value) {
   if (typeof value === "number" && Number.isFinite(value)) return new Date(value).toISOString();
   return null;
 }
-function text$u(value) {
+function text$v(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function roundMoney$7(value) {
@@ -4607,40 +4607,40 @@ function bookingListingGroups(input) {
   for (const doc of requests) {
     const node = nodeId("orderRequests", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("listings", text$t(doc.data.listingId)));
-    uf.link(node, nodeId("orders", text$t(doc.data.orderId) || text$t(doc.data.convertedToOrderId)));
-    uf.link(node, nodeId("invoices", text$t(doc.data.invoiceId)));
-    uf.link(node, nodeId("galleries", text$t(doc.data.galleryId)));
+    uf.link(node, nodeId("listings", text$u(doc.data.listingId)));
+    uf.link(node, nodeId("orders", text$u(doc.data.orderId) || text$u(doc.data.convertedToOrderId)));
+    uf.link(node, nodeId("invoices", text$u(doc.data.invoiceId)));
+    uf.link(node, nodeId("galleries", text$u(doc.data.galleryId)));
   }
   for (const doc of orders) {
     const node = nodeId("orders", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$t(doc.data.orderRequestId)));
-    uf.link(node, nodeId("listings", text$t(doc.data.listingId)));
-    uf.link(node, nodeId("invoices", text$t(doc.data.invoiceId)));
-    uf.link(node, nodeId("galleries", text$t(doc.data.galleryId)));
+    uf.link(node, nodeId("orderRequests", text$u(doc.data.orderRequestId)));
+    uf.link(node, nodeId("listings", text$u(doc.data.listingId)));
+    uf.link(node, nodeId("invoices", text$u(doc.data.invoiceId)));
+    uf.link(node, nodeId("galleries", text$u(doc.data.galleryId)));
   }
   for (const doc of invoices) {
     const node = nodeId("invoices", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$t(doc.data.orderRequestId)));
-    uf.link(node, nodeId("orders", text$t(doc.data.orderId)));
-    uf.link(node, nodeId("listings", text$t(doc.data.listingId)));
+    uf.link(node, nodeId("orderRequests", text$u(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$u(doc.data.orderId)));
+    uf.link(node, nodeId("listings", text$u(doc.data.listingId)));
   }
   for (const doc of appointments) {
     const node = nodeId("appointments", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$t(doc.data.orderRequestId)));
-    uf.link(node, nodeId("orders", text$t(doc.data.orderId)));
-    uf.link(node, nodeId("listings", text$t(doc.data.listingId)));
+    uf.link(node, nodeId("orderRequests", text$u(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$u(doc.data.orderId)));
+    uf.link(node, nodeId("listings", text$u(doc.data.listingId)));
   }
   for (const doc of galleries) {
     const node = nodeId("galleries", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$t(doc.data.orderRequestId)));
-    uf.link(node, nodeId("orders", text$t(doc.data.orderId)));
-    uf.link(node, nodeId("invoices", text$t(doc.data.invoiceId)));
-    uf.link(node, nodeId("listings", text$t(doc.data.listingId)));
+    uf.link(node, nodeId("orderRequests", text$u(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$u(doc.data.orderId)));
+    uf.link(node, nodeId("invoices", text$u(doc.data.invoiceId)));
+    uf.link(node, nodeId("listings", text$u(doc.data.listingId)));
   }
   const groups = [];
   for (const nodes of uf.components()) {
@@ -4700,7 +4700,7 @@ function fillEmptyListingFields(existing, desired) {
   return patch;
 }
 function clientOwnsListing(listing, clients) {
-  const clientId2 = text$t(listing.clientId);
+  const clientId2 = text$u(listing.clientId);
   const email = normalizeEmail$1(listing.clientEmail || listing.email);
   if (!clientId2 && !email) return true;
   if (clientId2 && clients.ids.includes(clientId2)) return true;
@@ -4772,10 +4772,10 @@ function chooseListing(group, listings, clients) {
 }
 function listingMatches(doc, group) {
   if (doc.id === group.stableId || group.preferredListingIds.includes(doc.id)) return true;
-  const requestId = text$t(doc.data.orderRequestId);
-  const orderId = text$t(doc.data.orderId);
-  const invoiceId = text$t(doc.data.invoiceId);
-  const appointmentId = text$t(doc.data.appointmentId);
+  const requestId = text$u(doc.data.orderRequestId);
+  const orderId = text$u(doc.data.orderId);
+  const invoiceId = text$u(doc.data.invoiceId);
+  const appointmentId = text$u(doc.data.appointmentId);
   return Boolean(
     requestId && group.orderRequestIds.includes(requestId) || orderId && group.orderIds.includes(orderId) || invoiceId && group.invoiceIds.includes(invoiceId) || appointmentId && group.appointmentIds.includes(appointmentId)
   );
@@ -4785,7 +4785,7 @@ function linksFor(group, listingId, listings, clients) {
   const links = [];
   const push = (collection, docs) => {
     for (const doc of docs) {
-      const current = text$t(doc.data.listingId);
+      const current = text$u(doc.data.listingId);
       if (current === listingId) continue;
       if (current && isPortalListingId(current) && ownedIds.has(current)) continue;
       links.push({ collection, id: doc.id });
@@ -4802,7 +4802,7 @@ function clientsFor(group, identity) {
   const ids = /* @__PURE__ */ new Set();
   const emails = /* @__PURE__ */ new Set();
   const addId = (value) => {
-    const id = text$t(value);
+    const id = text$u(value);
     if (id) ids.add(id);
   };
   const addEmail = (value) => {
@@ -4821,7 +4821,7 @@ function clientsFor(group, identity) {
 function preferredListingIds(group) {
   const ids = [];
   const push = (value) => {
-    const id = text$t(value);
+    const id = text$u(value);
     if (id && isPortalListingId(id) && !ids.includes(id)) ids.push(id);
   };
   for (const doc of [...group.orderRequests, ...group.orders, ...group.invoices, ...group.appointments, ...group.galleries]) {
@@ -4856,9 +4856,9 @@ function bestAddress(group) {
   }
   for (const doc of propertyDocs(group)) {
     for (const key of ["address", "propertyAddress", "shootLocation"]) {
-      if (typeof doc.data[key] === "string" && text$t(doc.data[key])) return text$t(doc.data[key]);
+      if (typeof doc.data[key] === "string" && text$u(doc.data[key])) return text$u(doc.data[key]);
     }
-    if (text$t(doc.data.addressLabel)) return text$t(doc.data.addressLabel);
+    if (text$u(doc.data.addressLabel)) return text$u(doc.data.addressLabel);
   }
   return null;
 }
@@ -4874,7 +4874,7 @@ function firstScheduleDate(group) {
 function firstScheduleTime(group) {
   for (const doc of [...group.appointments, ...group.orders, ...group.orderRequests]) {
     for (const key of ["scheduledTime", "appointmentTime", "apptTime", "requestedTime"]) {
-      const value = text$t(doc.data[key]);
+      const value = text$u(doc.data[key]);
       if (value && !/^tbd$/i.test(value)) return value;
     }
   }
@@ -4891,7 +4891,7 @@ function projectType(group) {
     if (doc.data.projectType === "real_estate") return "real_estate";
     const service = doc.data.selectedService;
     if (service && typeof service === "object") {
-      const category = text$t(service.category);
+      const category = text$u(service.category);
       if (category === "business" || category === "branding") return "business";
       if (category === "listings") return "real_estate";
     }
@@ -4917,7 +4917,7 @@ function namesFrom(value) {
   for (const item of value) {
     if (typeof item === "string" && item.trim()) names.push(item.trim());
     else if (item && typeof item === "object") {
-      const name = text$t(item.name);
+      const name = text$u(item.name);
       if (name) names.push(name);
     }
     if (names.length >= 40) break;
@@ -4942,8 +4942,8 @@ function accessInfo(group) {
   return [firstText$2(group, ["accessMethod"]), firstText$2(group, ["lockboxCode"])].filter(Boolean).join(" - ");
 }
 function clientId(group, identity) {
-  const bookingIds = propertyDocs(group).map((doc) => text$t(doc.data.clientId)).filter(Boolean);
-  const identityIds = (identity?.ids || []).map((id) => text$t(id)).filter(Boolean);
+  const bookingIds = propertyDocs(group).map((doc) => text$u(doc.data.clientId)).filter(Boolean);
+  const identityIds = (identity?.ids || []).map((id) => text$u(id)).filter(Boolean);
   return bookingIds.find((id) => identityIds.includes(id)) || bookingIds[0] || identityIds[0] || "";
 }
 function clientEmail(group, identity) {
@@ -4957,8 +4957,8 @@ function clientEmail(group, identity) {
 }
 function clientName$1(group) {
   for (const doc of propertyDocs(group)) {
-    if (text$t(doc.data.clientName)) return text$t(doc.data.clientName);
-    const joined = `${text$t(doc.data.firstName)} ${text$t(doc.data.lastName)}`.trim();
+    if (text$u(doc.data.clientName)) return text$u(doc.data.clientName);
+    const joined = `${text$u(doc.data.firstName)} ${text$u(doc.data.lastName)}`.trim();
     if (joined) return joined;
   }
   return "";
@@ -4966,7 +4966,7 @@ function clientName$1(group) {
 function chosenInvoiceId(group) {
   const known = new Set(group.invoiceIds);
   for (const doc of [...group.orderRequests, ...group.orders]) {
-    const id = text$t(doc.data.invoiceId);
+    const id = text$u(doc.data.invoiceId);
     if (id && known.has(id)) return id;
   }
   return newestDoc(group.invoices)?.id || group.invoiceIds[0] || "";
@@ -4975,7 +4975,7 @@ function chosenId(docs, ids, pointers = [], keys = []) {
   const known = new Set(ids);
   for (const doc of pointers) {
     for (const key of keys) {
-      const id = text$t(doc.data[key]);
+      const id = text$u(doc.data[key]);
       if (id && known.has(id)) return id;
     }
   }
@@ -4987,7 +4987,7 @@ function propertyDocs(group) {
 function firstText$2(group, keys) {
   for (const doc of propertyDocs(group)) {
     for (const key of keys) {
-      const value = text$t(doc.data[key]);
+      const value = text$u(doc.data[key]);
       if (value) return value;
     }
   }
@@ -5055,7 +5055,7 @@ function hasAddress(value) {
   if (typeof value === "string") return value.trim().length > 0;
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const record2 = value;
-  return ["formatted", "label", "street", "line1", "addressLine1", "city", "state", "zip"].some((key) => text$t(record2[key]).length > 0);
+  return ["formatted", "label", "street", "line1", "addressLine1", "city", "state", "zip"].some((key) => text$u(record2[key]).length > 0);
 }
 function statusKey(value) {
   return String(value || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
@@ -5087,14 +5087,14 @@ function isEmpty(value) {
 function isSentinel$1(value) {
   return Boolean(value && typeof value === "object" && "_methodName" in value);
 }
-function text$t(value) {
+function text$u(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function cleanDocs(docs) {
   const out = [];
   const seen = /* @__PURE__ */ new Set();
   for (const doc of docs || []) {
-    const id = text$t(doc?.id);
+    const id = text$u(doc?.id);
     if (!id || seen.has(id)) continue;
     seen.add(id);
     out.push({ id, data: doc.data && typeof doc.data === "object" ? doc.data : {} });
@@ -5180,7 +5180,7 @@ async function ensureBookingListingForRequest(orderRequestId) {
     galleries: []
   });
   const identity = {
-    ids: text$s(request.data.clientId) ? [text$s(request.data.clientId)] : [],
+    ids: text$t(request.data.clientId) ? [text$t(request.data.clientId)] : [],
     email: normalizeEmail$1(request.data.clientEmail || request.data.email)
   };
   const plans = await plansFor(bundle, identity);
@@ -5233,7 +5233,7 @@ async function applyBookingListingPlan(plan) {
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
       created = true;
-      console.info(`[Listings] Created ${plan.listingId} for booking ${text$s(plan.createFields.orderRequestId) || text$s(plan.createFields.orderId) || text$s(plan.createFields.invoiceId)}`);
+      console.info(`[Listings] Created ${plan.listingId} for booking ${text$t(plan.createFields.orderRequestId) || text$t(plan.createFields.orderId) || text$t(plan.createFields.invoiceId)}`);
     } catch (err) {
       if (!alreadyExists(err)) throw err;
       await fillListing(ref, plan.createFields);
@@ -5262,7 +5262,7 @@ async function linkRecord(collectionName2, id, listingId) {
   const ref = db$A().collection(collectionName2).doc(id);
   const snap = await ref.get();
   if (!snap.exists) return;
-  if (text$s(snap.data()?.listingId) === listingId) return;
+  if (text$t(snap.data()?.listingId) === listingId) return;
   await ref.update({
     listingId,
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
@@ -5276,9 +5276,9 @@ async function loadVisibleSeeds(identity) {
   const keep = (map, docs) => {
     for (const doc of docs) {
       if (!visibleToPortalClient({
-        clientId: text$s(doc.data.clientId),
-        email: text$s(doc.data.email),
-        clientEmail: text$s(doc.data.clientEmail)
+        clientId: text$t(doc.data.clientId),
+        email: text$t(doc.data.email),
+        clientEmail: text$t(doc.data.clientEmail)
       }, identity)) continue;
       if (!map.has(doc.id)) map.set(doc.id, doc);
     }
@@ -5317,36 +5317,36 @@ async function hydrateBundle(seed2) {
   const galleries = mapDocs(seed2.galleries);
   const requestIds = new Set(requests.keys());
   for (const doc of [...orders.values(), ...invoices.values(), ...appointments.values()]) {
-    const id = text$s(doc.data.orderRequestId);
+    const id = text$t(doc.data.orderRequestId);
     if (id) requestIds.add(id);
   }
   await readMissing("orderRequests", requestIds, requests);
   const orderIds = new Set(orders.keys());
   for (const doc of requests.values()) {
-    const id = text$s(doc.data.convertedToOrderId) || text$s(doc.data.orderId);
+    const id = text$t(doc.data.convertedToOrderId) || text$t(doc.data.orderId);
     if (id) orderIds.add(id);
   }
   for (const doc of [...invoices.values(), ...appointments.values()]) {
-    const id = text$s(doc.data.orderId);
+    const id = text$t(doc.data.orderId);
     if (id) orderIds.add(id);
   }
   await readMissing("orders", orderIds, orders);
   const invoiceIds = new Set(invoices.keys());
   for (const doc of [...requests.values(), ...orders.values()]) {
-    const id = text$s(doc.data.invoiceId);
+    const id = text$t(doc.data.invoiceId);
     if (id) invoiceIds.add(id);
   }
   await readMissing("invoices", invoiceIds, invoices);
   const legacyIds = /* @__PURE__ */ new Set();
   for (const doc of requests.values()) {
-    for (const id of legacyInvoiceDocIds({ orderRequestId: doc.id, listingId: text$s(doc.data.listingId) })) {
+    for (const id of legacyInvoiceDocIds({ orderRequestId: doc.id, listingId: text$t(doc.data.listingId) })) {
       legacyIds.add(id);
     }
   }
   for (const doc of orders.values()) {
     for (const id of legacyInvoiceDocIds({
-      orderRequestId: text$s(doc.data.orderRequestId),
-      listingId: text$s(doc.data.listingId)
+      orderRequestId: text$t(doc.data.orderRequestId),
+      listingId: text$t(doc.data.listingId)
     })) {
       legacyIds.add(id);
     }
@@ -5359,7 +5359,7 @@ async function hydrateBundle(seed2) {
   mergeDocs(appointments, await queryIn("appointments", "orderId", [...orders.keys()]));
   const galleryIds = new Set(galleries.keys());
   for (const doc of [...requests.values(), ...orders.values()]) {
-    const id = text$s(doc.data.galleryId);
+    const id = text$t(doc.data.galleryId);
     if (id) galleryIds.add(id);
   }
   await readMissing("galleries", galleryIds, galleries);
@@ -5488,7 +5488,7 @@ function alreadyExists(err) {
 function isSentinel(value) {
   return Boolean(value && typeof value === "object" && "_methodName" in value);
 }
-function text$s(value) {
+function text$t(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function chunk$1(items, size) {
@@ -5505,14 +5505,14 @@ const BOOKING_PHOTOGRAPHER_STAFF_UIDS = {
   "david-gonzalez": "",
   "cadi-torres": ""
 };
-function text$r(value) {
+function text$s(value) {
   return typeof value === "string" ? value.trim().toLowerCase() : "";
 }
 function resolveBookingPhotographerStaff(input) {
   const publicId = input.publicId.trim();
   const configured = String(BOOKING_PHOTOGRAPHER_STAFF_UIDS[publicId] || "").trim();
-  const calendar = text$r(input.calendarId);
-  const match = calendar ? (input.staff || []).find((member) => text$r(member.email) === calendar || text$r(member.googleCalendarId) === calendar) : void 0;
+  const calendar = text$s(input.calendarId);
+  const match = calendar ? (input.staff || []).find((member) => text$s(member.email) === calendar || text$s(member.googleCalendarId) === calendar) : void 0;
   const candidate = String(match?.id || configured || "").trim();
   const uid = candidate && candidate !== publicId ? candidate : null;
   const matchedName = typeof match?.name === "string" ? match.name.trim() : "";
@@ -5612,7 +5612,7 @@ function adminRevenueAcceptance(by, at = (/* @__PURE__ */ new Date()).toISOStrin
   return { countsTowardRevenue: true, revenueAcceptedAt: at, revenueAcceptedBy: actor2 };
 }
 function revenueAcceptanceForRequest(request, staffBy, at = (/* @__PURE__ */ new Date()).toISOString()) {
-  const row = asRecord$5(request);
+  const row = asRecord$6(request);
   const source = typeof row.source === "string" ? row.source : "";
   const adminSource = source === "admin" || source === "manual_invoice";
   if (row.countsTowardRevenue === true || adminSource) {
@@ -5627,21 +5627,21 @@ function isPlaytestRecord(record2, links) {
   if (playtestId(record2)) return true;
   if (playtestFlag(links?.order) || playtestFlag(links?.client)) return true;
   if (playtestId(links?.order) || playtestId(links?.client)) return true;
-  const data = asRecord$5(record2);
+  const data = asRecord$6(record2);
   return playtestFlag(data.order) || playtestFlag(data.client) || playtestFlag(data.invoice) || playtestId(data.order) || playtestId(data.client);
 }
 function isQaOnlyRecord(record2, links) {
   if (qaOnlyFlag(record2)) return true;
   if (qaOnlyFlag(links?.order) || qaOnlyFlag(links?.client)) return true;
-  const data = asRecord$5(record2);
+  const data = asRecord$6(record2);
   return qaOnlyFlag(data.order) || qaOnlyFlag(data.client) || qaOnlyFlag(data.invoice);
 }
 function recordCountsTowardRevenue(record2, links) {
   if (isPlaytestRecord(record2, links) || isQaOnlyRecord(record2, links)) return false;
-  return asRecord$5(record2).countsTowardRevenue === true;
+  return asRecord$6(record2).countsTowardRevenue === true;
 }
 function revenueStamp(record2) {
-  const row = asRecord$5(record2);
+  const row = asRecord$6(record2);
   return {
     countsTowardRevenue: recordCountsTowardRevenue(record2),
     ...row.playtest === true ? { playtest: true } : {},
@@ -5651,7 +5651,7 @@ function revenueStamp(record2) {
 function sumTransactionAmounts(records) {
   return records.reduce((sum, record2) => {
     if (!recordCountsTowardRevenue(record2)) return sum;
-    return sum + (Number(asRecord$5(record2).amount) || 0);
+    return sum + (Number(asRecord$6(record2).amount) || 0);
   }, 0);
 }
 function planRevenueAcceptanceUpdates(input) {
@@ -5688,15 +5688,15 @@ function planRevenueAcceptanceUpdates(input) {
   return { found: patches.length > 0, patches };
 }
 function playtestFlag(record2) {
-  return asRecord$5(record2).playtest === true;
+  return asRecord$6(record2).playtest === true;
 }
 function playtestId(record2) {
-  return textId$1(asRecord$5(record2).id).toLowerCase().startsWith("playtest-");
+  return textId$1(asRecord$6(record2).id).toLowerCase().startsWith("playtest-");
 }
 function qaOnlyFlag(record2) {
-  return asRecord$5(record2).qaOnly === true;
+  return asRecord$6(record2).qaOnly === true;
 }
-function asRecord$5(value) {
+function asRecord$6(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
   return value;
 }
@@ -5803,7 +5803,7 @@ function synthesizePackageLine(record2) {
 }
 function packageLabel(record2) {
   for (const key of PACKAGE_LABEL_KEYS) {
-    const value = text$q(record2[key]);
+    const value = text$r(record2[key]);
     if (value) return value;
   }
   return "";
@@ -5840,7 +5840,7 @@ function moneyOrNull$1(value) {
 function nested$2(value) {
   return value && typeof value === "object" ? value : {};
 }
-function text$q(value) {
+function text$r(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function roundMoney$5(value) {
@@ -5872,7 +5872,7 @@ function buildAdminOrderTile(record2) {
   const packageName = skin2?.title || named || "Custom order";
   const charges = orderChargeSummary(record2, lines);
   return {
-    id: text$p(record2.id) || packageName,
+    id: text$q(record2.id) || packageName,
     orderCode: orderCode(kind, record2),
     kind,
     typeLabel: kind === "business" ? "Business" : "Listing",
@@ -5895,7 +5895,7 @@ function buildAdminOrderTile(record2) {
   };
 }
 function orderKind(record2, skin2) {
-  const raw = text$p(record2.projectType || record2.orderType || record2.type).toLowerCase();
+  const raw = text$q(record2.projectType || record2.orderType || record2.type).toLowerCase();
   if (raw === "business" || raw === "brand" || raw === "social") return "business";
   if (raw === "real_estate" || raw === "listing" || raw === "property") return "listing";
   if (skin2?.category === "listing") return "listing";
@@ -5909,9 +5909,9 @@ function channelFor(skin2, kind) {
   return kind === "business" ? "Human Brand" : "Listings & Spaces";
 }
 function orderCode(kind, record2) {
-  const explicit = text$p(record2.orderCode || record2.orderNumber || record2.displayId);
+  const explicit = text$q(record2.orderCode || record2.orderNumber || record2.displayId);
   if (explicit) return explicit.toUpperCase();
-  const id = text$p(record2.id);
+  const id = text$q(record2.id);
   const prefix = kind === "listing" ? "L" : "B";
   return `ORD - ${prefix} - ${orderCodeTail(id)}`;
 }
@@ -5929,29 +5929,29 @@ function orderCodeTail(id, salt = 0) {
   return String(1e4 + (h >>> 0) % 9e4);
 }
 function heroFromRecord(record2) {
-  const explicit = text$p(record2.heroUrl) || text$p(record2.coverUrl) || text$p(record2.coverImage);
+  const explicit = text$q(record2.heroUrl) || text$q(record2.coverUrl) || text$q(record2.coverImage);
   if (explicit) return explicit;
   const images = record2.images;
   if (!Array.isArray(images)) return "";
   for (const image of images) {
     if (typeof image === "string" && image.trim()) return image.trim();
     if (image && typeof image === "object") {
-      const url = text$p(image.url) || text$p(image.thumbnailUrl);
+      const url = text$q(image.url) || text$q(image.thumbnailUrl);
       if (url) return url;
     }
   }
   return "";
 }
 function clientName(record2) {
-  const named = text$p(record2.clientName) || text$p(record2.customerName) || text$p(record2.agentName) || [text$p(record2.firstName), text$p(record2.lastName)].filter(Boolean).join(" ");
+  const named = text$q(record2.clientName) || text$q(record2.customerName) || text$q(record2.agentName) || [text$q(record2.firstName), text$q(record2.lastName)].filter(Boolean).join(" ");
   return named || "—";
 }
 function appointmentLabel(record2) {
   const raw = record2.appointmentDate ?? record2.apptDate ?? record2.scheduledDate ?? record2.requestedDate;
   const key = calendarDateKey(raw);
   const date = formatShootDateLabel(key, typeof raw === "string" ? raw : void 0);
-  const time = text$p(record2.scheduledTime || record2.appointmentTime || record2.requestedTime);
-  const photographer = text$p(record2.assignedPhotographerName || record2.photographerName || record2.photographerPreference);
+  const time = text$q(record2.scheduledTime || record2.appointmentTime || record2.requestedTime);
+  const photographer = text$q(record2.assignedPhotographerName || record2.photographerName || record2.photographerPreference);
   return [date, time, photographer].filter(Boolean).join(" · ") || "—";
 }
 function tilePrice(amount) {
@@ -6019,7 +6019,7 @@ function money$5(value) {
   }
   return 0;
 }
-function text$p(value) {
+function text$q(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 const NOT_PROVIDED = "Not provided";
@@ -6040,7 +6040,7 @@ function officeNewOrderEmail(saved, options) {
   const notes = notesOf(saved);
   const fields = [
     ["Order number", orderNumber],
-    ["Admin link", text$o(options?.adminUrl) || NOT_PROVIDED],
+    ["Admin link", text$p(options?.adminUrl) || NOT_PROVIDED],
     ["Client name", clientName2],
     ["Client email", firstText$1(saved, ["clientEmail", "email"])],
     ["Client phone", firstText$1(saved, ["clientPhone", "phone"])],
@@ -6074,7 +6074,7 @@ function officeNewOrderEmail(saved, options) {
     ["Notes", notes],
     ["Booked via", bookedVia(saved)]
   ];
-  const officeNote = text$o(saved.officeNote);
+  const officeNote = text$p(saved.officeNote);
   if (officeNote) fields.unshift(["Office note", officeNote]);
   const subjectCore = `New order ${orderNumber} — ${packageName} — ${address} — ${requestedDate}`;
   const subject = isTestOrder(clientName2, notes) ? `[TEST] ${subjectCore}` : subjectCore;
@@ -6088,19 +6088,19 @@ ${notes}`.toUpperCase().includes("TEST ORDER");
 }
 function orderNumberOf(saved) {
   for (const key of ["orderNumber", "orderCode", "displayId"]) {
-    const value = text$o(saved[key]);
+    const value = text$p(saved[key]);
     if (value && value !== NOT_PROVIDED) return value;
   }
-  if (!text$o(saved.id)) return NOT_PROVIDED;
+  if (!text$p(saved.id)) return NOT_PROVIDED;
   return buildAdminOrderTile(saved).orderCode;
 }
 function explicitPackageName(saved) {
   for (const key of ["packageName", "serviceName"]) {
-    const value = text$o(saved[key]);
+    const value = text$p(saved[key]);
     if (value && value !== NOT_PROVIDED) return cleanPackageName(value) || value;
   }
-  const selected = text$o(saved.selectedService);
-  if (text$o(saved.id) || selected) {
+  const selected = text$p(saved.selectedService);
+  if (text$p(saved.id) || selected) {
     const tileName = buildAdminOrderTile(saved).packageName;
     if (tileName && tileName !== "Custom order") return tileName;
   }
@@ -6110,7 +6110,7 @@ function explicitPackageName(saved) {
 function clientNameOf(saved) {
   const named = firstText$1(saved, ["clientName", "customerName"]);
   if (named) return named;
-  const joined = [text$o(saved.firstName), text$o(saved.lastName)].filter(Boolean).join(" ");
+  const joined = [text$p(saved.firstName), text$p(saved.lastName)].filter(Boolean).join(" ");
   return joined || NOT_PROVIDED;
 }
 function agentContactOf(saved) {
@@ -6128,7 +6128,7 @@ function agentField(saved, keys, nestedKey) {
   if (direct !== NOT_PROVIDED) return direct;
   for (const holder of [saved.agent, saved.listingAgent, saved.realtor]) {
     const record2 = nested(holder);
-    const value = text$o(record2[nestedKey]);
+    const value = text$p(record2[nestedKey]);
     if (value) return value;
   }
   return "";
@@ -6137,7 +6137,7 @@ function digits$1(value) {
   return value === NOT_PROVIDED ? "" : value.replace(/\D/g, "");
 }
 function notesOf(saved) {
-  const parts = ["vibeNote", "notes", "specialInstructions", "internalNotes"].map((key) => text$o(saved[key])).filter(Boolean);
+  const parts = ["vibeNote", "notes", "specialInstructions", "internalNotes"].map((key) => text$p(saved[key])).filter(Boolean);
   return parts.length ? parts.join("\n") : NOT_PROVIDED;
 }
 function lockboxOf(saved) {
@@ -6145,12 +6145,12 @@ function lockboxOf(saved) {
   return code || NOT_PROVIDED;
 }
 function occupancyOf(saved) {
-  const parts = ["occupancy", "propertyStatus", "furnishingStatus"].map((key) => text$o(saved[key])).filter(Boolean);
+  const parts = ["occupancy", "propertyStatus", "furnishingStatus"].map((key) => text$p(saved[key])).filter(Boolean);
   return parts.length ? parts.join(", ") : NOT_PROVIDED;
 }
 function bookedVia(saved) {
-  const lead = text$o(saved.leadSource);
-  const source = text$o(saved.source);
+  const lead = text$p(saved.leadSource);
+  const source = text$p(saved.source);
   const blob = `${lead} ${source}`.toLowerCase();
   if (!blob.trim()) return NOT_PROVIDED;
   if (/admin/.test(blob)) return "Admin";
@@ -6160,7 +6160,7 @@ function bookedVia(saved) {
 }
 function paymentOf(saved, total) {
   const invoice = nested(saved.invoice);
-  const explicit = [saved.paymentStatus, saved.invoiceStatus, invoice.status].map((value) => text$o(value).toLowerCase()).find(Boolean) || "";
+  const explicit = [saved.paymentStatus, saved.invoiceStatus, invoice.status].map((value) => text$p(value).toLowerCase()).find(Boolean) || "";
   if (/partial/.test(explicit)) return "Partial";
   if (/\bpaid\b/.test(explicit) && !/unpaid/.test(explicit)) return "Paid";
   if (/unpaid/.test(explicit)) return "Unpaid";
@@ -6267,7 +6267,7 @@ function moneyOrNull(value) {
 function nested(value) {
   return value && typeof value === "object" ? value : {};
 }
-function text$o(value) {
+function text$p(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function escapeHtml$8(value) {
@@ -6578,15 +6578,15 @@ function canonicalSlotTime(value) {
   if (hour < 1 || hour > 12) return null;
   return `${hour}:${match[2]} ${match[3].toUpperCase()}`;
 }
-function text$n(value) {
+function text$o(value) {
   return typeof value === "string" ? value : "";
 }
 function isHolidayTestBooking(order) {
-  const email = `${text$n(order.email)} ${text$n(order.clientEmail)}`.toLowerCase();
+  const email = `${text$o(order.email)} ${text$o(order.clientEmail)}`.toLowerCase();
   if (email.includes("ops+deliveryqa@")) return true;
   if (order.playtest === true || order.test === true || order.isTest === true) return true;
-  const name = text$n(order.clientName) || `${text$n(order.firstName)} ${text$n(order.lastName)}`.trim();
-  const notes = text$n(order.vibeNote) || text$n(order.notes);
+  const name = text$o(order.clientName) || `${text$o(order.firstName)} ${text$o(order.lastName)}`.trim();
+  const notes = text$o(order.vibeNote) || text$o(order.notes);
   return `${name}
 ${notes}`.toUpperCase().includes("TEST ORDER");
 }
@@ -6607,15 +6607,15 @@ function holidayStoredDate(order) {
       }).format(date);
     }
   }
-  const fromNote = /^Date:\s*(\d{4}-\d{2}-\d{2})/im.exec(text$n(order.vibeNote));
+  const fromNote = /^Date:\s*(\d{4}-\d{2}-\d{2})/im.exec(text$o(order.vibeNote));
   if (fromNote) return fromNote[1];
-  if (text$n(order.leadSource).trim() === HOLIDAY_RSVP_LEAD) return THANKFUL_EVENT_DATE;
+  if (text$o(order.leadSource).trim() === HOLIDAY_RSVP_LEAD) return THANKFUL_EVENT_DATE;
   return null;
 }
 function holidayStoredTime(order) {
   const labeled = canonicalSlotTime(order.requestedTimeLabel);
   if (labeled) return labeled;
-  const note = text$n(order.vibeNote);
+  const note = text$o(order.vibeNote);
   const requested = /Requested photo time:\s*(\d{1,2}:\d{2}\s*[AP]M)/i.exec(note);
   if (requested) return canonicalSlotTime(requested[1]);
   const line = /^Time:\s*(\d{1,2}:\d{2}\s*[AP]M)/im.exec(note);
@@ -6625,8 +6625,8 @@ function holidayStoredTime(order) {
 function holidaySlotClaim(leadSource, date, time) {
   const clock = canonicalSlotTime(time);
   if (!clock) return null;
-  const lead = text$n(leadSource).trim();
-  const day = text$n(date).trim().slice(0, 10);
+  const lead = text$o(leadSource).trim();
+  const day = text$o(date).trim().slice(0, 10);
   if (lead === HOLIDAY_RSVP_LEAD) {
     const thankfulDay = day || THANKFUL_EVENT_DATE;
     if (thankfulDay !== THANKFUL_EVENT_DATE || !thankfulSlotTimes().includes(clock)) return null;
@@ -6652,7 +6652,7 @@ function holidayTakenFromOrders(orders, limit = HOLIDAY_SLOT_LIMIT) {
   const counts2 = /* @__PURE__ */ new Map();
   for (const order of orders) {
     if (isHolidayTestBooking(order)) continue;
-    const status2 = text$n(order.status).trim().toLowerCase();
+    const status2 = text$o(order.status).trim().toLowerCase();
     if (CLOSED_STATUSES$1.has(status2)) continue;
     const claim = holidaySlotClaim(order.leadSource, holidayStoredDate(order), holidayStoredTime(order));
     if (!claim) continue;
@@ -6685,18 +6685,18 @@ const HOLIDAY_SLOT_MINUTES = 15;
 const LEGACY_THANKFUL_DATE = "2026-11-14";
 const LEGACY_THANKFUL_TIME = "11:00 AM";
 const CLOSED_STATUSES = /* @__PURE__ */ new Set(["declined", "cancelled", "canceled"]);
-function text$m(value) {
+function text$n(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function noteOf(order) {
-  return text$m(order.vibeNote) || text$m(order.notes);
+  return text$n(order.vibeNote) || text$n(order.notes);
 }
 function lineValue(note, label) {
   const match = new RegExp(`^${label}:\\s*(.*)$`, "im").exec(note);
   return match ? match[1].trim() : "";
 }
 function holidayGuestName(order) {
-  const named = text$m(order.clientName) || `${text$m(order.firstName)} ${text$m(order.lastName)}`.trim();
+  const named = text$n(order.clientName) || `${text$n(order.firstName)} ${text$n(order.lastName)}`.trim();
   return named || "Guest";
 }
 function holidayHeadcountLabel(order) {
@@ -6730,18 +6730,18 @@ function holidayNotesLabel(order) {
   return lineValue(noteOf(order), "Notes");
 }
 function holidayPackageLabel(order) {
-  const selected = text$m(order.selectedService);
+  const selected = text$n(order.selectedService);
   if (selected) return selected;
-  const named = text$m(order.packageName);
+  const named = text$n(order.packageName);
   if (named) return named;
   const fromNote = lineValue(noteOf(order), "Package");
   return fromNote || "Holiday shoot";
 }
 function closedStatus(order) {
-  return CLOSED_STATUSES.has(text$m(order.status).toLowerCase());
+  return CLOSED_STATUSES.has(text$n(order.status).toLowerCase());
 }
 function holidayLead(order) {
-  const lead = text$m(order.leadSource);
+  const lead = text$n(order.leadSource);
   if (lead === HOLIDAY_RSVP_LEAD) return "thankful";
   if (lead === HOLIDAY_SEASON_LEAD) return "season";
   return null;
@@ -6797,11 +6797,11 @@ function buildPlan(order, adminUrl) {
   const name = holidayGuestName(order);
   const headcount = holidayHeadcountLabel(order);
   const headcountTitle = holidayHeadcountNumber(headcount) ?? (headcount || "—");
-  const orderNumber = text$m(order.orderNumber);
+  const orderNumber = text$n(order.orderNumber);
   const summary = kind === "thankful" ? `Thankful RSVP — ${name} (${headcountTitle})` : `'Tis shoot — ${name} — ${holidayPackageLabel(order)}`;
   const description = [
-    `Email: ${text$m(order.email) || text$m(order.clientEmail) || "—"}`,
-    `Phone: ${text$m(order.phone) || text$m(order.clientPhone) || "—"}`,
+    `Email: ${text$n(order.email) || text$n(order.clientEmail) || "—"}`,
+    `Phone: ${text$n(order.phone) || text$n(order.clientPhone) || "—"}`,
     `Headcount: ${headcount || "—"}`,
     `Kids/Santa: ${holidaySantaLabel(order) || "—"}`,
     `Menu vote: ${holidayMenuVote(order) || "—"}`,
@@ -6810,7 +6810,7 @@ function buildPlan(order, adminUrl) {
     `Admin: ${adminUrl}`
   ].join("\n");
   return {
-    orderId: text$m(order.id),
+    orderId: text$n(order.id),
     orderNumber,
     kind,
     name,
@@ -6827,7 +6827,7 @@ function classifyHolidayCalendarOrder(order, adminUrl) {
   if (!holidayLead(order)) return { action: "skip", reason: "notASlot" };
   if (isHolidayTestBooking(order)) return { action: "skip", reason: "test" };
   if (closedStatus(order)) return { action: "skip", reason: "cancelled" };
-  if (text$m(order.calendarEventId)) return { action: "skip", reason: "already" };
+  if (text$n(order.calendarEventId)) return { action: "skip", reason: "already" };
   const plan = buildPlan(order, adminUrl);
   if (!plan) return { action: "skip", reason: "notASlot" };
   return { action: "create", plan };
@@ -7222,7 +7222,7 @@ function roundMoney$4(value) {
   if (!Number.isFinite(value)) return 0;
   return Math.round(value * 100) / 100;
 }
-function text$l(value) {
+function text$m(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function amountOf(value, fallback = 0) {
@@ -7370,6 +7370,28 @@ function defaultPricingAdjustments() {
       amount: SEED_SENIOR_DEPOSIT_PERCENT,
       sortOrder: 430,
       note: "Percent of the senior living total due to reserve the date."
+    }),
+    seed({
+      id: "pay-at-close",
+      kind: "fee",
+      name: "Pay at Close",
+      active: false,
+      removed: false,
+      mode: "flat",
+      amount: 0,
+      sortOrder: 500,
+      note: "Turn this on to offer Pay at Close. The amount is the fee added to that invoice. 0 means no extra fee. Flat is dollars. Percent is percent of the service subtotal. Checkout stays hidden until PAY_AT_CLOSE_LIVE is also true."
+    }),
+    seed({
+      id: "pay-at-close-card-processing",
+      kind: "fee",
+      name: "Card processing on Pay at Close",
+      active: false,
+      removed: false,
+      mode: "percent",
+      amount: 0,
+      sortOrder: 510,
+      note: "Turn this on to keep the card processing fee on Pay at Close invoices. Off leaves that fee off, because it applies to card payments. The percent still comes from the processing fee row."
     })
   ];
 }
@@ -7379,15 +7401,15 @@ function optionalNumber(value) {
   return Number.isFinite(amount) ? amount : void 0;
 }
 function fromDoc(doc, current) {
-  const id = text$l(doc.id) || current?.id || "";
+  const id = text$m(doc.id) || current?.id || "";
   if (!id) return null;
-  const kindRaw = text$l(doc.kind);
-  const modeRaw = text$l(doc.mode);
+  const kindRaw = text$m(doc.kind);
+  const modeRaw = text$m(doc.mode);
   const kind = KINDS$1.has(kindRaw) ? kindRaw : current?.kind;
   const mode = MODES.has(modeRaw) ? modeRaw : current?.mode;
   if (!kind || !mode) return null;
-  const code = text$l(doc.code) || current?.code;
-  const note = text$l(doc.note) || current?.note;
+  const code = text$m(doc.code) || current?.code;
+  const note = text$m(doc.note) || current?.note;
   const zone = optionalNumber(doc.zone) ?? current?.zone;
   const outerMiles = optionalNumber(doc.outerMiles) ?? current?.outerMiles;
   const minCount = optionalNumber(doc.minCount) ?? current?.minCount;
@@ -7395,7 +7417,7 @@ function fromDoc(doc, current) {
   return {
     id,
     kind,
-    name: text$l(doc.name) || current?.name || id,
+    name: text$m(doc.name) || current?.name || id,
     active: doc.active === false ? false : doc.active === true ? true : current?.active ?? true,
     removed: false,
     mode,
@@ -7413,7 +7435,7 @@ function mergePricingAdjustments(liveDocs = [], options) {
   const byId = /* @__PURE__ */ new Map();
   for (const item of defaultPricingAdjustments()) byId.set(item.id, { ...item });
   for (const doc of liveDocs) {
-    const id = text$l(doc.id);
+    const id = text$m(doc.id);
     if (!id) continue;
     if (doc.removed === true) {
       {
@@ -7446,8 +7468,8 @@ function pricingRates(items = mergePricingAdjustments([])) {
     feeCents: Math.round(Math.max(0, item.amount) * 100)
   })).filter((zone) => zone.zone > 0 && zone.outerMiles > 0).sort((a, b) => a.outerMiles - b.outerMiles);
   const travelSeedMissing = seedTravelIds.some((id) => !travelItems.some((item) => item.id === id));
-  const promos = items.filter((item) => item.kind === "promo" && item.active && !item.removed && text$l(item.code)).map((item) => ({
-    code: text$l(item.code).toUpperCase(),
+  const promos = items.filter((item) => item.kind === "promo" && item.active && !item.removed && text$m(item.code)).map((item) => ({
+    code: text$m(item.code).toUpperCase(),
     discount: Math.max(0, item.amount),
     mode: item.mode === "percent" ? "percent" : "flat",
     active: true
@@ -7490,13 +7512,453 @@ function taxDollars(base, rates) {
   if (!rates.taxActive) return 0;
   return percentOfDollars(base, rates.taxPercent);
 }
-async function loadPricingRates() {
+async function loadPricingAdjustments() {
   try {
     const snap = await admin.firestore().collection(PRICING_ADJUSTMENTS_COLLECTION).get();
-    return pricingRates(mergePricingAdjustments(snap.docs.map((entry2) => ({ id: entry2.id, ...entry2.data() }))));
+    return mergePricingAdjustments(snap.docs.map((entry2) => ({ id: entry2.id, ...entry2.data() })));
   } catch (err) {
     console.error("[Pricing] Settings read failed — using the seeded rates", err);
-    return pricingRates(mergePricingAdjustments([]));
+    return mergePricingAdjustments([]);
+  }
+}
+async function loadPricingRates() {
+  return pricingRates(await loadPricingAdjustments());
+}
+const PAY_AT_CLOSE_METHOD = "pay_at_close";
+const PAY_AT_CLOSE_PENDING_STATUS = "pending - pay at close";
+const PAY_AT_CLOSE_OFFER_ID = "pay-at-close";
+const PAY_AT_CLOSE_CARD_PROCESSING_ID = "pay-at-close-card-processing";
+const PAY_AT_CLOSE_FEE_LINE_ID = "pay-at-close-fee";
+const TITUS_STAGING_API_BASE = "https://api.gotitus.dev";
+const PAY_AT_CLOSE_REPLAY_WINDOW_MS = 5 * 60 * 1e3;
+function payAtCloseLive(env) {
+  return env?.PAY_AT_CLOSE_LIVE === "true";
+}
+function payAtCloseApiBaseUrl(env) {
+  const raw = String(env?.PAY_AT_CLOSE_API_BASE_URL ?? "").trim().replace(/\/+$/, "");
+  return raw || TITUS_STAGING_API_BASE;
+}
+function payAtCloseBaseUrlDecision(env) {
+  const base = payAtCloseApiBaseUrl(env);
+  let host = "";
+  try {
+    host = new URL(base).host;
+  } catch {
+    return { ok: false, error: "Pay at Close base URL is not a valid URL." };
+  }
+  if (host === "api.gotitus.com" && !payAtCloseLive(env)) {
+    return { ok: false, error: "Pay at Close live API stays off until PAY_AT_CLOSE_LIVE is true." };
+  }
+  return { ok: true, base };
+}
+function payAtClosePublicOffer(env, adjustments) {
+  const offer = adjustments.find((item) => item.id === PAY_AT_CLOSE_OFFER_ID && !item.removed);
+  const card = adjustments.find((item) => item.id === PAY_AT_CLOSE_CARD_PROCESSING_ID && !item.removed);
+  const enabledByOffice = Boolean(offer?.active);
+  const live = payAtCloseLive(env);
+  return {
+    live,
+    enabledByOffice,
+    offered: live && enabledByOffice,
+    feeMode: offer?.mode === "percent" ? "percent" : "flat",
+    feeRate: enabledByOffice ? Math.max(0, Number(offer?.amount) || 0) : 0,
+    chargeCardProcessing: Boolean(card?.active)
+  };
+}
+function roundPayAtCloseMoney(value) {
+  if (!Number.isFinite(value)) return 0;
+  return Math.round(value * 100) / 100;
+}
+function payAtCloseFeeDollars(rate2, mode, base) {
+  const safeRate = Number(rate2);
+  const safeBase = Math.max(0, Number(base) || 0);
+  if (!Number.isFinite(safeRate) || safeRate <= 0) return 0;
+  if (mode === "percent") return roundPayAtCloseMoney(safeBase * safeRate / 100);
+  return roundPayAtCloseMoney(safeRate);
+}
+function serviceBase(lineItems) {
+  const base = lineItems.filter((item) => item.id !== PAY_AT_CLOSE_FEE_LINE_ID && adjustmentKind(item) !== "processing" && !String(item.id || "").startsWith("promo-") && !String(item.name || "").startsWith("Promo Code:")).filter((item) => adjustmentKind(item) !== "travel").reduce((sum, item) => sum + (Number(item.price) || 0), 0);
+  return roundPayAtCloseMoney(Math.max(0, base));
+}
+function shapePayAtCloseDraft(draft, offer) {
+  const kept = draft.lineItems.filter((item) => item.id !== PAY_AT_CLOSE_FEE_LINE_ID && (offer.chargeCardProcessing || adjustmentKind(item) !== "processing"));
+  const fee = payAtCloseFeeDollars(offer.feeRate, offer.feeMode, serviceBase(kept));
+  const lineItems = fee > 0 ? [...kept, {
+    id: PAY_AT_CLOSE_FEE_LINE_ID,
+    name: "Pay at Close",
+    unitPrice: fee,
+    qty: 1,
+    price: fee
+  }] : kept;
+  const total = roundPayAtCloseMoney(sumLineItemPrices(lineItems));
+  const amountPaid = roundPayAtCloseMoney(Math.max(0, Number(draft.amountPaid) || 0));
+  return {
+    ...draft,
+    lineItems,
+    total,
+    amountDue: roundPayAtCloseMoney(Math.max(0, total - amountPaid)),
+    amountPaid,
+    subtotal: serviceBase(lineItems),
+    processing: offer.chargeCardProcessing ? draft.processing ?? 0 : 0,
+    processingPolicy: offer.chargeCardProcessing ? draft.processingPolicy ?? "included" : "waived",
+    status: PAY_AT_CLOSE_PENDING_STATUS,
+    paymentMethod: PAY_AT_CLOSE_METHOD,
+    paymentProvider: PAY_AT_CLOSE_METHOD,
+    paymentStatus: PAY_AT_CLOSE_PENDING_STATUS,
+    payAtCloseFee: fee
+  };
+}
+function premiumCatalogPackages(catalog, limit = 4) {
+  const priced = catalog.filter((item) => item.isActive && item.price > 0 && item.bookingKind !== "addon" && item.bookingKind !== "upgrade");
+  const preferred = priced.filter((item) => item.bookingKind === "service" || item.tier === "premium" || item.tier === "campaign");
+  const pool = preferred.length >= 3 ? preferred : priced;
+  return [...pool].sort((a, b) => b.price - a.price || a.name.localeCompare(b.name)).slice(0, Math.max(1, limit));
+}
+function titusCheckoutBody(input) {
+  const body = {
+    orderId: input.invoiceId,
+    amount: roundPayAtCloseMoney(input.amount),
+    description: input.description,
+    successUrl: input.successUrl,
+    cancelUrl: input.cancelUrl,
+    payNowEnabled: false,
+    idempotencyKey: input.idempotencyKey,
+    metadata: {
+      invoiceId: input.invoiceId,
+      ...input.orderId ? { orderId: input.orderId } : {}
+    },
+    prefillData: { preferredPaymentMethod: "pay-at-close" }
+  };
+  const customer = String(input.externalCustomerId || "").trim();
+  if (customer) body.externalCustomerId = customer;
+  const businessId = String(input.businessId || "").trim();
+  if (businessId) body.businessId = businessId;
+  if (input.project && (input.project.address || input.project.contact)) body.project = input.project;
+  return body;
+}
+function payAtCloseIdempotencyKey(invoiceId, checkoutStatus) {
+  const id = invoiceId.trim() || "invoice";
+  if (checkoutStatus === "canceled") return `pac-${id}-retry`;
+  return `pac-${id}`;
+}
+function titusProjectFromAddress(input) {
+  const raw = String(input.address || "").trim();
+  const match = raw.match(/^(.*?),\s*([^,]+),\s*([A-Za-z]{2})\s+(\d{5})(?:-\d{4})?\s*$/);
+  const phone = String(input.phone || "").replace(/\D/g, "");
+  const contact = {
+    ...String(input.firstName || "").trim() ? { firstName: String(input.firstName).trim() } : {},
+    ...String(input.lastName || "").trim() ? { lastName: String(input.lastName).trim() } : {},
+    ...String(input.email || "").includes("@") ? { workEmail: String(input.email).trim() } : {},
+    ...phone.length >= 10 ? { phone: phone.slice(-10) } : {}
+  };
+  if (!match) return Object.keys(contact).length ? { contact } : null;
+  return {
+    address: {
+      addressLine1: match[1].trim(),
+      city: match[2].trim(),
+      state: match[3].toUpperCase(),
+      zip: match[4]
+    },
+    ...Object.keys(contact).length ? { contact } : {}
+  };
+}
+function payAtCloseTimestampMs(raw, now = Date.now()) {
+  const trimmed = raw.trim();
+  if (!/^\d+$/.test(trimmed)) return null;
+  const value = Number(trimmed);
+  if (!Number.isFinite(value)) return null;
+  const ms = value < 1e12 ? value * 1e3 : value;
+  if (Math.abs(now - ms) > PAY_AT_CLOSE_REPLAY_WINDOW_MS) return null;
+  return ms;
+}
+function payAtCloseSignatureExpected(secret, timestamp, rawBody, hmacHex2) {
+  return hmacHex2(secret, `${timestamp}.${rawBody}`);
+}
+function asRecord$5(value) {
+  return value && typeof value === "object" ? value : null;
+}
+function text$l(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+function interpretPayAtCloseWebhook(body) {
+  const event = asRecord$5(body);
+  const eventType = text$l(event?.type);
+  const payload = asRecord$5(event?.payload) || {};
+  if (eventType === "refund.created" || eventType === "refund.updated") {
+    return {
+      type: "refund",
+      eventType,
+      refundId: text$l(payload.id),
+      checkoutId: text$l(payload.checkoutId),
+      amount: roundPayAtCloseMoney(Number(payload.amount) || 0),
+      refundStatus: text$l(payload.status)
+    };
+  }
+  if (eventType === "checkout.loan_application_denied" || eventType === "authorization.loan_application_denied") {
+    return {
+      type: "checkout",
+      eventType,
+      checkoutId: text$l(payload.id),
+      invoiceId: "",
+      checkoutStatus: "requires-payment",
+      application: "denied",
+      failureReason: "Pay at Close application was declined."
+    };
+  }
+  if (eventType === "checkout.loan_application_under_review") {
+    return {
+      type: "checkout",
+      eventType,
+      checkoutId: text$l(payload.id),
+      invoiceId: "",
+      checkoutStatus: "requires-payment",
+      application: "under_review"
+    };
+  }
+  if (eventType === "checkout.loan_application_approved") {
+    return {
+      type: "checkout",
+      eventType,
+      checkoutId: text$l(payload.id),
+      invoiceId: "",
+      checkoutStatus: "requires-payment",
+      application: "approved"
+    };
+  }
+  if (!eventType.startsWith("checkout.")) return { type: "ignore", eventType };
+  const metadata = asRecord$5(payload.metadata);
+  const invoiceId = text$l(payload.orderId) || text$l(metadata?.invoiceId);
+  const checkoutStatus = text$l(payload.status);
+  const error = asRecord$5(payload.lastPaymentError);
+  const amount = roundPayAtCloseMoney((Number(payload.amount) || 0) + (Number(payload.tipAmount) || 0));
+  const paidAt = text$l(payload.updatedAt) || text$l(event?.createdAt);
+  return {
+    type: "checkout",
+    eventType,
+    checkoutId: text$l(payload.id),
+    invoiceId,
+    checkoutStatus,
+    amount,
+    ...paidAt ? { paidAt } : {},
+    ...eventType === "checkout.payment_failed" ? { failureReason: text$l(error?.message) || text$l(error?.code) || "Payment failed." } : {}
+  };
+}
+function payAtCloseSettlement(action, amountDue) {
+  if (action.application === "denied" || action.failureReason) return "failed";
+  if (action.checkoutStatus === "succeeded") {
+    if (amountDue <= 0) return "paid";
+    const amount = action.amount ?? 0;
+    if (amount <= 0) return "pending";
+    return amount + 9e-3 >= amountDue ? "paid" : "partial";
+  }
+  if (action.checkoutStatus === "canceled") return "failed";
+  return "pending";
+}
+function isMirroredPayAtCloseSquarePayment(payment, invoice) {
+  if (String(payment?.source_type || "").toUpperCase() !== "EXTERNAL") return false;
+  return invoice?.paymentMethod === PAY_AT_CLOSE_METHOD || invoice?.paymentProvider === PAY_AT_CLOSE_METHOD || Boolean(text$l(invoice?.titusCheckoutId));
+}
+function hmacHex(secret, payload) {
+  return createHmac("sha256", secret).update(payload).digest("hex");
+}
+function payAtCloseOfferFromAdjustments(env, adjustments) {
+  return payAtClosePublicOffer(env, adjustments);
+}
+function redact$1(value, secret) {
+  if (!secret) return value;
+  return value.split(secret).join("[redacted]");
+}
+async function createTitusCheckout(input, deps) {
+  const decision = payAtCloseBaseUrlDecision(deps.env);
+  if (decision.ok === false) return { ok: false, error: decision.error };
+  const apiKey = String(deps.env.PAY_AT_CLOSE_API_KEY || "").trim();
+  if (!apiKey) return { ok: false, error: "Pay at Close is not configured." };
+  const idempotencyKey = payAtCloseIdempotencyKey(input.invoiceId, input.checkoutStatus);
+  const body = titusCheckoutBody({
+    invoiceId: input.invoiceId,
+    orderId: input.orderId,
+    amount: input.amount,
+    description: input.description,
+    successUrl: input.successUrl,
+    cancelUrl: input.cancelUrl,
+    idempotencyKey,
+    externalCustomerId: input.externalCustomerId || input.email,
+    businessId: deps.env.PAY_AT_CLOSE_BUSINESS_ID,
+    project: titusProjectFromAddress(input)
+  });
+  const fetchImpl = deps.fetchImpl || fetch;
+  let response;
+  try {
+    response = await fetchImpl(`${decision.base}/v1/checkouts`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "idempotency-key": idempotencyKey
+      },
+      body: JSON.stringify(body)
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Pay at Close request failed.";
+    console.error("[Pay at Close] Checkout request failed:", redact$1(message, apiKey));
+    return { ok: false, error: "Pay at Close checkout could not be started." };
+  }
+  const payload = await response.json().catch(() => ({}));
+  const data = payload && typeof payload === "object" && "data" in payload ? payload.data : payload;
+  const record2 = data && typeof data === "object" ? data : {};
+  const checkoutUrl = typeof record2.checkoutUrl === "string" ? record2.checkoutUrl : "";
+  const checkoutId = typeof record2.id === "string" ? record2.id : "";
+  const status2 = typeof record2.status === "string" ? record2.status : "";
+  if (!response.ok || !checkoutUrl || !checkoutId) {
+    const raw = JSON.stringify(payload).slice(0, 500);
+    console.error("[Pay at Close] Checkout was declined:", response.status, redact$1(raw, apiKey));
+    return { ok: false, error: "Pay at Close checkout could not be started." };
+  }
+  return { ok: true, checkoutId, checkoutUrl, status: status2 };
+}
+function verifyPayAtCloseWebhook(rawBody, headers, env, now = Date.now()) {
+  const secret = String(env.PAY_AT_CLOSE_WEBHOOK_SECRET || "").trim();
+  if (!secret) return { ok: false, status: 401, error: "Pay at Close webhook secret is not configured." };
+  const timestamp = String(headers.timestamp || "").trim();
+  const signature = String(headers.signature || "").trim();
+  if (!timestamp || !signature) return { ok: false, status: 401, error: "Missing Pay at Close webhook signature." };
+  if (payAtCloseTimestampMs(timestamp, now) == null) {
+    return { ok: false, status: 401, error: "Pay at Close webhook timestamp is outside the 5 minute window." };
+  }
+  const expected = payAtCloseSignatureExpected(secret, timestamp, rawBody, hmacHex);
+  const expectedBuf = Buffer.from(expected, "utf8");
+  const receivedBuf = Buffer.from(signature.trim().toLowerCase(), "utf8");
+  if (expectedBuf.length !== receivedBuf.length || !timingSafeEqual(expectedBuf, receivedBuf)) {
+    return { ok: false, status: 401, error: "Invalid Pay at Close webhook signature." };
+  }
+  return { ok: true };
+}
+function invoiceIdOf(action, invoice) {
+  if (action.type === "checkout" && action.invoiceId) return action.invoiceId;
+  return invoice?.id || "";
+}
+async function applyPayAtCloseWebhook(rawBody, headers, deps) {
+  const verified = verifyPayAtCloseWebhook(rawBody, headers, deps.env, deps.now);
+  if (verified.ok === false) return { status: verified.status, body: { error: verified.error } };
+  let parsed;
+  try {
+    parsed = JSON.parse(rawBody);
+  } catch {
+    return { status: 400, body: { error: "Pay at Close webhook body is not JSON." } };
+  }
+  const action = interpretPayAtCloseWebhook(parsed);
+  if (action.type === "ignore") return { status: 200, body: { received: true, ignored: action.eventType || "unknown" } };
+  const checkoutId = action.type === "refund" ? action.checkoutId : action.checkoutId;
+  let invoice = null;
+  if (action.type === "checkout" && action.invoiceId) invoice = await deps.findInvoiceById(action.invoiceId);
+  if (!invoice && checkoutId) invoice = await deps.findInvoiceByCheckoutId(checkoutId);
+  const invoiceId = invoiceIdOf(action, invoice);
+  if (!invoice || !invoiceId) return { status: 200, body: { received: true, unmatched: true } };
+  if (action.type === "refund") {
+    if (action.refundStatus !== "completed" || action.amount <= 0 || !action.refundId) {
+      await deps.save(invoice.id, {
+        payAtCloseRefundStatus: action.refundStatus || "pending",
+        updatedAt: (/* @__PURE__ */ new Date()).toISOString()
+      });
+      return { status: 200, body: { received: true, refund: action.refundStatus || "pending" } };
+    }
+    const result = await deps.recordRefund({
+      invoiceId: invoice.id,
+      amount: action.amount,
+      refundId: action.refundId,
+      checkoutId: action.checkoutId
+    });
+    return { status: 200, body: { received: true, refund: true, ...result || {} } };
+  }
+  const amountDue = roundPayAtCloseMoney(Number(invoice.data.amountDue ?? invoice.data.total) || 0);
+  const settlement = payAtCloseSettlement(action, amountDue);
+  const patch = {
+    paymentMethod: PAY_AT_CLOSE_METHOD,
+    paymentProvider: PAY_AT_CLOSE_METHOD,
+    titusCheckoutId: action.checkoutId || invoice.data.titusCheckoutId || null,
+    titusCheckoutStatus: action.checkoutStatus,
+    ...action.application ? { payAtCloseApplication: action.application } : {},
+    ...action.failureReason ? { payAtCloseFailure: action.failureReason } : {},
+    ...action.paidAt ? { titusEventAt: action.paidAt } : {}
+  };
+  if (settlement === "paid" || settlement === "partial") {
+    const amount = action.amount ?? amountDue;
+    const applied = await deps.applyPayment({
+      invoiceId: invoice.id,
+      orderId: typeof invoice.data.orderId === "string" ? invoice.data.orderId : void 0,
+      clientId: typeof invoice.data.clientId === "string" ? invoice.data.clientId : void 0,
+      clientName: typeof invoice.data.clientName === "string" ? invoice.data.clientName : void 0,
+      amount,
+      titusCheckoutId: action.checkoutId,
+      paidAt: action.paidAt
+    });
+    await deps.save(invoice.id, patch);
+    if (!applied?.duplicate) {
+      await deps.mirrorSquare(invoice, { amount, checkoutId: action.checkoutId });
+    }
+    return { status: 200, body: { received: true, settlement, ...applied || {} } };
+  }
+  if (settlement === "failed") {
+    const alreadyPaid = roundPayAtCloseMoney(Number(invoice.data.amountPaid) || 0) > 0;
+    await deps.save(invoice.id, {
+      ...patch,
+      status: alreadyPaid ? invoice.data.status || "partial" : "failed",
+      paymentStatus: alreadyPaid ? "partial" : "failed"
+    });
+    return { status: 200, body: { received: true, settlement: "failed" } };
+  }
+  await deps.save(invoice.id, {
+    ...patch,
+    status: invoice.data.status === "paid" ? "paid" : PAY_AT_CLOSE_PENDING_STATUS,
+    paymentStatus: invoice.data.status === "paid" ? "paid" : PAY_AT_CLOSE_PENDING_STATUS
+  });
+  return { status: 200, body: { received: true, settlement: "pending" } };
+}
+function squareExternalPayAtCloseBody(input) {
+  const cents2 = Math.round(roundPayAtCloseMoney(input.amount) * 100);
+  return {
+    source_id: "EXTERNAL",
+    idempotency_key: `titus-${input.checkoutId}`.slice(0, 45),
+    amount_money: { amount: cents2, currency: "USD" },
+    order_id: input.squareOrderId,
+    location_id: input.locationId,
+    note: `Pay at Close ${input.checkoutId} invoiceId:${input.invoiceId}`.slice(0, 500),
+    external_details: {
+      type: "OTHER",
+      source: "Titus Pay at Close",
+      source_id: input.checkoutId.slice(0, 255)
+    }
+  };
+}
+async function mirrorPayAtCloseOnSquareOrder(invoice, input, deps) {
+  const squareOrderId = typeof invoice.data.squareOrderId === "string" ? invoice.data.squareOrderId.trim() : "";
+  const token = String(deps.env.SQUARE_ACCESS_TOKEN || "").trim();
+  const locationId = String(deps.env.SQUARE_LOCATION_ID || "").trim();
+  if (!squareOrderId || !token || !locationId || input.amount <= 0) return;
+  const fetchImpl = deps.fetchImpl || fetch;
+  const body = squareExternalPayAtCloseBody({
+    invoiceId: invoice.id,
+    squareOrderId,
+    locationId,
+    amount: input.amount,
+    checkoutId: input.checkoutId
+  });
+  try {
+    const response = await fetchImpl(`${squareApiBaseUrl(deps.env.SQUARE_ENVIRONMENT)}/v2/payments`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Square-Version": deps.env.SQUARE_VERSION || "2026-08-20",
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify(body)
+    });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      console.error("[Pay at Close] Square external tender was not recorded:", response.status, JSON.stringify(payload).slice(0, 300));
+    }
+  } catch (err) {
+    console.error("[Pay at Close] Square external tender failed:", err instanceof Error ? err.message : "request failed");
   }
 }
 const HUB_SOCIAL_PLATFORMS = [
@@ -10168,9 +10630,15 @@ router$y.post("/", async (req, res) => {
     const travel = traveled.travel;
     const promoCode = resolved.promoCode;
     const promoDiscount = resolved.promoDiscount;
-    const serviceBase = Math.max(0, sumLineItemPrices(traveled.lineItems.filter((item) => !isTravelFeeLine(item) && !isPromoInvoiceLine(item))) - promoDiscount);
-    const tax = taxDollars(serviceBase, rates);
-    const sale = buildBookingInvoiceDraft({
+    const serviceBase2 = Math.max(0, sumLineItemPrices(traveled.lineItems.filter((item) => !isTravelFeeLine(item) && !isPromoInvoiceLine(item))) - promoDiscount);
+    const tax = taxDollars(serviceBase2, rates);
+    const adjustments = await loadPricingAdjustments();
+    const payAtCloseOffer = payAtClosePublicOffer(process.env, adjustments);
+    const wantsPayAtClose = req.body.paymentMethod === PAY_AT_CLOSE_METHOD;
+    if (wantsPayAtClose && !payAtCloseOffer.offered) {
+      return res.status(400).json({ error: "Pay at Close is not available." });
+    }
+    let sale = buildBookingInvoiceDraft({
       lineItems: traveled.lineItems,
       total: traveled.total,
       pricing: { subtotal: traveled.total, tax },
@@ -10179,9 +10647,15 @@ router$y.post("/", async (req, res) => {
       promoCode,
       promoDiscount,
       travel,
-      applyProcessing: processingEnabled() && rates.processingActive,
+      applyProcessing: processingEnabled() && rates.processingActive && (!wantsPayAtClose || payAtCloseOffer.chargeCardProcessing),
       processingPercent: rates.processingPercent
     });
+    let payAtCloseFee = 0;
+    if (wantsPayAtClose) {
+      const shaped = shapePayAtCloseDraft(sale, payAtCloseOffer);
+      payAtCloseFee = shaped.payAtCloseFee;
+      sale = shaped;
+    }
     const lineItems = sale.lineItems;
     const total = sale.total;
     const pricing = { subtotal: sale.subtotal, tax: sale.tax, total: sale.total };
@@ -10275,6 +10749,11 @@ router$y.post("/", async (req, res) => {
       promoDiscount: Number(promoDiscount) || 0,
       processing: sale.processing ?? 0,
       processingPolicy: sale.processingPolicy ?? (processingEnabled() ? "included" : "waived"),
+      ...wantsPayAtClose ? {
+        paymentMethod: PAY_AT_CLOSE_METHOD,
+        paymentStatus: PAY_AT_CLOSE_PENDING_STATUS,
+        payAtCloseFee
+      } : {},
       travelZone: travel.travelZone,
       travelMiles: travel.travelMiles,
       travelFeeCents: travel.travelFeeCents,
@@ -10667,7 +11146,7 @@ router$y.post("/", async (req, res) => {
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     }).catch((err) => console.error("[Bookings] Notification status was not saved:", err));
     let holidayCheckout = null;
-    const holidayKind = holidayCheckoutKind(leadSource, total);
+    const holidayKind = wantsPayAtClose ? null : holidayCheckoutKind(leadSource, total);
     if (holidayKind === "free") {
       holidayCheckout = { payment: "free" };
     } else if (holidayKind === "paid") {
@@ -10708,6 +11187,42 @@ router$y.post("/", async (req, res) => {
         }
       }
     }
+    let payAtCloseCheckoutUrl = "";
+    if (wantsPayAtClose && invoiceId) {
+      try {
+        const invoiceSnap = await db$w().collection("invoices").doc(invoiceId).get();
+        const invoiceData = invoiceSnap.data() || {};
+        const payToken = typeof invoiceData.payToken === "string" ? invoiceData.payToken : "";
+        const successUrl = clientInvoiceUrl({ id: invoiceId, payToken, status: "sent" }, void 0, { paid: "1" }) || "";
+        const cancelUrl = clientInvoiceUrl({ id: invoiceId, payToken, status: "sent" }) || successUrl;
+        const created = await createTitusCheckout({
+          invoiceId,
+          orderId: null,
+          amount: Number(invoiceData.amountDue ?? invoiceData.total) || Number(total) || 0,
+          description: `Iconic Images ${invoiceData.invoiceNumber || invoiceId}`,
+          successUrl,
+          cancelUrl,
+          email,
+          firstName,
+          lastName,
+          phone,
+          address: displayAddress
+        }, { env: process.env });
+        if (created.ok === true) {
+          payAtCloseCheckoutUrl = created.checkoutUrl;
+          await db$w().collection("invoices").doc(invoiceId).update({
+            titusCheckoutId: created.checkoutId,
+            titusCheckoutUrl: created.checkoutUrl,
+            titusCheckoutStatus: created.status || "requires-payment",
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+          });
+        } else {
+          console.error("[Pay at Close] Booking checkout was not started:", created.error);
+        }
+      } catch (err) {
+        console.error("[Pay at Close] Booking checkout failed:", err instanceof Error ? err.message : "error");
+      }
+    }
     return res.status(201).json({
       success: true,
       requestId: docRef.id,
@@ -10716,7 +11231,8 @@ router$y.post("/", async (req, res) => {
       accountCreated: account.createdAccount,
       notifications,
       ...holidayCheckout ? { payment: holidayCheckout.payment } : {},
-      ...holidayCheckout?.checkoutUrl ? { checkoutUrl: holidayCheckout.checkoutUrl } : {},
+      ...payAtCloseCheckoutUrl ? { checkoutUrl: payAtCloseCheckoutUrl, payment: "pay_at_close" } : {},
+      ...holidayCheckout?.checkoutUrl && !payAtCloseCheckoutUrl ? { checkoutUrl: holidayCheckout.checkoutUrl } : {},
       ...holidayCheckout?.missingEnv ? { missingEnv: holidayCheckout.missingEnv } : {},
       message: "Booking request received. We'll confirm shortly!"
     });
@@ -10835,11 +11351,13 @@ router$y.get("/slots", async (req, res) => {
 });
 router$y.get("/catalog", async (_req, res) => {
   const catalog = await loadBookingCatalog();
-  const rates = await loadPricingRates();
+  const adjustments = await loadPricingAdjustments();
+  const rates = pricingRates(adjustments);
   return res.json({
     ...publicBookingCatalogResponse(catalog),
     processingEnabled: processingEnabled() && rates.processingActive,
-    pricingRates: rates
+    pricingRates: rates,
+    payAtClose: payAtClosePublicOffer(process.env, adjustments)
   });
 });
 router$y.get("/", requireCoordinator, async (_req, res) => {
@@ -11035,6 +11553,10 @@ router$y.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       travelQuoted: travel.travelQuoted,
       depositPaid: 0,
       balanceDue: requestTotal,
+      ...request.paymentMethod === PAY_AT_CLOSE_METHOD ? {
+        paymentMethod: PAY_AT_CLOSE_METHOD,
+        paymentStatus: typeof request.paymentStatus === "string" && request.paymentStatus ? request.paymentStatus : PAY_AT_CLOSE_PENDING_STATUS
+      } : {},
       status: "confirmed",
       assignedPhotographerId: assignedPhotographerId || null,
       assignedPhotographerName: assignedPhotographerName || null,
@@ -11197,8 +11719,15 @@ router$y.patch("/:id/confirm", requireCoordinator, async (req, res) => {
         // Older requests have no policy, so confirming them does not add one.
         applyProcessing: request.processingPolicy === "included"
       });
-      await invoiceRef.set({
+      const payAtCloseDraft = request.paymentMethod === PAY_AT_CLOSE_METHOD ? {
         ...draft,
+        status: PAY_AT_CLOSE_PENDING_STATUS,
+        paymentMethod: PAY_AT_CLOSE_METHOD,
+        paymentProvider: PAY_AT_CLOSE_METHOD,
+        paymentStatus: PAY_AT_CLOSE_PENDING_STATUS
+      } : draft;
+      await invoiceRef.set({
+        ...payAtCloseDraft,
         ...portalBillingStamp(request),
         orderId: orderRef.id,
         galleryId: galleryRef.id,
@@ -12773,11 +13302,11 @@ function ownerSessionSecret(env = ownerRuntimeEnv()) {
   if (explicit && explicit.length >= 16) return explicit;
   const serviceAccount = env.FIREBASE_SERVICE_ACCOUNT;
   if (serviceAccount && serviceAccount.length >= 32) {
-    return createHmac("sha256", "iconic-owners-suite-v1").update(serviceAccount).digest("hex");
+    return createHmac$1("sha256", "iconic-owners-suite-v1").update(serviceAccount).digest("hex");
   }
   const sheetsKey = env.OWNER_SHEETS_SA_KEY;
   if (sheetsKey && sheetsKey.length >= 32) {
-    return createHmac("sha256", "iconic-owners-suite-v1").update(sheetsKey).digest("hex");
+    return createHmac$1("sha256", "iconic-owners-suite-v1").update(sheetsKey).digest("hex");
   }
   return null;
 }
@@ -12787,16 +13316,16 @@ function signOwnerSession(identity, secret, now = Date.now()) {
     uid: identity.uid,
     exp: now + SESSION_MS
   })).toString("base64url");
-  const sig = createHmac("sha256", secret).update(body).digest("base64url");
+  const sig = createHmac$1("sha256", secret).update(body).digest("base64url");
   return `${body}.${sig}`;
 }
 function readOwnerSession(token, secret, now = Date.now()) {
   const [body, sig] = token.split(".");
   if (!body || !sig) return null;
-  const expected = createHmac("sha256", secret).update(body).digest("base64url");
+  const expected = createHmac$1("sha256", secret).update(body).digest("base64url");
   const actualBuf = Buffer.from(sig);
   const expectedBuf = Buffer.from(expected);
-  if (actualBuf.length !== expectedBuf.length || !timingSafeEqual(actualBuf, expectedBuf)) return null;
+  if (actualBuf.length !== expectedBuf.length || !timingSafeEqual$1(actualBuf, expectedBuf)) return null;
   try {
     const parsed = JSON.parse(Buffer.from(body, "base64url").toString("utf8"));
     if (!parsed.email || !parsed.uid || typeof parsed.exp !== "number" || parsed.exp < now) return null;
@@ -12997,11 +13526,11 @@ function ownerDisplaySecret(env = process.env) {
   if (explicit && explicit.length >= 16) return explicit;
   const serviceAccount = env.FIREBASE_SERVICE_ACCOUNT;
   if (serviceAccount && serviceAccount.length >= 32) {
-    return createHmac$1("sha256", "iconic-owner-display-v1").update(serviceAccount).digest("hex");
+    return createHmac("sha256", "iconic-owner-display-v1").update(serviceAccount).digest("hex");
   }
   const sheetsKey = env.OWNER_SHEETS_SA_KEY;
   if (sheetsKey && sheetsKey.length >= 32) {
-    return createHmac$1("sha256", "iconic-owner-display-v1").update(sheetsKey).digest("hex");
+    return createHmac("sha256", "iconic-owner-display-v1").update(sheetsKey).digest("hex");
   }
   if (!isHostedDeployment(env)) return DEV_SECRET;
   return null;
@@ -13015,7 +13544,7 @@ function signOwnerDisplayToken(claims, now = Date.now(), env = process.env) {
     id: claims.id,
     exp: now + OWNER_DISPLAY_TTL_MS
   })).toString("base64url");
-  const sig = createHmac$1("sha256", secret).update(body).digest("base64url");
+  const sig = createHmac("sha256", secret).update(body).digest("base64url");
   return `${body}.${sig}`;
 }
 function ownerDisplayPath(token, index) {
@@ -17457,7 +17986,7 @@ function finite(value) {
 function text$a(value) {
   return typeof value === "string" ? value.trim() : "";
 }
-function payTokenMatches(stored, presented, equal = timingSafeEqual$1) {
+function payTokenMatches(stored, presented, equal = timingSafeEqual) {
   const left = Buffer.from(typeof stored === "string" ? stored : "");
   const right = Buffer.from(typeof presented === "string" ? presented : "");
   if (left.length === 0) return false;
@@ -17883,7 +18412,9 @@ function invoiceNumberFields(invoice, id) {
 }
 async function paymentAlreadyRecorded({
   squarePaymentId,
-  stripePaymentIntentId
+  stripePaymentIntentId,
+  titusCheckoutId,
+  titusRefundId
 }) {
   if (squarePaymentId) {
     const existing = await db$k().collection("transactions").where("squarePaymentId", "==", squarePaymentId).limit(1).get();
@@ -17891,6 +18422,14 @@ async function paymentAlreadyRecorded({
   }
   if (stripePaymentIntentId) {
     const existing = await db$k().collection("transactions").where("stripePaymentIntentId", "==", stripePaymentIntentId).limit(1).get();
+    if (!existing.empty) return true;
+  }
+  if (titusCheckoutId) {
+    const existing = await db$k().collection("transactions").where("titusCheckoutId", "==", titusCheckoutId).limit(1).get();
+    if (!existing.empty) return true;
+  }
+  if (titusRefundId) {
+    const existing = await db$k().collection("transactions").where("titusRefundId", "==", titusRefundId).limit(1).get();
     if (!existing.empty) return true;
   }
   return false;
@@ -17996,7 +18535,9 @@ async function applySuccessfulPayment({
   amount,
   method,
   squarePaymentId,
-  stripePaymentIntentId
+  stripePaymentIntentId,
+  titusCheckoutId,
+  titusPaidAt
 }) {
   const invoiceRef = db$k().collection("invoices").doc(invoiceId);
   const invoiceDoc = await invoiceRef.get();
@@ -18006,7 +18547,7 @@ async function applySuccessfulPayment({
   const resolvedClientId = clientId2 || invoice.clientId || "";
   const sameSquare = Boolean(squarePaymentId) && invoice.squarePaymentId === squarePaymentId;
   const sameStripe = Boolean(stripePaymentIntentId) && invoice.stripePaymentIntentId === stripePaymentIntentId;
-  const duplicate = sameSquare || sameStripe || await paymentAlreadyRecorded({ squarePaymentId, stripePaymentIntentId });
+  const duplicate = sameSquare || sameStripe || await paymentAlreadyRecorded({ squarePaymentId, stripePaymentIntentId, titusCheckoutId });
   if (duplicate) {
     if (invoiceAllowsDownload(invoice)) {
       await syncDownloadAccess({
@@ -18030,6 +18571,8 @@ async function applySuccessfulPayment({
     paymentMethod: method,
     ...squarePaymentId ? { squarePaymentId } : {},
     ...stripePaymentIntentId ? { stripePaymentIntentId } : {},
+    ...titusCheckoutId ? { titusCheckoutId, titusSettledCheckoutId: titusCheckoutId } : {},
+    ...titusPaidAt ? { titusPaidAt } : {},
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
   });
   if (resolvedOrderId) {
@@ -18037,8 +18580,18 @@ async function applySuccessfulPayment({
       depositPaid: admin.firestore.FieldValue.increment(amount),
       balanceDue: newAmountDue,
       paymentStatus: newAmountDue <= 0 ? "paid" : "partial",
+      ...method === "pay_at_close" ? { paymentMethod: PAY_AT_CLOSE_METHOD, titusCheckoutId: titusCheckoutId || null } : {},
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     }).catch((err) => console.error("[Payments] Order balance update failed:", err));
+  }
+  const orderRequestId = typeof invoice.orderRequestId === "string" ? invoice.orderRequestId : "";
+  if (orderRequestId && method === "pay_at_close") {
+    await db$k().collection("orderRequests").doc(orderRequestId).update({
+      paymentMethod: PAY_AT_CLOSE_METHOD,
+      paymentStatus: newAmountDue <= 0 ? "paid" : "partial",
+      balanceDue: newAmountDue,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    }).catch((err) => console.error("[Payments] Order request balance update failed:", err));
   }
   const stamp2 = revenueStamp(invoice);
   if (resolvedClientId && stamp2.countsTowardRevenue) {
@@ -18059,6 +18612,8 @@ async function applySuccessfulPayment({
     ...stamp2,
     ...squarePaymentId ? { squarePaymentId } : {},
     ...stripePaymentIntentId ? { stripePaymentIntentId } : {},
+    ...titusCheckoutId ? { titusCheckoutId } : {},
+    ...titusPaidAt ? { titusPaidAt } : {},
     processedAt: admin.firestore.FieldValue.serverTimestamp(),
     processedBy: "system",
     createdAt: admin.firestore.FieldValue.serverTimestamp()
@@ -18407,6 +18962,212 @@ router$u.post("/send-receipt", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to send receipt." });
   }
 });
+router$u.get("/pay-at-close", async (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  const adjustments = await loadPricingAdjustments();
+  const offer = payAtCloseOfferFromAdjustments(process.env, adjustments);
+  let catalog = packagesForStaffEditor([]);
+  try {
+    const snap = await db$k().collection("packages").get();
+    catalog = packagesForStaffEditor(snap.docs.map((entry2) => ({ id: entry2.id, ...entry2.data() })));
+  } catch (err) {
+    console.error("[Pay at Close] Catalog read failed — using the seeded catalog", err);
+  }
+  const packages = premiumCatalogPackages(catalog, 4).map((item) => ({
+    id: item.bookingId || item.id,
+    name: item.name,
+    description: item.description,
+    price: item.price,
+    features: item.includedServices
+  }));
+  return res.json({ ...offer, packages });
+});
+async function beginPayAtCloseCheckout(invoiceDoc) {
+  const invoice = invoiceDoc.data() || {};
+  const offer = payAtCloseOfferFromAdjustments(process.env, await loadPricingAdjustments());
+  if (!offer.offered) return { status: 403, body: { error: "Pay at Close is not available." } };
+  if (invoiceAllowsDownload(invoice)) return { status: 200, body: { paid: true } };
+  let payable = invoice;
+  if (invoice.paymentMethod !== PAY_AT_CLOSE_METHOD) {
+    const draft = buildBookingInvoiceDraft({
+      lineItems: invoice.lineItems,
+      total: invoice.total,
+      pricing: { subtotal: invoice.subtotal, tax: invoice.tax },
+      clientEmail: String(invoice.clientEmail || ""),
+      clientName: String(invoice.clientName || ""),
+      promoCode: typeof invoice.promoCode === "string" ? invoice.promoCode : null,
+      promoDiscount: invoice.promoDiscount,
+      processing: invoice.processing,
+      applyProcessing: false
+    });
+    const shaped = shapePayAtCloseDraft({ ...draft, amountPaid: Number(invoice.amountPaid) || 0 }, offer);
+    payable = { ...invoice, ...shaped };
+    await invoiceDoc.ref.update({
+      lineItems: shaped.lineItems,
+      subtotal: shaped.subtotal,
+      total: shaped.total,
+      amountDue: shaped.amountDue,
+      processing: shaped.processing,
+      processingPolicy: shaped.processingPolicy,
+      payAtCloseFee: shaped.payAtCloseFee,
+      paymentMethod: PAY_AT_CLOSE_METHOD,
+      paymentProvider: PAY_AT_CLOSE_METHOD,
+      paymentStatus: PAY_AT_CLOSE_PENDING_STATUS,
+      status: PAY_AT_CLOSE_PENDING_STATUS,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+  }
+  const due = amountStillDue(payable);
+  if (due <= 0) return { status: 400, body: { error: "This invoice cannot be paid online." } };
+  const payToken = await payTokenForLink(invoiceDoc);
+  const successUrl = clientInvoiceUrl({ id: invoiceDoc.id, payToken, status: "sent" }, void 0, { paid: "1" }) || "";
+  const cancelUrl = clientInvoiceUrl({ id: invoiceDoc.id, payToken, status: "sent" }) || successUrl;
+  const name = typeof payable.clientName === "string" ? payable.clientName.trim() : "";
+  const created = await createTitusCheckout({
+    invoiceId: invoiceDoc.id,
+    orderId: typeof payable.orderId === "string" ? payable.orderId : null,
+    amount: due,
+    description: `Iconic Images ${payable.invoiceNumber || invoiceDoc.id}`,
+    successUrl,
+    cancelUrl,
+    email: typeof payable.clientEmail === "string" ? payable.clientEmail : null,
+    firstName: name.split(/\s+/)[0] || null,
+    lastName: name.split(/\s+/).slice(1).join(" ") || null,
+    address: typeof payable.billToAddress === "string" ? payable.billToAddress : null,
+    phone: typeof payable.billingPhone === "string" ? payable.billingPhone : null,
+    checkoutStatus: typeof payable.titusCheckoutStatus === "string" ? payable.titusCheckoutStatus : null
+  }, { env: process.env });
+  if (created.ok === false) return { status: 502, body: { error: created.error } };
+  await invoiceDoc.ref.update({
+    paymentMethod: PAY_AT_CLOSE_METHOD,
+    paymentProvider: PAY_AT_CLOSE_METHOD,
+    paymentStatus: PAY_AT_CLOSE_PENDING_STATUS,
+    status: invoice.status === "paid" ? "paid" : PAY_AT_CLOSE_PENDING_STATUS,
+    titusCheckoutId: created.checkoutId,
+    titusCheckoutUrl: created.checkoutUrl,
+    titusCheckoutStatus: created.status || "requires-payment",
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+  const requestId = typeof payable.orderRequestId === "string" ? payable.orderRequestId : "";
+  if (requestId) {
+    await db$k().collection("orderRequests").doc(requestId).update({
+      paymentMethod: PAY_AT_CLOSE_METHOD,
+      paymentStatus: PAY_AT_CLOSE_PENDING_STATUS,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    }).catch((err) => console.error("[Pay at Close] Order request was not marked:", err));
+  }
+  return { status: 200, body: { checkoutUrl: created.checkoutUrl, provider: PAY_AT_CLOSE_METHOD } };
+}
+router$u.post("/invoice/:id/pay-at-close", async (req, res) => {
+  try {
+    const invoiceDoc = await loadInvoice(req.params.id);
+    if (!invoiceDoc) return invoiceNotFound(res);
+    const invoice = invoiceDoc.data() || {};
+    const audience = await audienceFor(req, invoice);
+    const view = decideInvoiceView({
+      invoiceId: invoiceDoc.id,
+      payToken: invoice.payToken,
+      presentedToken: presentedPayToken(req),
+      audience,
+      matches: payTokenMatches
+    });
+    if (view === "deny") return invoiceNotFound(res);
+    const result = await beginPayAtCloseCheckout(invoiceDoc);
+    return res.status(result.status).json(result.body);
+  } catch (err) {
+    console.error("[Pay at Close] Checkout start failed:", err instanceof Error ? err.message : "error");
+    return res.status(500).json({ error: "Pay at Close checkout could not be started." });
+  }
+});
+router$u.post("/pay-at-close-webhook", async (req, res) => {
+  try {
+    const rawBody = await readSquareWebhookRawBody(req);
+    if (rawBody === null) return res.status(400).json({ error: "Pay at Close webhook raw body is unavailable." });
+    const header = (name) => {
+      const value = req.headers[name];
+      return Array.isArray(value) ? value[0] : value;
+    };
+    const result = await applyPayAtCloseWebhook(rawBody, {
+      signature: header("x-webhook-signature"),
+      timestamp: header("x-webhook-timestamp")
+    }, {
+      env: process.env,
+      findInvoiceById: async (id) => {
+        const snap = await db$k().collection("invoices").doc(id).get();
+        return snap.exists ? { id: snap.id, data: snap.data() || {} } : null;
+      },
+      findInvoiceByCheckoutId: async (checkoutId) => {
+        const snap = await db$k().collection("invoices").where("titusCheckoutId", "==", checkoutId).limit(1).get();
+        if (snap.empty) return null;
+        const doc = snap.docs[0];
+        return { id: doc.id, data: doc.data() || {} };
+      },
+      save: async (id, patch) => {
+        await db$k().collection("invoices").doc(id).update({
+          ...patch,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+      },
+      applyPayment: (input) => applySuccessfulPayment({
+        invoiceId: input.invoiceId,
+        orderId: input.orderId,
+        clientId: input.clientId,
+        clientName: input.clientName,
+        amount: input.amount,
+        method: "pay_at_close",
+        titusCheckoutId: input.titusCheckoutId,
+        titusPaidAt: input.paidAt
+      }),
+      recordRefund: async (input) => {
+        if (await paymentAlreadyRecorded({ titusRefundId: input.refundId })) return { duplicate: true };
+        const ref = db$k().collection("invoices").doc(input.invoiceId);
+        const snap = await ref.get();
+        if (!snap.exists) return { duplicate: false };
+        const invoice = snap.data() || {};
+        const paid = Number(invoice.amountPaid) || 0;
+        const total = Number(invoice.total) || 0;
+        const nextPaid = roundMoney$1(Math.max(0, paid - input.amount));
+        const nextDue = roundMoney$1(Math.max(0, total - nextPaid));
+        await ref.update({
+          amountPaid: nextPaid,
+          amountDue: nextDue,
+          status: nextDue <= 0 ? "paid" : nextPaid > 0 ? "partial" : "failed",
+          paymentMethod: PAY_AT_CLOSE_METHOD,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+        if (typeof invoice.orderId === "string" && invoice.orderId) {
+          await db$k().collection("orders").doc(invoice.orderId).update({
+            balanceDue: nextDue,
+            paymentStatus: nextDue <= 0 ? "paid" : "partial",
+            paymentMethod: PAY_AT_CLOSE_METHOD,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+          }).catch((err) => console.error("[Pay at Close] Refund order update failed:", err));
+        }
+        await db$k().collection("transactions").add({
+          type: "refund",
+          invoiceId: input.invoiceId,
+          orderId: invoice.orderId || "",
+          clientId: invoice.clientId || "",
+          clientName: invoice.clientName || "",
+          amount: -input.amount,
+          paymentMethod: PAY_AT_CLOSE_METHOD,
+          status: "completed",
+          titusRefundId: input.refundId,
+          titusCheckoutId: input.checkoutId,
+          processedBy: "system",
+          processedAt: admin.firestore.FieldValue.serverTimestamp(),
+          createdAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+        return { duplicate: false };
+      },
+      mirrorSquare: (invoice, input) => mirrorPayAtCloseOnSquareOrder(invoice, input, { env: process.env })
+    });
+    return res.status(result.status).json(result.body);
+  } catch (err) {
+    console.error("[Pay at Close] Webhook failed:", err instanceof Error ? err.message : "error");
+    return res.status(500).json({ error: "Pay at Close webhook handler failed." });
+  }
+});
 router$u.get("/invoice/:id", async (req, res) => {
   try {
     const invoiceDoc = await loadInvoice(req.params.id);
@@ -18424,6 +19185,7 @@ router$u.get("/invoice/:id", async (req, res) => {
     if (view === "deny") return invoiceNotFound(res);
     const paid = invoiceAllowsDownload(invoice);
     const doorsOpen = paid ? await ensureDotOptInLink(invoice) : null;
+    const payAtCloseOffer = payAtCloseOfferFromAdjustments(process.env, await loadPricingAdjustments());
     const shared = {
       id: invoiceDoc.id,
       paid,
@@ -18432,7 +19194,13 @@ router$u.get("/invoice/:id", async (req, res) => {
       ...invoiceMoney(invoice),
       status: invoice.status,
       paymentProvider: provider,
+      paymentMethod: invoice.paymentMethod || null,
+      payAtCloseOffered: payAtCloseOffer.offered,
+      payAtCloseFee: invoice.payAtCloseFee ?? null,
+      payAtCloseFailure: typeof invoice.payAtCloseFailure === "string" ? invoice.payAtCloseFailure : null,
+      payAtCloseApplication: typeof invoice.payAtCloseApplication === "string" ? invoice.payAtCloseApplication : null,
       canPayOnline: provider === "stripe" ? stripeReady() : squareReady(),
+      canPayAtClose: payAtCloseOffer.offered,
       createdAt: invoice.createdAt || null
     };
     if (view === "public") {
@@ -18565,6 +19333,7 @@ router$u.post("/invoice/:id/checkout", async (req, res) => {
       await invoiceDoc.ref.update({
         status: "sent",
         paymentProvider: "square",
+        paymentMethod: "square",
         paymentUrl: link?.url || invoiceUrl,
         squarePaymentLinkId: link?.id || null,
         squareOrderId: link?.order_id || null,
@@ -18847,6 +19616,9 @@ router$u.post("/square-webhook", async (req, res) => {
     const invoice = invoiceDoc.data() || {};
     if (invoiceProvider(invoice) === "stripe") {
       return res.json({ received: true, ignored: "stripe-invoice" });
+    }
+    if (isMirroredPayAtCloseSquarePayment(payment, invoice)) {
+      return res.json({ received: true, ignored: "pay-at-close-external" });
     }
     const amountCents = Number(payment.amount_money?.amount ?? payment.total_money?.amount ?? 0);
     const amount = amountCents / 100;
@@ -26737,10 +27509,10 @@ function safeEqual(left, right) {
   const a = Buffer.from(left);
   const b = Buffer.from(right);
   if (a.length !== b.length) {
-    timingSafeEqual$1(a, a);
+    timingSafeEqual(a, a);
     return false;
   }
-  return timingSafeEqual$1(a, b);
+  return timingSafeEqual(a, b);
 }
 function asText$1(value) {
   return typeof value === "string" ? value : "";
@@ -29229,7 +30001,7 @@ function newToken() {
 }
 function tokensMatch(stored, provided) {
   if (!stored || !provided || stored.length !== provided.length || stored.length > 128) return false;
-  return timingSafeEqual$1(Buffer.from(stored), Buffer.from(provided));
+  return timingSafeEqual(Buffer.from(stored), Buffer.from(provided));
 }
 function trimMessages(messages) {
   if (messages.length <= MAX_THREAD_MESSAGES) return messages;
@@ -36284,6 +37056,7 @@ function createServer() {
   }));
   app.use("/api/payments/webhook", express.raw({ type: "application/json" }));
   app.use("/api/payments/square-webhook", express.raw({ type: "application/json" }));
+  app.use("/api/payments/pay-at-close-webhook", express.raw({ type: "application/json" }));
   app.use("/api/site-content/media", express.json({ limit: "120mb" }));
   app.use("/api/site-content/dropbox", express.json({ limit: "1mb" }));
   app.use(express.json({ limit: "10mb" }));

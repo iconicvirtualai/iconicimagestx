@@ -234,6 +234,28 @@ export function defaultPricingAdjustments(): PricingAdjustment[] {
       sortOrder: 430,
       note: "Percent of the senior living total due to reserve the date.",
     }),
+    seed({
+      id: "pay-at-close",
+      kind: "fee",
+      name: "Pay at Close",
+      active: false,
+      removed: false,
+      mode: "flat",
+      amount: 0,
+      sortOrder: 500,
+      note: "Turn this on to offer Pay at Close. The amount is the fee added to that invoice. 0 means no extra fee. Flat is dollars. Percent is percent of the service subtotal. Checkout stays hidden until PAY_AT_CLOSE_LIVE is also true.",
+    }),
+    seed({
+      id: "pay-at-close-card-processing",
+      kind: "fee",
+      name: "Card processing on Pay at Close",
+      active: false,
+      removed: false,
+      mode: "percent",
+      amount: 0,
+      sortOrder: 510,
+      note: "Turn this on to keep the card processing fee on Pay at Close invoices. Off leaves that fee off, because it applies to card payments. The percent still comes from the processing fee row.",
+    }),
   ];
 }
 

@@ -31,6 +31,8 @@ const INVOICE_STATUS: Record<string, { label: string; color: string }> = {
   partial: { label: "Partial", color: "bg-yellow-100 text-yellow-700" },
   paid: { label: "Paid", color: "bg-green-100 text-green-700" },
   overdue: { label: "Overdue", color: "bg-red-100 text-red-600" },
+  failed: { label: "Failed", color: "bg-red-100 text-red-600" },
+  "pending - pay at close": { label: "Pay at Close", color: "bg-teal-100 text-teal-800" },
 };
 
 const labelCls = "text-[10px] font-black text-gray-400 uppercase tracking-widest";

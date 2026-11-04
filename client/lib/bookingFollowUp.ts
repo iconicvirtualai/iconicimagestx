@@ -8,6 +8,7 @@ export interface BookingSubmitResult {
   /** Used only to derive the admin order code when the response omitted orderNumber. */
   selectedService?: string | null;
   accountCreated?: boolean;
+  checkoutUrl?: string;
   /**
    * True only when client notifications are live (CLIENT_NOTIFY_LIVE is exactly
    * "true" and CLIENT_COMMS_ZONE is not RED).

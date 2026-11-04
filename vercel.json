@@ -1613,6 +1613,14 @@
       "destination": "/seo/login.html"
     },
     {
+      "source": "/pay-at-close",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/pay-at-close/",
+      "destination": "/seo/app.html"
+    },
+    {
       "source": "/pricing/ai-assistant",
       "destination": "/seo/app.html"
     },

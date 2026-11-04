@@ -35,6 +35,7 @@ import {
   type BookingPriceInput,
 } from "@shared/bookingPricing";
 import { BOOKING_PROCESSING_LABEL, estimateBookingCharge } from "@shared/invoiceProcessing";
+import { payAtCloseFeeDollars, type PayAtClosePublicOffer } from "@shared/payAtClose";
 import { taxDollars, type PricingRates } from "@shared/pricingSettings";
 import { readPricingRates, seedPricingRates } from "@/lib/pricingAdjustments";
 import {
@@ -240,6 +241,18 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
   const [slotsChecked, setSlotsChecked] = useState(false);
   const [processingOn, setProcessingOn] = useState(true);
   const [pricing, setPricing] = useState<PricingRates>(() => seedPricingRates());
+  const devPayAtClosePreview = import.meta.env.DEV && searchParams.get("pacPreview") === "1";
+  const [payAtCloseOffer, setPayAtCloseOffer] = useState<PayAtClosePublicOffer>({
+    live: false,
+    enabledByOffice: false,
+    offered: false,
+    feeMode: "flat",
+    feeRate: 0,
+    chargeCardProcessing: false,
+  });
+  const [paymentChoice, setPaymentChoice] = useState<"card" | "pay_at_close">(
+    searchParams.get("payment") === "pay-at-close" ? "pay_at_close" : "card",
+  );
   const offer = useMemo(() => bookingOffer(catalog), [catalog]);
   const services = offer.services;
   const addOns = offer.addOns;
@@ -263,6 +276,9 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
         if (typeof data.processingEnabled === "boolean") setProcessingOn(data.processingEnabled);
         if (data.pricingRates && typeof data.pricingRates === "object") {
           setPricing((current) => ({ ...current, ...data.pricingRates }));
+        }
+        if (data.payAtClose && typeof data.payAtClose === "object") {
+          setPayAtCloseOffer(data.payAtClose as PayAtClosePublicOffer);
         }
       })
       .catch(() => {});
@@ -703,6 +719,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
         total,
         promoCode: appliedPromo?.code || null,
         promoDiscount: appliedPromo?.discount || 0,
+        paymentMethod: paymentChoice === "pay_at_close" && payAtCloseOffer.offered ? "pay_at_close" : undefined,
       }),
       readClientNotificationsLive(),
     ]);
@@ -711,6 +728,10 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
       selectedService: typeof formData.selectedService === "string" ? formData.selectedService : null,
       clientNotificationsLive,
     });
+    if (result.checkoutUrl) {
+      window.location.assign(result.checkoutUrl);
+      return;
+    }
 
     setStep("success");
 
@@ -730,15 +751,24 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
   const showTravelLine = Boolean(formData.servicePlace) || formData.address.trim().length > 0;
   const priceInput = bookingPriceInput();
   const serviceBase = Math.max(0, sumLineItemPrices(buildSubmittedLineItems({ ...priceInput, promo: null })));
+  const showPayAtClose = payAtCloseOffer.offered || devPayAtClosePreview;
+  const payAtCloseSelected = showPayAtClose && paymentChoice === "pay_at_close";
+  const chargeProcessing = payAtCloseSelected
+    ? payAtCloseOffer.chargeCardProcessing && processingOn && pricing.processingActive
+    : processingOn && pricing.processingActive;
   const estimate = estimateBookingCharge(
     priceInput,
     showTravelLine ? travelFeeDollars(travel) : 0,
-    processingOn && pricing.processingActive,
+    chargeProcessing,
     {
       processingPercent: pricing.processingPercent,
       tax: taxDollars(Math.max(0, serviceBase - (appliedPromo?.discount || 0)), pricing),
     },
   );
+  const payAtCloseFee = payAtCloseSelected
+    ? payAtCloseFeeDollars(payAtCloseOffer.feeRate, payAtCloseOffer.feeMode, estimate.processingBase)
+    : 0;
+  const estimateTotal = estimate.total + payAtCloseFee;
   const handleApplyPromo = () => {
     const promo = promoDiscountFor(promoInput, pricing.promos, serviceBase) ?? promoDiscountFor(promoInput);
     if (promo?.code === "ICONICAI") {
@@ -868,14 +898,20 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
             <TravelFeeLine travel={travel} />
           </div>
         )}
-        {processingOn && hasBookingSelection(bookingPriceInput()) && (
+        {chargeProcessing && hasBookingSelection(bookingPriceInput()) && (
           <ProcessingEstimateLine amount={estimate.processing} />
+        )}
+        {payAtCloseFee > 0 && (
+          <div className="mb-2 flex justify-between text-xs font-bold text-neutral-700">
+            <span>Pay at Close</span>
+            <span>${payAtCloseFee.toFixed(2)}</span>
+          </div>
         )}
         <div className="flex justify-between items-center mb-4">
           <span className="text-[10px] font-black uppercase text-gray-400">Total Estimate</span>
           {hasBookingSelection(bookingPriceInput()) ? (
             <MoneyAmount data-testid="booking-total" className="text-2xl font-black text-black" style={{ color: settings.global.primaryColor }}>
-              ${estimate.total.toFixed(2)}
+              ${estimateTotal.toFixed(2)}
             </MoneyAmount>
           ) : (
             <span data-testid="booking-total" className="text-sm font-bold uppercase tracking-widest text-gray-400">
@@ -1606,13 +1642,19 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
                <div data-testid="order-summary-before-submit" className="rounded-2xl border border-gray-100 bg-gray-50 p-5 space-y-3">
                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Order summary</p>
                  <TravelFeeLine travel={travel} />
-                 {processingOn && hasBookingSelection(bookingPriceInput()) && (
+                 {chargeProcessing && hasBookingSelection(bookingPriceInput()) && (
                    <ProcessingEstimateLine amount={estimate.processing} />
+                 )}
+                 {payAtCloseFee > 0 && (
+                   <div className="flex justify-between text-xs font-bold text-neutral-700">
+                     <span>Pay at Close</span>
+                     <span>${payAtCloseFee.toFixed(2)}</span>
+                   </div>
                  )}
                  <div className="flex items-baseline justify-between gap-3 border-t border-gray-200 pt-3">
                    <span className="min-w-0 text-[10px] font-black uppercase text-gray-400">Total estimate</span>
                    {hasBookingSelection(bookingPriceInput()) ? (
-                     <MoneyAmount className="text-lg font-black text-black">${estimate.total.toFixed(2)}</MoneyAmount>
+                     <MoneyAmount className="text-lg font-black text-black">${estimateTotal.toFixed(2)}</MoneyAmount>
                    ) : (
                      <span className="text-sm font-bold uppercase tracking-widest text-gray-400">Select a package</span>
                    )}
@@ -1669,6 +1711,38 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
                    {prefill?.cardLabel ? <p className="text-sm text-gray-600">Card on file: {prefill.cardLabel}</p> : null}
                  </div>
                ) : null}
+
+               {showPayAtClose && (
+                 <fieldset data-testid="pay-at-close-option" className="space-y-3 rounded-[1.5rem] border border-gray-100 bg-white p-4">
+                   <legend className="px-1 text-[10px] font-black uppercase tracking-widest text-gray-400">How do you want to pay?</legend>
+                   <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-gray-100 p-3">
+                     <input
+                       type="radio"
+                       name="payment-choice"
+                       className="mt-1"
+                       checked={paymentChoice !== "pay_at_close"}
+                       onChange={() => setPaymentChoice("card")}
+                     />
+                     <span>
+                       <span className="block text-sm font-black text-black">Pay by card</span>
+                       <span className="block text-xs leading-relaxed text-gray-500">Square checkout on this same invoice. The card processing fee stays on when that fee is turned on.</span>
+                     </span>
+                   </label>
+                   <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-[#0d9488]/30 bg-[#f0fdfa] p-3">
+                     <input
+                       type="radio"
+                       name="payment-choice"
+                       className="mt-1"
+                       checked={paymentChoice === "pay_at_close"}
+                       onChange={() => setPaymentChoice("pay_at_close")}
+                     />
+                     <span>
+                       <span className="block text-sm font-black text-black">Pay at Close</span>
+                       <span className="block text-xs leading-relaxed text-gray-600">Book the full package now. Titus pays Iconic, and you settle when the home closes. One invoice, either way.</span>
+                     </span>
+                   </label>
+                 </fieldset>
+               )}
 
                <SmsConsentField
                  checked={formData.smsConsent}
