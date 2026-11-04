@@ -60,15 +60,12 @@ export default function FeaturesSection() {
     return item ? itemText(item, key, fallback) : fallback;
   };
 
-  const snapStill = field("snap", "still", "/media/videos/snap-reels/hereford-way-snap.jpg");
-  const snapVideo = field("snap", "video", "/media/videos/snap-reels/hereford-way-snap.mp4");
-  const angleFallbacks = [
-    "/media/photos/listing-living-01.jpg",
-    "/media/photos/listing-living-02.jpg",
-    "/media/photos/listing-living-03.jpg",
-    "/media/photos/listing-living-04.jpg",
-  ];
-  const angles = angleFallbacks.map((src, index) => field("staging", `angle${index + 1}`, src)).filter(Boolean);
+  const snapStill = field("snap", "still", "/media/home-v2/snap-feature/snap-still.jpg");
+  const snapVideo = field("snap", "video", "/media/home-v2/snap-feature/snap-motion.mp4");
+  const bedroomBefore = field("staging", "bedroomBefore", "/media/home-v2/staging/vs-bedroom-before.jpg");
+  const bedroomAfter = field("staging", "bedroomAfter", "/media/home-v2/staging/vs-bedroom-after.jpg");
+  const moreAngles = field("staging", "moreAngles", "");
+  const moreLabel = field("staging", "moreLabel", "More angles");
 
   return (
     <section className="bg-white py-20 md:py-24">
@@ -105,7 +102,7 @@ export default function FeaturesSection() {
                   data-site-item="snap"
                   data-site-field="still"
                   data-site-kind="image"
-                  className="aspect-[3/4] max-h-[340px] w-full object-cover"
+                  className="aspect-[4/5] max-h-[420px] w-full object-cover"
                 />
                 <figcaption className="bg-white px-3 py-2 text-center text-[10px] font-black uppercase tracking-[0.18em] text-teal-700">Still</figcaption>
               </figure>
@@ -118,7 +115,7 @@ export default function FeaturesSection() {
                   data-site-item="snap"
                   data-site-field="video"
                   data-site-kind="video"
-                  className="aspect-[3/4] max-h-[340px] w-full object-cover"
+                  className="aspect-[4/5] max-h-[420px] w-full object-cover"
                   autoPlay
                   muted
                   loop
@@ -146,23 +143,19 @@ export default function FeaturesSection() {
             <div className="mt-5 overflow-hidden rounded-xl border border-gray-100 bg-white">
               <CompareSlider
                 itemId="staging"
-                before={field("staging", "before", "/media/before-after/pavilion-empty.jpg")}
-                after={field("staging", "after", "/media/before-after/pavilion-lifestyle.jpg")}
+                before={field("staging", "before", "/media/home-v2/staging/vs-living-before.jpg")}
+                after={field("staging", "after", "/media/home-v2/staging/vs-living-after.jpg")}
               />
-              <div className="grid grid-cols-4 gap-1 bg-white p-2">
-                {angles.map((src, index) => (
-                  <img
-                    key={src}
-                    src={src}
-                    alt={`Staged angle ${index + 1}`}
-                    data-site-page="home"
-                    data-site-block="features"
-                    data-site-item="staging"
-                    data-site-field={`angle${index + 1}`}
-                    data-site-kind="image"
-                    className="aspect-[4/3] w-full rounded-md object-cover"
-                  />
-                ))}
+              <div className="grid grid-cols-3 gap-1 bg-white p-2">
+                <img src={bedroomBefore} alt="Second room before staging" data-site-page="home" data-site-block="features" data-site-item="staging" data-site-field="bedroomBefore" data-site-kind="image" className="aspect-[4/3] w-full rounded-md object-cover" />
+                <img src={bedroomAfter} alt="Second room after staging" data-site-page="home" data-site-block="features" data-site-item="staging" data-site-field="bedroomAfter" data-site-kind="image" className="aspect-[4/3] w-full rounded-md object-cover" />
+                {moreAngles ? (
+                  <img src={moreAngles} alt={moreLabel} data-site-page="home" data-site-block="features" data-site-item="staging" data-site-field="moreAngles" data-site-kind="image" className="aspect-[4/3] w-full rounded-md object-cover" />
+                ) : (
+                  <div data-site-page="home" data-site-block="features" data-site-item="staging" data-site-field="moreAngles" data-site-kind="image" className="flex aspect-[4/3] w-full items-center justify-center rounded-md border border-dashed border-[#14b8a6] bg-[#f0fdfa] px-2 text-center text-[10px] font-black uppercase tracking-[0.14em] text-[#0f766e]">
+                    <span data-site-page="home" data-site-block="features" data-site-item="staging" data-site-field="moreLabel" data-site-kind="text">{moreLabel}</span>
+                  </div>
+                )}
               </div>
               <p className="px-3 pb-3 text-center text-[10px] font-black uppercase tracking-[0.18em] text-teal-700">By Iconic</p>
             </div>
@@ -173,13 +166,13 @@ export default function FeaturesSection() {
               {field("edits", "title", "Bring your photos to life with After Iconic AI renders")}
             </h3>
             <p data-site-page="home" data-site-block="features" data-site-item="edits" data-site-field="body" data-site-kind="text" className="mt-2 text-sm leading-relaxed text-gray-500">
-              {field("edits", "body", "Twilight, sky, and the finish that makes a daylight photo feel like the evening a buyer wants to walk into.")}
+              {field("edits", "body", "A daylight pavilion, finished so it feels lived in. A warm-dusk pool pair is saved beside this one if you want to swap it in.")}
             </p>
             <div className="mt-5 overflow-hidden rounded-xl border border-gray-100 bg-white">
               <CompareSlider
                 itemId="edits"
-                before={field("edits", "before", "/media/before-after/twilight-pool-day.jpg")}
-                after={field("edits", "after", "/media/before-after/twilight-pool-lifestyle.jpg")}
+                before={field("edits", "before", "/media/home-v2/photo-edits/pavilion-before.jpg")}
+                after={field("edits", "after", "/media/home-v2/photo-edits/pavilion-after-iconic.jpg")}
               />
             </div>
           </article>
@@ -193,14 +186,14 @@ export default function FeaturesSection() {
             </p>
             <div className="mt-5 overflow-hidden rounded-xl border border-gray-100 bg-white">
               <img
-                src={field("studio", "image", "/media/photos/luxury-a7305553.jpg")}
+                src={field("studio", "image", "/media/home-v2/studio/iconic-studio-editor-snippet.jpg")}
                 alt="Iconic Studio editor"
                 data-site-page="home"
                 data-site-block="features"
                 data-site-item="studio"
                 data-site-field="image"
                 data-site-kind="image"
-                className="max-h-[420px] w-full object-cover object-center"
+                className="max-h-[420px] w-full bg-[#f4f7f8] object-contain object-center"
               />
             </div>
           </article>

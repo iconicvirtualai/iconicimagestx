@@ -5,11 +5,22 @@ const NETWORK_BODY = "We look forward to working with you. Collaborators, creato
 const NETWORK_CLOSER = "Bring your clients and your craft. There is room for the work you already love.";
 
 const FALLBACK_PHOTOS = [
-  { id: "studio", image: "/media/about/06_holiday_group_energy_16x9.jpg", alt: "A bright studio set with the team" },
-  { id: "podcast", image: "/media/photos/headshot-gracepoint-4.jpg", alt: "On-camera portrait, stand-in for a podcast set" },
-  { id: "location", image: "/media/photos/lifestyle-kennedy-mtz01127.jpg", alt: "On location, outdoors in full color" },
-  { id: "wild", image: "/media/photos/drone-hero.jpg", alt: "Out on a property, from the air" },
+  { id: "podcast-set", image: "/media/home-v2/lifestyle/podcast-set-wide.jpg", alt: "The Iconic podcast set, cameras and lights" },
+  { id: "conversation", image: "/media/home-v2/lifestyle/podcast-conversation.jpg", alt: "A host and guest in conversation on the podcast set" },
+  { id: "crew", image: "/media/home-v2/lifestyle/podcast-crew-cameras.jpg", alt: "The podcast set from behind the cameras" },
+  { id: "interior", image: "/media/home-v2/lifestyle/interior-shoot-lighting.jpg", alt: "A lit interior shoot" },
+  { id: "location", image: "/media/home-v2/lifestyle/on-location-outdoor-shoot.jpg", alt: "Shooting outdoors on location" },
+  { id: "sweep", image: "/media/home-v2/lifestyle/studio-105-sweep.jpg", alt: "Studio 105 white sweep with strobes" },
 ];
+
+const FRAME: Record<string, string> = {
+  "podcast-set": "col-span-2 aspect-[3/2] md:col-span-3",
+  conversation: "col-span-2 aspect-[3/2] md:col-span-3",
+  crew: "col-span-1 aspect-[3/4] md:col-span-2",
+  interior: "col-span-1 aspect-[3/4] md:col-span-2",
+  location: "col-span-2 aspect-[3/4] md:col-span-2 md:aspect-[3/4]",
+  sweep: "col-span-2 aspect-[16/9] md:col-span-6",
+};
 
 export default function TheNetwork() {
   const titleLead = useSiteText("home", "network", "titleLead", "Built Bigger Than");
@@ -48,15 +59,15 @@ export default function TheNetwork() {
           </motion.div>
         </div>
 
-        <div className="mx-auto grid max-w-5xl grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
+        <div className="mx-auto grid max-w-5xl grid-cols-2 gap-3 md:grid-cols-6 md:gap-4">
           {photos.map((photo, index) => (
             <motion.figure
               key={photo.id}
               initial={{ opacity: 1, y: 12 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: index * 0.08 }}
-              className={`overflow-hidden rounded-[1.5rem] border-4 border-white shadow-xl ${index % 2 === 0 ? "md:translate-y-6" : ""}`}
+              transition={{ duration: 0.6, delay: index * 0.05 }}
+              className={`overflow-hidden rounded-[1.5rem] border-4 border-white shadow-xl ${FRAME[photo.id] || "col-span-1 aspect-[3/4] md:col-span-2"}`}
             >
               <img
                 src={photo.image}
@@ -66,7 +77,7 @@ export default function TheNetwork() {
                 data-site-item={photo.id}
                 data-site-field="image"
                 data-site-kind="image"
-                className="aspect-[3/4] h-full w-full object-cover transition duration-700 motion-safe:hover:scale-105"
+                className="h-full w-full object-cover transition duration-700 motion-safe:hover:scale-105"
               />
             </motion.figure>
           ))}

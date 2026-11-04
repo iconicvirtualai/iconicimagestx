@@ -37,11 +37,10 @@ export const SNAP_REELS: readonly SnapReel[] = [
 /** Homepage strip. Newest Blaze cuts, bright covers, no street names. */
 export const SNAP_REEL_STRIP: readonly SnapReel[] = [
   {
-    src: "/media/videos/snap-reels/heron-wing-blaze-v2.mp4",
-    poster: "/media/videos/snap-reels/heron-wing-blaze-v2.jpg",
+    src: "/media/home-v2/snap-cards/bluelake-blaze.mp4",
+    poster: "/media/home-v2/snap-cards/bluelake-blaze.jpg",
     title: "",
     vibe: "JPGs rendering...",
-    startAt: 2,
   },
   {
     src: "/media/home-v2/snap-cards/woodville-blaze-v5.mp4",
