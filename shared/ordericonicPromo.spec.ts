@@ -24,12 +24,18 @@ describe("ordericonic November promo", () => {
     expect(html).not.toContain("const RATES");
   });
 
-  it("introduces Pay at Close for every listing without naming the financing company", () => {
+  it("shouts the live social percent and introduces Pay Later without a fee or a financing name", () => {
+    expect(html).toContain('id="social-blast"');
+    expect(html).toContain('id="social-blast-pct"');
+    expect(html).toContain("SOCIAL PACKAGES");
+    expect(html).toContain("this November");
+    expect(html).toContain("blastPct.textContent=pctLabel(percent)");
+    expect(html).not.toMatch(/>\d+(?:\.\d+)?% OFF</);
     expect(html).toContain('href="https://iconicimagestx.vercel.app/pay-at-close"');
-    expect(html).toContain("See Pay at Close");
-    expect(html).toContain("Spoil your listing. Pay at closing.");
-    expect(html).toContain("Pay $0 today");
-    expect(html).toContain("our Partner");
+    expect(html).toContain("Pay Later at Closing →");
+    expect(html).toContain("Splurge Alert!!");
+    expect(html).toContain("Give every listing the budget it deserves, and pay at closing.");
+    expect(html).toContain("Your seller covers it when they pay you.");
     const visible = html.slice(html.indexOf("<body"));
     expect(visible).not.toMatch(/(^|[^0-9.])6%/);
     expect(html.toLowerCase()).not.toContain("titus");

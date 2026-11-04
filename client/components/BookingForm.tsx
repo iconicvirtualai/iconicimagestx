@@ -240,6 +240,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
   const [processingOn, setProcessingOn] = useState(true);
   const [pricing, setPricing] = useState<PricingRates>(() => seedPricingRates());
   const devPayAtClosePreview = import.meta.env.DEV && searchParams.get("pacPreview") === "1";
+  const [socialPercent, setSocialPercent] = useState<number | null>(null);
   const [payAtCloseOffer, setPayAtCloseOffer] = useState<PayAtClosePublicOffer>({
     live: false,
     enabledByOffice: false,
@@ -259,6 +260,9 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
   const basicsList = offer.basics;
   const campaignCategories = (["listings", "branding", "business", "growth", "studio"] as const)
     .filter((cat) => services.some((item) => item.category === cat));
+  const socialOffLabel = socialPercent == null
+    ? null
+    : `${Number.isInteger(socialPercent) ? socialPercent : socialPercent}%`;
   const iconicFinishPrice = offer.iconicFinish?.price ?? 0;
   const virtualStagingUnitPrice = offer.virtualStaging?.price ?? 0;
   const specializedSocialPrice = offer.specializedSocial?.price ?? 0;
@@ -283,6 +287,20 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
       .catch(() => {
         if (!cancelled) setCatalog(packagesForStaffEditor([]));
       });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/bookings/social-rate")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled || !data || data.ended === true || typeof data.percent !== "number") return;
+        setSocialPercent(data.percent);
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -956,6 +974,13 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
                 // Campaign Tiers View
                 campaignCategories.map((cat) => (
                   <div key={cat} className="space-y-3">
+                    {cat === "business" && socialOffLabel ? (
+                      <div data-testid="social-november-banner" className="overflow-hidden rounded-2xl bg-[#1c140c] px-5 py-4 text-[#fff7ed] shadow-lg ring-2 ring-[#FFD700]">
+                        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#FFD700]">This November</p>
+                        <p className="mt-1 text-3xl font-black leading-none tracking-tight text-[#FFD700]">{socialOffLabel} OFF</p>
+                        <p className="mt-1 text-sm font-black uppercase tracking-[0.16em]">Social packages</p>
+                      </div>
+                    ) : null}
                     <button 
                       onClick={() => toggleCategory(cat)}
                       className="w-full flex items-center justify-between gap-3 p-4 bg-white border border-gray-100 rounded-2xl hover:bg-gray-50 transition-all shadow-sm"
@@ -1015,7 +1040,12 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
                                       Best Value
                                     </div>
                                   )}
-                                  <div className="flex-1 space-y-1">
+                                  {cat === "business" && socialOffLabel ? (
+                                    <span className="absolute right-3 top-2 z-10 rounded-full bg-[#FFD700] px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-black shadow">
+                                      {socialOffLabel} off
+                                    </span>
+                                  ) : null}
+                                  <div className={`flex-1 space-y-1 ${cat === "business" && socialOffLabel ? "pr-16" : ""}`}>
                                     <h4 className="font-black text-black uppercase text-[11px] leading-tight">{s.name}</h4>
                                     <p className="text-[10px] text-gray-500 leading-relaxed line-clamp-2">{s.description}</p>
                                   </div>
@@ -1955,6 +1985,13 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
         {/* Sidebar Summary Area */}
         <div className="w-full lg:w-[380px]">
            <div className="flex flex-col gap-6 lg:sticky lg:top-32">
+           <Link to="/pay-at-close" data-testid="splurge-alert" className="block rounded-[2rem] bg-[#1c140c] p-6 text-[#fff7ed] shadow-xl ring-2 ring-[#FFD700]">
+              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#FFD700]">Pay later</p>
+              <h3 className="mt-2 text-2xl font-black leading-none text-white">Splurge Alert!!</h3>
+              <p className="mt-3 text-sm font-semibold leading-snug">Give every listing the budget it deserves, and pay at closing.</p>
+              <p className="mt-2 text-sm font-black text-[#FFD700]">Your seller covers it when they pay you.</p>
+              <span className="mt-4 inline-block text-sm font-black text-white">Pay Later at Closing →</span>
+           </Link>
            {renderSummarySidebar()}
            <div className="p-6 bg-black rounded-[2rem] text-white space-y-4">
               <div className="flex items-center gap-2.5">

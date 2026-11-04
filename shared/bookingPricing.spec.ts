@@ -150,6 +150,9 @@ describe("booking total contract", () => {
     expect(bookingForm).toContain("promoDiscountFor(promoInput)");
     expect(bookingForm).toContain("bookingOffer(catalog)");
     expect(bookingForm).toContain('fetch("/api/bookings/catalog")');
+    expect(bookingForm).toContain('fetch("/api/bookings/social-rate")');
+    expect(bookingForm).toContain("Splurge Alert!!");
+    expect(bookingForm).toContain('to="/pay-at-close"');
     expect(bookingForm).toContain("data.packages");
     expect(bookingForm).not.toContain("charging hardcoded prices");
     expect(bookingForm).not.toContain("lifeOfTheListingCarePrice");
