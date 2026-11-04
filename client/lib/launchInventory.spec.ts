@@ -15,11 +15,10 @@ function walk(dir: string, out: string[] = []): string[] {
   return out;
 }
 
-// Homepage, About, and the stock library were restored to the pre-#32 pages.
+// Homepage and About were restored to the pre-#32 pages.
 // Those screens still reference the hosts they used before that cleanup.
 const RESTORED_PRE_32 = new Set([
   "client/pages/About.tsx",
-  "client/pages/StockFootage.tsx",
   "client/components/HeroSection.tsx",
   "client/components/MediaCarousel.tsx",
   "client/hooks/useSiteSettings.ts",
