@@ -6464,17 +6464,55 @@ function socialRateForDateKey(key) {
 function socialRateForInstant(now) {
   return socialRateForDateKey(chicagoDateKey$1(now));
 }
+function nextChicagoMidnightIso(dateKey2) {
+  if (!SOCIAL_DATE_KEY.test(dateKey2)) return null;
+  const [year, month, day] = dateKey2.split("-").map(Number);
+  const targetKey = new Date(Date.UTC(year, month - 1, day + 1)).toISOString().slice(0, 10);
+  let ms = Date.parse(`${targetKey}T06:00:00.000Z`);
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Chicago",
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  });
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const bag = {};
+    for (const part of fmt.formatToParts(new Date(ms))) {
+      if (part.type !== "literal") bag[part.type] = part.value;
+    }
+    let hour = Number(bag.hour);
+    let key = `${bag.year}-${bag.month}-${bag.day}`;
+    if (hour === 24) {
+      hour = 0;
+      key = new Date(Date.parse(`${key}T00:00:00.000Z`) + 864e5).toISOString().slice(0, 10);
+    }
+    const minute = Number(bag.minute);
+    const second = Number(bag.second);
+    if (key === targetKey && hour === 0 && minute === 0 && second === 0) {
+      return new Date(ms).toISOString();
+    }
+    const dayDelta = key < targetKey ? 1 : key > targetKey ? -1 : 0;
+    ms += (dayDelta * 86400 - (hour * 3600 + minute * 60 + second)) * 1e3;
+  }
+  return null;
+}
 function socialRateView(now, requestedDate, previewAllowed) {
   const today = chicagoDateKey$1(now);
   const asked = requestedDate && SOCIAL_DATE_KEY.test(requestedDate.trim()) ? requestedDate.trim() : null;
   const preview = Boolean(asked && asked !== today && previewAllowed);
   const date = preview && asked ? asked : today;
   const percent = socialRateForDateKey(date);
+  const dropsTomorrow = percent != null && percent !== SOCIAL_RATE_BY_DATE[THANKFUL_EVENT_DATE];
   return {
     date,
     percent,
     ended: percent == null,
-    dropsTomorrow: percent != null && percent !== SOCIAL_RATE_BY_DATE[THANKFUL_EVENT_DATE],
+    dropsTomorrow,
+    nextDropAt: dropsTomorrow ? nextChicagoMidnightIso(date) : null,
     preview
   };
 }
@@ -6497,13 +6535,12 @@ function quoteSocialTerm(monthlyDollars, months, dayRate) {
   if (percent == null) return null;
   const monthlyCents = discountedCents(Math.round(monthlyDollars * 100), percent);
   const termCents = Math.max(0, monthlyCents * months - (months === 3 ? 1e4 : 0));
-  const processingCents = processingFeeCents(termCents);
   return {
     percent,
     monthlyCents,
     termCents,
-    processingCents,
-    squareCents: termCents + processingCents
+    processingCents: 0,
+    squareCents: termCents
   };
 }
 function quoteThankfulSocialSave(input) {
@@ -10642,6 +10679,7 @@ router$y.post("/", async (req, res) => {
     if (wantsPayAtClose && !payAtCloseOffer.offered) {
       return res.status(400).json({ error: "Pay at Close is not available." });
     }
+    const socialSaves = leadSource === HOLIDAY_SOCIAL_SAVES_LEAD;
     let sale = buildBookingInvoiceDraft({
       lineItems: traveled.lineItems,
       total: traveled.total,
@@ -10651,7 +10689,7 @@ router$y.post("/", async (req, res) => {
       promoCode,
       promoDiscount,
       travel,
-      applyProcessing: processingEnabled() && rates.processingActive && (!wantsPayAtClose || payAtCloseOffer.chargeCardProcessing),
+      applyProcessing: socialSaves ? false : processingEnabled() && rates.processingActive && (!wantsPayAtClose || payAtCloseOffer.chargeCardProcessing),
       processingPercent: rates.processingPercent
     });
     let payAtCloseFee = 0;
@@ -10751,8 +10789,8 @@ router$y.post("/", async (req, res) => {
       vibeNote: vibeNote || "",
       promoCode: promoCode || null,
       promoDiscount: Number(promoDiscount) || 0,
-      processing: sale.processing ?? 0,
-      processingPolicy: sale.processingPolicy ?? (processingEnabled() ? "included" : "waived"),
+      processing: socialSaves ? 0 : sale.processing ?? 0,
+      processingPolicy: socialSaves ? "waived" : sale.processingPolicy ?? (processingEnabled() ? "included" : "waived"),
       ...wantsPayAtClose ? {
         paymentMethod: PAY_AT_CLOSE_METHOD,
         paymentStatus: PAY_AT_CLOSE_PENDING_STATUS,
