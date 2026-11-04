@@ -348,6 +348,9 @@ a.checkout-continue {
 .sg .was { text-decoration: line-through; color: var(--mute); }
 .sg .now { font-family: "Cormorant Garamond", Georgia, serif; font-size: 36px; }
 .sg .btn { margin-top: auto; }
+.sg .payrow { display: flex; flex-wrap: wrap; gap: 8px; margin-top: auto; }
+.sg .payrow .btn { margin-top: 0; padding: 10px 12px; font-size: 14px; }
+.sg .pay-later { background: transparent; color: var(--ink); border: 1px solid rgba(26, 18, 14, 0.35); }
 .only { margin-top: 12px; background: rgba(198, 161, 91, 0.16); color: var(--gold2); }
 .evdiv { background: var(--paper); padding: 10px 0 0; }
 .evdiv .ln { border-top: 1px solid var(--line); text-align: center; }

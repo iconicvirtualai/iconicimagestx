@@ -279,6 +279,9 @@ router.post("/", async (req, res) => {
     const tax = taxDollars(serviceBase, rates);
     // New bookings store the processing rate once. The kill switch is server-only.
     // Legacy invoices are not updated here. A removed processing fee stays off.
+    // Thankful social Buy Now is exempt: the card total is the charged total.
+    // Regular bookings still use the admin Prices processing-fee adjustment.
+    const socialSaves = leadSource === HOLIDAY_SOCIAL_SAVES_LEAD;
     const sale = buildBookingInvoiceDraft({
       lineItems: traveled.lineItems,
       total: traveled.total,
@@ -288,7 +291,7 @@ router.post("/", async (req, res) => {
       promoCode,
       promoDiscount,
       travel,
-      applyProcessing: processingEnabled() && rates.processingActive,
+      applyProcessing: socialSaves ? false : processingEnabled() && rates.processingActive,
       processingPercent: rates.processingPercent,
     });
     const lineItems = sale.lineItems;
@@ -397,8 +400,8 @@ router.post("/", async (req, res) => {
       vibeNote: vibeNote || "",
       promoCode: promoCode || null,
       promoDiscount: Number(promoDiscount) || 0,
-      processing: sale.processing ?? 0,
-      processingPolicy: sale.processingPolicy ?? (processingEnabled() ? "included" : "waived"),
+      processing: socialSaves ? 0 : (sale.processing ?? 0),
+      processingPolicy: socialSaves ? "waived" : (sale.processingPolicy ?? (processingEnabled() ? "included" : "waived")),
       travelZone: travel.travelZone,
       travelMiles: travel.travelMiles,
       travelFeeCents: travel.travelFeeCents,

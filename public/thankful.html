@@ -283,7 +283,6 @@ async function loadSocialRate(){
   render();
 }
 function discountedCents(listCents,percent){const tenths=Math.round(percent*10);return Math.round(listCents*(1000-tenths)/1000)}
-function feeCents(baseCents){const cents=Math.round(Number(baseCents));if(!Number.isFinite(cents)||cents<=0)return 0;return Math.floor((cents*28+500)/1000)}
 const PK=[
  ['Tier 1','The Baseline','The Professional Foundation',500,['8 professionally EDITED reels a month (2/week)','Made from YOUR own raw footage. You film it, we edit it (not Iconic-filmed)','Signature "Iconic" 2026 editing style','Trending audio & brand integration']],
  ['Tier 2','The Growth Engine','Turning Views into Conversations',850,['12 professionally edited reels (3/week)','The Hook Suite: high-conversion captions & strategic hashtags','Scroll-stopping visual flow','Conversion-focused copywriting']],
@@ -300,10 +299,12 @@ function render(){
  const base=P===null?0:P;const extra=T===12?10:T===6?5:0;const pct=base+extra;
  const shown=pctLabel(base);
  document.getElementById('termnote').textContent=rateError?'Today\'s discount didn\'t load. Refresh the page, or call 281.356.0965.':P===null?'Social pricing ended after Sat, Nov 7.':T===12?`12-month term: today's ${shown}% + 10% term bonus = ${pctLabel(pct)}% off every month.`:T===6?`6-month term: today's ${shown}% + 5% term bonus = ${pctLabel(pct)}% off every month.`:T===3?`3-month term: today's ${shown}% off, plus $100 off your 3-month total.`:`Month to month: today's ${shown}% applies only during the promo, then regular pricing.`;
- document.getElementById('sg').innerHTML=PK.map(([tier,n,tag,r,inc],i)=>{const months=T===1?1:T;const monthlyCents=P===null?r*100:discountedCents(r*100,pct);const termCents=Math.max(0,monthlyCents*months-(T===3?10000:0));const processing=feeCents(termCents);const mo=monthlyCents/100;const tot=termCents/100;const fee=processing/100;const pay=(termCents+processing)/100;const save=r*months-tot;
+ document.getElementById('sg').innerHTML=PK.map(([tier,n,tag,r,inc],i)=>{const months=T===1?1:T;const monthlyCents=P===null?r*100:discountedCents(r*100,pct);const termCents=Math.max(0,monthlyCents*months-(T===3?10000:0));const mo=monthlyCents/100;const tot=termCents/100;const save=r*months-tot;
   const closed=P===null||rateError;
-  const statusLine=rateError?'Today\'s discount didn\'t load. Refresh, or call 281.356.0965.':P===null?'Social pricing has ended.':T===1?`Promo month ${money(tot)} · Processing (2.8%) ${money(fee)}`:`${money(tot)} for ${months} months · <b>save ${money(save)}</b><br>Processing (2.8%) ${money(fee)} · Square ${money(pay)}`;
-  return `<div>${i===1?'<span class="pop">Most popular</span>':''}<div class="tier">${tier}</div><h4>${n}</h4><div class="tag">${tag}</div><ul>${inc.map(x=>`<li>${x}</li>`).join('')}</ul><div class="was">${money(r)}/mo</div><div class="now">${money(mo)}<small>/mo</small></div><div class="tot">${statusLine}</div>${closed?'':`<button type="button" class="btn btn-dark" id="buy-${n.toLowerCase().replace(/^the /,'').replace(/\s+/g,'-')}-${T}m" data-buy="1" data-tier="${tier}" data-name="${n}" data-price="${tot}" data-months="${months}" data-pct="${pct}">Buy now</button>`}</div>`}).join('')+
+  const statusLine=rateError?'Today\'s discount didn\'t load. Refresh, or call 281.356.0965.':P===null?'Social pricing has ended.':T===1?`${money(tot)} today`:`${money(tot)} today · <b>save ${money(save)}</b>`;
+  const buyId=n.toLowerCase().replace(/^the /,'').replace(/\s+/g,'-');
+  const actions=closed?'':`<div class="payrow"><button type="button" class="btn btn-dark" id="buy-${buyId}-${T}m" data-buy="1" data-tier="${tier}" data-name="${n}" data-price="${tot}" data-months="${months}" data-pct="${pct}">Buy now</button><a class="btn pay-later" href="https://iconicimagestx.vercel.app/pay-at-close" target="_blank" rel="noopener noreferrer">Pay Later</a></div>`;
+  return `<div>${i===1?'<span class="pop">Most popular</span>':''}<div class="tier">${tier}</div><h4>${n}</h4><div class="tag">${tag}</div><ul>${inc.map(x=>`<li>${x}</li>`).join('')}</ul><div class="was">${money(r)}/mo</div><div class="now">${money(mo)}<small>/mo</small></div><div class="tot">${statusLine}</div>${actions}</div>`}).join('')+
  `<div style="background:var(--cran);color:#fff;justify-content:center"><div class="tier" style="color:#ffd9b0">At the event</div><h4 style="font-size:22px;margin:6px 0">Or buy at the event</h4><p style="font-size:14px;opacity:.9">Want to talk it through? Sit down with us on Sat, Nov 7 and lock in that day's savings, plus your term bonus. The sooner you buy, the more you save.</p><a class="btn btn-gold" href="#rsvp" style="margin-top:18px">RSVP to the event</a></div>`;
 }
 document.querySelectorAll('#terms button').forEach(b=>b.onclick=()=>{T=+b.dataset.t;render()});
@@ -434,8 +435,8 @@ document.getElementById("buyform").addEventListener("submit", async (event) => {
     "Package: " + buyPick.name,
     "Term months: " + buyPick.months,
     "Displayed discount percent: " + buyPick.pct,
-    "Displayed term total before processing: $" + price.toFixed(2),
-    "Checkout opens a Square payment link for the invoice total, including processing. If Square is unavailable, we will text a secure payment link."
+    "Displayed total: $" + price.toFixed(2),
+    "Checkout opens a secure payment link for that total. If checkout is unavailable, we will text a secure payment link."
   ].join("\n");
   try {
     const saved = await sendOrder(orderBody({

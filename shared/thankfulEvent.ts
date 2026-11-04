@@ -1,12 +1,12 @@
 /**
  * Iconic Client Holiday Event, Sat Nov 7, 2026.
  * Times are America/Chicago. Social rates are an explicit table.
- * The server quotes the Square amount from this file.
+ * The server quotes the checkout amount from this file.
+ * Thankful social Buy Now charges the term total. No processing fee is added.
  */
 
 import { mailboxAddress } from "./clientNotify.ts";
 import { DELIVERY_QA_CLIENT_EMAIL } from "./deliveryQaClient.ts";
-import { processingFeeCents } from "./invoiceProcessing.ts";
 
 export const THANKFUL_EVENT_DATE = "2026-11-07";
 export const THANKFUL_EVENT_WHEN = "Sat, Nov 7, 2026";
@@ -201,13 +201,12 @@ export function quoteSocialTerm(monthlyDollars: number, months: number, dayRate:
   if (percent == null) return null;
   const monthlyCents = discountedCents(Math.round(monthlyDollars * 100), percent);
   const termCents = Math.max(0, monthlyCents * months - (months === 3 ? 10000 : 0));
-  const processingCents = processingFeeCents(termCents);
   return {
     percent,
     monthlyCents,
     termCents,
-    processingCents,
-    squareCents: termCents + processingCents,
+    processingCents: 0,
+    squareCents: termCents,
   };
 }
 

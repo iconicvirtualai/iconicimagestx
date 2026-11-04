@@ -663,7 +663,9 @@ describe("public booking calendar hold", () => {
     expect(socialBody.success).toBe(true);
     const line = (saved.lineItems as Array<{ price?: number }>).find((item) => (item.price || 0) > 0);
     expect(line?.price).toBe(665);
-    expect(saved.total).toBe(683.62);
+    expect(saved.total).toBe(665);
+    expect(saved.processing).toBe(0);
+    expect(saved.processingPolicy).toBe("waived");
     expect(createHoliday).not.toHaveBeenCalled();
 
     vi.setSystemTime(new Date("2026-11-01T05:00:00.000Z"));
