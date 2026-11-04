@@ -213,13 +213,12 @@ export default function PayAtClose() {
         <div className="hero-bg" aria-hidden="true" />
         <div className="wrap hero-content">
           <div className="pill">Pay at Close · Our financing Partner</div>
-          <h1>Spoil yourself.<br /><em>Pay at closing.</em></h1>
+          <h1>Spoil your listing.<br /><em>Pay at closing.</em></h1>
           <p className="hero-lead">
-            Estate-scale media — Market Leader, Legacy cinema, Showcase aerials — for homes over 6,000 square feet.
-            Take advantage of our discounts with Pay at Close. <strong>{dueToday} due today.</strong> Our financing Partner covers Iconic now. You settle when the home closes.
+            Premium listing media with <strong>{dueToday} due today.</strong> Market Leader, Legacy cinema, Showcase aerials and more. Our financing Partner covers Iconic now, and it’s settled from proceeds when your listing closes.
           </p>
           <div className="hero-actions">
-            <Link className="btn btn-teal" to={bookPayAtCloseHref()}>Order your shoot →</Link>
+            <Link className="btn btn-teal" to={bookPayAtCloseHref()}>Order for my listing →</Link>
             <a className="btn btn-ghost" href="#calculator">Estimate my payoff</a>
           </div>
           <div className="hero-stats">
@@ -232,10 +231,10 @@ export default function PayAtClose() {
 
       <div className="value-strip">
         <div className="wrap value-grid">
-          <div className="value-item"><strong>Order bigger</strong><span>No cash crunch on launch day</span></div>
+          <div className="value-item"><strong>Spoil the listing</strong><span>Full package, no cash crunch at launch</span></div>
           <div className="value-item"><strong>Win the listing</strong><span>Present like the market leader</span></div>
-          <div className="value-item"><strong>Same Iconic speed</strong><span>Same-day / next-day delivery</span></div>
-          <div className="value-item"><strong>Paid from proceeds</strong><span>Title handles the payoff</span></div>
+          <div className="value-item"><strong>Same Iconic speed</strong><span>Same-day / next‑day delivery</span></div>
+          <div className="value-item"><strong>Paid from proceeds</strong><span>Title handles the payoff at closing</span></div>
         </div>
       </div>
 
@@ -262,8 +261,12 @@ export default function PayAtClose() {
                       {slot.features.map((feature) => <li key={feature}>{feature}</li>)}
                     </ul>
                     <div className="pkg-actions">
-                      <Link className={slot.button === "teal" ? "btn btn-teal btn-block" : "btn btn-primary btn-block"} to={bookPayAtCloseHref(slot.id)}>
-                        Order {nameOf(slot.id, slot.calcId)}
+                      <Link
+                        className={slot.button === "teal" ? "btn btn-teal btn-block" : "btn btn-primary btn-block"}
+                        to={bookPayAtCloseHref(slot.id)}
+                        aria-label={`Order ${nameOf(slot.id, slot.calcId)} for my listing`}
+                      >
+                        Order for my listing
                       </Link>
                       <button type="button" className="btn btn-outline btn-block btn-sm" onClick={() => addAndScroll(slot.id)}>Add to calculator</button>
                     </div>
@@ -416,13 +419,13 @@ export default function PayAtClose() {
             </div>
             <div className="step">
               <div className="step-num">2</div>
-              <h3>Order Iconic. We get paid.</h3>
-              <p>Once approved, book your shoot. Our Partner pays Iconic for the estate media. You pay <strong>{dueToday} out of pocket today</strong>.</p>
+              <h3>Order for your listing.<br />We get paid.</h3>
+              <p>Once approved, book your shoot. Our Partner pays Iconic for the listing media. You pay <strong>{dueToday} out of pocket today</strong>.</p>
             </div>
             <div className="step">
               <div className="step-num">3</div>
               <h3>Settled at closing</h3>
-              <p>At close of escrow, our Partner sends a payoff to title/escrow. Repaid from sale proceeds plus a low flat fee. Due at sale or 6 months, whichever comes first.</p>
+              <p>At closing, our Partner’s payoff goes to title/escrow and is repaid from the sale proceeds plus a small Partner fee. Due at sale or 6 months, whichever comes first.</p>
             </div>
           </div>
           <div className="center-actions">
@@ -433,8 +436,8 @@ export default function PayAtClose() {
 
       <section className="work">
         <div className="wrap">
-          <p className="section-kicker">Homes over 6,000 square feet</p>
-          <h2 className="section-title">Estate scale. Daylight.</h2>
+          <p className="section-kicker">Listings that sell</p>
+          <h2 className="section-title">Show every listing<br />at its best.</h2>
           {estateFeatures.length ? (
             <div className="estate-row">
               {estateFeatures.map((item) => item.kind === "still" ? (
@@ -507,8 +510,8 @@ export default function PayAtClose() {
         <div className="wrap">
           <div className="final-cta" style={{ ["--cta" as string]: `url(${LUXURY}/pool-rd/07-front-day.jpg)` }}>
             <div className="final-cta-bg" aria-hidden="true" />
-            <h2>Spoil yourself.<br />Pay at close.</h2>
-            <p>Take the estate package and our Pay at Close discounts. The house looks Iconic while the other listing is still waiting on budget.</p>
+            <h2>Spoil your sellers.<br />Pay at close.</h2>
+            <p>Give your sellers the full package with {dueToday} out of pocket. Their listing looks Iconic while the competition is still waiting on budget.</p>
             <div className="final-actions">
               <Link className="btn btn-teal" to={bookPayAtCloseHref()}>Order now — pay at close</Link>
               <a className="btn btn-ghost" href={TITUS_ESTIMATE_URL}>Get your Partner estimate</a>

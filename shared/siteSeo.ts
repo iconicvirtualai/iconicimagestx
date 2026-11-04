@@ -252,7 +252,7 @@ export function metaPlan(pathname: string, origin = SITE_ORIGIN): MetaPlan {
     return {
       kind: "public",
       title: "Pay at Close · Iconic Images",
-      description: "Spoil yourself. Book estate media now and take advantage of our discounts with Pay at Close. Our financing Partner covers Iconic today.",
+      description: "Spoil your listing. Premium listing media with $0 due today. Our financing Partner covers Iconic now, and it’s settled from proceeds when your listing closes.",
       canonical: canonicalUrl(path, origin),
       image: `${origin.replace(/\/+$/, "")}/media/pay-at-close/luxury/marias/01-front-day.jpg`,
     };

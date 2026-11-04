@@ -170,12 +170,12 @@
   margin-bottom: 1.1rem;
 }
 .pac-page .hero h1 {
-  font-size: clamp(2.6rem, 7vw, 5.2rem);
+  font-size: clamp(1.85rem, 6.2vw, 4.4rem);
   font-weight: 900;
   letter-spacing: -0.04em;
-  line-height: 0.92;
+  line-height: 0.95;
   text-transform: uppercase;
-  max-width: 14ch;
+  max-width: 12em;
   margin: 0 0 1.1rem;
 }
 .pac-page .hero h1 em { font-style: normal; color: #5eead4; }
@@ -251,13 +251,28 @@
   .pac-page .value-grid { grid-template-columns: repeat(4, 1fr); }
 }
 .pac-page .value-item { text-align: center; padding: 0.5rem 20px; }
-.pac-page .value-item strong { display: block; font-size: 1.5rem; font-weight: 900; color: #5eead4; }
+.pac-page .value-item strong {
+  display: block;
+  font-size: clamp(1.15rem, 2vw, 1.35rem);
+  font-weight: 900;
+  color: #5eead4;
+  text-wrap: balance;
+  white-space: nowrap;
+}
 .pac-page .value-item span {
-  font-size: 0.75rem;
+  font-size: 0.68rem;
   font-weight: 700;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
   color: rgba(255, 255, 255, 0.7);
+  text-wrap: balance;
+}
+@media (min-width: 800px) {
+  .pac-page .value-item span {
+    display: block;
+    max-width: 24ch;
+    margin-inline: auto;
+  }
 }
 
 .pac-page .pkg-grid { display: grid; gap: 1.25rem; grid-template-columns: 1fr; }
@@ -469,7 +484,7 @@
   font-weight: 900;
   margin-bottom: 1rem;
 }
-.pac-page .step h3 { font-size: 1.15rem; font-weight: 900; text-transform: uppercase; margin: 0 0 0.4rem; }
+.pac-page .step h3 { font-size: 1.15rem; font-weight: 900; text-transform: uppercase; margin: 0 0 0.4rem; text-wrap: balance; }
 .pac-page .step p { color: var(--muted); font-size: 0.92rem; margin: 0; }
 
 .pac-page .gallery {
@@ -532,7 +547,7 @@
 }
 .pac-page .final-cta > *:not(.final-cta-bg) { position: relative; z-index: 1; }
 .pac-page .final-cta h2 {
-  font-size: clamp(2rem, 5vw, 3.4rem);
+  font-size: clamp(1.85rem, 6vw, 3.2rem);
   font-weight: 900;
   letter-spacing: -0.03em;
   text-transform: uppercase;
