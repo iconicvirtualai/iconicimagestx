@@ -36,6 +36,7 @@ import Apprenticeship from "./pages/Apprenticeship";
 import RealEstate75 from "./pages/RealEstate75";
 import Headshots10 from "./pages/Headshots10";
 import Pricing from "./pages/Pricing";
+import PayAtClose from "./pages/PayAtClose";
 import AIPricingAssistant from "./pages/AIPricingAssistant";
 import Socials from "./pages/Socials";
 import Insights from "./pages/Insights";
@@ -170,6 +171,7 @@ const App = () => (
             <Route path="/headshots-10/faq" element={<Headshots10 />} />
             <Route path="/headshots-10/location" element={<Headshots10 />} />
             <Route path="/pricing" element={<Pricing />} />
+            <Route path="/pay-at-close" element={<PayAtClose />} />
             <Route path="/pricing/ai-assistant" element={<AIPricingAssistant />} />
             <Route path="/socials" element={<Socials />} />
             <Route path="/agents" element={<AgentLandingPage />} />

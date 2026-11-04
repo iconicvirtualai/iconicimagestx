@@ -9,7 +9,7 @@ import { Timestamp } from "firebase/firestore";
 // ─── Shared ──────────────────────────────────────────────────────────────────
 
 export type UserRole = "admin" | "coordinator" | "photographer" | "editor";
-export type PaymentMethod = "stripe" | "square" | "cash" | "check";
+export type PaymentMethod = "stripe" | "square" | "cash" | "check" | "pay_at_close";
 
 // ─── Staff ───────────────────────────────────────────────────────────────────
 

@@ -55,6 +55,22 @@ import { resolveLateApprenticeshipPayment } from "../services/apprenticeshipHold
 import { HEADSHOTS_ORDER_SOURCE, headshotBookingReturnPath } from "../../shared/headshots10";
 import { confirmHeadshotHold, resolveLateHeadshotPayment } from "../services/headshotHolds";
 import { seniorDepositCheckoutLive, seniorLivingDepositReturnPath } from "../../shared/seniorLiving";
+import {
+  isMirroredPayAtCloseSquarePayment,
+  PAY_AT_CLOSE_METHOD,
+  PAY_AT_CLOSE_PENDING_STATUS,
+  premiumCatalogPackages,
+  shapePayAtCloseDraft,
+} from "../../shared/payAtClose";
+import { packagesForStaffEditor } from "../../shared/bookingCatalog";
+import { buildBookingInvoiceDraft } from "../../shared/bookingInvoice";
+import { loadPricingAdjustments } from "../services/pricingAdjustments";
+import {
+  applyPayAtCloseWebhook,
+  createTitusCheckout,
+  mirrorPayAtCloseOnSquareOrder,
+  payAtCloseOfferFromAdjustments,
+} from "../services/payAtClose";
 
 const router = Router();
 const db = () => appFirestore();
@@ -189,9 +205,13 @@ function invoiceNumberFields(invoice: Record<string, unknown>, id: string) {
 async function paymentAlreadyRecorded({
   squarePaymentId,
   stripePaymentIntentId,
+  titusCheckoutId,
+  titusRefundId,
 }: {
   squarePaymentId?: string;
   stripePaymentIntentId?: string;
+  titusCheckoutId?: string;
+  titusRefundId?: string;
 }) {
   if (squarePaymentId) {
     const existing = await db().collection("transactions").where("squarePaymentId", "==", squarePaymentId).limit(1).get();
@@ -199,6 +219,14 @@ async function paymentAlreadyRecorded({
   }
   if (stripePaymentIntentId) {
     const existing = await db().collection("transactions").where("stripePaymentIntentId", "==", stripePaymentIntentId).limit(1).get();
+    if (!existing.empty) return true;
+  }
+  if (titusCheckoutId) {
+    const existing = await db().collection("transactions").where("titusCheckoutId", "==", titusCheckoutId).limit(1).get();
+    if (!existing.empty) return true;
+  }
+  if (titusRefundId) {
+    const existing = await db().collection("transactions").where("titusRefundId", "==", titusRefundId).limit(1).get();
     if (!existing.empty) return true;
   }
   return false;
@@ -347,15 +375,19 @@ async function applySuccessfulPayment({
   method,
   squarePaymentId,
   stripePaymentIntentId,
+  titusCheckoutId,
+  titusPaidAt,
 }: {
   invoiceId: string;
   orderId?: string;
   clientId?: string;
   clientName?: string;
   amount: number;
-  method: "square" | "stripe";
+  method: "square" | "stripe" | "pay_at_close";
   squarePaymentId?: string;
   stripePaymentIntentId?: string;
+  titusCheckoutId?: string;
+  titusPaidAt?: string;
 }): Promise<AppliedPayment | undefined> {
   const invoiceRef = db().collection("invoices").doc(invoiceId);
   const invoiceDoc = await invoiceRef.get();
@@ -366,7 +398,7 @@ async function applySuccessfulPayment({
   const resolvedClientId = clientId || invoice.clientId || "";
   const sameSquare = Boolean(squarePaymentId) && invoice.squarePaymentId === squarePaymentId;
   const sameStripe = Boolean(stripePaymentIntentId) && invoice.stripePaymentIntentId === stripePaymentIntentId;
-  const duplicate = sameSquare || sameStripe || await paymentAlreadyRecorded({ squarePaymentId, stripePaymentIntentId });
+  const duplicate = sameSquare || sameStripe || await paymentAlreadyRecorded({ squarePaymentId, stripePaymentIntentId, titusCheckoutId });
 
   if (duplicate) {
     if (invoiceAllowsDownload(invoice)) {
@@ -393,6 +425,8 @@ async function applySuccessfulPayment({
     paymentMethod: method,
     ...(squarePaymentId ? { squarePaymentId } : {}),
     ...(stripePaymentIntentId ? { stripePaymentIntentId } : {}),
+    ...(titusCheckoutId ? { titusCheckoutId, titusSettledCheckoutId: titusCheckoutId } : {}),
+    ...(titusPaidAt ? { titusPaidAt } : {}),
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   });
 
@@ -401,8 +435,19 @@ async function applySuccessfulPayment({
       depositPaid: admin.firestore.FieldValue.increment(amount),
       balanceDue: newAmountDue,
       paymentStatus: newAmountDue <= 0 ? "paid" : "partial",
+      ...(method === "pay_at_close" ? { paymentMethod: PAY_AT_CLOSE_METHOD, titusCheckoutId: titusCheckoutId || null } : {}),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     }).catch((err) => console.error("[Payments] Order balance update failed:", err));
+  }
+
+  const orderRequestId = typeof invoice.orderRequestId === "string" ? invoice.orderRequestId : "";
+  if (orderRequestId && method === "pay_at_close") {
+    await db().collection("orderRequests").doc(orderRequestId).update({
+      paymentMethod: PAY_AT_CLOSE_METHOD,
+      paymentStatus: newAmountDue <= 0 ? "paid" : "partial",
+      balanceDue: newAmountDue,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }).catch((err) => console.error("[Payments] Order request balance update failed:", err));
   }
 
   const stamp = revenueStamp(invoice);
@@ -425,6 +470,8 @@ async function applySuccessfulPayment({
     ...stamp,
     ...(squarePaymentId ? { squarePaymentId } : {}),
     ...(stripePaymentIntentId ? { stripePaymentIntentId } : {}),
+    ...(titusCheckoutId ? { titusCheckoutId } : {}),
+    ...(titusPaidAt ? { titusPaidAt } : {}),
     processedAt: admin.firestore.FieldValue.serverTimestamp(),
     processedBy: "system",
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -846,6 +893,219 @@ router.post("/send-receipt", requireCoordinator, async (req, res) => {
   }
 });
 
+router.get("/pay-at-close", async (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  const adjustments = await loadPricingAdjustments();
+  const offer = payAtCloseOfferFromAdjustments(process.env, adjustments);
+  let catalog = packagesForStaffEditor([]);
+  try {
+    const snap = await db().collection("packages").get();
+    catalog = packagesForStaffEditor(snap.docs.map((entry) => ({ id: entry.id, ...entry.data() })));
+  } catch (err) {
+    console.error("[Pay at Close] Catalog read failed — using the seeded catalog", err);
+  }
+  const packages = premiumCatalogPackages(catalog, 4).map((item) => ({
+    id: item.bookingId || item.id,
+    name: item.name,
+    description: item.description,
+    price: item.price,
+    features: item.includedServices,
+  }));
+  return res.json({ ...offer, packages });
+});
+
+async function beginPayAtCloseCheckout(invoiceDoc: FirebaseFirestore.DocumentSnapshot) {
+  const invoice = invoiceDoc.data() || {};
+  const offer = payAtCloseOfferFromAdjustments(process.env, await loadPricingAdjustments());
+  if (!offer.offered) return { status: 403, body: { error: "Pay at Close is not available." } };
+  if (invoiceAllowsDownload(invoice)) return { status: 200, body: { paid: true } };
+
+  let payable = invoice;
+  if (invoice.paymentMethod !== PAY_AT_CLOSE_METHOD) {
+    const draft = buildBookingInvoiceDraft({
+      lineItems: invoice.lineItems,
+      total: invoice.total,
+      pricing: { subtotal: invoice.subtotal, tax: invoice.tax },
+      clientEmail: String(invoice.clientEmail || ""),
+      clientName: String(invoice.clientName || ""),
+      promoCode: typeof invoice.promoCode === "string" ? invoice.promoCode : null,
+      promoDiscount: invoice.promoDiscount,
+      processing: invoice.processing,
+      applyProcessing: false,
+    });
+    const shaped = shapePayAtCloseDraft({ ...draft, amountPaid: Number(invoice.amountPaid) || 0 }, offer);
+    payable = { ...invoice, ...shaped };
+    await invoiceDoc.ref.update({
+      lineItems: shaped.lineItems,
+      subtotal: shaped.subtotal,
+      total: shaped.total,
+      amountDue: shaped.amountDue,
+      processing: shaped.processing,
+      processingPolicy: shaped.processingPolicy,
+      payAtCloseFee: shaped.payAtCloseFee,
+      paymentMethod: PAY_AT_CLOSE_METHOD,
+      paymentProvider: PAY_AT_CLOSE_METHOD,
+      paymentStatus: PAY_AT_CLOSE_PENDING_STATUS,
+      status: PAY_AT_CLOSE_PENDING_STATUS,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  }
+
+  const due = amountStillDue(payable);
+  if (due <= 0) return { status: 400, body: { error: "This invoice cannot be paid online." } };
+  const payToken = await payTokenForLink(invoiceDoc);
+  const successUrl = clientInvoiceUrl({ id: invoiceDoc.id, payToken, status: "sent" }, undefined, { paid: "1" }) || "";
+  const cancelUrl = clientInvoiceUrl({ id: invoiceDoc.id, payToken, status: "sent" }) || successUrl;
+  const name = typeof payable.clientName === "string" ? payable.clientName.trim() : "";
+  const created = await createTitusCheckout({
+    invoiceId: invoiceDoc.id,
+    orderId: typeof payable.orderId === "string" ? payable.orderId : null,
+    amount: due,
+    description: `Iconic Images ${payable.invoiceNumber || invoiceDoc.id}`,
+    successUrl,
+    cancelUrl,
+    email: typeof payable.clientEmail === "string" ? payable.clientEmail : null,
+    firstName: name.split(/\s+/)[0] || null,
+    lastName: name.split(/\s+/).slice(1).join(" ") || null,
+    address: typeof payable.billToAddress === "string" ? payable.billToAddress : null,
+    phone: typeof payable.billingPhone === "string" ? payable.billingPhone : null,
+    checkoutStatus: typeof payable.titusCheckoutStatus === "string" ? payable.titusCheckoutStatus : null,
+  }, { env: process.env });
+  if (created.ok === false) return { status: 502, body: { error: created.error } };
+
+  await invoiceDoc.ref.update({
+    paymentMethod: PAY_AT_CLOSE_METHOD,
+    paymentProvider: PAY_AT_CLOSE_METHOD,
+    paymentStatus: PAY_AT_CLOSE_PENDING_STATUS,
+    status: invoice.status === "paid" ? "paid" : PAY_AT_CLOSE_PENDING_STATUS,
+    titusCheckoutId: created.checkoutId,
+    titusCheckoutUrl: created.checkoutUrl,
+    titusCheckoutStatus: created.status || "requires-payment",
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+  const requestId = typeof payable.orderRequestId === "string" ? payable.orderRequestId : "";
+  if (requestId) {
+    await db().collection("orderRequests").doc(requestId).update({
+      paymentMethod: PAY_AT_CLOSE_METHOD,
+      paymentStatus: PAY_AT_CLOSE_PENDING_STATUS,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }).catch((err) => console.error("[Pay at Close] Order request was not marked:", err));
+  }
+  return { status: 200, body: { checkoutUrl: created.checkoutUrl, provider: PAY_AT_CLOSE_METHOD } };
+}
+
+router.post("/invoice/:id/pay-at-close", async (req: Request, res: Response) => {
+  try {
+    const invoiceDoc = await loadInvoice(req.params.id);
+    if (!invoiceDoc) return invoiceNotFound(res);
+    const invoice = invoiceDoc.data() || {};
+    const audience = await audienceFor(req, invoice);
+    const view = decideInvoiceView({
+      invoiceId: invoiceDoc.id,
+      payToken: invoice.payToken,
+      presentedToken: presentedPayToken(req),
+      audience,
+      matches: payTokenMatches,
+    });
+    if (view === "deny") return invoiceNotFound(res);
+    const result = await beginPayAtCloseCheckout(invoiceDoc);
+    return res.status(result.status).json(result.body);
+  } catch (err) {
+    console.error("[Pay at Close] Checkout start failed:", err instanceof Error ? err.message : "error");
+    return res.status(500).json({ error: "Pay at Close checkout could not be started." });
+  }
+});
+
+router.post("/pay-at-close-webhook", async (req: Request, res: Response) => {
+  try {
+    const rawBody = await readSquareWebhookRawBody(req);
+    if (rawBody === null) return res.status(400).json({ error: "Pay at Close webhook raw body is unavailable." });
+    const header = (name: string) => {
+      const value = req.headers[name];
+      return Array.isArray(value) ? value[0] : value;
+    };
+    const result = await applyPayAtCloseWebhook(rawBody, {
+      signature: header("x-webhook-signature"),
+      timestamp: header("x-webhook-timestamp"),
+    }, {
+      env: process.env,
+      findInvoiceById: async (id) => {
+        const snap = await db().collection("invoices").doc(id).get();
+        return snap.exists ? { id: snap.id, data: snap.data() || {} } : null;
+      },
+      findInvoiceByCheckoutId: async (checkoutId) => {
+        const snap = await db().collection("invoices").where("titusCheckoutId", "==", checkoutId).limit(1).get();
+        if (snap.empty) return null;
+        const doc = snap.docs[0];
+        return { id: doc.id, data: doc.data() || {} };
+      },
+      save: async (id, patch) => {
+        await db().collection("invoices").doc(id).update({
+          ...patch,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      },
+      applyPayment: (input) => applySuccessfulPayment({
+        invoiceId: input.invoiceId,
+        orderId: input.orderId,
+        clientId: input.clientId,
+        clientName: input.clientName,
+        amount: input.amount,
+        method: "pay_at_close",
+        titusCheckoutId: input.titusCheckoutId,
+        titusPaidAt: input.paidAt,
+      }),
+      recordRefund: async (input) => {
+        if (await paymentAlreadyRecorded({ titusRefundId: input.refundId })) return { duplicate: true };
+        const ref = db().collection("invoices").doc(input.invoiceId);
+        const snap = await ref.get();
+        if (!snap.exists) return { duplicate: false };
+        const invoice = snap.data() || {};
+        const paid = Number(invoice.amountPaid) || 0;
+        const total = Number(invoice.total) || 0;
+        const nextPaid = roundMoney(Math.max(0, paid - input.amount));
+        const nextDue = roundMoney(Math.max(0, total - nextPaid));
+        await ref.update({
+          amountPaid: nextPaid,
+          amountDue: nextDue,
+          status: nextDue <= 0 ? "paid" : nextPaid > 0 ? "partial" : "failed",
+          paymentMethod: PAY_AT_CLOSE_METHOD,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        if (typeof invoice.orderId === "string" && invoice.orderId) {
+          await db().collection("orders").doc(invoice.orderId).update({
+            balanceDue: nextDue,
+            paymentStatus: nextDue <= 0 ? "paid" : "partial",
+            paymentMethod: PAY_AT_CLOSE_METHOD,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          }).catch((err) => console.error("[Pay at Close] Refund order update failed:", err));
+        }
+        await db().collection("transactions").add({
+          type: "refund",
+          invoiceId: input.invoiceId,
+          orderId: invoice.orderId || "",
+          clientId: invoice.clientId || "",
+          clientName: invoice.clientName || "",
+          amount: -input.amount,
+          paymentMethod: PAY_AT_CLOSE_METHOD,
+          status: "completed",
+          titusRefundId: input.refundId,
+          titusCheckoutId: input.checkoutId,
+          processedBy: "system",
+          processedAt: admin.firestore.FieldValue.serverTimestamp(),
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        return { duplicate: false };
+      },
+      mirrorSquare: (invoice, input) => mirrorPayAtCloseOnSquareOrder(invoice, input, { env: process.env }),
+    });
+    return res.status(result.status).json(result.body);
+  } catch (err) {
+    console.error("[Pay at Close] Webhook failed:", err instanceof Error ? err.message : "error");
+    return res.status(500).json({ error: "Pay at Close webhook handler failed." });
+  }
+});
+
 router.get("/invoice/:id", async (req: Request, res: Response) => {
   try {
     const invoiceDoc = await loadInvoice(req.params.id);
@@ -865,6 +1125,7 @@ router.get("/invoice/:id", async (req: Request, res: Response) => {
 
     const paid = invoiceAllowsDownload(invoice);
     const doorsOpen = paid ? await ensureDotOptInLink(invoice) : null;
+    const payAtCloseOffer = payAtCloseOfferFromAdjustments(process.env, await loadPricingAdjustments());
     const shared = {
       id: invoiceDoc.id,
       paid,
@@ -873,7 +1134,13 @@ router.get("/invoice/:id", async (req: Request, res: Response) => {
       ...invoiceMoney(invoice),
       status: invoice.status,
       paymentProvider: provider,
+      paymentMethod: invoice.paymentMethod || null,
+      payAtCloseOffered: payAtCloseOffer.offered,
+      payAtCloseFee: invoice.payAtCloseFee ?? null,
+      payAtCloseFailure: typeof invoice.payAtCloseFailure === "string" ? invoice.payAtCloseFailure : null,
+      payAtCloseApplication: typeof invoice.payAtCloseApplication === "string" ? invoice.payAtCloseApplication : null,
       canPayOnline: provider === "stripe" ? stripeReady() : squareReady(),
+      canPayAtClose: payAtCloseOffer.offered,
       createdAt: invoice.createdAt || null,
     };
     if (view === "public") {
@@ -1026,6 +1293,7 @@ router.post("/invoice/:id/checkout", async (req: Request, res: Response) => {
       await invoiceDoc.ref.update({
         status: "sent",
         paymentProvider: "square",
+        paymentMethod: "square",
         paymentUrl: link?.url || invoiceUrl,
         squarePaymentLinkId: link?.id || null,
         squareOrderId: link?.order_id || null,
@@ -1352,6 +1620,9 @@ router.post("/square-webhook", async (req: Request, res: Response) => {
     const invoice = invoiceDoc.data() || {};
     if (invoiceProvider(invoice) === "stripe") {
       return res.json({ received: true, ignored: "stripe-invoice" });
+    }
+    if (isMirroredPayAtCloseSquarePayment(payment, invoice)) {
+      return res.json({ received: true, ignored: "pay-at-close-external" });
     }
 
     const amountCents = Number(payment.amount_money?.amount ?? payment.total_money?.amount ?? 0);

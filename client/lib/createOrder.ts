@@ -62,6 +62,7 @@ export async function createOrder(formData: any) {
     // Unpriced draft add-on. Kept off lineItems so it cannot change the total.
     lifeOfTheListingCare:   lifeOfTheListingCareSelected(formData.lifeOfTheListingCare),
     dotOptIn:               dotOptInSelected(formData.dotOptIn),
+    paymentMethod:          formData.paymentMethod === "pay_at_close" ? "pay_at_close" : undefined,
   };
 
   console.log("POSTING ORDER TO /api/bookings:", payload);
@@ -84,6 +85,7 @@ export async function createOrder(formData: any) {
     requestId: data.requestId as string,
     orderNumber: typeof data.orderNumber === "string" ? data.orderNumber : "",
     accountCreated: Boolean(data.accountCreated),
+    checkoutUrl: typeof data.checkoutUrl === "string" ? data.checkoutUrl : "",
     notifications: (data.notifications || null) as {
       appointmentEmail?: string;
       sms?: string;

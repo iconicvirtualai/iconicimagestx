@@ -32,6 +32,7 @@ export interface SquareInvoiceSource {
   subtotal?: unknown;
   processing?: unknown;
   paymentProvider?: unknown;
+  paymentMethod?: unknown;
   squareInvoiceId?: unknown;
 }
 
@@ -66,6 +67,7 @@ export type SquareSyncResult =
         | "not-configured"
         | "nothing-due"
         | "stripe"
+        | "pay-at-close"
         | "missing-email"
         | "total-mismatch"
         | "before-shoot";
@@ -280,6 +282,8 @@ export async function syncSquareInvoice(invoice: SquareInvoiceSource, deps: Squa
     if (String(invoice.paymentProvider || "").toLowerCase() === "stripe") {
       return { ok: true, skipped: true, reason: "stripe" };
     }
+    const payAtClose = String(invoice.paymentMethod || invoice.paymentProvider || "").toLowerCase() === "pay_at_close";
+    if (payAtClose) return { ok: true, skipped: true, reason: "pay-at-close" };
     const total = Math.round((Number(invoice.total) || 0) * 100) / 100;
     if (total <= 0) return { ok: true, skipped: true, reason: "nothing-due" };
     if (!squareConfigured(deps.env)) return { ok: true, skipped: true, reason: "not-configured" };

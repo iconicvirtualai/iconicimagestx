@@ -45,9 +45,11 @@ import { HOLIDAY_OFFICE_CALENDAR_ID, classifyHolidayCalendarOrder } from "../../
 import { createHolidaySquareCheckout } from "../services/holidaySquareCheckout";
 import { loadHolidaySlotOrders } from "../services/holidaySlots";
 import { packagesForStaffEditor, publicBookingCatalogResponse } from "../../shared/bookingCatalog";
-import { taxDollars } from "../../shared/pricingSettings";
+import { pricingRates, taxDollars } from "../../shared/pricingSettings";
 import { isPromoInvoiceLine } from "../../shared/invoiceFace";
-import { loadPricingRates } from "../services/pricingAdjustments";
+import { loadPricingAdjustments, loadPricingRates } from "../services/pricingAdjustments";
+import { PAY_AT_CLOSE_METHOD, PAY_AT_CLOSE_PENDING_STATUS, payAtClosePublicOffer, shapePayAtCloseDraft } from "../../shared/payAtClose";
+import { createTitusCheckout } from "../services/payAtClose";
 import { normalizeEmail } from "../../shared/listingAccess";
 import { portalBillingStamp } from "../../shared/clientHubSettings";
 import { addressText } from "../../shared/addressText";
@@ -279,10 +281,14 @@ router.post("/", async (req, res) => {
     const tax = taxDollars(serviceBase, rates);
     // New bookings store the processing rate once. The kill switch is server-only.
     // Legacy invoices are not updated here. A removed processing fee stays off.
-    // Thankful social Buy Now is exempt: the card total is the charged total.
-    // Regular bookings still use the admin Prices processing-fee adjustment.
+    const adjustments = await loadPricingAdjustments();
+    const payAtCloseOffer = payAtClosePublicOffer(process.env, adjustments);
+    const wantsPayAtClose = req.body.paymentMethod === PAY_AT_CLOSE_METHOD;
+    if (wantsPayAtClose && !payAtCloseOffer.offered) {
+      return res.status(400).json({ error: "Pay at Close is not available." });
+    }
     const socialSaves = leadSource === HOLIDAY_SOCIAL_SAVES_LEAD;
-    const sale = buildBookingInvoiceDraft({
+    let sale = buildBookingInvoiceDraft({
       lineItems: traveled.lineItems,
       total: traveled.total,
       pricing: { subtotal: traveled.total, tax },
@@ -291,9 +297,15 @@ router.post("/", async (req, res) => {
       promoCode,
       promoDiscount,
       travel,
-      applyProcessing: socialSaves ? false : processingEnabled() && rates.processingActive,
+      applyProcessing: socialSaves ? false : (processingEnabled() && rates.processingActive && (!wantsPayAtClose || payAtCloseOffer.chargeCardProcessing)),
       processingPercent: rates.processingPercent,
     });
+    let payAtCloseFee = 0;
+    if (wantsPayAtClose) {
+      const shaped = shapePayAtCloseDraft(sale, payAtCloseOffer);
+      payAtCloseFee = shaped.payAtCloseFee;
+      sale = shaped as unknown as typeof sale;
+    }
     const lineItems = sale.lineItems;
     const total = sale.total;
     const pricing = { subtotal: sale.subtotal, tax: sale.tax, total: sale.total };
@@ -402,6 +414,11 @@ router.post("/", async (req, res) => {
       promoDiscount: Number(promoDiscount) || 0,
       processing: socialSaves ? 0 : (sale.processing ?? 0),
       processingPolicy: socialSaves ? "waived" : (sale.processingPolicy ?? (processingEnabled() ? "included" : "waived")),
+      ...(wantsPayAtClose ? {
+        paymentMethod: PAY_AT_CLOSE_METHOD,
+        paymentStatus: PAY_AT_CLOSE_PENDING_STATUS,
+        payAtCloseFee,
+      } : {}),
       travelZone: travel.travelZone,
       travelMiles: travel.travelMiles,
       travelFeeCents: travel.travelFeeCents,
@@ -847,7 +864,7 @@ router.post("/", async (req, res) => {
       checkoutUrl?: string;
       missingEnv?: string[];
     } | null = null;
-    const holidayKind = holidayCheckoutKind(leadSource, total);
+    const holidayKind = wantsPayAtClose ? null : holidayCheckoutKind(leadSource, total);
     if (holidayKind === "free") {
       holidayCheckout = { payment: "free" };
     } else if (holidayKind === "paid") {
@@ -891,6 +908,43 @@ router.post("/", async (req, res) => {
       }
     }
 
+    let payAtCloseCheckoutUrl = "";
+    if (wantsPayAtClose && invoiceId) {
+      try {
+        const invoiceSnap = await db().collection("invoices").doc(invoiceId).get();
+        const invoiceData = invoiceSnap.data() || {};
+        const payToken = typeof invoiceData.payToken === "string" ? invoiceData.payToken : "";
+        const successUrl = clientInvoiceUrl({ id: invoiceId, payToken, status: "sent" }, undefined, { paid: "1" }) || "";
+        const cancelUrl = clientInvoiceUrl({ id: invoiceId, payToken, status: "sent" }) || successUrl;
+        const created = await createTitusCheckout({
+          invoiceId,
+          orderId: null,
+          amount: Number(invoiceData.amountDue ?? invoiceData.total) || Number(total) || 0,
+          description: `Iconic Images ${invoiceData.invoiceNumber || invoiceId}`,
+          successUrl,
+          cancelUrl,
+          email,
+          firstName,
+          lastName,
+          phone,
+          address: displayAddress,
+        }, { env: process.env });
+        if (created.ok === true) {
+          payAtCloseCheckoutUrl = created.checkoutUrl;
+          await db().collection("invoices").doc(invoiceId).update({
+            titusCheckoutId: created.checkoutId,
+            titusCheckoutUrl: created.checkoutUrl,
+            titusCheckoutStatus: created.status || "requires-payment",
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        } else {
+          console.error("[Pay at Close] Booking checkout was not started:", created.error);
+        }
+      } catch (err) {
+        console.error("[Pay at Close] Booking checkout failed:", err instanceof Error ? err.message : "error");
+      }
+    }
+
     return res.status(201).json({
       success: true,
       requestId: docRef.id,
@@ -899,7 +953,8 @@ router.post("/", async (req, res) => {
       accountCreated: account.createdAccount,
       notifications,
       ...(holidayCheckout ? { payment: holidayCheckout.payment } : {}),
-      ...(holidayCheckout?.checkoutUrl ? { checkoutUrl: holidayCheckout.checkoutUrl } : {}),
+      ...(payAtCloseCheckoutUrl ? { checkoutUrl: payAtCloseCheckoutUrl, payment: "pay_at_close" } : {}),
+      ...(holidayCheckout?.checkoutUrl && !payAtCloseCheckoutUrl ? { checkoutUrl: holidayCheckout.checkoutUrl } : {}),
       ...(holidayCheckout?.missingEnv ? { missingEnv: holidayCheckout.missingEnv } : {}),
       message: "Booking request received. We'll confirm shortly!",
     });
@@ -1037,11 +1092,13 @@ router.get("/slots", async (req, res) => {
 
 router.get("/catalog", async (_req, res) => {
   const catalog = await loadBookingCatalog();
-  const rates = await loadPricingRates();
+  const adjustments = await loadPricingAdjustments();
+  const rates = pricingRates(adjustments);
   return res.json({
     ...publicBookingCatalogResponse(catalog),
     processingEnabled: processingEnabled() && rates.processingActive,
     pricingRates: rates,
+    payAtClose: payAtClosePublicOffer(process.env, adjustments),
   });
 });
 
@@ -1277,6 +1334,12 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
       travelQuoted: travel.travelQuoted,
       depositPaid: 0,
       balanceDue: requestTotal,
+      ...(request.paymentMethod === PAY_AT_CLOSE_METHOD ? {
+        paymentMethod: PAY_AT_CLOSE_METHOD,
+        paymentStatus: typeof request.paymentStatus === "string" && request.paymentStatus
+          ? request.paymentStatus
+          : PAY_AT_CLOSE_PENDING_STATUS,
+      } : {}),
       status: "confirmed",
       assignedPhotographerId: assignedPhotographerId || null,
       assignedPhotographerName: assignedPhotographerName || null,
@@ -1457,8 +1520,17 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
         // Older requests have no policy, so confirming them does not add one.
         applyProcessing: request.processingPolicy === "included",
       });
+      const payAtCloseDraft = request.paymentMethod === PAY_AT_CLOSE_METHOD
+        ? {
+          ...draft,
+          status: PAY_AT_CLOSE_PENDING_STATUS,
+          paymentMethod: PAY_AT_CLOSE_METHOD,
+          paymentProvider: PAY_AT_CLOSE_METHOD,
+          paymentStatus: PAY_AT_CLOSE_PENDING_STATUS,
+        }
+        : draft;
       await invoiceRef.set({
-        ...draft,
+        ...payAtCloseDraft,
         ...portalBillingStamp(request),
         orderId: orderRef.id,
         galleryId: galleryRef.id,
