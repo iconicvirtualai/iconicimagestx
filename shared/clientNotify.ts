@@ -31,6 +31,9 @@
  * When the switch is on, the allowlist is not consulted.
  * The booking_received, Thankful RSVP confirm (when THANKFUL_RSVP_CONFIRM_LIVE=true),
  * and staff carve-outs are unchanged and are not narrowed to the allowlist.
+ * Staff office_new_order may set Reply-To to the booking client's mailbox.
+ * That mailbox is not a delivery recipient: it must not appear in To, Cc, or Bcc.
+ * narrowGatedClientRecipients still removes a client Reply-To on every gated send.
  */
 
 

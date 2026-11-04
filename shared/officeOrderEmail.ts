@@ -1,13 +1,15 @@
 /**
  * Internal office email for a brand-new booking.
  * Built from the saved order record so it matches the admin order page.
- * This module does not send mail and does not address the client.
+ * This module does not send mail. The client is not a recipient.
+ * The reply button is a mailto draft for the staff reader. It sends nothing.
  */
 
 import { buildAdminOrderTile } from "./adminOrderTile.ts";
 import { addressText } from "./addressText.ts";
 import { formatChicagoDate } from "./clientHome.ts";
 import { packagesForStaffEditor, type StaffCatalogPackage } from "./bookingCatalog.ts";
+import { mailboxAddress } from "./clientNotify.ts";
 import { orderChargeSummary, orderServiceLines, cleanPackageName, type OrderServiceLine } from "./orderPackageLines.ts";
 import { isTravelFeeLine, travelTextForRecord } from "./travelZones.ts";
 
@@ -19,6 +21,8 @@ export interface OfficeOrderEmail {
   html: string;
   orderNumber: string;
   packageName: string;
+  /** Booking client mailbox for Reply-To. Never a To, Cc, or Bcc address. */
+  replyTo?: string;
 }
 
 const FIELD_LABELS = [
@@ -120,11 +124,87 @@ export function officeNewOrderEmail(
   const officeNote = text(saved.officeNote);
   if (officeNote) fields.unshift(["Office note", officeNote]);
 
+  const replyTo = bookingClientMailbox(saved);
+  const firstName = bookingClientFirstName(saved);
+  const phone = bookingClientPhone(saved);
   const subjectCore = `New order ${orderNumber} — ${packageName} — ${address} — ${requestedDate}`;
   const subject = isTestOrder(clientName, notes) ? `[TEST] ${subjectCore}` : subjectCore;
-  const plain = fields.map(([label, value]) => `${label}: ${value}`).join("\n");
-  const html = `<div style="font-family:Arial,sans-serif;max-width:640px;color:#111"><h1 style="font-size:18px">${escapeHtml(subject)}</h1><table style="width:100%;border-collapse:collapse">${fields.map(([label, value]) => `<tr><td style="padding:6px 10px;border-bottom:1px solid #eee;font-weight:bold;vertical-align:top">${escapeHtml(label)}</td><td style="padding:6px 10px;border-bottom:1px solid #eee;white-space:pre-wrap">${escapeHtml(value)}</td></tr>`).join("")}</table></div>`;
-  return { subject, text: plain, html, orderNumber, packageName };
+  const plainRows = fields.map(([label, value]) => `${label}: ${value}`);
+  if (replyTo) {
+    const replyLine = `Reply to agent: ${replyTo}`;
+    const at = plainRows[0]?.startsWith("Office note:") ? 1 : 0;
+    plainRows.splice(at, 0, replyLine);
+  }
+  const plain = plainRows.join("\n");
+  const replyHtml = staffReplyHtml({ replyTo, firstName, phone, orderNumber, address });
+  const html = `<div style="font-family:Arial,sans-serif;max-width:640px;color:#111"><h1 style="font-size:18px">${escapeHtml(subject)}</h1>${replyHtml}<table style="width:100%;border-collapse:collapse">${fields.map(([label, value]) => `<tr><td style="padding:6px 10px;border-bottom:1px solid #eee;font-weight:bold;vertical-align:top">${escapeHtml(label)}</td><td style="padding:6px 10px;border-bottom:1px solid #eee;white-space:pre-wrap">${escapeHtml(value)}</td></tr>`).join("")}</table></div>`;
+  return { subject, text: plain, html, orderNumber, packageName, ...(replyTo ? { replyTo } : {}) };
+}
+
+/** Mailbox of the agent who booked. clientEmail wins when both are present. */
+function bookingClientMailbox(saved: Record<string, unknown>): string {
+  for (const key of ["clientEmail", "email"]) {
+    const value = text(saved[key]);
+    const mailbox = value ? mailboxAddress(value) : null;
+    if (mailbox) return mailbox;
+  }
+  return "";
+}
+
+function bookingClientFirstName(saved: Record<string, unknown>): string {
+  const explicit = text(saved.firstName);
+  const source = explicit || clientNameOf(saved);
+  if (!source || source === NOT_PROVIDED) return "";
+  const parts = source.split(/\s+/).filter(Boolean);
+  const start = parts[0]?.toUpperCase() === "TEST" && parts[1]?.toUpperCase() === "ORDER" ? 2 : 0;
+  return parts[start] || "";
+}
+
+function bookingClientPhone(saved: Record<string, unknown>): string {
+  const phone = firstText(saved, ["clientPhone", "phone"]);
+  return phone === NOT_PROVIDED ? "" : phone;
+}
+
+/**
+ * Opens a draft in the reader's mail app. The link is not a send.
+ * Call and text links use the booking client's phone when it is dialable.
+ */
+function staffReplyHtml(input: {
+  replyTo: string;
+  firstName: string;
+  phone: string;
+  orderNumber: string;
+  address: string;
+}): string {
+  const parts: string[] = [];
+  if (input.replyTo) {
+    const label = input.firstName ? `Reply to ${input.firstName}` : "Reply to agent";
+    const greeting = input.firstName ? `Hi ${input.firstName},` : "Hi,";
+    const href = escapeHtml(
+      `mailto:${input.replyTo}?subject=${encodeURIComponent(`Re: ${input.orderNumber} — ${input.address}`)}&body=${encodeURIComponent(greeting)}`,
+    );
+    parts.push(
+      `<p style="margin:16px 0 8px"><a href="${href}" style="display:inline-block;background:#111;color:#fff;font-weight:bold;text-decoration:none;padding:12px 18px;border-radius:4px;font-size:16px">${escapeHtml(label)}</a></p>`,
+    );
+  }
+  const phoneHtml = phoneLinksHtml(input.phone);
+  if (phoneHtml) parts.push(phoneHtml);
+  return parts.join("");
+}
+
+function phoneLinksHtml(phone: string): string {
+  const dial = dialablePhone(phone);
+  if (!dial) return "";
+  const shown = escapeHtml(phone);
+  const href = escapeHtml(dial);
+  return `<p style="margin:0 0 16px;font-size:14px"><a href="tel:${href}" style="color:#111;font-weight:bold">Call ${shown}</a> · <a href="sms:${href}" style="color:#111;font-weight:bold">Text ${shown}</a></p>`;
+}
+
+function dialablePhone(phone: string): string {
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length === 10) return `+1${digits}`;
+  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+  return "";
 }
 
 export function officeOrderEmailFieldLabels(): readonly string[] {

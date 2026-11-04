@@ -263,4 +263,62 @@ describe("client notify test allowlist", () => {
     expect(office).toEqual({ sent: true, delivery: "sent" });
     expect(lastSent().to).toBe("photos@iconicimagestx.com, coord@iconicimagestx.com");
   });
+
+  it("keeps a client Reply-To on staff office_new_order only, and never as a delivery recipient", async () => {
+    useNotifyEnv({ CLIENT_COMMS_ZONE: "RED" });
+    const staff = await sendEmail({
+      to: "photos@iconicimagestx.com, coord@iconicimagestx.com",
+      replyTo: CLIENT,
+      template: "office_new_order",
+      audience: "staff",
+      subject: "New order ORD-L-00534",
+      html: "<p>Reply to Sytoya</p>",
+      text: `Reply to agent: ${CLIENT}`,
+    });
+    expect(staff).toEqual({ sent: true, delivery: "sent" });
+    const message = lastSent();
+    expect(message.replyTo).toBe(CLIENT);
+    expect(message.to).toBe("photos@iconicimagestx.com, coord@iconicimagestx.com");
+    expect(message.cc).toBeUndefined();
+    expect(message.bcc).toBeUndefined();
+    expect([message.to, message.cc, message.bcc].filter(Boolean).join("\n")).not.toContain(CLIENT);
+
+    sendMail.mockClear();
+    const unsigned = await sendEmail({
+      to: CLIENT,
+      cc: "agent@broker.com",
+      bcc: CLIENT,
+      replyTo: CLIENT,
+      template: "office_new_order",
+    });
+    expect(unsigned).toEqual({ sent: false, delivery: "suppressed" });
+    expect(sendMail).not.toHaveBeenCalled();
+
+    sendMail.mockClear();
+    const gated = await sendEmail({
+      to: QA,
+      cc: CLIENT,
+      bcc: CLIENT,
+      replyTo: CLIENT,
+      template: "invoice",
+    });
+    expect(gated).toEqual({ sent: false, delivery: "suppressed" });
+    expect(sendMail).not.toHaveBeenCalled();
+
+    useNotifyEnv({ NOTIFY_TEST_ALLOWLIST: QA, CLIENT_COMMS_ZONE: "RED", CLIENT_NOTIFY_LIVE: "true" });
+    const narrowed = await sendEmail({
+      to: `${CLIENT}, ${QA}`,
+      cc: CLIENT,
+      bcc: CLIENT,
+      replyTo: CLIENT,
+      template: "gallery_delivery",
+    });
+    expect(narrowed).toEqual({ sent: true, delivery: "allowlist" });
+    const allowlisted = lastSent();
+    expect(allowlisted.to).toBe(QA);
+    expect(allowlisted.cc).toBeUndefined();
+    expect(allowlisted.bcc).toBeUndefined();
+    expect(allowlisted.replyTo).toBeUndefined();
+    expect(JSON.stringify(allowlisted)).not.toContain(CLIENT);
+  });
 });
