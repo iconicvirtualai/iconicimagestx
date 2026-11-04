@@ -24,15 +24,20 @@ describe("ordericonic November promo", () => {
     expect(html).not.toContain("const RATES");
   });
 
-  it("introduces Pay at Close for agents without naming the financing company or a card fee", () => {
+  it("introduces Pay at Close for every listing without naming the financing company", () => {
     expect(html).toContain('href="https://iconicimagestx.vercel.app/pay-at-close"');
     expect(html).toContain("See Pay at Close");
-    expect(html).toContain("Agents, spoil yourselves.");
-    expect(html).toContain("pay $0 today");
+    expect(html).toContain("Spoil your listing. Pay at closing.");
+    expect(html).toContain("Pay $0 today");
     expect(html).toContain("our Partner");
+    const visible = html.slice(html.indexOf("<body"));
+    expect(visible).not.toMatch(/(^|[^0-9.])6%/);
     expect(html.toLowerCase()).not.toContain("titus");
     expect(html.toLowerCase()).not.toContain("gotitus");
     expect(html.toLowerCase()).not.toContain("card fee");
+    const promo = html.slice(html.indexOf('aria-label="November promos"'), html.indexOf("</header>"));
+    expect(promo).not.toContain("Processing (2.8%)");
+    expect(promo).not.toMatch(/Square/);
   });
 
   it("drops the October twilight ads and keeps bright photos", () => {
@@ -57,8 +62,10 @@ describe("ordericonic November promo", () => {
     expect(form).toContain("/api/apprenticeship/order");
     expect(form).toContain("/deposit-checkout");
     expect(form).toContain("leadSource:'Iconic temporary booking page'");
-    expect(form).toContain('value="October: 20% off real twilight upgrade"');
+    expect(form).not.toContain("October:");
+    expect(form).not.toContain("Referral: $25");
     expect(html).toContain('id="apprentice"');
-    expect(html).toContain("The Essentials — $249");
+    expect(html).toContain('value="listing-essentials"');
+    expect(html).toContain("/api/bookings/catalog");
   });
 });

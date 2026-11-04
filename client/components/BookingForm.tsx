@@ -11,8 +11,6 @@ import { MoneyAmount } from "@/components/MoneyAmount";
 import { SmsConsentField } from "@/components/SmsConsentField";
 import { DoorsOpenTourCheckbox } from "@/components/DoorsOpenTour";
 import { BUSINESS_CONTACT } from "@shared/businessContact";
-import { db } from "@/lib/firebase";
-import { collection, getDocs } from "firebase/firestore";
 import {
   APPRENTICESHIP_BRIDGE_COPY,
   APPRENTICESHIP_OVERAGE_LABEL,
@@ -273,6 +271,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (cancelled || !data) return;
+        if (Array.isArray(data.packages)) setCatalog(data.packages);
         if (typeof data.processingEnabled === "boolean") setProcessingOn(data.processingEnabled);
         if (data.pricingRates && typeof data.pricingRates === "object") {
           setPricing((current) => ({ ...current, ...data.pricingRates }));
@@ -281,7 +280,9 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
           setPayAtCloseOffer(data.payAtClose as PayAtClosePublicOffer);
         }
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!cancelled) setCatalog(packagesForStaffEditor([]));
+      });
     return () => {
       cancelled = true;
     };
@@ -294,23 +295,6 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
         if (!cancelled && next) setPricing(next);
       })
       .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // Booking prices come from the packages catalog. A failed read keeps the seed.
-  useEffect(() => {
-    let cancelled = false;
-    getDocs(collection(db, "packages"))
-      .then((snap) => {
-        if (cancelled) return;
-        setCatalog(packagesForStaffEditor(snap.docs.map((entry) => ({ id: entry.id, ...entry.data() }))));
-      })
-      .catch((err) => {
-        console.warn("[Booking] Catalog read failed — using the seeded catalog", err);
-        if (!cancelled) setCatalog(packagesForStaffEditor([]));
-      });
     return () => {
       cancelled = true;
     };
@@ -783,7 +767,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
   };
 
   const renderSummarySidebar = () => (
-    <div data-testid="booking-estimator" className="bg-white text-neutral-950 rounded-[2rem] border border-gray-100 p-6 shadow-xl sticky top-8">
+    <div data-testid="booking-estimator" className="bg-white text-neutral-950 rounded-[2rem] border border-gray-100 p-6 shadow-xl">
       <h3 className="text-lg font-black text-black uppercase tracking-tight mb-4 pb-3 border-b">Order Summary</h3>
       <div className="space-y-3 mb-6">
         {selectedServiceData && (
@@ -1003,7 +987,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
                           exit={{ height: 0, opacity: 0 }}
                           className="overflow-hidden"
                         >
-                          <div className={cat === "listings" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 p-1" : "space-y-2 p-1"}>
+                          <div className={cat === "listings" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 px-1 pb-1 pt-4" : "space-y-2 px-1 pb-1 pt-4"}>
                             {cat === "business" && (
                               <div className="w-full">
                                 <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-2 px-1">Phase 1: Establishing Foundation</p>
@@ -1022,12 +1006,12 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
                                 )}
                                 <button
                                   onClick={() => toggleService(s.id)}
-                                  className={`relative p-4 rounded-2xl border-2 transition-all text-left flex flex-col justify-between group h-full ${
+                                  className={`relative rounded-2xl border-2 px-4 pb-4 text-left transition-all flex flex-col justify-between group h-full ${s.isPopular ? "pt-7" : "pt-4"} ${
                                     formData.selectedService === s.id ? 'border-black bg-white scale-[1.01] shadow-lg' : 'border-gray-100 bg-white hover:border-gray-200'
                                   } ${s.highlights ? 'border-teal-300' : ''}`}
                                 >
                                   {s.isPopular && (
-                                    <div className="absolute -top-2 left-1/2 -translate-x-1/2 bg-red-500 text-white text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest whitespace-nowrap shadow-lg">
+                                    <div className="absolute top-2 left-1/2 z-10 -translate-x-1/2 bg-red-500 text-white text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest whitespace-nowrap shadow-lg">
                                       Best Value
                                     </div>
                                   )}
@@ -1969,9 +1953,10 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
         </div>
 
         {/* Sidebar Summary Area */}
-        <div className="w-full lg:w-[350px]">
+        <div className="w-full lg:w-[380px]">
+           <div className="flex flex-col gap-6 lg:sticky lg:top-32">
            {renderSummarySidebar()}
-           <div className="mt-6 p-6 bg-black rounded-[2rem] text-white space-y-4">
+           <div className="p-6 bg-black rounded-[2rem] text-white space-y-4">
               <div className="flex items-center gap-2.5">
                  <HelpCircle className="w-4 h-4 text-teal-400" />
                  <h4 className="font-black uppercase tracking-widest text-[11px]">Need help?</h4>
@@ -2000,6 +1985,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
                     <span className="text-[9px] font-black uppercase tracking-widest group-hover:text-teal-400 transition-colors whitespace-nowrap">{BUSINESS_CONTACT.phoneDisplay}</span>
                  </a>
               </div>
+           </div>
            </div>
         </div>
       </div>
