@@ -1,6 +1,5 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { processingFeeCents } from "./invoiceProcessing";
 import { holidayPaymentLinkBody } from "./holidayCheckout";
 import { THANKFUL_META_DESCRIPTION } from "./siteSeo";
 import {
@@ -11,6 +10,7 @@ import {
   THANKFUL_RSVP_CLOSE_UTC,
   quoteSocialTerm,
   quoteThankfulSocialSave,
+  nextChicagoMidnightIso,
   socialRateForInstant,
   socialRatePreviewAllowed,
   socialRateView,
@@ -48,18 +48,17 @@ describe("thankful event on Nov 7", () => {
     expect(SOCIAL_RATE_BY_DATE["2026-11-07"]).toBe(20);
   });
 
-  it("rounds a half-percent month and the 2.8% fee to the cents Square charges", () => {
+  it("charges the term total with no processing fee on a Thankful social checkout", () => {
     const quote = quoteSocialTerm(850, 12, 31.5);
     expect(quote).toMatchObject({
       percent: 41.5,
       monthlyCents: 49725,
       termCents: 596700,
+      processingCents: 0,
+      squareCents: 596700,
     });
-    expect(quote?.processingCents).toBe(processingFeeCents(596700));
-    expect(quote?.squareCents).toBe(596700 + (quote?.processingCents ?? 0));
     const three = quoteSocialTerm(500, 3, 31.5);
-    expect(three).toMatchObject({ monthlyCents: 34250, termCents: 92750 });
-    expect(three?.processingCents).toBe(processingFeeCents(92750));
+    expect(three).toMatchObject({ monthlyCents: 34250, termCents: 92750, processingCents: 0, squareCents: 92750 });
     const link = holidayPaymentLinkBody({
       invoiceId: "inv-social",
       amount: (three?.squareCents ?? 0) / 100,
@@ -67,7 +66,7 @@ describe("thankful event on Nov 7", () => {
       locationId: "LOC",
       redirectUrl: "https://iconicimagestx.vercel.app/thankful?paid=1&order=%23043#social-saves",
     });
-    expect((link.quick_pay as { price_money: { amount: number } }).price_money.amount).toBe(three?.squareCents);
+    expect((link.quick_pay as { price_money: { amount: number } }).price_money.amount).toBe(three?.termCents);
   });
 
   it("ignores a posted price and quotes Oct 17 from the package and term", () => {
@@ -81,7 +80,7 @@ describe("thankful event on Nov 7", () => {
     if (!quoted.ok) return;
     expect(quoted.quote.percent).toBe(49);
     expect(quoted.termDollars).toBe(665);
-    expect(quoted.squareDollars).toBe((66500 + processingFeeCents(66500)) / 100);
+    expect(quoted.squareDollars).toBe(665);
     expect(quoteThankfulSocialSave({
       packageName: "The Baseline",
       months: 3,
@@ -103,7 +102,13 @@ describe("thankful event on Nov 7", () => {
     expect(season).toContain("Sat, Oct 31");
     expect(season).not.toContain("Nov 14");
     expect(season).not.toContain("Nov 6");
-    expect(thankful).toContain("Math.floor((cents*28+500)/1000)");
+    expect(thankful).not.toContain("feeCents");
+    expect(thankful).not.toContain("Processing (2.8%)");
+    expect(thankful).not.toMatch(/Square/);
+    expect(thankful).toContain(">Pay Later</a>");
+    expect(thankful).toContain('href="https://iconicimagestx.vercel.app/pay-at-close"');
+    expect(thankful.toLowerCase()).not.toContain("titus");
+    expect(thankful.toLowerCase()).not.toContain("gotitus");
     expect(thankful).toContain("/api/bookings/social-rate");
     expect(thankful).not.toContain("const RATES=");
   });
@@ -133,11 +138,15 @@ describe("thankful event on Nov 7", () => {
 
   it("serves one day from the server table and keeps ?date= for admin or the QA mailbox", () => {
     const today = new Date("2026-10-18T15:00:00.000Z");
+    expect(nextChicagoMidnightIso("2026-10-18")).toBe("2026-10-19T05:00:00.000Z");
+    expect(nextChicagoMidnightIso("2026-11-04")).toBe("2026-11-05T06:00:00.000Z");
+    expect(nextChicagoMidnightIso("2026-11-07")).toBe("2026-11-08T06:00:00.000Z");
     expect(socialRateView(today, null, false)).toEqual({
       date: "2026-10-18",
       percent: 47,
       ended: false,
       dropsTomorrow: true,
+      nextDropAt: "2026-10-19T05:00:00.000Z",
       preview: false,
     });
     expect(socialRateView(today, "2026-11-07", false)).toMatchObject({
@@ -150,10 +159,21 @@ describe("thankful event on Nov 7", () => {
       percent: 20,
       ended: false,
       dropsTomorrow: false,
+      nextDropAt: null,
       preview: true,
     });
+    expect(socialRateView(new Date("2026-11-04T17:00:00.000Z"), null, false)).toMatchObject({
+      date: "2026-11-04",
+      percent: 22,
+      dropsTomorrow: true,
+      nextDropAt: "2026-11-05T06:00:00.000Z",
+    });
     expect(socialRateView(today, "not-a-day", true).preview).toBe(false);
-    expect(socialRateView(new Date("2026-11-08T06:00:00.000Z"), null, false).ended).toBe(true);
+    expect(socialRateView(new Date("2026-11-08T06:00:00.000Z"), null, false)).toMatchObject({
+      ended: true,
+      percent: null,
+      nextDropAt: null,
+    });
     expect(socialRatePreviewAllowed({ role: "admin", email: "owner@iconicimagestx.com" })).toBe(true);
     expect(socialRatePreviewAllowed({ role: null, email: "Ops QA <ops+deliveryqa@iconicimagestx.com>" })).toBe(true);
     expect(socialRatePreviewAllowed({ role: "coordinator", email: "office@iconicimagestx.com" })).toBe(false);

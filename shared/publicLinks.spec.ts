@@ -87,6 +87,8 @@ const ALLOWED_EXTERNAL = [
   "https://fonts.googleapis.com",
   "https://fonts.gstatic.com",
   "https://www.google.com/maps/",
+  "https://iconicimagestx.vercel.app/thankful",
+  "https://iconicimagestx.vercel.app/pay-at-close",
   "https://maps.google.com/",
   "https://my.matterport.com/",
   "https://doorsopentour.com",

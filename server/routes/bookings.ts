@@ -287,6 +287,7 @@ router.post("/", async (req, res) => {
     if (wantsPayAtClose && !payAtCloseOffer.offered) {
       return res.status(400).json({ error: "Pay at Close is not available." });
     }
+    const socialSaves = leadSource === HOLIDAY_SOCIAL_SAVES_LEAD;
     let sale = buildBookingInvoiceDraft({
       lineItems: traveled.lineItems,
       total: traveled.total,
@@ -296,7 +297,7 @@ router.post("/", async (req, res) => {
       promoCode,
       promoDiscount,
       travel,
-      applyProcessing: processingEnabled() && rates.processingActive && (!wantsPayAtClose || payAtCloseOffer.chargeCardProcessing),
+      applyProcessing: socialSaves ? false : (processingEnabled() && rates.processingActive && (!wantsPayAtClose || payAtCloseOffer.chargeCardProcessing)),
       processingPercent: rates.processingPercent,
     });
     let payAtCloseFee = 0;
@@ -411,8 +412,8 @@ router.post("/", async (req, res) => {
       vibeNote: vibeNote || "",
       promoCode: promoCode || null,
       promoDiscount: Number(promoDiscount) || 0,
-      processing: sale.processing ?? 0,
-      processingPolicy: sale.processingPolicy ?? (processingEnabled() ? "included" : "waived"),
+      processing: socialSaves ? 0 : (sale.processing ?? 0),
+      processingPolicy: socialSaves ? "waived" : (sale.processingPolicy ?? (processingEnabled() ? "included" : "waived")),
       ...(wantsPayAtClose ? {
         paymentMethod: PAY_AT_CLOSE_METHOD,
         paymentStatus: PAY_AT_CLOSE_PENDING_STATUS,

@@ -1,12 +1,12 @@
 /**
  * Iconic Client Holiday Event, Sat Nov 7, 2026.
  * Times are America/Chicago. Social rates are an explicit table.
- * The server quotes the Square amount from this file.
+ * The server quotes the checkout amount from this file.
+ * Thankful social Buy Now charges the term total. No processing fee is added.
  */
 
 import { mailboxAddress } from "./clientNotify.ts";
 import { DELIVERY_QA_CLIENT_EMAIL } from "./deliveryQaClient.ts";
-import { processingFeeCents } from "./invoiceProcessing.ts";
 
 export const THANKFUL_EVENT_DATE = "2026-11-07";
 export const THANKFUL_EVENT_WHEN = "Sat, Nov 7, 2026";
@@ -102,7 +102,50 @@ export interface SocialRateView {
   percent: number | null;
   ended: boolean;
   dropsTomorrow: boolean;
+  /** Chicago midnight when the next lower rate starts. Null on Nov 7 and after the promo. */
+  nextDropAt: string | null;
   preview: boolean;
+}
+
+/**
+ * UTC instant of the next America/Chicago midnight after a calendar day.
+ * The rate table decides whether a drop exists. This only names that midnight.
+ */
+export function nextChicagoMidnightIso(dateKey: string): string | null {
+  if (!SOCIAL_DATE_KEY.test(dateKey)) return null;
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const targetKey = new Date(Date.UTC(year, month - 1, day + 1)).toISOString().slice(0, 10);
+  let ms = Date.parse(`${targetKey}T06:00:00.000Z`);
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Chicago",
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const bag: Record<string, string> = {};
+    for (const part of fmt.formatToParts(new Date(ms))) {
+      if (part.type !== "literal") bag[part.type] = part.value;
+    }
+    let hour = Number(bag.hour);
+    let key = `${bag.year}-${bag.month}-${bag.day}`;
+    if (hour === 24) {
+      hour = 0;
+      key = new Date(Date.parse(`${key}T00:00:00.000Z`) + 86400000).toISOString().slice(0, 10);
+    }
+    const minute = Number(bag.minute);
+    const second = Number(bag.second);
+    if (key === targetKey && hour === 0 && minute === 0 && second === 0) {
+      return new Date(ms).toISOString();
+    }
+    const dayDelta = key < targetKey ? 1 : key > targetKey ? -1 : 0;
+    ms += (dayDelta * 86400 - (hour * 3600 + minute * 60 + second)) * 1000;
+  }
+  return null;
 }
 
 /**
@@ -115,11 +158,13 @@ export function socialRateView(now: Date, requestedDate: string | null, previewA
   const preview = Boolean(asked && asked !== today && previewAllowed);
   const date = preview && asked ? asked : today;
   const percent = socialRateForDateKey(date);
+  const dropsTomorrow = percent != null && percent !== SOCIAL_RATE_BY_DATE[THANKFUL_EVENT_DATE];
   return {
     date,
     percent,
     ended: percent == null,
-    dropsTomorrow: percent != null && percent !== SOCIAL_RATE_BY_DATE[THANKFUL_EVENT_DATE],
+    dropsTomorrow,
+    nextDropAt: dropsTomorrow ? nextChicagoMidnightIso(date) : null,
     preview,
   };
 }
@@ -156,13 +201,12 @@ export function quoteSocialTerm(monthlyDollars: number, months: number, dayRate:
   if (percent == null) return null;
   const monthlyCents = discountedCents(Math.round(monthlyDollars * 100), percent);
   const termCents = Math.max(0, monthlyCents * months - (months === 3 ? 10000 : 0));
-  const processingCents = processingFeeCents(termCents);
   return {
     percent,
     monthlyCents,
     termCents,
-    processingCents,
-    squareCents: termCents + processingCents,
+    processingCents: 0,
+    squareCents: termCents,
   };
 }
 
