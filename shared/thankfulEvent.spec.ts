@@ -11,6 +11,7 @@ import {
   THANKFUL_RSVP_CLOSE_UTC,
   quoteSocialTerm,
   quoteThankfulSocialSave,
+  nextChicagoMidnightIso,
   socialRateForInstant,
   socialRatePreviewAllowed,
   socialRateView,
@@ -133,11 +134,15 @@ describe("thankful event on Nov 7", () => {
 
   it("serves one day from the server table and keeps ?date= for admin or the QA mailbox", () => {
     const today = new Date("2026-10-18T15:00:00.000Z");
+    expect(nextChicagoMidnightIso("2026-10-18")).toBe("2026-10-19T05:00:00.000Z");
+    expect(nextChicagoMidnightIso("2026-11-04")).toBe("2026-11-05T06:00:00.000Z");
+    expect(nextChicagoMidnightIso("2026-11-07")).toBe("2026-11-08T06:00:00.000Z");
     expect(socialRateView(today, null, false)).toEqual({
       date: "2026-10-18",
       percent: 47,
       ended: false,
       dropsTomorrow: true,
+      nextDropAt: "2026-10-19T05:00:00.000Z",
       preview: false,
     });
     expect(socialRateView(today, "2026-11-07", false)).toMatchObject({
@@ -150,10 +155,21 @@ describe("thankful event on Nov 7", () => {
       percent: 20,
       ended: false,
       dropsTomorrow: false,
+      nextDropAt: null,
       preview: true,
     });
+    expect(socialRateView(new Date("2026-11-04T17:00:00.000Z"), null, false)).toMatchObject({
+      date: "2026-11-04",
+      percent: 22,
+      dropsTomorrow: true,
+      nextDropAt: "2026-11-05T06:00:00.000Z",
+    });
     expect(socialRateView(today, "not-a-day", true).preview).toBe(false);
-    expect(socialRateView(new Date("2026-11-08T06:00:00.000Z"), null, false).ended).toBe(true);
+    expect(socialRateView(new Date("2026-11-08T06:00:00.000Z"), null, false)).toMatchObject({
+      ended: true,
+      percent: null,
+      nextDropAt: null,
+    });
     expect(socialRatePreviewAllowed({ role: "admin", email: "owner@iconicimagestx.com" })).toBe(true);
     expect(socialRatePreviewAllowed({ role: null, email: "Ops QA <ops+deliveryqa@iconicimagestx.com>" })).toBe(true);
     expect(socialRatePreviewAllowed({ role: "coordinator", email: "office@iconicimagestx.com" })).toBe(false);

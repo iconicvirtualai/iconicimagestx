@@ -142,7 +142,7 @@ vi.mock("../services/bookingListing", () => ({
 }));
 
 import { realEstate75OpenSchedule } from "../../shared/realestate75";
-import { chicagoDateKey, SOCIAL_RATE_BY_DATE } from "../../shared/thankfulEvent";
+import { chicagoDateKey, nextChicagoMidnightIso, SOCIAL_RATE_BY_DATE } from "../../shared/thankfulEvent";
 import bookingsRouter, { resetPublicBookingRateLimit } from "./bookings";
 
 const SLOT = {
@@ -564,6 +564,7 @@ describe("public booking calendar hold", () => {
     expect(JSON.stringify(slots)).not.toContain("Quinn");
 
     const today = chicagoDateKey(new Date());
+    const dropsTomorrow = Object.prototype.hasOwnProperty.call(SOCIAL_RATE_BY_DATE, today) && SOCIAL_RATE_BY_DATE[today] !== 20;
     const publicRate = await fetch(`${baseUrl}/api/bookings/social-rate?date=2026-11-07`);
     const publicBody = await publicRate.json();
     expect(publicRate.status).toBe(200);
@@ -572,11 +573,12 @@ describe("public booking calendar hold", () => {
       date: today,
       percent: Object.prototype.hasOwnProperty.call(SOCIAL_RATE_BY_DATE, today) ? SOCIAL_RATE_BY_DATE[today] : null,
       ended: !Object.prototype.hasOwnProperty.call(SOCIAL_RATE_BY_DATE, today),
-      dropsTomorrow: Object.prototype.hasOwnProperty.call(SOCIAL_RATE_BY_DATE, today) && SOCIAL_RATE_BY_DATE[today] !== 20,
+      dropsTomorrow,
+      nextDropAt: dropsTomorrow ? nextChicagoMidnightIso(today) : null,
       preview: false,
     });
     expect(JSON.stringify(publicBody)).not.toContain("2026-11-06");
-    expect(Object.keys(publicBody).sort()).toEqual(["date", "dropsTomorrow", "ended", "percent", "preview"]);
+    expect(Object.keys(publicBody).sort()).toEqual(["date", "dropsTomorrow", "ended", "nextDropAt", "percent", "preview"]);
 
     docs("staff").set("admin-1", { role: "admin", isActive: true });
     const adminRate = await fetch(`${baseUrl}/api/bookings/social-rate?date=2026-11-07`, {
