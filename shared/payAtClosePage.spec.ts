@@ -1,9 +1,9 @@
 import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { packagesForStaffEditor } from "./bookingCatalog.ts";
-import { payAtCloseListedPrice, payAtClosePublicOffer } from "./payAtClose.ts";
+import { payAtCloseCustomerOffer, payAtCloseListedPrice, payAtClosePublicOffer } from "./payAtClose.ts";
 import { mergePricingAdjustments } from "./pricingSettings.ts";
-import { estimateTitusPayAtClose } from "./titusPayAtCloseSchedule.ts";
+import { PAY_AT_CLOSE_PACKAGES_FOOTNOTE, TITUS_BROWSER_SDK_URL, TITUS_PAY_AT_CLOSE_BUSINESS_ID, titusPayAtCloseBusinessId } from "./titusEstimate.ts";
 import {
   PAY_AT_CLOSE_ESTATES,
   bookPayAtCloseHref,
@@ -32,31 +32,38 @@ describe("Pay at Close page prices", () => {
     expect(bookPayAtCloseHref()).toBe("/book?payment=pay-at-close");
   });
 
-  it("does not hard-code dollar amounts in the page", () => {
+  it("names Titus, uses the SDK estimate, and does not publish rates", () => {
     const page = readFileSync(new URL("../client/pages/PayAtClose.tsx", import.meta.url), "utf8");
+    const sdk = readFileSync(new URL("../client/lib/titusSdk.ts", import.meta.url), "utf8");
     expect(page).not.toMatch(/\$\s?\d/);
     expect(page).not.toMatch(/shore-tour/);
-    expect(page).not.toMatch(/gotitus|Get your Partner estimate/i);
-    expect(page).not.toMatch(/surcharge|\+6%|(?<!\d)6%/i);
+    expect(page).not.toMatch(/surcharge|\+6%|(?<!\d)6%|0%–8%|16%|6 months/i);
+    expect(page).not.toMatch(/estimateTitusPayAtClose|payAtCloseListedPrice|credit score|Partner fee/i);
+    expect(page).toContain("Titus");
+    expect(page).toContain("PAY_AT_CLOSE_PACKAGES_FOOTNOTE");
+    expect(page).toContain("openTitusEstimateModal");
+    expect(page).toContain("titus-pill-");
+    expect(PAY_AT_CLOSE_PACKAGES_FOOTNOTE).toBe("$0 due until closing with financing arranged by Titus.");
+    expect(sdk).toContain("showEstimateModal");
+    expect(sdk).toContain("businessId");
+    expect(TITUS_BROWSER_SDK_URL).toBe("https://assets.gotitus.com/sdk/v1/titus.js");
+    expect(titusPayAtCloseBusinessId("")).toBe(TITUS_PAY_AT_CLOSE_BUSINESS_ID);
+    expect(titusPayAtCloseBusinessId("  custom-id  ")).toBe("custom-id");
+    expect(TITUS_PAY_AT_CLOSE_BUSINESS_ID).toBe("550ccb3e-4384-4441-90f1-20456bce82e6");
   });
 
-  it("lists Showcase at the Pay at Close price and adds the Partner fee after that", () => {
+  it("lists packages at the catalog price and does not add the Pay at Close percent", () => {
     const offer = payAtClosePublicOffer(undefined, mergePricingAdjustments([]));
+    const customer = payAtCloseCustomerOffer(offer);
     const showcase = packagesForStaffEditor([]).find((item) => item.id === "listing-showcase");
     const legacy = packagesForStaffEditor([]).find((item) => item.id === "listing-legacy");
     expect(showcase?.price).toBe(549);
     expect(legacy?.price).toBe(899);
-    expect(payAtCloseListedPrice(showcase?.price || 0, offer)).toBe(582);
-    expect(payAtCloseListedPrice(legacy?.price || 0, offer)).toBe(953);
-    const estimate = estimateTitusPayAtClose({
-      role: "agent",
-      tier: "prime",
-      property: "single-family",
-      media: payAtCloseListedPrice(showcase?.price || 0, offer) + payAtCloseListedPrice(legacy?.price || 0, offer),
-    });
-    expect(estimate.media).toBe(1535);
-    expect(Math.round(estimate.fee || 0)).toBe(61);
-    expect(Math.round(estimate.payoff || 0)).toBe(1596);
+    expect(offer.feeRate).toBe(6);
+    expect(customer.feeRate).toBe(0);
+    expect(customer.enabledByOffice).toBe(true);
+    expect(payAtCloseListedPrice(showcase?.price || 0, customer)).toBe(549);
+    expect(payAtCloseListedPrice(legacy?.price || 0, customer)).toBe(899);
   });
 
   it("lists estates as data and skips an empty feature", () => {

@@ -59,6 +59,7 @@ import {
   isMirroredPayAtCloseSquarePayment,
   PAY_AT_CLOSE_METHOD,
   PAY_AT_CLOSE_PENDING_STATUS,
+  payAtCloseCustomerOffer,
   premiumCatalogPackages,
   shapePayAtCloseDraft,
 } from "../../shared/payAtClose";
@@ -933,7 +934,7 @@ async function beginPayAtCloseCheckout(invoiceDoc: FirebaseFirestore.DocumentSna
       processing: invoice.processing,
       applyProcessing: false,
     });
-    const shaped = shapePayAtCloseDraft({ ...draft, amountPaid: Number(invoice.amountPaid) || 0 }, offer);
+    const shaped = shapePayAtCloseDraft({ ...draft, amountPaid: Number(invoice.amountPaid) || 0 }, payAtCloseCustomerOffer(offer));
     payable = { ...invoice, ...shaped };
     await invoiceDoc.ref.update({
       lineItems: shaped.lineItems,

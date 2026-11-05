@@ -16,6 +16,7 @@ import {
   isMirroredPayAtCloseSquarePayment,
   payAtCloseApiBaseUrl,
   payAtCloseBaseUrlDecision,
+  payAtCloseCustomerOffer,
   payAtCloseFeeDollars,
   payAtCloseListedPrice,
   payAtCloseLive,
@@ -47,6 +48,10 @@ describe("Pay at Close gates and prices", () => {
       feeRate: 6,
     });
     expect(payAtClosePublicOffer({ PAY_AT_CLOSE_LIVE: "true" }, adjustments).offered).toBe(true);
+    const customer = payAtCloseCustomerOffer(payAtClosePublicOffer({ PAY_AT_CLOSE_LIVE: "true" }, adjustments));
+    expect(customer.offered).toBe(true);
+    expect(customer.feeRate).toBe(0);
+    expect(payAtCloseListedPrice(549, customer)).toBe(549);
     const off = mergePricingAdjustments([{ id: "pay-at-close", active: false }]);
     expect(payAtClosePublicOffer({ PAY_AT_CLOSE_LIVE: "true" }, off).offered).toBe(false);
     const flat = mergePricingAdjustments([{ id: "pay-at-close", active: true, mode: "flat", amount: 25 }]);
