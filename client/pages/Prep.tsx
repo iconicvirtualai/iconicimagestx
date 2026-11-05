@@ -14,7 +14,7 @@ export default function Prep() {
       description: "Learn how to use natural and artificial lighting to showcase rooms in their best light.",
       duration: "8:45",
       thumbnail: "/media/photos/luxury-interior.jpg",
-      videoUrl: "/media/video/content-web-clip.mp4"
+      videoUrl: "/media/videos/snap-reels/snap-reel-02.mp4"
     },
     {
       id: "staging",
@@ -22,7 +22,7 @@ export default function Prep() {
       description: "Expert tips on decluttering, decorating, and presenting each room to its full potential.",
       duration: "12:30",
       thumbnail: "/media/photos/staged-living-room.jpg",
-      videoUrl: "/media/video/content-web-clip.mp4"
+      videoUrl: "/media/videos/snap-reels/stoney-brook-blaze.mp4"
     },
     {
       id: "cleanup",
@@ -30,7 +30,7 @@ export default function Prep() {
       description: "A comprehensive walkthrough of cleaning steps to ensure your listing looks showroom-ready.",
       duration: "10:15",
       thumbnail: "/media/photos/listing-living-03.jpg",
-      videoUrl: "/media/video/content-web-clip.mp4"
+      videoUrl: "/media/videos/snap-reels/heron-wing-blaze.mp4"
     },
     {
       id: "camera",
@@ -38,7 +38,7 @@ export default function Prep() {
       description: "Discover the best angles and camera movements to capture each room dynamically.",
       duration: "9:20",
       thumbnail: "/media/photos/luxury-exterior.jpg",
-      videoUrl: "/media/video/content-web-clip.mp4"
+      videoUrl: "/media/blaze/03_TEN_YEARS_v2.mp4"
     },
     {
       id: "outdoor",
@@ -46,7 +46,7 @@ export default function Prep() {
       description: "Learn how to capture curb appeal, landscaping, and exterior features that sell properties.",
       duration: "7:50",
       thumbnail: "/media/photos/drone-hero.jpg",
-      videoUrl: "/media/video/content-web-clip.mp4"
+      videoUrl: "/media/about/about_were_here_v1.mp4"
     },
     {
       id: "audio",
@@ -54,7 +54,7 @@ export default function Prep() {
       description: "Eliminate background noise and ensure clean audio recording during your shoot.",
       duration: "6:40",
       thumbnail: "/media/before-after/pavilion-lifestyle.jpg",
-      videoUrl: "/media/video/content-web-clip.mp4"
+      videoUrl: "/media/videos/snap-reels/snap-reel-01.mp4"
     }
   ];
 

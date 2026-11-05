@@ -86,4 +86,29 @@ describe("published merge", () => {
     expect(dirty?.blocks.some((block) => block.id === "not-a-section")).toBe(false);
     expect(dirty?.blocks.find((block) => block.id === "hero")?.fields.some((field) => field.id === "injected")).toBe(false);
   });
+
+  it("keeps saved copy on known slots and drops slots that left the defaults", () => {
+    const home = defaultPage("home");
+    if (!home) throw new Error("missing");
+    const solution = home.blocks.find((block) => block.id === "solution");
+    const first = solution?.items?.[0];
+    if (!solution || !first) throw new Error("missing slides");
+    const merged = mergeContent({
+      ...home,
+      blocks: home.blocks.map((block) => block.id === "solution"
+        ? {
+          ...block,
+          items: [
+            { id: first.id, fields: first.fields.map((field) => field.id === "title" ? { ...field, value: "Kept title" } : field) },
+            { id: "former-employee", fields: [{ id: "video", label: "Video", kind: "video" as const, value: "/media/reels/removed-reel.mp4" }, { id: "title", label: "Title", kind: "text" as const, value: "Removed" }] },
+          ],
+        }
+        : block),
+    });
+    const slides = merged?.blocks.find((block) => block.id === "solution")?.items ?? [];
+    expect(slides.map((item) => item.id)).toEqual(solution.items?.map((item) => item.id));
+    expect(slides[0]?.fields.find((field) => field.id === "title")?.value).toBe("Kept title");
+    expect(JSON.stringify(slides)).not.toContain("removed-reel");
+    expect(JSON.stringify(slides)).not.toContain("former-employee");
+  });
 });

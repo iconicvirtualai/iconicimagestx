@@ -86,6 +86,13 @@ export const PUBLIC_PAGES: readonly PublicPage[] = [
       "Contact Iconic Images in Spring, Texas about real estate photography and video in The Woodlands and Houston.",
   },
   {
+    path: "/partners",
+    file: "seo/partners.html",
+    title: "Partners | Iconic Images",
+    description:
+      "Photographers and real estate media companies can sign up to work with Iconic Images on listing media.",
+  },
+  {
     path: "/socials",
     file: "seo/socials.html",
     title: "Socials | Iconic Images",

@@ -1,346 +1,202 @@
-import { Play, ArrowRight, Instagram, Facebook, Linkedin, Youtube, Twitter, MousePointer2, Link as LinkIcon } from "lucide-react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { useState, useEffect } from "react";
-import { useSiteSettings } from "@/hooks/useSiteSettings";
-import { itemText, useSiteItems, useSiteText } from "@/content/siteContent";
-import { FEATURED_SNAP_REEL } from "@/lib/snapReels";
-import { beforeAfterById } from "@/lib/beforeAfter";
-
-const FeatureCard = ({
-  title,
-  description,
-  children,
-  colSpan = "col-span-1",
-  ctaText,
-  ctaLink,
-  itemId,
-}: {
-  title: string;
-  description: string;
-  children: React.ReactNode;
-  colSpan?: string;
-  ctaText?: string;
-  ctaLink?: string;
-  itemId?: string;
-}) => {
-  const settings = useSiteSettings();
-  return (
-    <div className={`bg-[#f8fdff] rounded-2xl border border-dashed border-[#ccfbf1] p-6 flex flex-col ${colSpan} relative group`}>
-      <div className="flex-1 mb-6">
-        <div className="flex justify-between items-start mb-2">
-          <h3 data-site-page="home" data-site-block="features" data-site-item={itemId} data-site-field="title" data-site-kind="text" className="text-lg font-bold text-black">{title}</h3>
-          {ctaLink && (
-            <Link to={ctaLink}>
-              <Button size="sm" className="text-white text-[10px] h-7 px-3 rounded-lg md:opacity-0 md:group-hover:opacity-100 transition-opacity" style={{ backgroundColor: settings.global.primaryColor }}>
-                {ctaText || "TRY NOW"}
-              </Button>
-            </Link>
-          )}
-        </div>
-        <p data-site-page="home" data-site-block="features" data-site-item={itemId} data-site-field="body" data-site-kind="text" className="text-gray-500 text-[11px] leading-relaxed">
-          {description}
-        </p>
-      </div>
-      <div className="relative rounded-xl overflow-hidden bg-white border border-gray-100 shadow-sm h-48">
-        {children}
-      </div>
-      {ctaLink && (
-         <div className="mt-4 md:hidden">
-           <Link to={ctaLink}>
-              <Button size="sm" className="w-full text-white text-[10px] h-8 rounded-lg" style={{ backgroundColor: settings.global.primaryColor }}>
-                {ctaText || "TRY NOW"}
-              </Button>
-            </Link>
-         </div>
-      )}
-    </div>
-  );
-};
-
-const AiPhotoEditSnippet = () => {
-  const settings = useSiteSettings();
-  const twilight = beforeAfterById("twilight-pool");
-
-  return (
-    <div className="relative h-full flex">
-      <div className="w-1/2 h-full relative border-r border-white/50">
-        <img src={twilight.before.src} className="w-full h-full object-cover" alt={twilight.before.alt} />
-        <span className="absolute top-3 left-3 bg-white/20 backdrop-blur-md text-white text-[8px] font-bold px-2 py-0.5 rounded uppercase border border-white/30">Before</span>
-      </div>
-      <div className="w-1/2 h-full relative">
-        <img src={twilight.after.src} className="w-full h-full object-cover" alt={twilight.after.alt} />
-        <span className="absolute top-3 right-3 backdrop-blur-md text-white text-[8px] font-bold px-2 py-0.5 rounded uppercase" style={{ backgroundColor: `${settings.global.primaryColor}CC` }}>After</span>
-      </div>
-      <div className="absolute left-1/2 top-0 bottom-0 w-[2px] bg-white z-10 flex items-center justify-center -translate-x-1/2">
-        <div className="w-4 h-4 bg-white rounded-full shadow-lg border border-gray-100 flex items-center justify-center">
-          <div className="flex gap-[1px]">
-            <div className="w-[1px] h-2 bg-gray-300"></div>
-            <div className="w-[1px] h-2 bg-gray-300"></div>
-          </div>
-        </div>
-      </div>
-      <span className="absolute bottom-2 left-1/2 z-10 -translate-x-1/2 rounded-md bg-black/70 px-2 py-1 text-[8px] font-black uppercase tracking-widest text-white">
-        {twilight.label}
-      </span>
-    </div>
-  );
-};
-
-const VirtualStagingSnippet = () => {
-  const [step, setStep] = useState(0); // 0: initial, 1: dragging, 2: processing, 3: result
-  const settings = useSiteSettings();
-  const lifestyle = beforeAfterById("pavilion-lifestyle");
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setStep((prev) => (prev + 1) % 4);
-    }, 3000);
-    return () => clearInterval(timer);
-  }, []);
-
-  return (
-    <div className="relative h-full w-full bg-gray-50 flex items-center justify-center overflow-hidden">
-      {/* Background Room - Empty */}
-      <img
-        src={lifestyle.before.src}
-        className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${step === 3 ? 'opacity-0' : 'opacity-100'}`}
-        alt={lifestyle.before.alt}
-      />
-
-      {/* Background Room - Staged */}
-      <img
-        src={lifestyle.after.src}
-        className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${step === 3 ? 'opacity-100' : 'opacity-0'}`}
-        alt={lifestyle.after.alt}
-      />
-
-      {/* Animation Overlay */}
-      <div className="absolute inset-0 z-20 pointer-events-none">
-        {/* Cursor & Photo Icon - Using standard CSS transitions/classes */}
-        <div
-          className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center transition-all duration-700 ${
-            step === 1 ? 'opacity-100 translate-y-0 translate-x-0' : 'opacity-0 translate-y-12 translate-x-12'
-          }`}
-        >
-          <div className="bg-white p-2 rounded-lg shadow-xl border border-gray-100 rotate-6 mb-2">
-            <div className="w-10 h-10 bg-[#f0fdfa] rounded flex items-center justify-center">
-              <LinkIcon className="w-5 h-5" style={{ color: settings.global.primaryColor }} />
-            </div>
-          </div>
-          <MousePointer2 className="w-5 h-5 text-black fill-black" />
-        </div>
-
-        {/* Processing State */}
-        <div
-          className={`absolute inset-0 flex items-center justify-center bg-black/10 backdrop-blur-[1px] transition-opacity duration-500 ${
-            step === 2 ? 'opacity-100' : 'opacity-0'
-          }`}
-        >
-          <div className="bg-white px-3 py-1.5 rounded-full shadow-lg flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full animate-spin" style={{ borderWidth: '2px', borderStyle: 'solid', borderBottomColor: settings.global.primaryColor, borderLeftColor: settings.global.primaryColor, borderRightColor: settings.global.primaryColor, borderTopColor: 'transparent' }}></div>
-            <span className="text-[9px] font-bold text-gray-700">AI STAGING...</span>
-          </div>
-        </div>
-
-        {/* Labels */}
-        <div className="absolute bottom-3 left-3 flex gap-2">
-           <div className="bg-white/90 backdrop-blur-md px-2 py-1 rounded-md text-[8px] font-bold shadow-sm flex items-center gap-1 border border-gray-100">
-            <div className={`w-1 h-1 rounded-full transition-colors duration-500`} style={{ backgroundColor: step === 3 ? settings.global.primaryColor : 'rgb(209 213 219)' }}></div>
-            {step === 3 ? "STAGED RESULT" : "EMPTY SPACE"}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
+import { itemText, useSiteHref, useSiteItems, useSiteText } from "@/content/siteContent";
 
 const FEATURE_TITLE = "Go beyond basic editing with powerful add-on tools";
-const FEATURE_BODY = "Iconic isn't just about reels — enhance your content with smart AI tools designed to polish, extend, and personalize every video.";
+const FEATURE_BODY = "Turn a still into motion, stage an empty room, finish a photo, and shape the cut in Studio.";
+
+function CompareSlider({
+  before,
+  after,
+  beforeLabel = "Before",
+  afterLabel = "After",
+  itemId,
+}: {
+  before: string;
+  after: string;
+  beforeLabel?: string;
+  afterLabel?: string;
+  itemId: string;
+}) {
+  const [position, setPosition] = useState(52);
+  return (
+    <div className="relative h-56 overflow-hidden bg-gray-100 sm:h-64">
+      <img src={after} alt={afterLabel} data-site-page="home" data-site-block="features" data-site-item={itemId} data-site-field="after" data-site-kind="image" className="absolute inset-0 h-full w-full object-cover" />
+      <img
+        src={before}
+        alt={beforeLabel}
+        data-site-page="home"
+        data-site-block="features"
+        data-site-item={itemId}
+        data-site-field="before"
+        data-site-kind="image"
+        className="absolute inset-0 h-full w-full object-cover"
+        style={{ clipPath: `inset(0 ${100 - position}% 0 0)` }}
+      />
+      <div className="pointer-events-none absolute inset-y-0 z-10 w-0.5 bg-white" style={{ left: `${position}%` }} />
+      <span className="pointer-events-none absolute left-3 top-3 rounded-md bg-black/70 px-2 py-1 text-[10px] font-black uppercase tracking-widest text-white">{beforeLabel}</span>
+      <span className="pointer-events-none absolute right-3 top-3 rounded-md bg-[#14b8a6] px-2 py-1 text-[10px] font-black uppercase tracking-widest text-white">{afterLabel}</span>
+      <input
+        type="range"
+        min={2}
+        max={98}
+        value={position}
+        aria-label="Drag to compare before and after"
+        onChange={(event) => setPosition(Number(event.target.value))}
+        className="absolute inset-x-0 bottom-3 z-20 mx-auto w-[80%] accent-[#14b8a6]"
+      />
+    </div>
+  );
+}
 
 export default function FeaturesSection() {
-  const settings = useSiteSettings();
   const badge = useSiteText("home", "features", "badge", "ADDITIONAL FEATURES");
   const title = useSiteText("home", "features", "title", FEATURE_TITLE);
   const body = useSiteText("home", "features", "body", FEATURE_BODY);
+  const promoHref = useSiteHref("chrome", "promo", "link", "/book");
   const saved = useSiteItems("home", "features");
-  const copy = (id: string, fallbackTitle: string, fallbackBody: string) => {
+  const field = (id: string, key: string, fallback: string) => {
     const item = saved?.find((entry) => entry.id === id);
-    return {
-      title: item ? itemText(item, "title") : fallbackTitle,
-      description: item ? itemText(item, "body") : fallbackBody,
-      itemId: id,
-    };
+    return item ? itemText(item, key, fallback) : fallback;
   };
+
+  const snapStill = field("snap", "still", "/media/home-v2/snap-feature/snap-still.jpg");
+  const snapVideo = field("snap", "video", "/media/home-v2/snap-feature/snap-motion.mp4");
+  const bedroomBefore = field("staging", "bedroomBefore", "/media/home-v2/staging/vs-bedroom-before.jpg");
+  const bedroomAfter = field("staging", "bedroomAfter", "/media/home-v2/staging/vs-bedroom-after.jpg");
+  const moreAngles = field("staging", "moreAngles", "");
+  const moreLabel = field("staging", "moreLabel", "More angles");
+
   return (
     <section className="bg-white py-20 md:py-24">
       <div className="container mx-auto px-4">
-        {/* Section Header */}
-        <div className="text-center mb-16">
-          <div className="inline-flex items-center px-3 py-1 rounded-md bg-black border border-black mb-6 shadow-lg">
-            <span data-site-page="home" data-site-block="features" data-site-field="badge" data-site-kind="text" className="text-[10px] font-bold tracking-wider uppercase accent-text-bordered">
+        <div className="mb-14 text-center">
+          <div className="mb-6 inline-flex items-center rounded-md border border-black bg-black px-3 py-1 shadow-lg">
+            <span data-site-page="home" data-site-block="features" data-site-field="badge" data-site-kind="text" className="accent-text-bordered text-[10px] font-bold uppercase tracking-wider">
               {badge}
             </span>
           </div>
-          <h2 data-site-page="home" data-site-block="features" data-site-field="title" data-site-kind="text" className="text-3xl md:text-5xl font-bold mb-6 text-black max-w-4xl mx-auto tracking-tight">
+          <h2 data-site-page="home" data-site-block="features" data-site-field="title" data-site-kind="text" className="mx-auto mb-6 max-w-4xl text-balance text-3xl font-bold tracking-tight text-black md:text-5xl">
             {title === FEATURE_TITLE ? <>Go beyond basic editing with <span className="accent-text-bordered">powerful</span> add-on tools</> : title}
           </h2>
-          <p data-site-page="home" data-site-block="features" data-site-field="body" data-site-kind="text" className="text-gray-500 max-w-2xl mx-auto text-sm leading-relaxed">
+          <p data-site-page="home" data-site-block="features" data-site-field="body" data-site-kind="text" className="mx-auto max-w-2xl text-balance text-sm leading-relaxed text-gray-500 md:text-base">
             {body}
           </p>
         </div>
 
-        {/* Features Bento Grid (3-Column Layout) */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto">
-
-          {/* Snap Reels */}
-          <FeatureCard
-            {...copy("snap", "Snap Reels", "Turn the listing stills into a 9:16 Snap Reel. A vertical cut buyers can watch before they ever book a showing.")}
-            colSpan="md:col-span-2"
-          >
-            <div className="flex h-full items-center justify-center p-4 gap-4">
-              <img src="/media/photos/luxury-interior.jpg" className="w-1/2 h-full object-cover rounded-lg border border-gray-100" alt="Listing still" />
-              <ArrowRight className="w-6 h-6 shrink-0" style={{ color: settings.global.primaryColor }} />
-              <div className="w-1/2 h-full relative rounded-lg overflow-hidden border border-gray-100 bg-black">
+        <div className="mx-auto grid max-w-6xl grid-cols-1 gap-6 lg:grid-cols-2">
+          <article className="flex flex-col rounded-2xl border border-dashed border-[#99f6e4] bg-[#f8fdff] p-6 lg:col-span-2">
+            <h3 data-site-page="home" data-site-block="features" data-site-item="snap" data-site-field="title" data-site-kind="text" className="text-balance text-xl font-bold text-black">
+              {field("snap", "title", "Iconic Snap Reels")}
+            </h3>
+            <p data-site-page="home" data-site-block="features" data-site-item="snap" data-site-field="body" data-site-kind="text" className="mt-2 max-w-2xl text-sm leading-relaxed text-gray-500">
+              {field("snap", "body", "Photo to video. One listing still on the left, and that same photo in motion on the right.")}
+            </p>
+            <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <figure className="overflow-hidden rounded-xl border border-gray-100 bg-black">
+                <img
+                  src={snapStill}
+                  alt="Listing photo, still"
+                  data-site-page="home"
+                  data-site-block="features"
+                  data-site-item="snap"
+                  data-site-field="still"
+                  data-site-kind="image"
+                  className="aspect-[4/5] max-h-[420px] w-full object-cover"
+                />
+                <figcaption className="bg-white px-3 py-2 text-center text-[10px] font-black uppercase tracking-[0.18em] text-teal-700">Still</figcaption>
+              </figure>
+              <figure className="overflow-hidden rounded-xl border border-gray-100 bg-black">
                 <video
-                  src={FEATURED_SNAP_REEL.src}
-                  poster={FEATURED_SNAP_REEL.poster}
-                  className="h-full w-full object-cover"
+                  src={snapVideo}
+                  poster={snapStill}
+                  data-site-page="home"
+                  data-site-block="features"
+                  data-site-item="snap"
+                  data-site-field="video"
+                  data-site-kind="video"
+                  className="aspect-[4/5] max-h-[420px] w-full object-cover"
                   autoPlay
                   muted
                   loop
                   playsInline
                   preload="metadata"
-                  aria-label={`Snap Reel — ${FEATURED_SNAP_REEL.title}`}
+                  aria-label="The same listing photo, in motion"
                 />
-                <span className="absolute bottom-2 left-2 rounded-md bg-black/70 px-2 py-1 text-[8px] font-black uppercase tracking-widest text-white">
-                  Snap Reel
-                </span>
-              </div>
+                <figcaption className="bg-white px-3 py-2 text-center text-[10px] font-black uppercase tracking-[0.18em] text-teal-700">In motion</figcaption>
+              </figure>
             </div>
-          </FeatureCard>
+          </article>
 
-          {/* One Click Import */}
-          <FeatureCard
-            {...copy("import", "One Click Import", "Pull listing photos directly from Realtor.com or Zillow to start your video in seconds.")}
-          >
-            <div className="flex flex-col h-full p-4 items-center justify-center gap-4 bg-[#f0f9ff]/30">
-              <div className="flex gap-4">
-                <div className="w-10 h-10 bg-white rounded-lg shadow-sm border border-gray-100 flex items-center justify-center font-bold text-red-500 text-xs">r</div>
-                <div className="w-10 h-10 bg-white rounded-lg shadow-sm border border-gray-100 flex items-center justify-center font-bold text-blue-600 text-xs">Z</div>
-              </div>
-              <div className="bg-white px-4 py-2 rounded-lg border border-gray-100 shadow-md text-[10px] font-medium flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: settings.global.secondaryColor }}></div>
-                Importing Listing...
-              </div>
-            </div>
-          </FeatureCard>
-
-          {/* AI Virtual Staging */}
-          <FeatureCard
-            {...copy("staging", "AI Virtual Staging", "Instantly furnish empty rooms with realistic AI staging to showcase your property's full potential.")}
-            ctaText="TRY NOW"
-            ctaLink="/services/virtual-staging"
-          >
-            <VirtualStagingSnippet />
-          </FeatureCard>
-
-          {/* AI Photo Edits */}
-          <FeatureCard
-            {...copy("edits", "AI Photo Edits", "Make your listing photos stand out with AI-powered enhancements — like twilights, lawn repairs, and other edits that instantly elevate any property.")}
-            colSpan="md:col-span-2"
-          >
-            <AiPhotoEditSnippet />
-          </FeatureCard>
-
-          {/* Studio */}
-          <FeatureCard
-            {...copy("studio", "Studio", "Iconic's built-in editor that allows you to customize your videos with templates, music, captions, branding, and even your own photos or clips.")}
-            colSpan="md:col-span-2"
-          >
-            <div className="bg-[#fcfdfd] h-full flex flex-col p-4">
-              <div className="flex gap-4 mb-4">
-                <div className="flex-1 bg-white border border-gray-100 rounded-lg shadow-sm p-3">
-                  <div className="w-full aspect-video bg-gray-100 rounded-md overflow-hidden relative">
-                    <img src="/media/photos/luxury-a7305553.jpg" className="w-full h-full object-cover" alt="Studio preview" />
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <Play className="w-4 h-4 text-white" />
-                    </div>
+          <article className="flex flex-col overflow-hidden rounded-2xl border border-dashed border-[#99f6e4] bg-[#f8fdff] p-6">
+            <h3 data-site-page="home" data-site-block="features" data-site-item="staging" data-site-field="title" data-site-kind="text" className="text-balance text-xl font-bold text-black">
+              {field("staging", "title", "AI Virtual Staging")}
+            </h3>
+            <p data-site-page="home" data-site-block="features" data-site-item="staging" data-site-field="body" data-site-kind="text" className="mt-2 text-sm leading-relaxed text-gray-500">
+              {field("staging", "body", "Empty room to furnished room, staged by Iconic. Drag the slider, then look across the angles.")}
+            </p>
+            <Link to={promoHref} className="mt-3 inline-flex text-sm font-bold text-[#0f766e] underline decoration-[#14b8a6] underline-offset-4">
+              <span data-site-page="home" data-site-block="features" data-site-item="staging" data-site-field="callout" data-site-kind="text">
+                {field("staging", "callout", "Iconic clients get FREE staging — info inside")}
+              </span>
+            </Link>
+            <div className="mt-5 overflow-hidden rounded-xl border border-gray-100 bg-white">
+              <CompareSlider
+                itemId="staging"
+                before={field("staging", "before", "/media/home-v2/staging/vs-living-before.jpg")}
+                after={field("staging", "after", "/media/home-v2/staging/vs-living-after.jpg")}
+              />
+              <div className="grid grid-cols-3 gap-1 bg-white p-2">
+                <img src={bedroomBefore} alt="Second room before staging" data-site-page="home" data-site-block="features" data-site-item="staging" data-site-field="bedroomBefore" data-site-kind="image" className="aspect-[4/3] w-full rounded-md object-cover" />
+                <img src={bedroomAfter} alt="Second room after staging" data-site-page="home" data-site-block="features" data-site-item="staging" data-site-field="bedroomAfter" data-site-kind="image" className="aspect-[4/3] w-full rounded-md object-cover" />
+                {moreAngles ? (
+                  <img src={moreAngles} alt={moreLabel} data-site-page="home" data-site-block="features" data-site-item="staging" data-site-field="moreAngles" data-site-kind="image" className="aspect-[4/3] w-full rounded-md object-cover" />
+                ) : (
+                  <div data-site-page="home" data-site-block="features" data-site-item="staging" data-site-field="moreAngles" data-site-kind="image" className="flex aspect-[4/3] w-full items-center justify-center rounded-md border border-dashed border-[#14b8a6] bg-[#f0fdfa] px-2 text-center text-[10px] font-black uppercase tracking-[0.14em] text-[#0f766e]">
+                    <span data-site-page="home" data-site-block="features" data-site-item="staging" data-site-field="moreLabel" data-site-kind="text">{moreLabel}</span>
                   </div>
-                  <div className="mt-2 h-1 rounded-full w-2/3" style={{ backgroundColor: settings.global.primaryColor }}></div>
-                </div>
-                <div className="w-24 flex flex-col gap-2">
-                  <div className="h-4 bg-gray-50 rounded border border-gray-100"></div>
-                  <div className="h-4 bg-gray-50 rounded border border-gray-100"></div>
-                  <div className="h-4 bg-gray-50 rounded border border-gray-100"></div>
-                </div>
+                )}
               </div>
-              <div className="mt-auto flex justify-between items-center text-[8px] font-bold text-gray-400 uppercase tracking-widest">
-                <span>00:15 / 00:45</span>
-                <span>HD 1080p</span>
-              </div>
+              <p className="px-3 pb-3 text-center text-[10px] font-black uppercase tracking-[0.18em] text-teal-700">By Iconic</p>
             </div>
-          </FeatureCard>
+          </article>
 
-          {/* AI Voiceovers */}
-          <FeatureCard
-            {...copy("voice", "AI Voiceovers", "Instantly generate natural-sounding narrations from a wide range of voices.")}
-          >
-            <div className="flex flex-col h-full p-4 items-center justify-center gap-4 bg-[#f0fdfa]/30">
-              <div className="w-full bg-white border border-gray-100 rounded-lg p-3 shadow-md flex items-center gap-3">
-                <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ backgroundColor: settings.global.primaryColor }}>
-                  <Play className="w-2 h-2 text-white fill-white ml-0.5" />
-                </div>
-                <div className="flex-1 flex gap-1 items-center">
-                  {[1,3,2,4,3,5,2,4,3].map((h, i) => (
-                    <div key={i} className="flex-1 bg-[#ccfbf1]" style={{height: `${h*4}px`}}></div>
-                  ))}
-                </div>
-              </div>
-              <div className="flex items-center gap-2 text-[10px] font-medium text-gray-500">
-                <span className="px-2 py-0.5 rounded bg-gray-100">Warm English Narrator</span>
-              </div>
+          <article className="flex flex-col overflow-hidden rounded-2xl border border-dashed border-[#99f6e4] bg-[#f8fdff] p-6">
+            <h3 data-site-page="home" data-site-block="features" data-site-item="edits" data-site-field="title" data-site-kind="text" className="text-balance text-xl font-bold text-black">
+              {field("edits", "title", "Bring your photos to life with After Iconic AI renders")}
+            </h3>
+            <p data-site-page="home" data-site-block="features" data-site-item="edits" data-site-field="body" data-site-kind="text" className="mt-2 text-sm leading-relaxed text-gray-500">
+              {field("edits", "body", "A daylight pavilion, finished so it feels lived in. A warm-dusk pool pair is saved beside this one if you want to swap it in.")}
+            </p>
+            <div className="mt-5 overflow-hidden rounded-xl border border-gray-100 bg-white">
+              <CompareSlider
+                itemId="edits"
+                before={field("edits", "before", "/media/home-v2/photo-edits/pavilion-before.jpg")}
+                after={field("edits", "after", "/media/home-v2/photo-edits/pavilion-after-iconic.jpg")}
+              />
             </div>
-          </FeatureCard>
+          </article>
 
-          {/* Social Media Captions */}
-          <FeatureCard
-            {...copy("captions", "Social Media Captions", "Automatically create captions optimized for Instagram, Facebook, LinkedIn, YouTube, and X.")}
-          >
-            <div className="flex flex-col h-full p-4 items-center justify-center gap-4">
-              <div className="flex gap-2 mb-2">
-                <Instagram className="w-5 h-5 text-pink-500" />
-                <Facebook className="w-5 h-5 text-blue-600" />
-                <Linkedin className="w-5 h-5 text-blue-700" />
-                <Youtube className="w-5 h-5 text-red-600" />
-                <Twitter className="w-5 h-5 text-black" />
-              </div>
-              <div className="w-full bg-gray-50 border border-dashed border-gray-200 rounded-lg p-3 text-[9px] text-gray-400 italic">
-                "Welcome to the most stunning property in The Woodlands..."
-              </div>
+          <article className="flex flex-col overflow-hidden rounded-2xl border border-dashed border-[#99f6e4] bg-[#f8fdff] p-6 lg:col-span-2">
+            <h3 data-site-page="home" data-site-block="features" data-site-item="studio" data-site-field="title" data-site-kind="text" className="text-balance text-xl font-bold text-black">
+              {field("studio", "title", "Studio")}
+            </h3>
+            <p data-site-page="home" data-site-block="features" data-site-item="studio" data-site-field="body" data-site-kind="text" className="mt-2 max-w-2xl text-sm leading-relaxed text-gray-500">
+              {field("studio", "body", "Iconic's built-in editor for templates, music, captions, branding, and your own photos or clips.")}
+            </p>
+            <div className="mt-5 overflow-hidden rounded-xl border border-gray-100 bg-white">
+              <img
+                src={field("studio", "image", "/media/home-v2/studio/iconic-studio-editor-snippet.jpg")}
+                alt="Iconic Studio editor"
+                data-site-page="home"
+                data-site-block="features"
+                data-site-item="studio"
+                data-site-field="image"
+                data-site-kind="image"
+                className="max-h-[420px] w-full bg-[#f4f7f8] object-contain object-center"
+              />
             </div>
-          </FeatureCard>
-
-          {/* AI Avatars */}
-          <FeatureCard
-            {...copy("avatars", "AI Avatars", "Create professional video presentations with AI-generated avatars for a personal touch.")}
-            colSpan="md:col-span-2"
-          >
-            <div className="flex h-full items-center justify-center p-4 gap-6">
-              {[
-                "/media/photos/lifestyle-mtz04327.jpg",
-                "/media/photos/lifestyle-kennedy-mtz01127.jpg",
-                "/media/photos/headshot-gracepoint-4.jpg",
-                "/media/photos/lifestyle-daughtery-mtz00636.jpg",
-                "/media/photos/headshot-gracepoint-1.jpg",
-              ].map((src, i) => (
-                <div key={src} className="w-16 h-16 md:w-20 md:h-20 rounded-xl border-2 shadow-lg overflow-hidden bg-gray-100 flex-shrink-0 first:ring-2" style={{ borderTopColor: 'white', borderRightColor: 'white', borderBottomColor: 'white', borderLeftColor: i === 0 ? settings.global.primaryColor : 'white', borderStyle: 'solid', boxShadow: i === 0 ? `0 0 0 2px ${settings.global.primaryColor}33, 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)` : undefined }}>
-                  <img src={src} className="w-full h-full object-cover" alt="Iconic portrait" />
-                </div>
-              ))}
-            </div>
-          </FeatureCard>
-
+          </article>
         </div>
       </div>
     </section>

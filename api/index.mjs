@@ -33705,8 +33705,8 @@ const PAGES = [
       areaField("body", "Body", "Transform your raw ideas into engaging cinematic media in minutes. Whether you're a high-growth startup serving multiple clients or an established enterprise, Iconic helps you create professional-grade visual content seamlessly.")
     ], [
       { id: "product", fields: [videoField("video", "Video", "/media/video/product-photography.mp4"), textField("title", "Title", "Product Photography")] },
-      { id: "vertical", fields: [videoField("video", "Video", "/media/reels/superpower-reel-12s.mp4"), textField("title", "Title", "Vertical Reel")] },
-      { id: "content", fields: [videoField("video", "Video", "/media/video/content-web-clip.mp4"), textField("title", "Title", "Content Package")] },
+      { id: "vertical", fields: [videoField("video", "Video", "/media/home-v2/slider/03-agent-emily-aguilar.mp4"), textField("title", "Title", "Vertical Reel")] },
+      { id: "content", fields: [videoField("video", "Video", "/media/blaze/02_US_v3.mp4"), textField("title", "Title", "Content Package")] },
       { id: "snap-luxury", fields: [videoField("video", "Video", "/media/videos/snap-reels/bayonne-snap.mp4"), textField("title", "Title", "Snap Reel · Luxury Tour")] },
       { id: "snap-modern", fields: [videoField("video", "Video", "/media/videos/snap-reels/snap-reel-02.mp4"), textField("title", "Title", "Snap Reel · Modern Living")] },
       { id: "snap-kitchen", fields: [videoField("video", "Video", "/media/videos/snap-reels/stoney-brook-blaze.mp4"), textField("title", "Title", "Snap Reel · Kitchen Glow")] },
