@@ -53,12 +53,6 @@ const fixedSelection: BookingPriceInput = {
   lifeOfTheListingCare: true,
 };
 
-function jsNumberMap(source: string, name: string): Record<string, number> {
-  const match = source.match(new RegExp(`const ${name}=(\\{[^}]+\\})`));
-  if (!match) throw new Error(`missing ${name}`);
-  return JSON.parse(match[1].replace(/'/g, '"')) as Record<string, number>;
-}
-
 describe("booking total contract", () => {
   it("keeps sidebar, submitted total, and email/SMS amount on the same number", () => {
     const sidebar = calculateSidebarTotal(fixedSelection);
@@ -155,7 +149,14 @@ describe("booking total contract", () => {
     expect(bookingForm).toContain("sumLineItemPrices(lineItems)");
     expect(bookingForm).toContain("promoDiscountFor(promoInput)");
     expect(bookingForm).toContain("bookingOffer(catalog)");
-    expect(bookingForm).toContain('collection(db, "packages")');
+    expect(bookingForm).toContain('fetch("/api/bookings/catalog")');
+    expect(bookingForm).toContain('fetch("/api/bookings/social-rate")');
+    expect(bookingForm).toContain("data.schedule");
+    expect(bookingForm).toContain("The sale covers it when it closes.");
+    expect(bookingForm).toContain("SocialCountdownBanner");
+    expect(bookingForm).toContain("Splurge Alert!!");
+    expect(bookingForm).toContain('to="/pay-at-close"');
+    expect(bookingForm).toContain("data.packages");
     expect(bookingForm).not.toContain("charging hardcoded prices");
     expect(bookingForm).not.toContain("lifeOfTheListingCarePrice");
   });
@@ -308,32 +309,37 @@ describe("booking catalog parity", () => {
 
   it("keeps ordericonic name+price lines when no catalog id matches", () => {
     const html = readFileSync(new URL("../public/ordericonic.html", import.meta.url), "utf8");
-    const basePrices = jsNumberMap(html, "basePrices");
-    const addonPrices = jsNumberMap(html, "addonPrices");
-    const addonLines = Object.entries(addonPrices).map(([name, price]) => ({ name, price }));
 
-    expect(html).toContain("selectedService:p.value");
+    expect(html).toContain('fetch(catalogUrl()');
+    expect(html).toContain("/api/bookings/catalog");
     expect(html).toContain("selectedAddOns:addons");
     expect(html).toContain("lineItems");
     expect(html).toContain(">Studio booking / pre-sale</option>");
-    expect(Object.keys(basePrices).length).toBeGreaterThan(0);
-    expect(basePrices["The Essentials — $249"]).toBe(249);
+    expect(html).toContain('value="agent-intro-video"');
+    expect(html).not.toContain('value="agent-intro"');
+    expect(html).not.toContain("October: 20% off");
 
-    for (const [label, price] of Object.entries(basePrices)) {
-      const lineItems = [{ name: label, price }, ...addonLines];
-      const resolved = resolveSubmittedBooking({
-        selectedService: label,
-        selectedAddOns: addonLines.map((item) => item.name),
-        lineItems,
-        total: lineItems.reduce((sum, item) => sum + item.price, 0),
-        leadSource: "Iconic temporary booking page",
-      });
-      expect(chargedServiceLines(resolved.lineItems).map((item) => item.price).sort((a, b) => a - b)).toEqual(
-        lineItems.map((item) => item.price).sort((a, b) => a - b),
-      );
-      expect(resolved.total).toBe(lineItems.reduce((sum, item) => sum + item.price, 0));
-      expect(resolved.selectedService).toBe(label);
-    }
+    const fromCatalog = resolveSubmittedBooking({
+      selectedService: "listing-essentials",
+      selectedAddOns: ["same-day", "agent-intro-video"],
+      premiumUpgrade: true,
+      virtualStagingCredits: 2,
+      lineItems: [
+        { id: "listing-essentials", name: "posted", price: 1 },
+        { id: "same-day", name: "posted", price: 1 },
+        { id: "agent-intro-video", name: "posted", price: 1 },
+        { id: "iconic-finish", name: "posted", price: 1 },
+        { id: "virtual-staging", name: "posted", qty: 2, price: 1 },
+      ],
+      leadSource: "Iconic temporary booking page",
+    });
+    expect(fromCatalog.lineItems.map((item) => [item.id, item.price])).toEqual([
+      ["listing-essentials", 249],
+      ["same-day", 50],
+      ["agent-intro-video", 59],
+      ["iconic-finish", 75],
+      ["virtual-staging", 70],
+    ]);
 
     const studio = resolveSubmittedBooking({
       selectedService: "Studio booking / pre-sale",

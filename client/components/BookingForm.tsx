@@ -11,8 +11,6 @@ import { MoneyAmount } from "@/components/MoneyAmount";
 import { SmsConsentField } from "@/components/SmsConsentField";
 import { DoorsOpenTourCheckbox } from "@/components/DoorsOpenTour";
 import { BUSINESS_CONTACT } from "@shared/businessContact";
-import { db } from "@/lib/firebase";
-import { collection, getDocs } from "firebase/firestore";
 import {
   APPRENTICESHIP_BRIDGE_COPY,
   APPRENTICESHIP_OVERAGE_LABEL,
@@ -35,7 +33,9 @@ import {
   type BookingPriceInput,
 } from "@shared/bookingPricing";
 import { BOOKING_PROCESSING_LABEL, estimateBookingCharge } from "@shared/invoiceProcessing";
+import SocialCountdownBanner from "@/components/SocialCountdownBanner";
 import { payAtCloseFeeDollars, type PayAtClosePublicOffer } from "@shared/payAtClose";
+import type { SocialRateStep } from "@shared/thankfulEvent";
 import { taxDollars, type PricingRates } from "@shared/pricingSettings";
 import { readPricingRates, seedPricingRates } from "@/lib/pricingAdjustments";
 import {
@@ -242,6 +242,11 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
   const [processingOn, setProcessingOn] = useState(true);
   const [pricing, setPricing] = useState<PricingRates>(() => seedPricingRates());
   const devPayAtClosePreview = import.meta.env.DEV && searchParams.get("pacPreview") === "1";
+  const [socialPercent, setSocialPercent] = useState<number | null>(null);
+  const [socialNextPercent, setSocialNextPercent] = useState<number | null>(null);
+  const [socialNextDropAt, setSocialNextDropAt] = useState<string | null>(null);
+  const [socialSchedule, setSocialSchedule] = useState<SocialRateStep[]>([]);
+  const [socialDate, setSocialDate] = useState("");
   const [payAtCloseOffer, setPayAtCloseOffer] = useState<PayAtClosePublicOffer>({
     live: false,
     enabledByOffice: false,
@@ -261,6 +266,9 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
   const basicsList = offer.basics;
   const campaignCategories = (["listings", "branding", "business", "growth", "studio"] as const)
     .filter((cat) => services.some((item) => item.category === cat));
+  const socialOffLabel = socialPercent == null
+    ? null
+    : `${Number.isInteger(socialPercent) ? socialPercent : socialPercent}%`;
   const iconicFinishPrice = offer.iconicFinish?.price ?? 0;
   const virtualStagingUnitPrice = offer.virtualStaging?.price ?? 0;
   const specializedSocialPrice = offer.specializedSocial?.price ?? 0;
@@ -273,6 +281,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (cancelled || !data) return;
+        if (Array.isArray(data.packages)) setCatalog(data.packages);
         if (typeof data.processingEnabled === "boolean") setProcessingOn(data.processingEnabled);
         if (data.pricingRates && typeof data.pricingRates === "object") {
           setPricing((current) => ({ ...current, ...data.pricingRates }));
@@ -280,6 +289,26 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
         if (data.payAtClose && typeof data.payAtClose === "object") {
           setPayAtCloseOffer(data.payAtClose as PayAtClosePublicOffer);
         }
+      })
+      .catch(() => {
+        if (!cancelled) setCatalog(packagesForStaffEditor([]));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/bookings/social-rate")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled || !data || data.ended === true || typeof data.percent !== "number") return;
+        setSocialPercent(data.percent);
+        setSocialNextPercent(typeof data.nextPercent === "number" ? data.nextPercent : null);
+        setSocialNextDropAt(typeof data.nextDropAt === "string" ? data.nextDropAt : null);
+        setSocialSchedule(Array.isArray(data.schedule) ? data.schedule : []);
+        setSocialDate(typeof data.date === "string" ? data.date : "");
       })
       .catch(() => {});
     return () => {
@@ -294,23 +323,6 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
         if (!cancelled && next) setPricing(next);
       })
       .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // Booking prices come from the packages catalog. A failed read keeps the seed.
-  useEffect(() => {
-    let cancelled = false;
-    getDocs(collection(db, "packages"))
-      .then((snap) => {
-        if (cancelled) return;
-        setCatalog(packagesForStaffEditor(snap.docs.map((entry) => ({ id: entry.id, ...entry.data() }))));
-      })
-      .catch((err) => {
-        console.warn("[Booking] Catalog read failed — using the seeded catalog", err);
-        if (!cancelled) setCatalog(packagesForStaffEditor([]));
-      });
     return () => {
       cancelled = true;
     };
@@ -783,7 +795,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
   };
 
   const renderSummarySidebar = () => (
-    <div data-testid="booking-estimator" className="bg-white text-neutral-950 rounded-[2rem] border border-gray-100 p-6 shadow-xl sticky top-8">
+    <div data-testid="booking-estimator" className="bg-white text-neutral-950 rounded-[2rem] border border-gray-100 p-6 shadow-xl">
       <h3 className="text-lg font-black text-black uppercase tracking-tight mb-4 pb-3 border-b">Order Summary</h3>
       <div className="space-y-3 mb-6">
         {selectedServiceData && (
@@ -972,6 +984,15 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
                 // Campaign Tiers View
                 campaignCategories.map((cat) => (
                   <div key={cat} className="space-y-3">
+                    {cat === "business" && socialOffLabel ? (
+                      <SocialCountdownBanner
+                        percent={socialPercent!}
+                        nextPercent={socialNextPercent}
+                        nextDropAt={socialNextDropAt}
+                        schedule={socialSchedule}
+                        today={socialDate}
+                      />
+                    ) : null}
                     <button 
                       onClick={() => toggleCategory(cat)}
                       className="w-full flex items-center justify-between gap-3 p-4 bg-white border border-gray-100 rounded-2xl hover:bg-gray-50 transition-all shadow-sm"
@@ -1003,7 +1024,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
                           exit={{ height: 0, opacity: 0 }}
                           className="overflow-hidden"
                         >
-                          <div className={cat === "listings" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 p-1" : "space-y-2 p-1"}>
+                          <div className={cat === "listings" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 px-1 pb-1 pt-4" : "space-y-2 px-1 pb-1 pt-4"}>
                             {cat === "business" && (
                               <div className="w-full">
                                 <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-2 px-1">Phase 1: Establishing Foundation</p>
@@ -1022,16 +1043,21 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
                                 )}
                                 <button
                                   onClick={() => toggleService(s.id)}
-                                  className={`relative p-4 rounded-2xl border-2 transition-all text-left flex flex-col justify-between group h-full ${
+                                  className={`relative rounded-2xl border-2 px-4 pb-4 text-left transition-all flex flex-col justify-between group h-full ${s.isPopular ? "pt-7" : "pt-4"} ${
                                     formData.selectedService === s.id ? 'border-black bg-white scale-[1.01] shadow-lg' : 'border-gray-100 bg-white hover:border-gray-200'
                                   } ${s.highlights ? 'border-teal-300' : ''}`}
                                 >
                                   {s.isPopular && (
-                                    <div className="absolute -top-2 left-1/2 -translate-x-1/2 bg-red-500 text-white text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest whitespace-nowrap shadow-lg">
+                                    <div className="absolute top-2 left-1/2 z-10 -translate-x-1/2 bg-red-500 text-white text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest whitespace-nowrap shadow-lg">
                                       Best Value
                                     </div>
                                   )}
-                                  <div className="flex-1 space-y-1">
+                                  {cat === "business" && socialOffLabel ? (
+                                    <span className="absolute right-3 top-2 z-10 rounded-full bg-[#FFD700] px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-black shadow">
+                                      {socialOffLabel} off
+                                    </span>
+                                  ) : null}
+                                  <div className={`flex-1 space-y-1 ${cat === "business" && socialOffLabel ? "pr-16" : ""}`}>
                                     <h4 className="font-black text-black uppercase text-[11px] leading-tight">{s.name}</h4>
                                     <p className="text-[10px] text-gray-500 leading-relaxed line-clamp-2">{s.description}</p>
                                   </div>
@@ -1969,9 +1995,17 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
         </div>
 
         {/* Sidebar Summary Area */}
-        <div className="w-full lg:w-[350px]">
+        <div className="w-full lg:w-[380px]">
+           <div className="flex flex-col gap-6 lg:sticky lg:top-32">
+           <Link to="/pay-at-close" data-testid="splurge-alert" className="block rounded-[2rem] bg-[#1c140c] p-6 text-[#fff7ed] shadow-xl ring-2 ring-[#FFD700]">
+              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#FFD700]">Pay later</p>
+              <h3 className="mt-2 text-2xl font-black leading-none text-white">Splurge Alert!!</h3>
+              <p className="mt-3 text-sm font-semibold leading-snug">Give every listing the budget it deserves, and pay at closing.</p>
+              <p className="mt-2 text-sm font-black text-[#FFD700]">The sale covers it when it closes.</p>
+              <span className="mt-4 inline-block text-sm font-black text-white">Pay Later at Closing →</span>
+           </Link>
            {renderSummarySidebar()}
-           <div className="mt-6 p-6 bg-black rounded-[2rem] text-white space-y-4">
+           <div className="p-6 bg-black rounded-[2rem] text-white space-y-4">
               <div className="flex items-center gap-2.5">
                  <HelpCircle className="w-4 h-4 text-teal-400" />
                  <h4 className="font-black uppercase tracking-widest text-[11px]">Need help?</h4>
@@ -2000,6 +2034,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
                     <span className="text-[9px] font-black uppercase tracking-widest group-hover:text-teal-400 transition-colors whitespace-nowrap">{BUSINESS_CONTACT.phoneDisplay}</span>
                  </a>
               </div>
+           </div>
            </div>
         </div>
       </div>

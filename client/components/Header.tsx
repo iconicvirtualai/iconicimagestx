@@ -43,9 +43,9 @@ export default function Header() {
   const logoSrc = useSiteText("chrome", "brand", "logo", "/media/logos/camera-logo-white-on-black.png");
 
   return (
-    <header className={`fixed ${showPromo ? "top-[44px]" : "top-4"} left-0 right-0 z-50 px-6 transition-all duration-300`}>
+    <header className={`fixed ${showPromo ? "top-14" : "top-6"} left-0 right-0 z-50 px-4 transition-all duration-300 sm:px-6`}>
       <div
-        className="mx-auto max-w-[1200px] rounded-full border border-white/20 bg-black/40 backdrop-blur-xl shadow-[0_4px_30px_rgba(0,0,0,0.3)] transition-all duration-500 px-6 py-1.5 flex items-center gap-4"
+        className="mx-auto flex min-h-16 max-w-[1280px] items-center gap-3 overflow-visible rounded-full border border-white/20 bg-black/40 px-4 py-3 shadow-[0_4px_30px_rgba(0,0,0,0.3)] backdrop-blur-xl transition-all duration-500 sm:gap-4 sm:px-6"
       >
         {/* Logo */}
         <Link to="/" className="flex items-center gap-2 flex-shrink-0 group">
@@ -66,12 +66,12 @@ export default function Header() {
         </Link>
 
         {/* Desktop Navigation (Left Aligned) */}
-        <nav className="hidden lg:flex items-center gap-8 ml-8 flex-1">
+        <nav className="hidden min-w-0 flex-1 items-center gap-x-3 overflow-visible lg:flex xl:ml-4 xl:gap-x-5">
           {menuItems.map((item) => (
             <Link
               key={item.href}
               to={item.href}
-              className="text-white/70 hover:text-white transition-colors text-[13px] font-semibold"
+              className="whitespace-nowrap text-[13px] font-semibold text-white/70 transition-colors hover:text-white"
             >
               {item.label}
             </Link>
@@ -92,7 +92,7 @@ export default function Header() {
 
         {/* Mobile Menu Button */}
         <button
-          className="lg:hidden p-2 text-white/70 hover:text-white transition-colors"
+          className="inline-flex shrink-0 p-2 text-white/70 transition-colors hover:text-white lg:hidden"
           onClick={toggleMenu}
           aria-label="Toggle menu"
         >

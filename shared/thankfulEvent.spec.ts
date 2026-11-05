@@ -13,6 +13,7 @@ import {
   nextChicagoMidnightIso,
   socialRateForInstant,
   socialRatePreviewAllowed,
+  socialRateSchedule,
   socialRateView,
   thankfulRsvpOpen,
 } from "./thankfulEvent";
@@ -141,12 +142,21 @@ describe("thankful event on Nov 7", () => {
     expect(nextChicagoMidnightIso("2026-10-18")).toBe("2026-10-19T05:00:00.000Z");
     expect(nextChicagoMidnightIso("2026-11-04")).toBe("2026-11-05T06:00:00.000Z");
     expect(nextChicagoMidnightIso("2026-11-07")).toBe("2026-11-08T06:00:00.000Z");
+    expect(socialRateSchedule("2026-11-04").map((step) => [step.date, step.percent])).toEqual([
+      ["2026-11-04", 22],
+      ["2026-11-05", 21.5],
+      ["2026-11-06", 21],
+      ["2026-11-07", 20],
+    ]);
+    expect(socialRateSchedule("2026-11-08")).toEqual([]);
     expect(socialRateView(today, null, false)).toEqual({
       date: "2026-10-18",
       percent: 47,
       ended: false,
       dropsTomorrow: true,
       nextDropAt: "2026-10-19T05:00:00.000Z",
+      nextPercent: 45,
+      schedule: socialRateSchedule("2026-10-18"),
       preview: false,
     });
     expect(socialRateView(today, "2026-11-07", false)).toMatchObject({
@@ -160,6 +170,8 @@ describe("thankful event on Nov 7", () => {
       ended: false,
       dropsTomorrow: false,
       nextDropAt: null,
+      nextPercent: null,
+      schedule: [{ date: "2026-11-07", percent: 20 }],
       preview: true,
     });
     expect(socialRateView(new Date("2026-11-04T17:00:00.000Z"), null, false)).toMatchObject({

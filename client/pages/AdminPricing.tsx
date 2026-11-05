@@ -688,13 +688,24 @@ function PriceList({
     return String(row[key as keyof typeof row] || "").toLowerCase().includes(value.toLowerCase());
   }));
 
+  const columns = [
+    { key: "id", label: "ID", min: "min-w-[10rem]" },
+    { key: "name", label: "Name", min: "min-w-[12rem]" },
+    { key: "price", label: "Price", min: "min-w-[7rem]" },
+    { key: "priceMax", label: "Price max", min: "min-w-[8rem]" },
+    { key: "category", label: "Category", min: "min-w-[8rem]" },
+    { key: "active", label: "Active", min: "min-w-[7rem]" },
+    { key: "description", label: "Description", min: "min-w-[280px]" },
+    { key: "charged", label: "Charged", min: "min-w-[11rem]" },
+  ] as const;
+
   const filter = (column: string) => (
     <input
       aria-label={`Filter ${column}`}
       placeholder="Filter..."
       value={filters[column] || ""}
       onChange={(event) => setFilters({ ...filters, [column]: event.target.value })}
-      className="mt-2 h-7 w-full rounded-md border border-slate-200 px-2 text-[10px] font-medium"
+      className="mt-2 box-border h-8 w-full min-w-[6.5rem] rounded-md border border-slate-200 px-2 text-xs font-medium normal-case tracking-normal text-slate-700"
     />
   );
 
@@ -707,13 +718,13 @@ function PriceList({
         </p>
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full">
+        <table className="w-max min-w-full border-collapse">
           <thead className="bg-slate-50/50">
             <tr>
-              {["id", "name", "price", "priceMax", "category", "active", "description", "charged"].map((column) => (
-                <th key={column} className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-500">
-                  {column}
-                  {filter(column)}
+              {columns.map((column) => (
+                <th key={column.key} className={`whitespace-nowrap px-4 py-3 text-left align-bottom text-[10px] font-black uppercase tracking-widest text-slate-500 ${column.min}`}>
+                  <span className="block whitespace-nowrap">{column.label}</span>
+                  {filter(column.key)}
                 </th>
               ))}
             </tr>
@@ -721,14 +732,16 @@ function PriceList({
           <tbody>
             {rows.map((row) => (
               <tr key={row.id} className="border-t border-slate-50">
-                <td className="whitespace-nowrap px-4 py-3 font-mono text-[11px] font-bold text-[#0d9488]">{row.id}</td>
-                <td className="whitespace-nowrap px-4 py-3 text-xs font-black uppercase">{row.name}</td>
-                <td className="whitespace-nowrap px-4 py-3 text-xs font-bold">${row.price}</td>
-                <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-400">{row.priceMax ? `$${row.priceMax}` : "—"}</td>
-                <td className="whitespace-nowrap px-4 py-3 text-[10px] font-black uppercase">{row.category}</td>
-                <td className="whitespace-nowrap px-4 py-3 text-[10px] font-black uppercase">{row.active}</td>
-                <td className="max-w-md px-4 py-3 align-top text-xs font-medium text-slate-500 whitespace-normal">{row.description}</td>
-                <td className="px-4 py-3 text-[10px] font-bold uppercase text-slate-500">{row.charged}</td>
+                <td className="whitespace-nowrap px-4 py-2 font-mono text-[11px] font-bold text-[#0d9488]">{row.id}</td>
+                <td className="whitespace-nowrap px-4 py-2 text-xs font-black uppercase">{row.name}</td>
+                <td className="whitespace-nowrap px-4 py-2 text-xs font-bold">${row.price}</td>
+                <td className="whitespace-nowrap px-4 py-2 text-xs text-slate-400">{row.priceMax ? `$${row.priceMax}` : "—"}</td>
+                <td className="whitespace-nowrap px-4 py-2 text-[10px] font-black uppercase">{row.category}</td>
+                <td className="whitespace-nowrap px-4 py-2 text-[10px] font-black uppercase">{row.active}</td>
+                <td className="px-4 py-2 align-top">
+                  <p className="line-clamp-3 w-[280px] text-xs font-medium leading-5 text-slate-500" title={row.description}>{row.description}</p>
+                </td>
+                <td className="whitespace-nowrap px-4 py-2 text-[10px] font-bold uppercase text-slate-500">{row.charged}</td>
               </tr>
             ))}
           </tbody>

@@ -995,7 +995,7 @@ async function socialRateCaller(req: { headers: { authorization?: string | strin
   }
 }
 
-// Today's social rate only. The full table stays on the server.
+// Today's rate plus the remaining steps from the server table.
 // ?date= is a preview for an active admin or the delivery-QA test mailbox.
 router.get("/social-rate", async (req, res) => {
   res.setHeader("Cache-Control", "no-store");

@@ -5,7 +5,7 @@ export default function BookPage() {
   return (
     <Layout>
       <div className="bg-white text-neutral-950">
-        <div className="px-4 py-8 sm:p-10">
+        <div className="px-4 pb-10 pt-32 sm:px-10 sm:pb-12 sm:pt-36">
           <BookingForm />
         </div>
       </div>

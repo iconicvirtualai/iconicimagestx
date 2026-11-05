@@ -564,7 +564,12 @@ describe("public booking calendar hold", () => {
     expect(JSON.stringify(slots)).not.toContain("Quinn");
 
     const today = chicagoDateKey(new Date());
-    const dropsTomorrow = Object.prototype.hasOwnProperty.call(SOCIAL_RATE_BY_DATE, today) && SOCIAL_RATE_BY_DATE[today] !== 20;
+    const schedule = Object.keys(SOCIAL_RATE_BY_DATE)
+      .filter((date) => date >= today)
+      .sort()
+      .map((date) => ({ date, percent: SOCIAL_RATE_BY_DATE[date] }));
+    const nextPercent = schedule.length > 1 ? schedule[1].percent : null;
+    const dropsTomorrow = nextPercent != null;
     const publicRate = await fetch(`${baseUrl}/api/bookings/social-rate?date=2026-11-07`);
     const publicBody = await publicRate.json();
     expect(publicRate.status).toBe(200);
@@ -572,13 +577,15 @@ describe("public booking calendar hold", () => {
     expect(publicBody).toEqual({
       date: today,
       percent: Object.prototype.hasOwnProperty.call(SOCIAL_RATE_BY_DATE, today) ? SOCIAL_RATE_BY_DATE[today] : null,
-      ended: !Object.prototype.hasOwnProperty.call(SOCIAL_RATE_BY_DATE, today),
+      ended: schedule.length === 0,
       dropsTomorrow,
       nextDropAt: dropsTomorrow ? nextChicagoMidnightIso(today) : null,
+      nextPercent,
+      schedule,
       preview: false,
     });
-    expect(JSON.stringify(publicBody)).not.toContain("2026-11-06");
-    expect(Object.keys(publicBody).sort()).toEqual(["date", "dropsTomorrow", "ended", "nextDropAt", "percent", "preview"]);
+    expect(publicBody.date).toBe(today);
+    expect(Object.keys(publicBody).sort()).toEqual(["date", "dropsTomorrow", "ended", "nextDropAt", "nextPercent", "percent", "preview", "schedule"]);
 
     docs("staff").set("admin-1", { role: "admin", isActive: true });
     const adminRate = await fetch(`${baseUrl}/api/bookings/social-rate?date=2026-11-07`, {
