@@ -33,7 +33,9 @@ import {
   type BookingPriceInput,
 } from "@shared/bookingPricing";
 import { BOOKING_PROCESSING_LABEL, estimateBookingCharge } from "@shared/invoiceProcessing";
+import SocialCountdownBanner from "@/components/SocialCountdownBanner";
 import { payAtCloseFeeDollars, type PayAtClosePublicOffer } from "@shared/payAtClose";
+import type { SocialRateStep } from "@shared/thankfulEvent";
 import { taxDollars, type PricingRates } from "@shared/pricingSettings";
 import { readPricingRates, seedPricingRates } from "@/lib/pricingAdjustments";
 import {
@@ -241,6 +243,10 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
   const [pricing, setPricing] = useState<PricingRates>(() => seedPricingRates());
   const devPayAtClosePreview = import.meta.env.DEV && searchParams.get("pacPreview") === "1";
   const [socialPercent, setSocialPercent] = useState<number | null>(null);
+  const [socialNextPercent, setSocialNextPercent] = useState<number | null>(null);
+  const [socialNextDropAt, setSocialNextDropAt] = useState<string | null>(null);
+  const [socialSchedule, setSocialSchedule] = useState<SocialRateStep[]>([]);
+  const [socialDate, setSocialDate] = useState("");
   const [payAtCloseOffer, setPayAtCloseOffer] = useState<PayAtClosePublicOffer>({
     live: false,
     enabledByOffice: false,
@@ -299,6 +305,10 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
       .then((data) => {
         if (cancelled || !data || data.ended === true || typeof data.percent !== "number") return;
         setSocialPercent(data.percent);
+        setSocialNextPercent(typeof data.nextPercent === "number" ? data.nextPercent : null);
+        setSocialNextDropAt(typeof data.nextDropAt === "string" ? data.nextDropAt : null);
+        setSocialSchedule(Array.isArray(data.schedule) ? data.schedule : []);
+        setSocialDate(typeof data.date === "string" ? data.date : "");
       })
       .catch(() => {});
     return () => {
@@ -975,11 +985,13 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
                 campaignCategories.map((cat) => (
                   <div key={cat} className="space-y-3">
                     {cat === "business" && socialOffLabel ? (
-                      <div data-testid="social-november-banner" className="overflow-hidden rounded-2xl bg-[#1c140c] px-5 py-4 text-[#fff7ed] shadow-lg ring-2 ring-[#FFD700]">
-                        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#FFD700]">This November</p>
-                        <p className="mt-1 text-3xl font-black leading-none tracking-tight text-[#FFD700]">{socialOffLabel} OFF</p>
-                        <p className="mt-1 text-sm font-black uppercase tracking-[0.16em]">Social packages</p>
-                      </div>
+                      <SocialCountdownBanner
+                        percent={socialPercent!}
+                        nextPercent={socialNextPercent}
+                        nextDropAt={socialNextDropAt}
+                        schedule={socialSchedule}
+                        today={socialDate}
+                      />
                     ) : null}
                     <button 
                       onClick={() => toggleCategory(cat)}
@@ -1989,7 +2001,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
               <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#FFD700]">Pay later</p>
               <h3 className="mt-2 text-2xl font-black leading-none text-white">Splurge Alert!!</h3>
               <p className="mt-3 text-sm font-semibold leading-snug">Give every listing the budget it deserves, and pay at closing.</p>
-              <p className="mt-2 text-sm font-black text-[#FFD700]">Your seller covers it when they pay you.</p>
+              <p className="mt-2 text-sm font-black text-[#FFD700]">The sale covers it when it closes.</p>
               <span className="mt-4 inline-block text-sm font-black text-white">Pay Later at Closing →</span>
            </Link>
            {renderSummarySidebar()}

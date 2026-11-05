@@ -97,14 +97,32 @@ export function socialRateForInstant(now: Date): number | null {
   return socialRateForDateKey(chicagoDateKey(now));
 }
 
+export interface SocialRateStep {
+  date: string;
+  percent: number;
+}
+
 export interface SocialRateView {
   date: string;
   percent: number | null;
   ended: boolean;
   dropsTomorrow: boolean;
-  /** Chicago midnight when the next lower rate starts. Null on Nov 7 and after the promo. */
+  /** Chicago midnight when the next lower rate starts. Null on the last day and after the promo. */
   nextDropAt: string | null;
+  /** Percent that starts at nextDropAt. Null when this day is the last step. */
+  nextPercent: number | null;
+  /** This day through the last day in the rate table. Empty once the promo has ended. */
+  schedule: SocialRateStep[];
   preview: boolean;
+}
+
+/** Remaining steps from a Chicago calendar day through the last day in the table. */
+export function socialRateSchedule(fromDate: string): SocialRateStep[] {
+  if (!SOCIAL_DATE_KEY.test(fromDate) || socialRateForDateKey(fromDate) == null) return [];
+  return Object.keys(SOCIAL_RATE_BY_DATE)
+    .filter((date) => date >= fromDate)
+    .sort()
+    .map((date) => ({ date, percent: SOCIAL_RATE_BY_DATE[date] }));
 }
 
 /**
@@ -158,13 +176,17 @@ export function socialRateView(now: Date, requestedDate: string | null, previewA
   const preview = Boolean(asked && asked !== today && previewAllowed);
   const date = preview && asked ? asked : today;
   const percent = socialRateForDateKey(date);
-  const dropsTomorrow = percent != null && percent !== SOCIAL_RATE_BY_DATE[THANKFUL_EVENT_DATE];
+  const schedule = socialRateSchedule(date);
+  const nextPercent = schedule.length > 1 ? schedule[1].percent : null;
+  const dropsTomorrow = nextPercent != null;
   return {
     date,
     percent,
     ended: percent == null,
     dropsTomorrow,
     nextDropAt: dropsTomorrow ? nextChicagoMidnightIso(date) : null,
+    nextPercent,
+    schedule,
     preview,
   };
 }
