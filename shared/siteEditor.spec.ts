@@ -111,4 +111,27 @@ describe("published merge", () => {
     expect(JSON.stringify(slides)).not.toContain("removed-reel");
     expect(JSON.stringify(slides)).not.toContain("former-employee");
   });
+
+  it("swaps the about decade tiles for the six mashup slots and keeps a saved label", () => {
+    const about = defaultPage("about");
+    if (!about) throw new Error("missing about");
+    const merged = mergeContent({
+      ...about,
+      blocks: about.blocks.map((block) => block.id === "hero"
+        ? {
+          ...block,
+          items: [
+            { id: "est", fields: [{ id: "image", label: "Photo", kind: "image" as const, value: "/media/about/tiles/01_est_2016.jpg" }, { id: "label", label: "Label", kind: "text" as const, value: "Est. 2016" }] },
+            { id: "mix-1", fields: [{ id: "video", label: "Video", kind: "video" as const, value: "/media/about/decade-mashups/mix-1.mp4" }, { id: "poster", label: "Poster", kind: "image" as const, value: "/media/about/decade-mashups/mix-1.jpg" }, { id: "label", label: "Label", kind: "text" as const, value: "Our decade" }] },
+          ],
+        }
+        : block),
+    });
+    const items = merged?.blocks.find((block) => block.id === "hero")?.items ?? [];
+    expect(items.map((item) => item.id)).toEqual(["mix-1", "mix-2", "mix-3", "mix-4", "mix-5", "mix-6"]);
+    expect(items[0]?.fields.find((field) => field.id === "label")?.value).toBe("Our decade");
+    expect(items[0]?.fields.find((field) => field.id === "video")?.kind).toBe("video");
+    expect(items[5]?.fields.find((field) => field.id === "video")?.value).toBe("/media/about/decade-mashups/mix-6.mp4");
+    expect(JSON.stringify(items)).not.toContain("01_est_2016");
+  });
 });
