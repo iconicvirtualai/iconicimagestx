@@ -53,6 +53,58 @@ describe("holiday Square payment link", () => {
     const quick = posted?.body.quick_pay as { price_money: { amount: number } };
     expect(quick.price_money.amount).toBe(25000);
     expect(String(posted?.body.payment_note)).toContain("invoiceId:inv-2");
+    const redirect = (posted?.body.checkout_options as { redirect_url?: string }).redirect_url || "";
+    expect(redirect).toBe("https://iconicimagestx.vercel.app/thankful?paid=1&order=%23011#social-saves");
+  });
+
+  it("keeps a same-origin return path and rejects an off-site redirect", async () => {
+    let redirect = "";
+    const result = await createHolidaySquareCheckout({
+      invoiceId: "stk-artavia",
+      amount: 49.99,
+      itemName: "Artavia amenity photos",
+      leadSource: "Stock footage",
+      orderNumber: "STK-1",
+      redirectUrl: "https://iconicimagestx.vercel.app/stock-footage?paid=1&set=artavia&order=STK-1",
+      logLabel: "Amenity stock",
+      env: {
+        SQUARE_ACCESS_TOKEN: "sq-test",
+        SQUARE_LOCATION_ID: "LOC",
+      },
+      fetchImpl: (async (_url: string, init?: { body?: string }) => {
+        redirect = JSON.parse(init?.body || "{}").checkout_options.redirect_url;
+        return {
+          ok: true,
+          json: async () => ({ payment_link: { id: "link-2", order_id: "order-2", url: "https://square.link/u/stock" } }),
+        };
+      }) as unknown as typeof fetch,
+    });
+    expect(result.checkoutUrl).toBe("https://square.link/u/stock");
+    expect(redirect).toBe("https://iconicimagestx.vercel.app/stock-footage?paid=1&set=artavia&order=STK-1");
+
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    const rejected = await createHolidaySquareCheckout({
+      invoiceId: "stk-artavia",
+      amount: 49.99,
+      itemName: "Artavia amenity photos",
+      leadSource: "Stock footage",
+      orderNumber: "STK-1",
+      redirectUrl: "https://evil.example/stock-footage",
+      logLabel: "Amenity stock",
+      env: {
+        SQUARE_ACCESS_TOKEN: "sq-test",
+        SQUARE_LOCATION_ID: "LOC",
+      },
+      fetchImpl: (() => {
+        throw new Error("Square should not be called");
+      }) as unknown as typeof fetch,
+    });
+    expect(rejected).toEqual({ payment: "fallback" });
+    expect(errors).toHaveBeenCalledWith(
+      "[Amenity stock] Square payment link was not created.",
+      expect.objectContaining({ reason: "redirect_rejected" }),
+    );
+    errors.mockRestore();
   });
 
   it("logs the Square status and error code when the link is refused", async () => {
