@@ -693,6 +693,12 @@ const PUBLIC_PAGES = [
     description: "Iconic Images is a Spring, Texas studio for real estate media, serving The Woodlands, Houston, and nearby communities since 2016."
   },
   {
+    path: "/what-we-do",
+    file: "seo/what-we-do.html",
+    title: "What does Iconic do? | Iconic Images",
+    description: "What Iconic Images does: listing photos, video, aerials, Snap Reels, twilight, and portraits in Spring, The Woodlands, and Houston."
+  },
+  {
     path: "/pricing",
     file: "seo/pricing.html",
     title: "Pricing | Iconic Images",
@@ -721,6 +727,12 @@ const PUBLIC_PAGES = [
     file: "seo/contact.html",
     title: "Contact | Iconic Images",
     description: "Contact Iconic Images in Spring, Texas about real estate photography and video in The Woodlands and Houston."
+  },
+  {
+    path: "/partners",
+    file: "seo/partners.html",
+    title: "Partners | Iconic Images",
+    description: "Photographers and real estate media companies can sign up to work with Iconic Images on listing media."
   },
   {
     path: "/socials",
@@ -1497,6 +1509,95 @@ function sniffMedia(bytes) {
   }
   return null;
 }
+const CLIENT_REVIEWS = [
+  {
+    initials: "R.J.",
+    role: "Google review",
+    stars: 5,
+    quote: "Daniel was very professional, offered honest and insightful feedback. Great attitude! We enjoyed working with him. Highly recommend."
+  },
+  {
+    initials: "S.Y.",
+    role: "Google review",
+    stars: 5,
+    quote: "Iconic Images has been providing me their services since they began and have been my go to ever since! The ease of scheduling, efficient communication, punctuality, quality and quick turnaround are some of the reasons why I highly recommend them. All photographers are professional and friendly. They always handle special requests with ease and no hesitations. Their services are a great asset to my business."
+  },
+  {
+    initials: "E.M.",
+    role: "Client",
+    stars: 5,
+    quote: "Pedro was awesome. 5 stars!"
+  },
+  {
+    initials: "H.D.",
+    role: "Client",
+    stars: 5,
+    quote: "Thank you so much, the pictures look great. Thank y'all so much for the quick turn around and wonderful service. My client had nothing but nice things to say about the photos process."
+  },
+  {
+    initials: "S.T.",
+    role: "Client",
+    stars: 5,
+    quote: "Holy cow. Once again, Mike is the miracle worker. These look great!"
+  },
+  {
+    initials: "L.F.",
+    role: "Client",
+    stars: 5,
+    quote: "Thank you so much. You guys always do a great job."
+  },
+  {
+    initials: "J.M.",
+    role: "Client",
+    stars: 5,
+    quote: "Wow, that looks fantastic! This is exactly what I was hoping for."
+  },
+  {
+    initials: "N.I.",
+    role: "Client",
+    stars: 5,
+    quote: "Love your work."
+  },
+  {
+    initials: "A.P.",
+    role: "Client",
+    stars: 5,
+    quote: "Yes! That works. He did a great job."
+  },
+  {
+    initials: "C.B.",
+    role: "Client",
+    stars: 5,
+    quote: "I'd like the same photographer. They did a great job. Same angles are great."
+  },
+  {
+    initials: "K.W.",
+    role: "Client",
+    stars: 5,
+    quote: "After a quick review everything looks great!"
+  },
+  {
+    initials: "A.A.",
+    role: "Client",
+    stars: 5,
+    quote: "The photos look perfect!"
+  },
+  {
+    initials: "W.L.",
+    role: "Client",
+    stars: 5,
+    quote: "The video looks absolutely FIRE! I love it SO much!"
+  }
+];
+CLIENT_REVIEWS.find((review) => review.initials === "S.Y.") ?? CLIENT_REVIEWS[0];
+const DECADE_MASHUPS = [
+  { id: "mix-1", video: "/media/about/decade-mashups/mix-1.mp4", poster: "/media/about/decade-mashups/mix-1.jpg", label: "The Standard" },
+  { id: "mix-2", video: "/media/about/decade-mashups/mix-2.mp4", poster: "/media/about/decade-mashups/mix-2.jpg", label: "On Set" },
+  { id: "mix-3", video: "/media/about/decade-mashups/mix-3.mp4", poster: "/media/about/decade-mashups/mix-3.jpg", label: "Together" },
+  { id: "mix-4", video: "/media/about/decade-mashups/mix-4.mp4", poster: "/media/about/decade-mashups/mix-4.jpg", label: "The Field" },
+  { id: "mix-5", video: "/media/about/decade-mashups/mix-5.mp4", poster: "/media/about/decade-mashups/mix-5.jpg", label: "In House" },
+  { id: "mix-6", video: "/media/about/decade-mashups/mix-6.mp4", poster: "/media/about/decade-mashups/mix-6.jpg", label: "The Craft" }
+];
 function seo(path2) {
   const page2 = PUBLIC_PAGES.find((item) => item.path === path2);
   return {
@@ -1538,7 +1639,8 @@ const PAGES = [
   page("chrome", "", "Header, footer, and promo", [
     block("promo", "Promo bar", [
       textField("visible", "Show promo bar", "true"),
-      textField("text", "Promo text", "FREE AI STAGING ON YOUR FIRST ORDER - CODE: ICONICAI")
+      textField("text", "Promo text", "FREE AI STAGING ON YOUR FIRST ORDER - CODE: ICONICAI"),
+      linkField("link", "Promo link", "Free AI staging", "/book")
     ]),
     block("brand", "Logo and color", [
       textField("logoText", "Logo wordmark", "ICONIC"),
@@ -1562,6 +1664,7 @@ const PAGES = [
       textField("copyright", "Copyright name", LEGAL_BUSINESS_NAME)
     ], [
       linkItem("home", "Home", "/"),
+      linkItem("whatWeDo", "What we do", "/what-we-do"),
       linkItem("pricing", "Pricing", "/pricing"),
       linkItem("socials", "Socials", "/socials"),
       linkItem("portfolio", "Portfolio", "/portfolio"),
@@ -1602,26 +1705,30 @@ const PAGES = [
       textField("titleLead", "Title lead", "We"),
       textField("titleAccent", "Title accent", "ARE"),
       textField("titleTail", "Title tail", "the Bar."),
-      areaField("body", "Body", "We don’t follow trends. We break patterns. We don’t undercut. We outperform.")
+      areaField("body", "Body", "We don’t follow trends. We break patterns. We don’t undercut. We outperform."),
+      videoField("video", "Phone video", "/media/video/content-web-clip.mp4")
     ]),
     block("market", "Our market", [
       textField("titleLead", "Title lead", "This Is"),
       textField("titleAccent", "Title accent", "OUR"),
       textField("titleTail", "Title tail", "Market."),
-      areaField("body", "Body", "Iconic was built here. We’ve invested here. We’ve shaped here. Winning brands don’t chase. They choose Iconic.")
+      areaField("body", "Body", "Iconic was built here. We’ve invested here. We’ve shaped here. Winning brands don’t chase. They choose Iconic."),
+      videoField("underlay", "Right column underlay", "/media/blaze/02_US_v3.mp4"),
+      videoField("video", "Portrait video", "/media/home-v2/services-blaze/services-blaze-v1-muted.mp4"),
+      imageField("poster", "Poster", "/media/home-v2/services-blaze/services-blaze-v1-poster.jpg")
     ]),
     block("solution", "High-impact video", [
       textField("badge", "Badge", "Built for Creative Excellence"),
       textField("title", "Headline", "Your All-in-One Solution for High-Impact Media Content"),
       areaField("body", "Body", "Transform your raw ideas into engaging cinematic media in minutes. Whether you're a high-growth startup serving multiple clients or an established enterprise, Iconic helps you create professional-grade visual content seamlessly.")
     ], [
-      { id: "product", fields: [videoField("video", "Video", "/media/video/product-photography.mp4"), textField("title", "Title", "Product Photography")] },
-      { id: "vertical", fields: [videoField("video", "Video", "/media/home-v2/slider/03-agent-emily-aguilar.mp4"), textField("title", "Title", "Vertical Reel")] },
-      { id: "content", fields: [videoField("video", "Video", "/media/blaze/02_US_v3.mp4"), textField("title", "Title", "Content Package")] },
-      { id: "snap-luxury", fields: [videoField("video", "Video", "/media/videos/snap-reels/bayonne-snap.mp4"), textField("title", "Title", "Snap Reel · Luxury Tour")] },
-      { id: "snap-modern", fields: [videoField("video", "Video", "/media/videos/snap-reels/snap-reel-02.mp4"), textField("title", "Title", "Snap Reel · Modern Living")] },
-      { id: "snap-kitchen", fields: [videoField("video", "Video", "/media/videos/snap-reels/stoney-brook-blaze.mp4"), textField("title", "Title", "Snap Reel · Kitchen Glow")] },
-      { id: "snap-arrival", fields: [videoField("video", "Video", "/media/videos/snap-reels/hereford-way-snap.mp4"), textField("title", "Title", "Snap Reel · Grand Arrival")] }
+      { id: "slide-1", fields: [videoField("video", "Slide 1 video — current listing film", "/media/video/product-photography.mp4"), imageField("poster", "Poster", ""), textField("aspect", "Frame (16/9 or 9/16)", "16/9"), textField("title", "On-screen title", "Listing film"), textField("sound", "Has sound", "false")] },
+      { id: "slide-2", fields: [videoField("video", "Slide 2 video — premium listing, horizontal", "/media/home-v2/slider/02-premium-listing-nubenbrook.mp4"), imageField("poster", "Poster", "/media/home-v2/slider/02-premium-listing-nubenbrook.jpg"), textField("aspect", "Frame (16/9 or 9/16)", "16/9"), textField("title", "On-screen title", "Premium listing"), textField("sound", "Has sound", "false")] },
+      { id: "slide-3", fields: [videoField("video", "Slide 3 video — Emily Aguilar, vertical", "/media/home-v2/slider/03-agent-emily-aguilar.mp4"), imageField("poster", "Poster", "/media/home-v2/slider/03-agent-emily-aguilar.jpg"), textField("aspect", "Frame (16/9 or 9/16)", "9/16"), textField("title", "On-screen title", "Emily Aguilar"), textField("sound", "Has sound", "true")] },
+      { id: "slide-4", fields: [videoField("video", "Slide 4 video — King Metals, horizontal", "/media/home-v2/slider/04-commercial-king-metals.mp4"), imageField("poster", "Poster", "/media/home-v2/slider/04-commercial-king-metals.jpg"), textField("aspect", "Frame (16/9 or 9/16)", "16/9"), textField("title", "On-screen title", "King Metals"), textField("sound", "Has sound", "false")] },
+      { id: "slide-5", fields: [videoField("video", "Slide 5 video — Blaze reel, vertical", "/media/home-v2/slider/05-blaze-reel-stoneybrook.mp4"), imageField("poster", "Poster", "/media/home-v2/slider/05-blaze-reel-stoneybrook.jpg"), textField("aspect", "Frame (16/9 or 9/16)", "9/16"), textField("title", "On-screen title", "Blaze reel"), textField("sound", "Has sound", "false")] },
+      { id: "slide-6", fields: [videoField("video", "Slide 6 video — aerial, horizontal", "/media/home-v2/slider/06-aerial-lakefront.mp4"), imageField("poster", "Poster", "/media/home-v2/slider/06-aerial-lakefront.jpg"), textField("aspect", "Frame (16/9 or 9/16)", "16/9"), textField("title", "On-screen title", "Aerial"), textField("sound", "Has sound", "false")] },
+      { id: "slide-7", fields: [videoField("video", "Slide 7 video — Amy Armstrong, vertical", "/media/home-v2/slider/07-agent-reel-amy-armstrong.mp4"), imageField("poster", "Poster", "/media/home-v2/slider/07-agent-reel-amy-armstrong.jpg"), textField("aspect", "Frame (16/9 or 9/16)", "9/16"), textField("title", "On-screen title", "Amy Armstrong"), textField("sound", "Has sound", "false")] }
     ]),
     block("stats", "Stats", [], [
       { id: "assets", fields: [textField("value", "Value", "100,000+"), textField("label", "Label", "Media assets produced")] },
@@ -1633,59 +1740,97 @@ const PAGES = [
       textField("title", "Headline", "From vision to viral in minutes, not days"),
       areaField("body", "Body", "Placing an order with Iconic is as simple as it gets. We handle the heavy lifting so you can focus on growth.")
     ], [
-      { id: "step-1", fields: [textField("step", "Step", "STEP 1"), textField("title", "Title", "Book your session"), areaField("body", "Body", "Select your creative service and schedule a time through our seamless partnership portal in just a few clicks.")] },
-      { id: "step-2", fields: [textField("step", "Step", "STEP 2"), textField("title", "Title", "We capture the vision"), areaField("body", "Body", "Our professional creative team arrives on-site with state-of-the-art equipment to capture high-impact raw media.")] },
-      { id: "step-3", fields: [textField("step", "Step", "STEP 3"), textField("title", "Title", "Rapid post-production"), areaField("body", "Body", "Our expert editors transform raw clips into polished, cinematic masterpieces that perfectly align with your brand.")] },
-      { id: "step-4", fields: [textField("step", "Step", "STEP 4"), textField("title", "Title", "Delivery & launch"), areaField("body", "Body", "Receive your ready-to-post assets within 24 hours. Download, publish, and dominate your social feed instantly.")] }
+      { id: "step-1", fields: [textField("step", "Step", "STEP 1"), textField("title", "Title", "Book your session"), areaField("body", "Body", "Select your creative service and schedule a time through our seamless partnership portal in just a few clicks."), imageField("image", "Photo", "/media/photos/lifestyle-mtz04327.jpg")] },
+      { id: "step-2", fields: [textField("step", "Step", "STEP 2"), textField("title", "Title", "We capture the vision"), areaField("body", "Body", "Our professional creative team arrives on-site with state-of-the-art equipment to capture high-impact raw media."), imageField("image", "Photo", "/media/photos/luxury-exterior.jpg")] },
+      { id: "step-3", fields: [textField("step", "Step", "STEP 3"), textField("title", "Title", "Rapid post-production"), areaField("body", "Body", "Our expert editors transform raw clips into polished, cinematic masterpieces that perfectly align with your brand."), imageField("image", "Photo", "/media/photos/luxury-interior.jpg")] },
+      { id: "step-4", fields: [textField("step", "Step", "STEP 4"), textField("title", "Title", "Delivery & launch"), areaField("body", "Body", "Receive your ready-to-post assets within 24 hours. Download, publish, and dominate your social feed instantly."), imageField("image", "Photo", "/media/launch/living_room_bright.jpg")] }
     ]),
     block("network", "The network", [
       textField("titleLead", "Title lead", "Built Bigger Than"),
       textField("titleAccent", "Title accent", "One Brand"),
-      areaField("body", "Body", "Iconic isn’t here to squeeze the market; we’re here to expand it.")
+      areaField("body", "Body", "We look forward to working with you. Collaborators, creators, producers, podcasters, and photographers are welcome here. Iconic was built to stand beside other media professionals, not to crowd them out."),
+      areaField("closer", "Closer", "Bring your clients and your craft. There is room for the work you already love.")
+    ], [
+      { id: "podcast-set", fields: [imageField("image", "Podcast set", "/media/home-v2/lifestyle/podcast-set-wide.jpg"), textField("alt", "Alt text", "The Iconic podcast set, cameras and lights")] },
+      { id: "conversation", fields: [imageField("image", "Podcast conversation", "/media/home-v2/lifestyle/podcast-conversation.jpg"), textField("alt", "Alt text", "A host and guest in conversation on the podcast set")] },
+      { id: "crew", fields: [imageField("image", "Podcast crew", "/media/home-v2/lifestyle/podcast-crew-cameras.jpg"), textField("alt", "Alt text", "The podcast set from behind the cameras")] },
+      { id: "interior", fields: [imageField("image", "Interior shoot", "/media/home-v2/lifestyle/interior-shoot-lighting.jpg"), textField("alt", "Alt text", "A lit interior shoot")] },
+      { id: "location", fields: [imageField("image", "On location", "/media/home-v2/lifestyle/on-location-outdoor-shoot.jpg"), textField("alt", "Alt text", "Shooting outdoors on location")] },
+      { id: "sweep", fields: [imageField("image", "Studio 105 backdrop", "/media/home-v2/lifestyle/studio-105-sweep.jpg"), textField("alt", "Alt text", "Studio 105 white sweep with strobes")] }
     ]),
     block("audience", "Who it’s for", [
       textField("badge", "Badge", "WHO IT'S FOR"),
-      textField("title", "Headline", "Tailored for real estate and visual storytelling professionals"),
-      areaField("body", "Body", "Iconic simplifies media creation for real estate professionals, builders, and business owners — helping you showcase your vision and grow your presence.")
+      textField("title", "Headline", "Who is Iconic for?"),
+      areaField("body", "Body", "We're more than just a company. What's a company anyway? A group of people doing what they do, helping others with what they need.")
     ]),
     block("audienceDetails", "Audiences", [], [
-      { id: "realtors", fields: [textField("title", "Title", "Realtors & Brokers"), areaField("body", "Body", "Attract leads, close faster, and win more listings with engaging property videos."), imageField("image", "Image", "/media/photos/lifestyle-mtz04327.jpg")] },
-      { id: "photographers", fields: [textField("title", "Title", "Photographers"), areaField("body", "Body", "Upsell AI videos with every order. More profit, no effort."), imageField("image", "Image", "/media/photos/studio-mtz01691.jpg")] },
-      { id: "media", fields: [textField("title", "Title", "Real Estate Media Companies"), areaField("body", "Body", "Scale your business and stay competitive with AI property videos — no extra overhead."), imageField("image", "Image", "/media/photos/drone-hero.jpg")] },
-      { id: "developers", fields: [textField("title", "Title", "Developers & Builders"), areaField("body", "Body", "Showcase new construction and development projects with cinematic fly-throughs."), imageField("image", "Image", "/media/photos/forest-heights-twilight-front.jpg")] },
-      { id: "business", fields: [textField("title", "Title", "Small Business Owners"), areaField("body", "Body", "Professional media content to tell your brand story and engage your local community."), imageField("image", "Image", "/media/photos/lifestyle-daughtery-mtz00636.jpg")] },
-      { id: "online", fields: [textField("title", "Title", "Online Appearance"), areaField("body", "Body", "High-impact visual identity for anyone looking to dominate their digital space."), imageField("image", "Image", "/media/photos/headshot-gracepoint-1.jpg")] }
+      { id: "realtors", fields: [textField("title", "Title", "Realtors & Brokers"), areaField("body", "Body", "Your listings deserve more than a photo dump. We help you show the house, the story, and the reason someone should call."), imageField("image", "Image", "/media/photos/lifestyle-kennedy-mtz01127.jpg")] },
+      { id: "developers", fields: [textField("title", "Title", "Developers & Builders"), areaField("body", "Body", "From the dirt lot to the model home, we help you show what you are building before a buyer ever walks the site."), imageField("image", "Image", "/media/photos/forest-heights-twilight-front.jpg")] },
+      { id: "business", fields: [textField("title", "Title", "Small Business Owners"), areaField("body", "Body", "You know your customers. We help you look like the business they already trust, online and in person."), imageField("image", "Image", "/media/photos/lifestyle-daughtery-mtz00636.jpg")] },
+      { id: "online", fields: [textField("title", "Title", "Online Appearance"), areaField("body", "Body", "Personal brands, headshots, and an on-camera presence. For the days you need to be seen, and seen well."), imageField("image", "Image", "/media/photos/headshot-gracepoint-1.jpg")] },
+      { id: "partners", fields: [textField("title", "Title", "Photographers & Real Estate Media Companies"), areaField("body", "Body", "If you already shoot for a living, come work on our platform. Bring your clients. We will help you deliver the rest."), imageField("image", "Image", "/media/photos/drone-hero.jpg"), textField("badge", "Ribbon", "Partners"), textField("cta", "Button", "Learn more"), textField("href", "Button link", "/partners")] }
     ]),
     block("snapReels", "Snap Reels", [
       textField("kicker", "Kicker", "Essentials"),
       textField("title", "Headline", "Snap Reels"),
       areaField("body", "Body", "Listing stills, turned into a 9:16 Snap Reel. Same-day vertical video from the photos we already shoot.")
     ], [
-      { id: "jpg", fields: [videoField("video", "Video", "/media/videos/snap-reels/heron-wing-blaze-v2.mp4"), textField("title", "Title", ""), textField("vibe", "Caption", "JPGs rendering...")] },
-      { id: "upload", fields: [videoField("video", "Video", "/media/videos/snap-reels/woodville-blaze-v4.mp4"), textField("title", "Title", ""), textField("vibe", "Caption", "Files uploading...")] },
-      { id: "sundown", fields: [videoField("video", "Video", "/media/videos/snap-reels/stoneridge-blaze-v2.mp4"), textField("title", "Title", ""), textField("vibe", "Caption", "Ready for Sundown")] },
-      { id: "png", fields: [videoField("video", "Video", "/media/videos/snap-reels/abbylane-blaze-v4.mp4"), textField("title", "Title", ""), textField("vibe", "Caption", "Once upon a PNG there was a For Sale sign")] }
+      { id: "jpg", fields: [videoField("video", "JPGs rendering video", "/media/home-v2/snap-cards/bluelake-blaze.mp4"), imageField("poster", "Poster", "/media/home-v2/snap-cards/bluelake-blaze.jpg"), textField("title", "Title", ""), textField("vibe", "Caption", "JPGs rendering...")] },
+      { id: "upload", fields: [videoField("video", "Files uploading video", "/media/home-v2/snap-cards/woodville-blaze-v5.mp4"), imageField("poster", "Poster", "/media/home-v2/snap-cards/woodville-blaze-v5.jpg"), textField("title", "Title", ""), textField("vibe", "Caption", "Files uploading...")] },
+      { id: "sundown", fields: [videoField("video", "Ready for Sundown video", "/media/home-v2/snap-cards/stoneridge-blaze-v3.mp4"), imageField("poster", "Poster", "/media/home-v2/snap-cards/stoneridge-blaze-v3.jpg"), textField("title", "Title", ""), textField("vibe", "Caption", "Ready for Sundown")] },
+      { id: "png", fields: [videoField("video", "Once upon a PNG video", "/media/home-v2/snap-cards/abbylane-blaze-v5.mp4"), imageField("poster", "Poster", "/media/home-v2/snap-cards/abbylane-blaze-v5.jpg"), textField("title", "Title", ""), textField("vibe", "Caption", "Once upon a PNG there was a For Sale sign")] }
     ]),
     block("features", "Add-on tools", [
       textField("badge", "Badge", "ADDITIONAL FEATURES"),
       textField("title", "Headline", "Go beyond basic editing with powerful add-on tools"),
-      areaField("body", "Body", "Iconic isn't just about reels — enhance your content with smart AI tools designed to polish, extend, and personalize every video.")
+      areaField("body", "Body", "Turn a still into motion, stage an empty room, finish a photo, and shape the cut in Studio.")
     ], [
-      { id: "snap", fields: [textField("title", "Title", "Snap Reels"), areaField("body", "Body", "Turn the listing stills into a 9:16 Snap Reel. A vertical cut buyers can watch before they ever book a showing.")] },
-      { id: "import", fields: [textField("title", "Title", "One Click Import"), areaField("body", "Body", "Pull listing photos directly from Realtor.com or Zillow to start your video in seconds.")] },
-      { id: "staging", fields: [textField("title", "Title", "AI Virtual Staging"), areaField("body", "Body", "Instantly furnish empty rooms with realistic AI staging to showcase your property's full potential.")] },
-      { id: "edits", fields: [textField("title", "Title", "AI Photo Edits"), areaField("body", "Body", "Make your listing photos stand out with AI-powered enhancements — like twilights, lawn repairs, and other edits that instantly elevate any property.")] },
-      { id: "studio", fields: [textField("title", "Title", "Studio"), areaField("body", "Body", "Iconic's built-in editor that allows you to customize your videos with templates, music, captions, branding, and even your own photos or clips.")] },
-      { id: "voice", fields: [textField("title", "Title", "AI Voiceovers"), areaField("body", "Body", "Instantly generate natural-sounding narrations from a wide range of voices.")] },
-      { id: "captions", fields: [textField("title", "Title", "Social Media Captions"), areaField("body", "Body", "Automatically create captions optimized for Instagram, Facebook, LinkedIn, YouTube, and X.")] },
-      { id: "avatars", fields: [textField("title", "Title", "AI Avatars"), areaField("body", "Body", "Create professional video presentations with AI-generated avatars for a personal touch.")] }
+      { id: "snap", fields: [
+        textField("title", "Title", "Iconic Snap Reels"),
+        areaField("body", "Body", "Photo to video. One listing still on the left, and that same photo in motion on the right."),
+        imageField("still", "Still photo — must match the video", "/media/home-v2/snap-feature/snap-still.jpg"),
+        videoField("video", "Motion video — same photo", "/media/home-v2/snap-feature/snap-motion.mp4")
+      ] },
+      { id: "staging", fields: [
+        textField("title", "Title", "AI Virtual Staging"),
+        areaField("body", "Body", "Empty room to furnished room, staged by Iconic. Drag the slider, then look across the angles."),
+        imageField("before", "Living room before", "/media/home-v2/staging/vs-living-before.jpg"),
+        imageField("after", "Living room after", "/media/home-v2/staging/vs-living-after.jpg"),
+        imageField("bedroomBefore", "Second room before", "/media/home-v2/staging/vs-bedroom-before.jpg"),
+        imageField("bedroomAfter", "Second room after", "/media/home-v2/staging/vs-bedroom-after.jpg"),
+        imageField("moreAngles", "More angles", ""),
+        textField("moreLabel", "More angles label", "More angles"),
+        textField("callout", "Free staging callout", "Iconic clients get FREE staging — info inside")
+      ] },
+      { id: "edits", fields: [
+        textField("title", "Title", "Bring your photos to life with After Iconic AI renders"),
+        areaField("body", "Body", "A daylight pavilion, finished so it feels lived in. A warm-dusk pool pair is saved beside this one if you want to swap it in."),
+        imageField("before", "Before", "/media/home-v2/photo-edits/pavilion-before.jpg"),
+        imageField("after", "After Iconic", "/media/home-v2/photo-edits/pavilion-after-iconic.jpg"),
+        imageField("altBefore", "Alt before — pool", "/media/home-v2/photo-edits/alt-marias-pool-before.jpg"),
+        imageField("altAfter", "Alt after — warm dusk", "/media/home-v2/photo-edits/alt-marias-pool-warmdusk-after.jpg")
+      ] },
+      { id: "studio", fields: [
+        textField("title", "Title", "Studio"),
+        areaField("body", "Body", "Iconic's built-in editor for templates, music, captions, branding, and your own photos or clips."),
+        imageField("image", "Studio editor screenshot", "/media/home-v2/studio/iconic-studio-editor-snippet.jpg"),
+        textField("note", "Editor note (not shown)", "Placeholder until a capture of the live Studio editor. Swap this image when that screenshot is ready.")
+      ] }
     ]),
     block("reviews", "Reviews", [
       textField("badge", "Badge", "TESTIMONIALS"),
       textField("title", "Headline", "What our clients are saying"),
       areaField("body", "Body", "Agents and businesses trust Iconic Images for listing photography, video, and a fast, professional turnaround."),
       linkField("cta", "Button", "Book a shoot", "/book")
-    ]),
+    ], CLIENT_REVIEWS.map((review, index) => ({
+      id: `review-${index + 1}`,
+      fields: [
+        textField("initials", "Initials", review.initials),
+        textField("role", "Source", review.role),
+        textField("stars", "Stars", String(review.stars)),
+        areaField("quote", "Quote", review.quote)
+      ]
+    }))),
     block("faq", "FAQ", [
       textField("badge", "Badge", "FAQ"),
       textField("title", "Headline", "Got questions? We've got answers."),
@@ -1767,6 +1912,15 @@ const PAGES = [
       textField("embedTitle", "Tour title", "Sample tour of a Woodlands-area senior living community")
     ])
   ]),
+  page("partners", "/partners", "Partners", [
+    block("hero", "Hero", [
+      textField("kicker", "Kicker", "Coming soon"),
+      textField("title", "Headline", "Work with Iconic"),
+      areaField("body", "Body", "Photographers and real estate media companies can sign up to work on Iconic's platform. Tell us about your studio. We will be in touch. This note stays with our team, and we do not email you a copy."),
+      textField("success", "Success message", "You're on the list. We'll be in touch."),
+      textField("submit", "Button", "Send my interest")
+    ])
+  ]),
   page("contact", "/contact", "Contact", [
     block("hero", "Hero", [
       textField("kicker", "Kicker", "CONTACT US"),
@@ -1783,21 +1937,77 @@ const PAGES = [
       textField("titleLead", "Title lead", "A Decade of"),
       textField("titleAccent", "Title accent", "Setting the Standard."),
       areaField("body", "Body", "Est. 2016. 10 Years. Thousands of Listings. Millions in Commission Generated for our Partners.")
-    ], [
-      { id: "est", fields: [imageField("image", "Photo", "/media/about/tiles/01_est_2016.jpg"), textField("label", "Label", "Est. 2016")] },
-      { id: "engine", fields: [imageField("image", "Photo", "/media/about/tiles/02_the_engine.jpg"), textField("label", "Label", "The Engine")] },
-      { id: "scale", fields: [imageField("image", "Photo", "/media/about/tiles/03_scale.jpg"), textField("label", "Label", "Scale")] },
-      { id: "growth", fields: [imageField("image", "Photo", "/media/about/tiles/04_growth.jpg"), textField("label", "Label", "Growth")] },
-      { id: "legacy", fields: [imageField("image", "Photo", "/media/about/tiles/05_legacy.jpg"), textField("label", "Label", "Legacy")] },
-      { id: "cinematic", fields: [imageField("image", "Photo", "/media/about/tiles/06_cinematic.jpg"), textField("label", "Label", "Cinematic")] },
-      { id: "market", fields: [imageField("image", "Photo", "/media/about/tiles/08_market_lead.jpg"), textField("label", "Label", "Market Lead")] }
-    ]),
+    ], DECADE_MASHUPS.map((mix) => ({
+      id: mix.id,
+      fields: [
+        videoField("video", "Video", mix.video),
+        imageField("poster", "Poster", mix.poster),
+        textField("label", "Label", mix.label)
+      ]
+    }))),
     block("hub", "Intelligence hub", [
       textField("kicker", "Kicker", "THE INTELLIGENCE HUB: BEYOND THE LENS"),
       textField("title", "Headline", "Where Vision Meets Velocity."),
       areaField("body", "Body", "At Iconic Images, we don’t just capture real estate; we engineer market ownership. In a world of infinite scrolling, 'pretty pictures' are the bare minimum."),
       textField("philosophyTitle", "Philosophy title", "THE ICONIC PHILOSOPHY"),
       areaField("philosophy", "Philosophy", "We believe the agent is the architect of the deal, but the media is the fuel.")
+    ])
+  ]),
+  page("whatWeDo", "/what-we-do", "What we do", [
+    block("hero", "Hero", [
+      textField("titleLead", "Headline line 1", "What does"),
+      textField("titleTail", "Headline line 2", "Iconic do?"),
+      areaField("line", "Line", "Photography, video, and listing media."),
+      videoField("video", "Hero video", "/media/home-v2/services-blaze/services-blaze-v1-muted.mp4"),
+      imageField("poster", "Poster", "/media/home-v2/services-blaze/services-blaze-v1-poster.jpg")
+    ]),
+    block("who", "Who we are", [
+      textField("title", "Headline", "Real estate media."),
+      areaField("line", "Line", "Spring, The Woodlands, and Houston."),
+      imageField("image", "Photo", "/media/home-v2/lifestyle/interior-shoot-lighting.jpg"),
+      textField("alt", "Alt text", "On-camera session inside a listing")
+    ]),
+    block("shoot", "What we shoot", [
+      textField("title", "Headline", "What we shoot."),
+      areaField("line", "Line", "Listing photos, film, and brand media.")
+    ], [
+      { id: "photos", fields: [textField("label", "Label", "Listing photos"), imageField("image", "Photo", "/media/launch/dining_room.jpg"), videoField("video", "Video", ""), imageField("poster", "Poster", "")] },
+      { id: "video", fields: [textField("label", "Label", "Property video"), imageField("image", "Photo", ""), videoField("video", "Video", "/media/home-v2/slider/02-premium-listing-nubenbrook.mp4"), imageField("poster", "Poster", "/media/home-v2/slider/02-premium-listing-nubenbrook.jpg")] },
+      { id: "aerial", fields: [textField("label", "Label", "Aerial drone"), imageField("image", "Photo", "/media/pay-at-close/luxury/marias/06-aerial-day.jpg"), videoField("video", "Video", ""), imageField("poster", "Poster", "")] },
+      { id: "podcast", fields: [textField("label", "Label", "Podcast"), imageField("image", "Photo", "/media/home-v2/lifestyle/podcast-crew-cameras.jpg"), videoField("video", "Video", ""), imageField("poster", "Poster", "")] },
+      { id: "twilight", fields: [textField("label", "Label", "Iconic Twilight"), imageField("image", "Photo", "/media/home-v2/photo-edits/alt-marias-pool-warmdusk-after.jpg"), videoField("video", "Video", ""), imageField("poster", "Poster", "")] },
+      { id: "headshots", fields: [textField("label", "Label", "Headshots"), imageField("image", "Photo", "/media/photos/headshot-gracepoint-4.jpg"), videoField("video", "Video", ""), imageField("poster", "Poster", "")] },
+      { id: "commercial", fields: [textField("label", "Label", "Commercial"), imageField("image", "Photo", ""), videoField("video", "Video", "/media/home-v2/slider/04-commercial-king-metals.mp4"), imageField("poster", "Poster", "/media/home-v2/slider/04-commercial-king-metals.jpg")] },
+      { id: "staging", fields: [textField("label", "Label", "AI Virtual Staging"), imageField("image", "Photo", "/media/home-v2/staging/vs-living-after.jpg"), videoField("video", "Video", ""), imageField("poster", "Poster", "")] }
+    ]),
+    block("serve", "Who it's for", [
+      textField("title", "Headline", "Who it's for."),
+      areaField("line", "Line", "Agents, builders, businesses, and literally everyone.")
+    ], [
+      { id: "agents", fields: [textField("label", "Label", "Realtors & Brokers"), imageField("image", "Photo", "/media/photos/lifestyle-kennedy-mtz01127.jpg")] },
+      { id: "builders", fields: [textField("label", "Label", "Developers & Builders"), imageField("image", "Photo", "/media/pay-at-close/luxury/pool-rd/07-front-day.jpg")] },
+      { id: "business", fields: [textField("label", "Label", "Small Business Owners"), imageField("image", "Photo", "/media/photos/lifestyle-daughtery-mtz00636.jpg")] },
+      { id: "everyone", fields: [textField("label", "Label", "Literally Everyone"), imageField("image", "Photo", "/media/photos/family-bryant-mtz09081.jpg")] }
+    ]),
+    block("steps", "How it works", [
+      textField("title", "Headline", "How it works."),
+      areaField("line", "Line", "Placing an order with Iconic is as simple as it gets.")
+    ], [
+      { id: "step-1", fields: [textField("step", "Step", "STEP 1"), textField("title", "Title", "Book your session"), imageField("image", "Photo", "/media/launch/exterior_entry_day.jpg")] },
+      { id: "step-2", fields: [textField("step", "Step", "STEP 2"), textField("title", "Title", "We capture the vision"), imageField("image", "Photo", "/media/launch/aerial_neighborhood_drone.jpg")] },
+      { id: "step-3", fields: [textField("step", "Step", "STEP 3"), textField("title", "Title", "Rapid post-production"), imageField("image", "Photo", "/media/home-v2/photo-edits/pavilion-after-iconic.jpg")] },
+      { id: "step-4", fields: [textField("step", "Step", "STEP 4"), textField("title", "Title", "Delivery & launch"), imageField("image", "Photo", "/media/launch/primary_suite.jpg")] }
+    ]),
+    block("why", "Why it matters", [
+      textField("title", "Headline", "Show the house."),
+      areaField("line", "Line", "The story, and the reason someone should call."),
+      imageField("image", "Photo", "/media/photos/drone-hero.jpg"),
+      textField("alt", "Alt text", "Drone view of a waterfront luxury home")
+    ]),
+    block("cta", "Close", [
+      textField("title", "Headline", "Book a shoot."),
+      linkField("book", "Shoot button", "Book a Shoot", "/book"),
+      linkField("studio", "Studio button", "Book our Studio", "/studio-105")
     ])
   ]),
   page("portfolio", "/portfolio", "Portfolio", [
@@ -1833,7 +2043,7 @@ const PAGES = [
   page("stock", "/stock-footage", "Stock footage", [
     block("hero", "Hero", [
       textField("title", "Headline", "Stock Footage Library"),
-      areaField("body", "Body", "Premium, professionally photographed real estate images by neighborhood. License instantly and use for your listings, marketing, or staging inspiration.")
+      areaField("body", "Body", "Neighborhood amenity photos from Iconic Images. Pay for a set and Iconic sends the files to you.")
     ])
   ]),
   page("virtualStaging", "/services/virtual-staging", "Virtual staging", [
@@ -1918,11 +2128,17 @@ function cleanField(field, fallback) {
   }
   return next;
 }
-function cleanItem(item, allowed) {
-  if (!item?.id || !Array.isArray(item.fields)) return null;
-  const fields = item.fields.map((field) => cleanField(field)).filter((field) => Boolean(field)).filter((field) => !allowed || allowed.has(field.id));
-  if (!fields.length) return null;
-  return { id: String(item.id).slice(0, 80), fields };
+function mergeItems(saved, fallback) {
+  const savedById = new Map((saved ?? []).map((item) => [item.id, item]));
+  return fallback.slice(0, MAX_ITEMS).map((base) => {
+    const incoming = savedById.get(base.id);
+    if (!incoming) return { id: base.id, fields: base.fields.map((field) => ({ ...field })) };
+    const fields = base.fields.map((field) => {
+      const found = incoming.fields?.find((item) => item.id === field.id);
+      return cleanField(found || field, field);
+    });
+    return { id: base.id, fields };
+  });
 }
 function cleanBlock(block2, fallback) {
   if (!block2?.id) return null;
@@ -1931,8 +2147,7 @@ function cleanBlock(block2, fallback) {
     const incoming = block2.fields?.find((item) => item.id === field.id);
     return cleanField(incoming || field, field);
   });
-  const allowedItemFields = new Set((fallback?.items ?? []).flatMap((item) => item.fields.map((field) => field.id)));
-  const items = fallback?.items ? Array.isArray(block2.items) ? block2.items.map((item) => cleanItem(item, allowedItemFields)).filter((item) => Boolean(item)).slice(0, MAX_ITEMS) : fallback.items : void 0;
+  const items = fallback?.items ? mergeItems(block2.items, fallback.items) : void 0;
   return {
     id: String(block2.id),
     label: String(block2.label || fallback?.label || block2.id),
@@ -2360,7 +2575,7 @@ async function workspacePage(id) {
   return mergeContent(draft || (published ? stripPage(published) : base));
 }
 router.get("/", async (_req, res) => {
-  const pages = await listPublished();
+  const pages = (await listPublished()).map((page2) => mergeContent(page2)).filter((page2) => Boolean(page2));
   return res.json({ pages });
 });
 router.get("/blob/:id", (req, res) => {

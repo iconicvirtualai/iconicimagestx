@@ -16,6 +16,7 @@ export default function Footer() {
     ? footerItems.map((item) => ({ label: itemText(item, "link"), href: itemLink(item, "link") || "/" }))
     : [
         { label: "Home", href: "/" },
+        { label: "What we do", href: "/what-we-do" },
         { label: "Pricing", href: "/pricing" },
         { label: "Socials", href: "/socials" },
         { label: "Portfolio", href: "/portfolio" },

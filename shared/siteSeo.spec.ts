@@ -57,6 +57,7 @@ describe("public page meta", () => {
     expect(paths).toEqual([
       "/",
       "/about",
+      "/what-we-do",
       "/pricing",
       "/studio-105",
       "/portfolio",
