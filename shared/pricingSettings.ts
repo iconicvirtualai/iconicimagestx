@@ -243,7 +243,7 @@ export function defaultPricingAdjustments(): PricingAdjustment[] {
       mode: "percent",
       amount: 6,
       sortOrder: 500,
-      note: "Percent uplift on the Pay at Close order subtotal. On at 6% until you change it. 0 keeps catalog prices. Turning this row off hides checkout. Checkout also stays hidden until PAY_AT_CLOSE_LIVE is true.",
+      note: "Kept so the office can edit this row. The public Pay at Close page, booking total, and Titus invoice do not add this amount. Titus shows its own fee. Turning this row off hides checkout. Checkout also stays hidden until PAY_AT_CLOSE_LIVE is true.",
     }),
     seed({
       id: "pay-at-close-card-processing",

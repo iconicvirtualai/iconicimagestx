@@ -8,7 +8,9 @@
  *
  * One Firestore invoice is the invoice of record. Titus orderId is that invoice id.
  * Card processing stays off unless the Prices row "Card processing on Pay at Close" is on.
- * The Pay at Close uplift is the "Pay at Close" Prices row (percent of the service subtotal, or a flat dollar amount). 0 adds nothing.
+ * The Prices row "Pay at Close" still gates checkout and stays editable.
+ * Public prices do not add that row. payAtCloseCustomerOffer zeros it.
+ * Titus discloses its own fee in the estimate modal.
  * An active row does not offer checkout. PAY_AT_CLOSE_LIVE still has to be exactly "true".
  */
 
@@ -136,7 +138,11 @@ export function payAtCloseFeeDollars(rate: number, mode: "flat" | "percent", bas
   return roundPayAtCloseMoney(safeRate);
 }
 
-/** Catalog price at the Pay at Close percent, rounded to a whole dollar. Flat mode leaves the catalog price. */
+/**
+ * Prices-row math for a Pay at Close percent. The public page, booking total,
+ * and Pay at Close invoice do not use this. They use payAtCloseCustomerOffer,
+ * which keeps the catalog price. Titus discloses its own fee.
+ */
 export function payAtCloseListedPrice(
   catalogPrice: number,
   offer: Pick<PayAtClosePublicOffer, "feeRate" | "feeMode">,
@@ -145,6 +151,15 @@ export function payAtCloseListedPrice(
   if (!Number.isFinite(price)) return 0;
   if (offer.feeMode !== "percent" || offer.feeRate <= 0) return price;
   return Math.round(price * (1 + offer.feeRate / 100));
+}
+
+/**
+ * Customer-facing Pay at Close pricing. The Prices row stays editable and
+ * still gates whether checkout is offered. Its amount is not added on the
+ * public page, the booking total, or the invoice sent to Titus.
+ */
+export function payAtCloseCustomerOffer<T extends PayAtClosePublicOffer>(offer: T): T {
+  return { ...offer, feeRate: 0 };
 }
 
 function serviceBase(lineItems: BookingLineItem[]): number {
