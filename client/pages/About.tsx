@@ -1,18 +1,10 @@
 import Layout from "@/components/Layout";
+import DecadeMashupCarousel from "@/components/DecadeMashupCarousel";
 import { Button } from "@/components/ui/button";
-import { Star, Zap, Rocket, MapPin, Quote, Award } from "lucide-react";
+import { Star, Zap, Rocket, MapPin, Award } from "lucide-react";
 import { Link } from "react-router-dom";
 import { itemText, useSiteItems, useSiteText } from "@/content/siteContent";
-
-const ABOUT_TILES = [
-  { img: "/media/about/tiles/01_est_2016.jpg", label: "Est. 2016" },
-  { img: "/media/about/tiles/02_the_engine.jpg", label: "The Engine" },
-  { img: "/media/about/tiles/03_scale.jpg", label: "Scale" },
-  { img: "/media/about/tiles/04_growth.jpg", label: "Growth" },
-  { img: "/media/about/tiles/05_legacy.jpg", label: "Legacy" },
-  { img: "/media/about/tiles/06_cinematic.jpg", label: "Cinematic" },
-  { img: "/media/about/tiles/08_market_lead.jpg", label: "Market Lead" },
-];
+import { DECADE_MASHUPS, type DecadeMashup } from "@shared/decadeMashups";
 
 export default function About() {
   const badge = useSiteText("about", "hero", "badge", "Decade of Excellence");
@@ -25,7 +17,14 @@ export default function About() {
   const philosophyTitle = useSiteText("about", "hub", "philosophyTitle", "THE ICONIC PHILOSOPHY");
   const philosophy = useSiteText("about", "hub", "philosophy", "We believe the agent is the architect of the deal, but the media is the fuel.");
   const tiles = useSiteItems("about", "hero");
-  const aboutTiles = tiles?.length ? tiles.map((item) => ({ img: itemText(item, "image"), label: itemText(item, "label") })) : ABOUT_TILES;
+  const mashups: DecadeMashup[] = tiles?.length
+    ? tiles.flatMap((item) => {
+      const video = itemText(item, "video");
+      const poster = itemText(item, "poster");
+      if (!video && !poster) return [];
+      return [{ id: item.id, video, poster, label: itemText(item, "label") }];
+    })
+    : DECADE_MASHUPS;
   return (
     <Layout>
       <div className="bg-white text-black">
@@ -34,7 +33,7 @@ export default function About() {
           <div className="absolute inset-0 opacity-20 pointer-events-none">
             <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-teal-500/20 via-transparent to-transparent"></div>
           </div>
-          <div className="container mx-auto px-4 py-12 md:py-16 relative z-10 text-center">
+          <div className="container relative z-10 mx-auto px-4 pb-12 pt-36 text-center md:pb-16">
             <div className="inline-flex items-center gap-2 px-4 py-1 rounded-full bg-teal-500/10 border border-teal-500/20 text-teal-400 font-bold text-xs tracking-widest uppercase mb-6 animate-pulse">
               <Award className="w-4 h-4" />
               {badge}
@@ -46,20 +45,7 @@ export default function About() {
               <span data-site-page="about" data-site-block="hero" data-site-field="body" data-site-kind="text">{body}</span>
             </p>
 
-            {/* Moving Photo Carousel */}
-            <div className="relative w-full overflow-hidden py-12">
-              <div className="flex animate-scroll whitespace-nowrap">
-                {[...aboutTiles, ...aboutTiles].map((item, i) => (
-                  <div key={i} className="flex-shrink-0 mx-2 w-[184px] h-[184px] md:w-[268px] md:h-[268px] bg-gray-900 rounded-2xl border border-white/10 flex items-center justify-center relative overflow-hidden group">
-                    <img src={item.img} className="absolute inset-0 w-full h-full object-cover opacity-40 group-hover:scale-110 group-hover:opacity-60 transition-all duration-700" alt={item.label} />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-                    <span className="absolute bottom-6 left-6 z-10 text-[10px] font-bold text-white uppercase tracking-widest opacity-80 group-hover:opacity-100 transition-opacity">
-                      {item.label}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <DecadeMashupCarousel cards={mashups.length ? mashups : DECADE_MASHUPS} />
           </div>
         </section>
 
@@ -201,19 +187,6 @@ export default function About() {
         </section>
       </div>
 
-      <style dangerouslySetInnerHTML={{ __html: `
-        @keyframes about-marquee {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
-        }
-        .animate-scroll {
-          animation: about-marquee 48s linear infinite;
-          animation-timeline: auto;
-        }
-        .animate-scroll:hover {
-          animation-play-state: paused;
-        }
-      `}} />
     </Layout>
   );
 }

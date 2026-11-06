@@ -4,6 +4,7 @@
 
 import { LEGAL_BUSINESS_NAME } from "./businessContact.ts";
 import { CLIENT_REVIEWS } from "./clientReviews.ts";
+import { DECADE_MASHUPS } from "./decadeMashups.ts";
 import { PUBLIC_PAGES } from "./siteSeo.ts";
 import {
   type ContentItem,
@@ -366,15 +367,14 @@ const PAGES: ContentPage[] = [
       textField("titleLead", "Title lead", "A Decade of"),
       textField("titleAccent", "Title accent", "Setting the Standard."),
       areaField("body", "Body", "Est. 2016. 10 Years. Thousands of Listings. Millions in Commission Generated for our Partners."),
-    ], [
-      { id: "est", fields: [imageField("image", "Photo", "/media/about/tiles/01_est_2016.jpg"), textField("label", "Label", "Est. 2016")] },
-      { id: "engine", fields: [imageField("image", "Photo", "/media/about/tiles/02_the_engine.jpg"), textField("label", "Label", "The Engine")] },
-      { id: "scale", fields: [imageField("image", "Photo", "/media/about/tiles/03_scale.jpg"), textField("label", "Label", "Scale")] },
-      { id: "growth", fields: [imageField("image", "Photo", "/media/about/tiles/04_growth.jpg"), textField("label", "Label", "Growth")] },
-      { id: "legacy", fields: [imageField("image", "Photo", "/media/about/tiles/05_legacy.jpg"), textField("label", "Label", "Legacy")] },
-      { id: "cinematic", fields: [imageField("image", "Photo", "/media/about/tiles/06_cinematic.jpg"), textField("label", "Label", "Cinematic")] },
-      { id: "market", fields: [imageField("image", "Photo", "/media/about/tiles/08_market_lead.jpg"), textField("label", "Label", "Market Lead")] },
-    ]),
+    ], DECADE_MASHUPS.map((mix) => ({
+      id: mix.id,
+      fields: [
+        videoField("video", "Video", mix.video),
+        imageField("poster", "Poster", mix.poster),
+        textField("label", "Label", mix.label),
+      ],
+    }))),
     block("hub", "Intelligence hub", [
       textField("kicker", "Kicker", "THE INTELLIGENCE HUB: BEYOND THE LENS"),
       textField("title", "Headline", "Where Vision Meets Velocity."),

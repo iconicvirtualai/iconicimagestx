@@ -78,6 +78,7 @@ const HOME_MEDIA = [
   "client/lib/beforeAfter.ts",
   "client/lib/snapReels.ts",
   "shared/siteEditorDefaults.ts",
+  "shared/decadeMashups.ts",
 ];
 
 const ALLOWED_EXTERNAL = [
