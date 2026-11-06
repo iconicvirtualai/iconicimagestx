@@ -326,6 +326,39 @@
   border-radius: 50%;
   background: var(--teal);
 }
+.pac-page .titus-pill {
+  display: inline-flex;
+  width: fit-content;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  line-height: 0;
+  border-radius: 6px;
+}
+.pac-page .titus-pill:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 3px;
+}
+.pac-page .titus-pill img {
+  width: 191px;
+  height: 24px;
+}
+.pac-page .pkg-footnote {
+  margin: 1.35rem 0 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+.pac-page .estimate-error {
+  margin: 0.35rem 0 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #b91c1c;
+}
+.pac-page .hero .estimate-error { color: #fecaca; }
+.pac-page .calc-right .estimate-error { color: #fecaca; }
 .pac-page .pkg-actions { margin-top: auto; display: grid; gap: 0.55rem; }
 .pac-page .confirm-tag {
   display: inline-block;

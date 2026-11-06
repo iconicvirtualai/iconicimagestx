@@ -12,4 +12,6 @@ interface ImportMetaEnv {
   readonly VITE_GOOGLE_ADS_LABEL_RE75_BOOKING?: string;
   readonly VITE_GOOGLE_ADS_LABEL_RE75_FORM_START?: string;
   readonly VITE_UET_TAG_ID?: string;
+  /** Public Titus business id for the Pay at Close estimate modal. Not a secret. */
+  readonly VITE_TITUS_BUSINESS_ID?: string;
 }

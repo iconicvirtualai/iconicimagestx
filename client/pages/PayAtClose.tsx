@@ -1,11 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { packagesForStaffEditor, type StaffCatalogPackage } from "@shared/bookingCatalog";
-import { payAtCloseListedPrice, payAtClosePublicOffer, type PayAtClosePublicOffer } from "@shared/payAtClose";
-import { mergePricingAdjustments } from "@shared/pricingSettings";
-import { readPricingAdjustments } from "@/lib/pricingAdjustments";
+import { openTitusEstimateModal } from "@/lib/titusSdk";
 import {
   PAY_AT_CLOSE_ADDON_SLOTS,
   PAY_AT_CLOSE_CARD_SLOTS,
@@ -18,15 +16,9 @@ import {
   type PayAtCloseEstateReel,
 } from "@shared/payAtClosePage";
 import {
-  TITUS_TEXAS_PAY_AT_CLOSE,
-  estimateTitusPayAtClose,
-  formatScheduleDollars,
-  titusFeePercentLabel,
-  titusTopDeferralCap,
-  type TitusBorrowerRole,
-  type TitusCreditTier,
-  type TitusPropertyType,
-} from "@shared/titusPayAtCloseSchedule";
+  PAY_AT_CLOSE_PACKAGES_FOOTNOTE,
+  TITUS_PAY_AT_CLOSE_PILL_SRC,
+} from "@shared/titusEstimate";
 import "./PayAtClose.css";
 
 const LUXURY = "/media/pay-at-close/luxury";
@@ -94,12 +86,51 @@ function priceLabel(amount: number | null): string {
   return amount == null ? "—" : formatCatalogDollars(amount);
 }
 
+function TitusPayAtClosePill({ amount, testId }: { amount?: number | null; testId: string }) {
+  return (
+    <TitusEstimateButton className="titus-pill" amount={amount} testId={testId} label="Pay at close with Titus">
+      <img src={TITUS_PAY_AT_CLOSE_PILL_SRC} alt="" />
+    </TitusEstimateButton>
+  );
+}
+
+function TitusEstimateButton({
+  amount,
+  className,
+  children,
+  label,
+  testId,
+}: {
+  amount?: number | null;
+  className: string;
+  children: ReactNode;
+  label: string;
+  testId?: string;
+}) {
+  const [error, setError] = useState("");
+  return (
+    <>
+      <button
+        type="button"
+        className={className}
+        data-testid={testId}
+        aria-label={label}
+        onClick={() => {
+          setError("");
+          void openTitusEstimateModal(amount).catch(() => {
+            setError("Titus’s estimate did not open. Try again.");
+          });
+        }}
+      >
+        {children}
+      </button>
+      {error ? <p className="estimate-error" role="alert">{error}</p> : null}
+    </>
+  );
+}
+
 export default function PayAtClose() {
   const [catalog, setCatalog] = useState<StaffCatalogPackage[]>(() => packagesForStaffEditor([]));
-  const [offer, setOffer] = useState<PayAtClosePublicOffer>(() => payAtClosePublicOffer(undefined, mergePricingAdjustments([])));
-  const [role, setRole] = useState<TitusBorrowerRole>("agent");
-  const [tier, setTier] = useState<TitusCreditTier>("prime");
-  const [property, setProperty] = useState<TitusPropertyType>("single-family");
   const [selected, setSelected] = useState<string[]>(["listing-showcase"]);
   const [addons, setAddons] = useState<Record<string, boolean>>({});
   const [credits, setCredits] = useState(5);
@@ -130,30 +161,17 @@ export default function PayAtClose() {
     };
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    readPricingAdjustments()
-      .then((adjustments) => {
-        if (!cancelled) setOffer(payAtClosePublicOffer(undefined, adjustments));
-      })
-      .catch(() => {
-        if (!cancelled) setOffer(payAtClosePublicOffer(undefined, mergePricingAdjustments([])));
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   const priceOf = (id: string) => {
     const item = catalogPackage(catalog, id);
     if (!item || !Number.isFinite(item.price)) return null;
-    return payAtCloseListedPrice(item.price, offer);
+    return item.price;
   };
   const nameOf = (id: string, fallback: string) => catalogPackage(catalog, id)?.name || fallback;
 
   const cards = PAY_AT_CLOSE_CARD_SLOTS.filter((slot) => slot.onGrid);
   const calcPackages = PAY_AT_CLOSE_CARD_SLOTS.filter((slot) => slot.inCalculator);
-  const staging = priceOf("virtual-staging");
+  const estateFeatures = payAtCloseFeatureRow(PAY_AT_CLOSE_ESTATES);
+  const estateGallery = payAtCloseEstateGallery(PAY_AT_CLOSE_ESTATES);
 
   const media = useMemo(() => {
     let total = 0;
@@ -168,17 +186,7 @@ export default function PayAtClose() {
       total += addon.credits ? amount * Math.max(0, credits) : amount;
     }
     return total;
-  }, [selected, addons, credits, catalog, offer]);
-
-  const estimate = estimateTitusPayAtClose({ role, tier, property, media });
-  const estateFeatures = payAtCloseFeatureRow(PAY_AT_CLOSE_ESTATES);
-  const estateGallery = payAtCloseEstateGallery(PAY_AT_CLOSE_ESTATES);
-  const showcasePrice = priceOf("listing-showcase");
-  const showcaseAtClose = showcasePrice == null ? null : showcasePrice * 1.04;
-  const dueToday = formatScheduleDollars(TITUS_TEXAS_PAY_AT_CLOSE.dueToday);
-  const topCapAmount = titusTopDeferralCap();
-  const topCap = formatScheduleDollars(topCapAmount);
-  const topCapShort = topCapAmount >= 1000 && topCapAmount % 1000 === 0 ? `$${topCapAmount / 1000}K` : topCap;
+  }, [selected, addons, credits, catalog]);
 
   const togglePackage = (id: string) => {
     setSelected((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]));
@@ -191,7 +199,7 @@ export default function PayAtClose() {
 
   return (
     <div className="pac-page" data-testid="pay-at-close-landing">
-      <div className="urgency">Pay at Close · <span>{dueToday} due today</span></div>
+      <div className="urgency">Pay at Close · <span>financing by Titus</span></div>
 
       <header className="nav">
         <div className="wrap nav-inner">
@@ -200,7 +208,7 @@ export default function PayAtClose() {
           </Link>
           <nav className="nav-links" aria-label="Page">
             <a href="#packages">Packages</a>
-            <a href="#calculator">Calculator</a>
+            <a href="#calculator">Estimate</a>
             <a href="#how">How it works</a>
             <a href="#faq">FAQ</a>
           </nav>
@@ -211,19 +219,21 @@ export default function PayAtClose() {
       <section className="hero" style={{ ["--hero" as string]: `url(${LUXURY}/marias/01-front-day.jpg)` }}>
         <div className="hero-bg" aria-hidden="true" />
         <div className="wrap hero-content">
-          <div className="pill">Pay at Close · Our financing Partner</div>
+          <div className="pill">Pay at Close · financing by Titus</div>
           <h1>Spoil your listing.<br /><em>Pay at closing.</em></h1>
           <p className="hero-lead">
-            Premium listing media with <strong>{dueToday} due today.</strong> Market Leader, Legacy cinema, Showcase aerials and more. Our financing Partner covers Iconic now, and it’s settled from proceeds when your listing closes.
+            Premium listing media with financing arranged by Titus. Market Leader, Legacy cinema, Showcase aerials and more. Titus pays Iconic now, and it’s settled from proceeds when your listing closes.
           </p>
           <div className="hero-actions">
             <Link className="btn btn-teal" to={bookPayAtCloseHref()}>Order for my listing →</Link>
-            <a className="btn btn-ghost" href="#calculator">Estimate my payoff</a>
+            <TitusEstimateButton className="btn btn-ghost" amount={media} label="See your rate with Titus">
+              See your rate with Titus
+            </TitusEstimateButton>
           </div>
           <div className="hero-stats">
-            <div className="hero-stat"><strong>{dueToday} today</strong><span>Due now</span></div>
-            <div className="hero-stat"><strong>{topCapShort}</strong><span>Max defer</span></div>
-            <div className="hero-stat"><strong>~2 min</strong><span>To apply</span></div>
+            <div className="hero-stat"><strong>Titus</strong><span>Live rates</span></div>
+            <div className="hero-stat"><strong>Catalog</strong><span>No added fee</span></div>
+            <div className="hero-stat"><strong>Same speed</strong><span>Iconic delivery</span></div>
           </div>
         </div>
       </section>
@@ -241,21 +251,23 @@ export default function PayAtClose() {
         <div className="wrap">
           <p className="section-kicker">Highest-ticket Iconic packages</p>
           <h2 className="section-title">Stop under-ordering.<br />Close with cinema.</h2>
-          <p className="section-sub">These are real Iconic prices from our booking catalog. Stack them in the calculator — then hit Order.</p>
+          <p className="section-sub">These are the same Iconic prices as the booking catalog. Titus shows the live rate when you open the estimate.</p>
           <div className="pkg-grid">
             {cards.map((slot) => {
               const price = priceOf(slot.id);
+              const packageName = nameOf(slot.id, slot.calcId);
               return (
                 <article key={slot.id} className={slot.featured ? "pkg featured" : "pkg"}>
                   {slot.badge ? <span className={slot.badgeGold ? "pkg-badge gold" : "pkg-badge"}>{slot.badge}</span> : null}
                   <div className="pkg-media"><img src={slot.image} alt={slot.imageAlt} /></div>
                   <div className="pkg-body">
-                    <h3 className="pkg-name">{nameOf(slot.id, slot.calcId)}</h3>
+                    <h3 className="pkg-name">{packageName}</h3>
                     <div className="pkg-price" data-testid={`pay-at-close-price-${slot.id}`}>
                       {priceLabel(price)} <small>{slot.priceNote}</small>
                     </div>
+                    <TitusPayAtClosePill amount={price} testId={`titus-pill-${slot.id}`} />
                     <p className="pkg-desc">{slot.blurb}</p>
-                    {slot.confirmWithPartner ? <p><span className="confirm-tag">Confirm with our Partner</span></p> : null}
+                    {slot.confirmWithPartner ? <p><span className="confirm-tag">Confirm with Titus</span></p> : null}
                     <ul className="pkg-features">
                       {slot.features.map((feature) => <li key={feature}>{feature}</li>)}
                     </ul>
@@ -263,19 +275,20 @@ export default function PayAtClose() {
                       <Link
                         className={slot.button === "teal" ? "btn btn-teal btn-block" : "btn btn-primary btn-block"}
                         to={bookPayAtCloseHref(slot.id)}
-                        aria-label={`Order ${nameOf(slot.id, slot.calcId)} for my listing`}
+                        aria-label={`Order ${packageName} for my listing`}
                       >
                         Order for my listing
                       </Link>
-                      <button type="button" className="btn btn-outline btn-block btn-sm" onClick={() => addAndScroll(slot.id)}>Add to calculator</button>
+                      <button type="button" className="btn btn-outline btn-block btn-sm" onClick={() => addAndScroll(slot.id)}>Add to estimate</button>
                     </div>
                   </div>
                 </article>
               );
             })}
           </div>
+          <p className="pkg-footnote" data-testid="pay-at-close-footnote">{PAY_AT_CLOSE_PACKAGES_FOOTNOTE}</p>
           <div className="center-actions">
-            <Link className="btn btn-teal" to={bookPayAtCloseHref()}>Order now — {dueToday} due today</Link>
+            <Link className="btn btn-teal" to={bookPayAtCloseHref()}>Order now</Link>
             <a className="btn btn-outline" href="#calculator">Build my total</a>
           </div>
         </div>
@@ -283,46 +296,13 @@ export default function PayAtClose() {
 
       <section className="calc-section" id="calculator">
         <div className="wrap">
-          <p className="section-kicker">Pay at Close calculator</p>
-          <h2 className="section-title">See what you pay<br />when it closes.</h2>
+          <p className="section-kicker">Titus estimate</p>
+          <h2 className="section-title">See your rate<br />with Titus.</h2>
           <p className="section-sub">
-            Texas estimate for Iconic’s market. Pick packages, set your credit tier —
-            see <strong>{dueToday} due now</strong> and the payoff at close. Final terms are set by our Partner.
+            Pick Iconic packages at the catalog price. Titus opens the live estimate for that total. Iconic does not calculate the fee.
           </p>
           <div className="calc-shell">
             <div className="calc-left">
-              <div className="field-row">
-                <span className="field-label">I am a</span>
-                <div className="seg" role="group" aria-label="Borrower role">
-                  <button type="button" className={role === "agent" ? "active" : ""} onClick={() => setRole("agent")}>Agent</button>
-                  <button type="button" className={role === "homeowner" ? "active" : ""} onClick={() => setRole("homeowner")}>Homeowner</button>
-                </div>
-              </div>
-              <div className="field-row">
-                <label className="field-label" htmlFor="pac-credit">Credit score</label>
-                <select id="pac-credit" value={tier} onChange={(event) => setTier(event.target.value as TitusCreditTier)}>
-                  {TITUS_TEXAS_PAY_AT_CLOSE.tiers.map((option) => (
-                    <option key={option.id} value={option.id}>{option.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="field-row">
-                <label className="field-label" htmlFor="pac-state">State</label>
-                <select id="pac-state" value="TX" aria-label="State" onChange={() => undefined}>
-                  <option value="TX">Texas (TX)</option>
-                </select>
-                <p className="hint">Texas rates are confirmed for this calculator. Final terms are set by our Partner.</p>
-              </div>
-              <div className="field-row">
-                <label className="field-label" htmlFor="pac-property">Property type</label>
-                <select id="pac-property" value={property} onChange={(event) => setProperty(event.target.value as TitusPropertyType)}>
-                  <option value="single-family">Single family</option>
-                  <option value="condo">Condo</option>
-                  <option value="townhome">Townhome</option>
-                  <option value="multi-unit">1–4 unit residential</option>
-                  <option value="manufactured-home">Manufactured / mobile</option>
-                </select>
-              </div>
               <div className="field-row">
                 <span className="field-label">Select Iconic packages</span>
                 <div className="pkg-checks">
@@ -380,21 +360,14 @@ export default function PayAtClose() {
             </div>
             <div className="calc-right">
               <div>
-                <div className="field-label" style={{ color: "rgba(255,255,255,.55)" }}>Due today</div>
-                <div className="result-big" data-testid="pac-due-now">{dueToday}</div>
+                <div className="field-label" style={{ color: "rgba(255,255,255,.55)" }}>Package total</div>
+                <div className="result-big" data-testid="pac-media">{formatCatalogDollars(media)}</div>
               </div>
-              <div className="result-row"><span>Media total</span><strong data-testid="pac-media">{formatScheduleDollars(estimate.media)}</strong></div>
-              <div className="result-row">
-                <span>Partner flat fee <span>{estimate.rate == null ? "(n/a)" : `(${titusFeePercentLabel(estimate.rate)} flat)`}</span></span>
-                <strong>{estimate.fee == null ? "—" : formatScheduleDollars(estimate.fee)}</strong>
-              </div>
-              <div className="result-row">
-                <span>Paid at close</span>
-                <strong className="payoff" data-testid="pac-at-close">{estimate.payoff == null ? "—" : formatScheduleDollars(estimate.payoff)}</strong>
-              </div>
-              <div className="result-row"><span>Max you can defer</span><strong>{estimate.cap == null ? "—" : formatScheduleDollars(estimate.cap)}</strong></div>
-              <div className={estimate.unavailable || estimate.overCap ? "result-note warn" : "result-note ok"}>{estimate.note}</div>
-              <Link className="btn btn-teal btn-block" to={bookPayAtCloseHref()}>Order this media now</Link>
+              <p className="result-note ok">This is the Iconic package price. Titus shows the rate and terms in the estimate.</p>
+              <TitusEstimateButton className="btn btn-teal btn-block" amount={media} testId="titus-estimate-open" label="See your rate with Titus">
+                See your rate with Titus
+              </TitusEstimateButton>
+              <Link className="btn btn-ghost btn-block" to={bookPayAtCloseHref()}>Order this media now</Link>
             </div>
           </div>
         </div>
@@ -404,22 +377,22 @@ export default function PayAtClose() {
         <div className="wrap">
           <p className="section-kicker">Three steps</p>
           <h2 className="section-title">How Pay at<br />Close works</h2>
-          <p className="section-sub">The same three steps our financing Partner uses for Iconic.</p>
+          <p className="section-sub">Financing arranged by Titus. The estimate shows the current terms.</p>
           <div className="steps">
             <div className="step">
               <div className="step-num">1</div>
-              <h3>Apply in ~2 minutes</h3>
-              <p>Agent or homeowner completes a short application with our financing Partner. Soft credit pull — does not ding your score for prequalification.</p>
+              <h3>See your rate with Titus</h3>
+              <p>Open the estimate on a package. Titus shows whether you qualify and the current rate. Iconic does not publish that rate here.</p>
             </div>
             <div className="step">
               <div className="step-num">2</div>
-              <h3>Order for your listing.<br />We get paid.</h3>
-              <p>Once approved, book your shoot. Our Partner pays Iconic for the listing media. You pay <strong>{dueToday} out of pocket today</strong>.</p>
+              <h3>Order for your listing.<br />Titus pays Iconic.</h3>
+              <p>Once approved, book your shoot. Titus pays Iconic for the listing media.</p>
             </div>
             <div className="step">
               <div className="step-num">3</div>
               <h3>Settled at closing</h3>
-              <p>At closing, our Partner’s payoff goes to title/escrow and is repaid from the sale proceeds plus a small Partner fee. Due at sale or 6 months, whichever comes first.</p>
+              <p>The payoff is settled from the sale. Titus shows the term in the estimate before you accept.</p>
             </div>
           </div>
           <div className="center-actions">
@@ -469,32 +442,20 @@ export default function PayAtClose() {
           <h2 className="section-title">Straight answers</h2>
           <div className="faq">
             <details open>
-              <summary>What do I pay Iconic today?</summary>
-              <p><strong>{dueToday}</strong> when you use Pay at Close on an approved order. Our financing Partner funds the media. You repay our Partner at closing (or within 6 months).</p>
+              <summary>Who arranges Pay at Close?</summary>
+              <p>Titus arranges the financing. Open the estimate on any package for the live rate and terms. The price on this page is the Iconic package price.</p>
             </details>
             <details>
-              <summary>How does the Partner fee work?</summary>
-              <p>When the home sells, our financing Partner is repaid for the media plus a flat fee based on credit tier and state (0%–8%).{showcasePrice != null && showcaseAtClose != null ? ` A Showcase at ${formatCatalogDollars(showcasePrice)} with a 4% Partner fee is ${formatScheduleDollars(showcaseAtClose)} at close.` : ""} Texas rates in this calculator follow our Partner’s published estimate.</p>
+              <summary>Will checking my rate affect my credit?</summary>
+              <p>Titus explains the credit check inside the estimate. Open it from a package before you apply.</p>
             </details>
             <details>
-              <summary>What’s the most I can defer?</summary>
-              <p>Up to <strong>{topCap}</strong> for prime / near-prime credit (670+), and up to <strong>{formatScheduleDollars(TITUS_TEXAS_PAY_AT_CLOSE.caps["upper-subprime"] || 0)}</strong> for average / fair tiers (640–669), subject to equity, LTV, and approval. Manufactured homes are capped lower (agents only, max {formatScheduleDollars(TITUS_TEXAS_PAY_AT_CLOSE.manufacturedAgentMax)}).</p>
-            </details>
-            <details>
-              <summary>What if the home doesn’t sell?</summary>
-              <p>Funds are due six months after first disbursement. Homeowners may repay or extend; extensions use a 16% annual interest rate with our Partner. Agents repay directly after the due date.</p>
-            </details>
-            <details>
-              <summary>Will this hurt my credit?</summary>
-              <p>Our financing Partner uses a <strong>soft pull</strong> for prequalification. Delinquency after funding may be reported and could affect credit.</p>
-            </details>
-            <details>
-              <summary>Who qualifies?</summary>
-              <p>Homeowners: own the listed property, signed listing agreement, within our Partner’s limits, minimum credit by state. Agents: active license, signed listing agreement, payment under half of expected commission, minimum credit. Texas is fully supported for agents and homeowners.</p>
+              <summary>Who can use Pay at Close?</summary>
+              <p>Agents and homeowners with a listing. Titus confirms eligibility. This page is built for Texas listings.</p>
             </details>
             <details>
               <summary>Is Content Partner eligible?</summary>
-              <p>Pay at Close is built for <strong>listing prep</strong> tied to a subject property. Listing packages are the natural fit. Monthly retainers and brand campaigns may need a confirmed listing context. <span className="confirm-tag">Confirm with our Partner</span></p>
+              <p>Pay at Close is built for <strong>listing prep</strong> tied to a subject property. Listing packages are the natural fit. Monthly retainers and brand campaigns may need a confirmed listing. <span className="confirm-tag">Confirm with Titus</span></p>
             </details>
           </div>
         </div>
@@ -505,7 +466,7 @@ export default function PayAtClose() {
           <div className="final-cta" style={{ ["--cta" as string]: `url(${LUXURY}/pool-rd/07-front-day.jpg)` }}>
             <div className="final-cta-bg" aria-hidden="true" />
             <h2>Spoil your sellers.<br />Pay at close.</h2>
-            <p>Give your sellers the full package with {dueToday} out of pocket. Their listing looks Iconic while the competition is still waiting on budget.</p>
+            <p>Give your sellers the full package. Titus arranges the financing, and the listing looks Iconic while the competition is still waiting on budget.</p>
             <div className="final-actions">
               <Link className="btn btn-teal" to={bookPayAtCloseHref()}>Order now — pay at close</Link>
             </div>
@@ -522,11 +483,11 @@ export default function PayAtClose() {
             <Link to="/" style={{ fontWeight: 700 }}>Iconic Images</Link>
           </div>
         </div>
-        <div className="wrap footnote">Estimates only. Final terms set by our Partner.</div>
+        <div className="wrap footnote">Rates and terms come from Titus.</div>
       </footer>
 
       <div className="sticky-order">
-        <div className="so-copy"><strong>{dueToday} due today</strong> Pay at Close · Order now</div>
+        <div className="so-copy"><strong>Financing by Titus</strong> Pay at Close · Order now</div>
         <Link className="btn btn-teal btn-sm" to={bookPayAtCloseHref()}>Order</Link>
       </div>
     </div>
