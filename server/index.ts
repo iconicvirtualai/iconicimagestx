@@ -59,6 +59,8 @@ import insightsRouter, { handleInsightShell } from "./routes/insights";
 import testDataCleanupRouter from "./routes/testDataCleanup";
 import holyGrailRouter from "./routes/holyGrail";
 import { originForHost, robotsTxt, sitemapXml } from "../shared/siteSeo.ts";
+import { amenityMediaRequestAllowed } from "../shared/amenityStock.ts";
+import stockFootageRouter from "./routes/stockFootage";
 
 const SETTINGS_FILE = path.join(process.cwd(), "site_settings.json");
 const API_BUILD_MARKER = "auth-square-2026-09-28";
@@ -121,6 +123,14 @@ export function createServer() {
   // Site media can carry a video. The public JSON limit stays 10mb.
   app.use("/api/site-content/media", express.json({ limit: "120mb" }));
   app.use("/api/site-content/dropbox", express.json({ limit: "1mb" }));
+
+  // Amenity sets stay off public URLs. Only the covered front still is allowed.
+  // This runs before the production static files, so a file in dist cannot slip out.
+  app.use((req, res, next) => {
+    if (amenityMediaRequestAllowed(req.path) && amenityMediaRequestAllowed(req.originalUrl || req.path)) return next();
+    res.setHeader("Cache-Control", "no-store");
+    return res.status(404).json({ error: "Not found." });
+  });
 
   // Standard middleware
   app.use(express.json({ limit: "10mb" }));
@@ -305,6 +315,7 @@ export function createServer() {
   app.use("/api/contact", liveChatRouter);
   app.use("/api/contact", contactRouter);
   app.use("/api/senior-living", seniorLivingRouter);
+  app.use("/api/stock-footage", stockFootageRouter);
   app.use("/api/apprenticeship", apprenticeshipRouter);
   app.use("/api/admin/test-data", testDataCleanupRouter);
   app.use("/api/holy-grail", holyGrailRouter);

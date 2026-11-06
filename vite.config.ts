@@ -2,6 +2,7 @@ import { defineConfig, loadEnv, Plugin } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { createServer } from "./server";
+import { amenityMediaRequestAllowed } from "./shared/amenityStock";
 import { matchingRedirect, redirectLocation, redirectStatus } from "./shared/spaRouting";
 
 // https://vitejs.dev/config/
@@ -48,6 +49,13 @@ function expressPlugin(): Plugin {
         const raw = req.url || "";
         const queryAt = raw.indexOf("?");
         const pathOnly = queryAt === -1 ? raw : raw.slice(0, queryAt);
+        if (!amenityMediaRequestAllowed(pathOnly)) {
+          res.statusCode = 404;
+          res.setHeader("Cache-Control", "no-store");
+          res.setHeader("Content-Type", "application/json");
+          res.end(JSON.stringify({ error: "Not found." }));
+          return;
+        }
         if (pathOnly === "/pricing-v1" || pathOnly === "/pricing-v1/") {
           res.statusCode = 301;
           res.setHeader("Location", "/pricing");
