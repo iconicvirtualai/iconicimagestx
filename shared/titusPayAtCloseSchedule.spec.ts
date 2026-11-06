@@ -1,31 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { mergePricingAdjustments } from "./pricingSettings.ts";
-import { payAtCloseListedPrice, payAtClosePublicOffer } from "./payAtClose.ts";
 import {
   estimateTitusPayAtClose,
   formatScheduleDollars,
   titusTopDeferralCap,
 } from "./titusPayAtCloseSchedule.ts";
 
-const defaultOffer = payAtClosePublicOffer({}, mergePricingAdjustments([]));
-
-function listed(catalogPrice: number): number {
-  return payAtCloseListedPrice(catalogPrice, defaultOffer);
-}
-
 describe("Titus Texas Pay at Close schedule", () => {
-  it("matches the agent prime example on Pay at Close prices", () => {
+  it("keeps the stored schedule math on a catalog media total", () => {
     const estimate = estimateTitusPayAtClose({
       role: "agent",
       tier: "prime",
       property: "single-family",
-      media: listed(549) + listed(899) + listed(1599),
+      media: 549 + 899 + 1599,
     });
-    expect(listed(549)).toBe(582);
-    expect(estimate.media).toBe(3230);
+    expect(estimate.media).toBe(3047);
     expect(estimate.rate).toBe(0.04);
-    expect(Math.round(estimate.fee || 0)).toBe(129);
-    expect(Math.round(estimate.payoff || 0)).toBe(3359);
+    expect(Math.round(estimate.fee || 0)).toBe(122);
+    expect(Math.round(estimate.payoff || 0)).toBe(3169);
     expect(estimate.dueToday).toBe(0);
     expect(estimate.cap).toBe(20000);
   });
@@ -35,12 +26,12 @@ describe("Titus Texas Pay at Close schedule", () => {
       role: "homeowner",
       tier: "near-prime",
       property: "single-family",
-      media: listed(549) + listed(2499),
+      media: 549 + 2499,
     });
-    expect(estimate.media).toBe(3231);
+    expect(estimate.media).toBe(3048);
     expect(estimate.rate).toBe(0.05);
-    expect(Math.round(estimate.fee || 0)).toBe(162);
-    expect(Math.round(estimate.payoff || 0)).toBe(3393);
+    expect(Math.round(estimate.fee || 0)).toBe(152);
+    expect(Math.round(estimate.payoff || 0)).toBe(3200);
   });
 
   it("marks deep-subprime as not on the schedule", () => {

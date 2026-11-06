@@ -48,7 +48,7 @@ import { packagesForStaffEditor, publicBookingCatalogResponse } from "../../shar
 import { pricingRates, taxDollars } from "../../shared/pricingSettings";
 import { isPromoInvoiceLine } from "../../shared/invoiceFace";
 import { loadPricingAdjustments, loadPricingRates } from "../services/pricingAdjustments";
-import { PAY_AT_CLOSE_METHOD, PAY_AT_CLOSE_PENDING_STATUS, payAtClosePublicOffer, shapePayAtCloseDraft } from "../../shared/payAtClose";
+import { PAY_AT_CLOSE_METHOD, PAY_AT_CLOSE_PENDING_STATUS, payAtCloseCustomerOffer, payAtClosePublicOffer, shapePayAtCloseDraft } from "../../shared/payAtClose";
 import { createTitusCheckout } from "../services/payAtClose";
 import { normalizeEmail } from "../../shared/listingAccess";
 import { portalBillingStamp } from "../../shared/clientHubSettings";
@@ -302,7 +302,7 @@ router.post("/", async (req, res) => {
     });
     let payAtCloseFee = 0;
     if (wantsPayAtClose) {
-      const shaped = shapePayAtCloseDraft(sale, payAtCloseOffer);
+      const shaped = shapePayAtCloseDraft(sale, payAtCloseCustomerOffer(payAtCloseOffer));
       payAtCloseFee = shaped.payAtCloseFee;
       sale = shaped as unknown as typeof sale;
     }

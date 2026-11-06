@@ -34,7 +34,7 @@ import {
 } from "@shared/bookingPricing";
 import { BOOKING_PROCESSING_LABEL, estimateBookingCharge } from "@shared/invoiceProcessing";
 import SocialCountdownBanner from "@/components/SocialCountdownBanner";
-import { payAtCloseFeeDollars, type PayAtClosePublicOffer } from "@shared/payAtClose";
+import { payAtCloseCustomerOffer, payAtCloseFeeDollars, type PayAtClosePublicOffer } from "@shared/payAtClose";
 import type { SocialRateStep } from "@shared/thankfulEvent";
 import { taxDollars, type PricingRates } from "@shared/pricingSettings";
 import { readPricingRates, seedPricingRates } from "@/lib/pricingAdjustments";
@@ -777,8 +777,9 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
       tax: taxDollars(Math.max(0, serviceBase - (appliedPromo?.discount || 0)), pricing),
     },
   );
+  const customerPayAtClose = payAtCloseCustomerOffer(payAtCloseOffer);
   const payAtCloseFee = payAtCloseSelected
-    ? payAtCloseFeeDollars(payAtCloseOffer.feeRate, payAtCloseOffer.feeMode, estimate.processingBase)
+    ? payAtCloseFeeDollars(customerPayAtClose.feeRate, customerPayAtClose.feeMode, estimate.processingBase)
     : 0;
   const estimateTotal = estimate.total + payAtCloseFee;
   const handleApplyPromo = () => {
@@ -1764,7 +1765,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
                      />
                      <span>
                        <span className="block text-sm font-black text-black">Pay at Close</span>
-                       <span className="block text-xs leading-relaxed text-gray-600">Spoil yourself and use our discounts. Our financing Partner pays Iconic now, and you settle when the home closes. One invoice, either way.</span>
+                       <span className="block text-xs leading-relaxed text-gray-600">Spoil yourself and use our discounts. Titus pays Iconic now, and you settle when the home closes. Titus shows its fee. One invoice, either way.</span>
                      </span>
                    </label>
                  </fieldset>

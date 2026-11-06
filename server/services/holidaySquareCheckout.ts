@@ -20,6 +20,10 @@ export interface HolidaySquareCheckoutInput {
   itemName: string;
   leadSource: string;
   orderNumber: string;
+  /** Absolute https URL on the public site origin. Omitted uses the holiday return path. */
+  redirectUrl?: string;
+  /** Log prefix. Holiday checkout leaves this unset. */
+  logLabel?: string;
   env?: Record<string, string | undefined>;
   fetchImpl?: typeof fetch;
 }
@@ -32,13 +36,26 @@ export interface HolidaySquareCheckoutResult {
   squareOrderId?: string;
 }
 
+function sameOriginRedirect(redirectUrl: string, origin: string): string | null {
+  let url: URL;
+  try {
+    url = new URL(redirectUrl);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== "https:" || url.origin !== origin || url.username || url.password) return null;
+  if (!url.pathname.startsWith("/")) return null;
+  return url.toString();
+}
+
 export async function createHolidaySquareCheckout(
   input: HolidaySquareCheckoutInput,
 ): Promise<HolidaySquareCheckoutResult> {
   const env = input.env ?? process.env;
+  const label = input.logLabel?.trim() || "Holiday";
   const missingEnv = squareCheckoutMissingEnv(env);
   if (missingEnv.length > 0) {
-    console.error("[Holiday] Square payment link was not created.", {
+    console.error(`[${label}] Square payment link was not created.`, {
       reason: "missing_env",
       missingEnv,
       invoiceId: input.invoiceId,
@@ -48,7 +65,7 @@ export async function createHolidaySquareCheckout(
   }
   const amount = Math.round(input.amount * 100) / 100;
   if (!Number.isFinite(amount) || amount <= 0) {
-    console.error("[Holiday] Square payment link was not created.", {
+    console.error(`[${label}] Square payment link was not created.`, {
       reason: "invalid_amount",
       amount: input.amount,
       invoiceId: input.invoiceId,
@@ -64,9 +81,19 @@ export async function createHolidaySquareCheckout(
       VITE_PUBLIC_SITE_URL: env.VITE_PUBLIC_SITE_URL,
     });
   } catch (err) {
-    console.error("[Holiday] Public site URL is not https. Using the Vercel app.", err);
+    console.error(`[${label}] Public site URL is not https. Using the Vercel app.`, err);
   }
-  const redirectUrl = `${origin}${holidayReturnPath(input.leadSource, input.orderNumber)}`;
+  const redirectUrl = input.redirectUrl
+    ? sameOriginRedirect(input.redirectUrl, origin)
+    : `${origin}${holidayReturnPath(input.leadSource, input.orderNumber)}`;
+  if (!redirectUrl) {
+    console.error(`[${label}] Square payment link was not created.`, {
+      reason: "redirect_rejected",
+      invoiceId: input.invoiceId,
+      orderNumber: input.orderNumber,
+    });
+    return { payment: "fallback" };
+  }
 
   const fetchImpl = input.fetchImpl ?? fetch;
   let response: Response;
@@ -89,7 +116,7 @@ export async function createHolidaySquareCheckout(
       })),
     });
   } catch (err) {
-    console.error("[Holiday] Square payment link was not created.", {
+    console.error(`[${label}] Square payment link was not created.`, {
       reason: "request_failed",
       invoiceId: input.invoiceId,
       orderNumber: input.orderNumber,
@@ -110,7 +137,7 @@ export async function createHolidaySquareCheckout(
         detail: typeof error?.detail === "string" ? error.detail.slice(0, 300) : undefined,
       }))
       : [];
-    console.error("[Holiday] Square payment link was not created.", {
+    console.error(`[${label}] Square payment link was not created.`, {
       reason: checkoutUrl ? "not_https" : "no_url",
       status: response.status,
       invoiceId: input.invoiceId,

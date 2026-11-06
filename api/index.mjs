@@ -2077,12 +2077,12 @@ function readEmailTemplateOverride(data) {
   if (typeof row.htmlBody !== "string" || !row.htmlBody.trim()) return null;
   return { subject: row.subject.trim(), htmlBody: row.htmlBody };
 }
-function clientOrderReceivedSubject(address, orderNumber) {
-  const code = orderNumber && /^#\d{3,}$/.test(orderNumber) ? ` ${orderNumber}` : "";
+function clientOrderReceivedSubject(address, orderNumber2) {
+  const code = orderNumber2 && /^#\d{3,}$/.test(orderNumber2) ? ` ${orderNumber2}` : "";
   return `Your Iconic order${code} was received: ${address}`;
 }
-function clientAppointmentConfirmedSubject(address, orderNumber) {
-  const code = orderNumber && /^#\d{3,}$/.test(orderNumber) ? ` ${orderNumber}` : "";
+function clientAppointmentConfirmedSubject(address, orderNumber2) {
+  const code = orderNumber2 && /^#\d{3,}$/.test(orderNumber2) ? ` ${orderNumber2}` : "";
   return `Your Iconic appointment${code} is confirmed: ${address}`;
 }
 function invoiceEmailSubject(invoiceNumber) {
@@ -2092,8 +2092,8 @@ function invoiceEmailSubject(invoiceNumber) {
 function paymentReceiptEmailSubject(invoiceNumber) {
   return `Payment received — ${invoiceNumber?.trim() || "Iconic Images"}`;
 }
-function clientConfirmationSubject(orderNumber) {
-  const code = orderNumber && /^#\d{3,}$/.test(orderNumber) ? ` ${orderNumber}` : "";
+function clientConfirmationSubject(orderNumber2) {
+  const code = orderNumber2 && /^#\d{3,}$/.test(orderNumber2) ? ` ${orderNumber2}` : "";
   return `We received your Iconic order${code}`;
 }
 function builtinEmailSubject(type, vars = {}) {
@@ -6033,13 +6033,13 @@ function officeNewOrderEmail(saved, options) {
   const deliverables = describeDeliverables(features);
   const fromLine = packageLine ? cleanPackageName(packageLine.name) : "";
   const packageName = fromLine || explicitPackageName(saved);
-  const orderNumber = orderNumberOf(saved);
+  const orderNumber2 = orderNumberOf(saved);
   const address = addressText(saved.addressLabel) || addressText(saved.address) || addressText(saved.propertyAddress) || addressText(saved.shootLocation) || NOT_PROVIDED;
   const requestedDate = firstDate(saved, ["scheduledDate", "requestedDate", "appointmentDate", "requestedDates"]);
   const clientName2 = clientNameOf(saved);
   const notes = notesOf(saved);
   const fields = [
-    ["Order number", orderNumber],
+    ["Order number", orderNumber2],
     ["Admin link", text$p(options?.adminUrl) || NOT_PROVIDED],
     ["Client name", clientName2],
     ["Client email", firstText$1(saved, ["clientEmail", "email"])],
@@ -6076,11 +6076,11 @@ function officeNewOrderEmail(saved, options) {
   ];
   const officeNote = text$p(saved.officeNote);
   if (officeNote) fields.unshift(["Office note", officeNote]);
-  const subjectCore = `New order ${orderNumber} — ${packageName} — ${address} — ${requestedDate}`;
+  const subjectCore = `New order ${orderNumber2} — ${packageName} — ${address} — ${requestedDate}`;
   const subject = isTestOrder(clientName2, notes) ? `[TEST] ${subjectCore}` : subjectCore;
   const plain = fields.map(([label, value]) => `${label}: ${value}`).join("\n");
   const html = `<div style="font-family:Arial,sans-serif;max-width:640px;color:#111"><h1 style="font-size:18px">${escapeHtml$8(subject)}</h1><table style="width:100%;border-collapse:collapse">${fields.map(([label, value]) => `<tr><td style="padding:6px 10px;border-bottom:1px solid #eee;font-weight:bold;vertical-align:top">${escapeHtml$8(label)}</td><td style="padding:6px 10px;border-bottom:1px solid #eee;white-space:pre-wrap">${escapeHtml$8(value)}</td></tr>`).join("")}</table></div>`;
-  return { subject, text: plain, html, orderNumber, packageName };
+  return { subject, text: plain, html, orderNumber: orderNumber2, packageName };
 }
 function isTestOrder(clientName2, notes) {
   return `${clientName2}
@@ -6338,10 +6338,10 @@ function squareCheckoutMissingEnv(env = process.env) {
   if (!env.SQUARE_LOCATION_ID) missing.push("SQUARE_LOCATION_ID");
   return missing;
 }
-function holidayReturnPath(leadSource, orderNumber) {
+function holidayReturnPath(leadSource, orderNumber2) {
   const params = new URLSearchParams({
     paid: "1",
-    order: orderNumber
+    order: orderNumber2
   });
   const query = params.toString();
   if (leadSource === HOLIDAY_SEASON_LEAD) return `/tis-the-season?${query}#book`;
@@ -6842,7 +6842,7 @@ function buildPlan(order, adminUrl) {
   const name = holidayGuestName(order);
   const headcount = holidayHeadcountLabel(order);
   const headcountTitle = holidayHeadcountNumber(headcount) ?? (headcount || "—");
-  const orderNumber = text$n(order.orderNumber);
+  const orderNumber2 = text$n(order.orderNumber);
   const summary = kind === "thankful" ? `Thankful RSVP — ${name} (${headcountTitle})` : `'Tis shoot — ${name} — ${holidayPackageLabel(order)}`;
   const description = [
     `Email: ${text$n(order.email) || text$n(order.clientEmail) || "—"}`,
@@ -6851,12 +6851,12 @@ function buildPlan(order, adminUrl) {
     `Kids/Santa: ${holidaySantaLabel(order) || "—"}`,
     `Menu vote: ${holidayMenuVote(order) || "—"}`,
     `Notes: ${holidayNotesLabel(order) || "—"}`,
-    `Order: ${orderNumber || "—"}`,
+    `Order: ${orderNumber2 || "—"}`,
     `Admin: ${adminUrl}`
   ].join("\n");
   return {
     orderId: text$n(order.id),
-    orderNumber,
+    orderNumber: orderNumber2,
     kind,
     name,
     date: claim.date,
@@ -7145,11 +7145,23 @@ async function fetchPublishedSquareInvoiceUrl(squareInvoiceId, deps) {
   if (!result.ok) return null;
   return publicUrlOf(result.body);
 }
+function sameOriginRedirect(redirectUrl, origin) {
+  let url;
+  try {
+    url = new URL(redirectUrl);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== "https:" || url.origin !== origin || url.username || url.password) return null;
+  if (!url.pathname.startsWith("/")) return null;
+  return url.toString();
+}
 async function createHolidaySquareCheckout(input) {
   const env = input.env ?? process.env;
+  const label = input.logLabel?.trim() || "Holiday";
   const missingEnv = squareCheckoutMissingEnv(env);
   if (missingEnv.length > 0) {
-    console.error("[Holiday] Square payment link was not created.", {
+    console.error(`[${label}] Square payment link was not created.`, {
       reason: "missing_env",
       missingEnv,
       invoiceId: input.invoiceId,
@@ -7159,7 +7171,7 @@ async function createHolidaySquareCheckout(input) {
   }
   const amount = Math.round(input.amount * 100) / 100;
   if (!Number.isFinite(amount) || amount <= 0) {
-    console.error("[Holiday] Square payment link was not created.", {
+    console.error(`[${label}] Square payment link was not created.`, {
       reason: "invalid_amount",
       amount: input.amount,
       invoiceId: input.invoiceId,
@@ -7174,9 +7186,17 @@ async function createHolidaySquareCheckout(input) {
       VITE_PUBLIC_SITE_URL: env.VITE_PUBLIC_SITE_URL
     });
   } catch (err) {
-    console.error("[Holiday] Public site URL is not https. Using the Vercel app.", err);
+    console.error(`[${label}] Public site URL is not https. Using the Vercel app.`, err);
   }
-  const redirectUrl = `${origin}${holidayReturnPath(input.leadSource, input.orderNumber)}`;
+  const redirectUrl = input.redirectUrl ? sameOriginRedirect(input.redirectUrl, origin) : `${origin}${holidayReturnPath(input.leadSource, input.orderNumber)}`;
+  if (!redirectUrl) {
+    console.error(`[${label}] Square payment link was not created.`, {
+      reason: "redirect_rejected",
+      invoiceId: input.invoiceId,
+      orderNumber: input.orderNumber
+    });
+    return { payment: "fallback" };
+  }
   const fetchImpl = input.fetchImpl ?? fetch;
   let response;
   try {
@@ -7198,7 +7218,7 @@ async function createHolidaySquareCheckout(input) {
       }))
     });
   } catch (err) {
-    console.error("[Holiday] Square payment link was not created.", {
+    console.error(`[${label}] Square payment link was not created.`, {
       reason: "request_failed",
       invoiceId: input.invoiceId,
       orderNumber: input.orderNumber,
@@ -7214,7 +7234,7 @@ async function createHolidaySquareCheckout(input) {
       code: typeof error?.code === "string" ? error.code : void 0,
       detail: typeof error?.detail === "string" ? error.detail.slice(0, 300) : void 0
     })) : [];
-    console.error("[Holiday] Square payment link was not created.", {
+    console.error(`[${label}] Square payment link was not created.`, {
       reason: checkoutUrl ? "not_https" : "no_url",
       status: response.status,
       invoiceId: input.invoiceId,
@@ -7425,7 +7445,7 @@ function defaultPricingAdjustments() {
       mode: "percent",
       amount: 6,
       sortOrder: 500,
-      note: "Percent uplift on the Pay at Close order subtotal. On at 6% until you change it. 0 keeps catalog prices. Turning this row off hides checkout. Checkout also stays hidden until PAY_AT_CLOSE_LIVE is true."
+      note: "Kept so the office can edit this row. The public Pay at Close page, booking total, and Titus invoice do not add this amount. Titus shows its own fee. Turning this row off hides checkout. Checkout also stays hidden until PAY_AT_CLOSE_LIVE is true."
     }),
     seed({
       id: "pay-at-close-card-processing",
@@ -7624,6 +7644,9 @@ function payAtCloseFeeDollars(rate2, mode, base) {
     return roundPayAtCloseMoney(Math.max(0, marked - safeBase));
   }
   return roundPayAtCloseMoney(safeRate);
+}
+function payAtCloseCustomerOffer(offer) {
+  return { ...offer, feeRate: 0 };
 }
 function serviceBase(lineItems) {
   const base = lineItems.filter((item) => item.id !== PAY_AT_CLOSE_FEE_LINE_ID && adjustmentKind(item) !== "processing" && !String(item.id || "").startsWith("promo-") && !String(item.name || "").startsWith("Promo Code:")).filter((item) => adjustmentKind(item) !== "travel").reduce((sum, item) => sum + (Number(item.price) || 0), 0);
@@ -9235,10 +9258,10 @@ function parseApprenticeshipOrder(body) {
     }
   };
 }
-function apprenticeshipBookingReturnPath(orderNumber, page2) {
+function apprenticeshipBookingReturnPath(orderNumber2, page2) {
   const params = new URLSearchParams({
     booking: "received",
-    order: orderNumber
+    order: orderNumber2
   });
   if (apprenticeshipReturnPage(page2) === "realestate-75") {
     return `/realestate-75/schedule?${params.toString()}`;
@@ -9774,11 +9797,11 @@ function parseHeadshotOrder(body, options) {
     }
   };
 }
-function headshotBookingReturnPath(orderNumber) {
+function headshotBookingReturnPath(orderNumber2) {
   const params = new URLSearchParams({
     booking: "received",
     paid: "1",
-    order: orderNumber
+    order: orderNumber2
   });
   return `${HEADSHOT_PATHS.book}?${params.toString()}`;
 }
@@ -10527,7 +10550,7 @@ function createRateLimiter(options) {
     }
   };
 }
-const router$y = Router();
+const router$z = Router();
 const db$w = () => admin.firestore();
 const BOOKING_SUBMIT_WINDOW_MS = 15 * 60 * 1e3;
 const BOOKING_SUBMIT_MAX = 10;
@@ -10575,7 +10598,7 @@ async function loadBookingCatalog() {
     return packagesForStaffEditor([]);
   }
 }
-router$y.post("/", async (req, res) => {
+router$z.post("/", async (req, res) => {
   const limit = bookingSubmitLimiter.check(clientIp(req));
   if (!limit.allowed) {
     res.setHeader("Retry-After", String(limit.retryAfterSec));
@@ -10702,7 +10725,7 @@ router$y.post("/", async (req, res) => {
     });
     let payAtCloseFee = 0;
     if (wantsPayAtClose) {
-      const shaped = shapePayAtCloseDraft(sale, payAtCloseOffer);
+      const shaped = shapePayAtCloseDraft(sale, payAtCloseCustomerOffer(payAtCloseOffer));
       payAtCloseFee = shaped.payAtCloseFee;
       sale = shaped;
     }
@@ -10854,7 +10877,7 @@ router$y.post("/", async (req, res) => {
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     };
     const docRef = await db$w().collection("orderRequests").add(orderRequest);
-    let orderNumber = docRef.id;
+    let orderNumber2 = docRef.id;
     let packageName = "";
     try {
       const tile = buildAdminOrderTile({
@@ -10865,8 +10888,8 @@ router$y.post("/", async (req, res) => {
         clientName: clientName2,
         address: savedAddress
       });
-      orderNumber = tile.orderCode;
-      orderNumber = reservedOrderNumber || await nextOrderNumber();
+      orderNumber2 = tile.orderCode;
+      orderNumber2 = reservedOrderNumber || await nextOrderNumber();
       packageName = tile.packageName === "Custom order" ? "" : tile.packageName;
     } catch (err) {
       console.error("[Bookings] Order number format failed:", err);
@@ -10875,7 +10898,7 @@ router$y.post("/", async (req, res) => {
     const holidayDecision = classifyHolidayCalendarOrder({
       ...orderRequest,
       id: docRef.id,
-      orderNumber,
+      orderNumber: orderNumber2,
       ...packageName ? { packageName } : {}
     }, orderRequestAdminUrl(docRef.id));
     if (holidayDecision.action === "create") {
@@ -10911,7 +10934,7 @@ router$y.post("/", async (req, res) => {
     }
     try {
       await docRef.update({
-        orderNumber,
+        orderNumber: orderNumber2,
         ...packageName ? { packageName } : {},
         ...holidayPatch,
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
@@ -11061,7 +11084,7 @@ router$y.post("/", async (req, res) => {
           variables: {
             clientName: clientName2,
             address: displayAddress,
-            orderNumber,
+            orderNumber: orderNumber2,
             requestId: docRef.id,
             scheduledDate: bookingDateLabel(scheduledDate, "Sat, Nov 7, 2026"),
             scheduledTime: shownTime
@@ -11076,13 +11099,13 @@ router$y.post("/", async (req, res) => {
       clientEmailStatus = await sendEmail({
         to: email,
         template: "booking_received",
-        subject: clientOrderReceivedSubject(displayAddress, orderNumber),
+        subject: clientOrderReceivedSubject(displayAddress, orderNumber2),
         html: holidayHtml || void 0,
         lockHtml: Boolean(holidayHtml),
         variables: {
           clientName: clientName2,
           address: displayAddress,
-          orderNumber,
+          orderNumber: orderNumber2,
           processing: money$3(sale.processing ?? 0),
           total: money$3(total),
           requestId: docRef.id,
@@ -11169,7 +11192,7 @@ router$y.post("/", async (req, res) => {
       const savedOrder = {
         id: savedSnap.id,
         ...savedSnap.data() || {},
-        orderNumber,
+        orderNumber: orderNumber2,
         ...packageName ? { packageName } : {}
       };
       const alert = await notifyOfficeOfOrder({
@@ -11214,7 +11237,7 @@ router$y.post("/", async (req, res) => {
             email: normalizedEmail,
             itemName: typeof selectedService === "string" && selectedService.trim() ? selectedService : "Holiday order",
             leadSource: typeof leadSource === "string" ? leadSource : "",
-            orderNumber
+            orderNumber: orderNumber2
           });
           if (linked.payment === "square" && linked.checkoutUrl) {
             await db$w().collection("invoices").doc(invoiceId).update({
@@ -11276,7 +11299,7 @@ router$y.post("/", async (req, res) => {
     return res.status(201).json({
       success: true,
       requestId: docRef.id,
-      orderNumber,
+      orderNumber: orderNumber2,
       invoiceId,
       accountCreated: account.createdAccount,
       notifications,
@@ -11321,13 +11344,13 @@ async function socialRateCaller(req) {
     return { role: null, email: null };
   }
 }
-router$y.get("/social-rate", async (req, res) => {
+router$z.get("/social-rate", async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   const requested = typeof req.query.date === "string" ? req.query.date : "";
   const previewAllowed = requested ? socialRatePreviewAllowed(await socialRateCaller(req)) : false;
   return res.json(socialRateView(/* @__PURE__ */ new Date(), requested || null, previewAllowed));
 });
-router$y.post("/holiday-calendar-backfill", requireAdmin, async (_req, res) => {
+router$z.post("/holiday-calendar-backfill", requireAdmin, async (_req, res) => {
   try {
     return res.json(await backfillHolidayCalendarEvents());
   } catch (err) {
@@ -11335,7 +11358,7 @@ router$y.post("/holiday-calendar-backfill", requireAdmin, async (_req, res) => {
     return res.status(500).json({ error: "Holiday calendar backfill failed." });
   }
 });
-router$y.get("/holiday-slots", async (_req, res) => {
+router$z.get("/holiday-slots", async (_req, res) => {
   res.setHeader("Cache-Control", "no-store");
   try {
     return res.json(holidayTakenFromOrders(await loadHolidaySlotOrders()));
@@ -11344,13 +11367,13 @@ router$y.get("/holiday-slots", async (_req, res) => {
     return res.status(500).json({ error: "Holiday slots are unavailable." });
   }
 });
-router$y.get("/photographers", (_req, res) => {
+router$z.get("/photographers", (_req, res) => {
   return res.json({
     noPreference: { id: NO_PREFERENCE_ID, name: NO_PREFERENCE_NAME },
     photographers: publicBookingPhotographers()
   });
 });
-router$y.get("/realestate-75/slots", async (req, res) => {
+router$z.get("/realestate-75/slots", async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   const pkg = realEstate75Package(typeof req.query.package === "string" ? req.query.package : "");
   try {
@@ -11374,7 +11397,7 @@ function postedDurationMinutes(value) {
   if (!Number.isInteger(parsed) || parsed < 15 || parsed > 24 * 60) return void 0;
   return parsed;
 }
-router$y.get("/slots", async (req, res) => {
+router$z.get("/slots", async (req, res) => {
   const basics = typeof req.query.basics === "string" ? req.query.basics.split(",").map((id) => id.trim()).filter(Boolean) : [];
   const preferenceId = preferenceFromRequest(req.query.photographer, "");
   try {
@@ -11399,7 +11422,7 @@ router$y.get("/slots", async (req, res) => {
     return res.json({ live: false, durationMinutes: 90, slots: [], suggestions: [] });
   }
 });
-router$y.get("/catalog", async (_req, res) => {
+router$z.get("/catalog", async (_req, res) => {
   const catalog = await loadBookingCatalog();
   const adjustments = await loadPricingAdjustments();
   const rates = pricingRates(adjustments);
@@ -11410,7 +11433,7 @@ router$y.get("/catalog", async (_req, res) => {
     payAtClose: payAtClosePublicOffer(process.env, adjustments)
   });
 });
-router$y.get("/", requireCoordinator, async (_req, res) => {
+router$z.get("/", requireCoordinator, async (_req, res) => {
   try {
     const snapshot = await db$w().collection("orderRequests").orderBy("createdAt", "desc").limit(100).get();
     const requests = snapshot.docs.map((doc) => ({
@@ -11423,7 +11446,7 @@ router$y.get("/", requireCoordinator, async (_req, res) => {
     return res.status(500).json({ error: "Failed to fetch booking requests." });
   }
 });
-router$y.get("/:id", requireCoordinator, async (req, res) => {
+router$z.get("/:id", requireCoordinator, async (req, res) => {
   try {
     const doc = await db$w().collection("orderRequests").doc(req.params.id).get();
     if (!doc.exists) {
@@ -11435,7 +11458,7 @@ router$y.get("/:id", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch booking request." });
   }
 });
-router$y.post("/:id/assign-photographer", requireCoordinator, async (req, res) => {
+router$z.post("/:id/assign-photographer", requireCoordinator, async (req, res) => {
   try {
     const requestDoc = await db$w().collection("orderRequests").doc(req.params.id).get();
     if (!requestDoc.exists) return res.status(404).json({ error: "Booking request not found." });
@@ -11450,7 +11473,7 @@ router$y.post("/:id/assign-photographer", requireCoordinator, async (req, res) =
     return res.status(500).json({ error: "Could not assign the photographer." });
   }
 });
-router$y.patch("/:id/confirm", requireCoordinator, async (req, res) => {
+router$z.patch("/:id/confirm", requireCoordinator, async (req, res) => {
   try {
     const { assignedPhotographerId, assignedPhotographerName: postedPhotographerName, scheduledDate, scheduledTime, internalNotes } = req.body;
     const requestDoc = await db$w().collection("orderRequests").doc(req.params.id).get();
@@ -11877,7 +11900,7 @@ async function releaseOrderCalendar(data) {
     return calendarHoldFailureMessage(err);
   }
 }
-router$y.patch("/:id/cancel", requireCoordinator, async (req, res) => {
+router$z.patch("/:id/cancel", requireCoordinator, async (req, res) => {
   try {
     const doc = await db$w().collection("orderRequests").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Not found." });
@@ -11906,7 +11929,7 @@ router$y.patch("/:id/cancel", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to cancel booking." });
   }
 });
-router$y.patch("/:id/decline", requireCoordinator, async (req, res) => {
+router$z.patch("/:id/decline", requireCoordinator, async (req, res) => {
   try {
     const { reason } = req.body;
     const doc = await db$w().collection("orderRequests").doc(req.params.id).get();
@@ -12027,10 +12050,10 @@ const SENIOR_LIVING_MANUAL_DEPOSIT_NOTE = "Invoice the 50% deposit manually";
 function seniorLivingDepositCopy(live) {
   return live ? SENIOR_LIVING_DEPOSIT_LINE_ONLINE : SENIOR_LIVING_DEPOSIT_LINE;
 }
-function seniorLivingDepositReturnPath(orderNumber) {
+function seniorLivingDepositReturnPath(orderNumber2) {
   const params = new URLSearchParams({
     deposit: "received",
-    order: orderNumber
+    order: orderNumber2
   });
   return `/senior-living?${params.toString()}`;
 }
@@ -12502,7 +12525,7 @@ async function resolveLateHeadshotPayment(orderId) {
   const stamp2 = admin.firestore.FieldValue.serverTimestamp();
   const requestId = typeof order.orderRequestId === "string" ? order.orderRequestId : "";
   const requestRef = requestId ? db$v().collection("orderRequests").doc(requestId) : null;
-  const orderNumber = String(order.orderNumber || "");
+  const orderNumber2 = String(order.orderNumber || "");
   const slotStart = typeof order.slotStart === "string" ? order.slotStart : "";
   const quantity = Number(order.quantity) || 1;
   const confirm = async (extra) => {
@@ -12530,7 +12553,7 @@ async function resolveLateHeadshotPayment(orderId) {
     if (open) {
       const event = await createBookingCalendarHold({
         photographerId: open.photographerId,
-        orderNumber,
+        orderNumber: orderNumber2,
         clientName: String(order.clientName || ""),
         clientEmail: String(order.clientEmail || ""),
         clientPhone: String(order.clientPhone || ""),
@@ -12572,8 +12595,8 @@ async function resolveLateHeadshotPayment(orderId) {
   }
   return "flagged";
 }
-const router$x = Router();
-const limiter$2 = createRateLimiter({ windowMs: 15 * 60 * 1e3, max: 8 });
+const router$y = Router();
+const limiter$3 = createRateLimiter({ windowMs: 15 * 60 * 1e3, max: 8 });
 const db$u = () => admin.firestore();
 async function nextInvoiceNumber$2() {
   const year = (/* @__PURE__ */ new Date()).getFullYear();
@@ -12585,7 +12608,7 @@ async function nextInvoiceNumber$2() {
     return `INV-${year}-${String(Date.now()).slice(-6)}`;
   }
 }
-router$x.get("/config", (_req, res) => {
+router$y.get("/config", (_req, res) => {
   const config = headshotConfig(process.env);
   res.json({
     ...config,
@@ -12596,7 +12619,7 @@ router$x.get("/config", (_req, res) => {
     holdMinutes: 60
   });
 });
-router$x.get("/slots", async (req, res) => {
+router$y.get("/slots", async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   const config = headshotConfig(process.env);
   const quantity = Number(req.query.quantity);
@@ -12622,8 +12645,8 @@ router$x.get("/slots", async (req, res) => {
     });
   }
 });
-router$x.post("/order", async (req, res) => {
-  const limit = limiter$2.check(clientIp(req));
+router$y.post("/order", async (req, res) => {
+  const limit = limiter$3.check(clientIp(req));
   if (!limit.allowed) {
     res.setHeader("Retry-After", String(limit.retryAfterSec));
     return res.status(429).json({
@@ -12658,9 +12681,9 @@ router$x.post("/order", async (req, res) => {
   if (!slot) {
     return res.status(409).json({ error: "That time was just taken. Pick another open time." });
   }
-  let orderNumber = "";
+  let orderNumber2 = "";
   try {
-    orderNumber = await nextOrderNumber();
+    orderNumber2 = await nextOrderNumber();
   } catch (error) {
     console.error("[Headshots] Order number failed:", error);
     return res.status(500).json({
@@ -12672,7 +12695,7 @@ router$x.post("/order", async (req, res) => {
   try {
     calendarEvent = await createBookingCalendarHold({
       photographerId: slot.photographerId,
-      orderNumber,
+      orderNumber: orderNumber2,
       clientName: clientName2,
       clientEmail: value.email,
       clientPhone: value.phone,
@@ -12726,7 +12749,7 @@ router$x.post("/order", async (req, res) => {
     whenTime: slot.time,
     quantity: quote.quantity,
     quote,
-    orderNumber,
+    orderNumber: orderNumber2,
     pageUrl,
     wearUrl
   });
@@ -12770,7 +12793,7 @@ router$x.post("/order", async (req, res) => {
       ...placedRevenueFields(),
       leadSource: HEADSHOTS_LEAD_SOURCE,
       ...value.gclid ? { gclid: value.gclid } : {},
-      orderNumber,
+      orderNumber: orderNumber2,
       calendarEventId: calendarEvent.eventId,
       calendarId: calendarEvent.calendarId,
       createdAt: now,
@@ -12807,7 +12830,7 @@ router$x.post("/order", async (req, res) => {
       source: HEADSHOTS_ORDER_SOURCE,
       ...placedRevenueFields(),
       leadSource: HEADSHOTS_LEAD_SOURCE,
-      orderNumber,
+      orderNumber: orderNumber2,
       calendarEventId: calendarEvent.eventId,
       calendarId: calendarEvent.calendarId,
       createdAt: now,
@@ -12832,7 +12855,7 @@ router$x.post("/order", async (req, res) => {
       depositReturn: "headshots-10",
       payToken,
       invoiceNumber,
-      orderNumber,
+      orderNumber: orderNumber2,
       notes: note,
       status: "draft",
       paymentProvider: "square",
@@ -12853,10 +12876,10 @@ router$x.post("/order", async (req, res) => {
       confirmationEmailStatus = await sendEmail({
         to: value.email,
         template: "headshot_booking",
-        subject: `Your Tuesday headshot time ${orderNumber}`,
+        subject: `Your Tuesday headshot time ${orderNumber2}`,
         html: confirmationEmailHtml,
         lockHtml: true,
-        variables: { clientName: clientName2, orderNumber }
+        variables: { clientName: clientName2, orderNumber: orderNumber2 }
       }).then((result) => result.sent ? "sent" : "failed").catch((error) => {
         console.error("[Headshots] Confirmation email failed:", error);
         return "failed";
@@ -12869,7 +12892,7 @@ router$x.post("/order", async (req, res) => {
       success: true,
       orderId: orderRef.id,
       orderRequestId: requestRef.id,
-      orderNumber,
+      orderNumber: orderNumber2,
       invoiceId: invoiceRef.id,
       payToken,
       depositAmount: quote.dueToday,
@@ -13033,7 +13056,7 @@ async function loadRevenueDocs(id) {
 function text$f(value) {
   return typeof value === "string" ? value.trim() : "";
 }
-const router$w = Router();
+const router$x = Router();
 const db$s = () => admin.firestore();
 const dotOptInLimiter = createRateLimiter({ windowMs: 10 * 60 * 1e3, max: 30 });
 function sendDotOptInPage(res, status2, ok) {
@@ -13046,7 +13069,7 @@ function sendDotOptInPage(res, status2, ok) {
   });
   res.send(dotOptInResultHtml(ok));
 }
-router$w.get("/dot-opt-in", async (req, res) => {
+router$x.get("/dot-opt-in", async (req, res) => {
   const limit = dotOptInLimiter.check(clientIp(req));
   if (!limit.allowed) {
     res.set("Retry-After", String(limit.retryAfterSec));
@@ -13062,7 +13085,7 @@ router$w.get("/dot-opt-in", async (req, res) => {
     sendDotOptInPage(res, 500, false);
   }
 });
-router$w.get("/", requireStaff, async (req, res) => {
+router$x.get("/", requireStaff, async (req, res) => {
   try {
     const { status: status2, photographerId, limit = "50", startAfter } = req.query;
     let query = db$s().collection("orders").orderBy("createdAt", "desc");
@@ -13090,7 +13113,7 @@ router$w.get("/", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch orders." });
   }
 });
-router$w.get("/dashboard", requireStaff, async (_req, res) => {
+router$x.get("/dashboard", requireStaff, async (_req, res) => {
   try {
     const now = /* @__PURE__ */ new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -13120,7 +13143,7 @@ router$w.get("/dashboard", requireStaff, async (_req, res) => {
     return res.status(500).json({ error: "Failed to fetch dashboard stats." });
   }
 });
-router$w.get("/:id", requireStaff, async (req, res) => {
+router$x.get("/:id", requireStaff, async (req, res) => {
   try {
     const orderDoc = await db$s().collection("orders").doc(req.params.id).get();
     if (!orderDoc.exists) return res.status(404).json({ error: "Order not found." });
@@ -13155,7 +13178,7 @@ router$w.get("/:id", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch order." });
   }
 });
-router$w.patch("/:id/revenue", requireCoordinator, async (req, res) => {
+router$x.patch("/:id/revenue", requireCoordinator, async (req, res) => {
   if (typeof req.body?.countsTowardRevenue !== "boolean") {
     return res.status(400).json({ error: "countsTowardRevenue must be true or false." });
   }
@@ -13184,7 +13207,7 @@ router$w.patch("/:id/revenue", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Could not update revenue acceptance." });
   }
 });
-router$w.patch("/:id", requireCoordinator, async (req, res) => {
+router$x.patch("/:id", requireCoordinator, async (req, res) => {
   try {
     const allowed = [
       "status",
@@ -13235,7 +13258,7 @@ const VALID_TRANSITIONS = {
   completed: [],
   cancelled: []
 };
-router$w.patch("/:id/status", requireCoordinator, async (req, res) => {
+router$x.patch("/:id/status", requireCoordinator, async (req, res) => {
   try {
     const { status: status2, note } = req.body;
     const orderDoc = await db$s().collection("orders").doc(req.params.id).get();
@@ -13281,7 +13304,7 @@ router$w.patch("/:id/status", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to update order status." });
   }
 });
-router$w.get("/:id/timeline", requireStaff, async (req, res) => {
+router$x.get("/:id/timeline", requireStaff, async (req, res) => {
   try {
     const [messages, editRequests, agentLogs] = await Promise.all([
       db$s().collection("messages").where("orderId", "==", req.params.id).orderBy("createdAt", "asc").get(),
@@ -17522,7 +17545,7 @@ const handlePublicGalleryLink = async (req, res) => {
     return res.status(500).json({ code: "lookup_failed", error: message, message });
   }
 };
-const router$v = Router();
+const router$w = Router();
 const db$m = () => admin.firestore();
 const storage = () => admin.storage().bucket();
 function cleanPosterUrl(value) {
@@ -17618,7 +17641,7 @@ function clientGalleryPayload(id, gallery, gate2) {
     mediaItems: showMedia ? lockedClientGalleryMedia(id, media, unlocked) : []
   };
 }
-router$v.get("/", requireStaff, async (req, res) => {
+router$w.get("/", requireStaff, async (req, res) => {
   try {
     const { status: status2, orderId } = req.query;
     let query = db$m().collection("galleries").orderBy("createdAt", "desc");
@@ -17664,7 +17687,7 @@ async function readGalleryPhotoBytes(item) {
     return null;
   }
 }
-router$v.get("/public/:id/photos.zip", async (req, res) => {
+router$w.get("/public/:id/photos.zip", async (req, res) => {
   const id = typeof req.params.id === "string" ? req.params.id : "";
   if (malformedPublicGalleryId(id)) return publicGalleryNotFound(res);
   if (!admin.apps.length) return publicGalleryNotFound(res);
@@ -17702,7 +17725,7 @@ router$v.get("/public/:id/photos.zip", async (req, res) => {
     return res.status(500).json({ error: "We couldn't build that download." });
   }
 });
-router$v.get("/public/:id", async (req, res) => {
+router$w.get("/public/:id", async (req, res) => {
   const id = typeof req.params.id === "string" ? req.params.id : "";
   if (malformedPublicGalleryId(id)) {
     console.warn("[Galleries] Public gallery id rejected.");
@@ -17730,8 +17753,8 @@ router$v.get("/public/:id", async (req, res) => {
     return res.status(500).json({ error: "We couldn't open this gallery." });
   }
 });
-router$v.get("/link/:id", handlePublicGalleryLink);
-router$v.get("/:id", requireAuth, async (req, res) => {
+router$w.get("/link/:id", handlePublicGalleryLink);
+router$w.get("/:id", requireAuth, async (req, res) => {
   try {
     const doc = await db$m().collection("galleries").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Gallery not found." });
@@ -17755,7 +17778,7 @@ router$v.get("/:id", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch gallery." });
   }
 });
-router$v.post("/:id/upload-url", requirePhotographer, async (req, res) => {
+router$w.post("/:id/upload-url", requirePhotographer, async (req, res) => {
   try {
     const { fileName: fileName2, fileType, isRaw: isRaw2 = false } = req.body;
     if (!fileName2 || !fileType) {
@@ -17780,7 +17803,7 @@ router$v.post("/:id/upload-url", requirePhotographer, async (req, res) => {
     return res.status(500).json({ error: "Failed to generate upload URL." });
   }
 });
-router$v.post("/:id/media", requirePhotographer, async (req, res) => {
+router$w.post("/:id/media", requirePhotographer, async (req, res) => {
   try {
     const {
       storagePath,
@@ -17834,7 +17857,7 @@ router$v.post("/:id/media", requirePhotographer, async (req, res) => {
     return res.status(500).json({ error: "Failed to register media." });
   }
 });
-router$v.post("/:id/media-link", requireCoordinator, async (req, res) => {
+router$w.post("/:id/media-link", requireCoordinator, async (req, res) => {
   try {
     const { url, title, type = "video", embedUrl, thumbnailUrl, downloadable = false, poster, posterUrl } = req.body;
     if (!url) return res.status(400).json({ error: "url required." });
@@ -17870,7 +17893,7 @@ router$v.post("/:id/media-link", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to register media link." });
   }
 });
-router$v.get("/:id/release", requireCoordinator, async (req, res) => {
+router$w.get("/:id/release", requireCoordinator, async (req, res) => {
   if (!adminReady$5(res)) return;
   try {
     const report = await loadGalleryReleaseForGallery(req.params.id);
@@ -17882,7 +17905,7 @@ router$v.get("/:id/release", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to check gallery release." });
   }
 });
-router$v.patch("/:id/status", requireCoordinator, async (req, res) => {
+router$w.patch("/:id/status", requireCoordinator, async (req, res) => {
   try {
     const { status: status2 } = req.body;
     const validStatuses = ["pending_upload", "raw_uploaded", "editing", "ready_for_review", "approved", "delivered"];
@@ -17904,7 +17927,7 @@ router$v.patch("/:id/status", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to update gallery status." });
   }
 });
-router$v.post("/:id/deliver", requireCoordinator, async (req, res) => {
+router$w.post("/:id/deliver", requireCoordinator, async (req, res) => {
   try {
     if (!adminReady$5(res)) return;
     const result = await deliverGalleryToClient(req.params.id, {
@@ -17933,7 +17956,7 @@ router$v.post("/:id/deliver", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to deliver gallery." });
   }
 });
-router$v.patch("/:id/downloads", requireCoordinator, async (req, res) => {
+router$w.patch("/:id/downloads", requireCoordinator, async (req, res) => {
   if (!adminReady$5(res)) return;
   try {
     if (typeof req.body?.released !== "boolean") {
@@ -17970,7 +17993,7 @@ router$v.patch("/:id/downloads", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to update gallery downloads." });
   }
 });
-router$v.delete("/:id/media/:mediaId", requireCoordinator, async (req, res) => {
+router$w.delete("/:id/media/:mediaId", requireCoordinator, async (req, res) => {
   try {
     const galleryDoc = await db$m().collection("galleries").doc(req.params.id).get();
     if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
@@ -18268,7 +18291,7 @@ async function resolveLateApprenticeshipPayment(orderId) {
   const stamp2 = admin.firestore.FieldValue.serverTimestamp();
   const requestId = typeof order.orderRequestId === "string" ? order.orderRequestId : "";
   const requestRef = requestId ? db$l().collection("orderRequests").doc(requestId) : null;
-  const orderNumber = String(order.orderNumber || "");
+  const orderNumber2 = String(order.orderNumber || "");
   const slotStart = typeof order.slotStart === "string" ? order.slotStart : "";
   const packageId = typeof order.packageId === "string" ? order.packageId : "";
   const confirm = async (extra) => {
@@ -18295,7 +18318,7 @@ async function resolveLateApprenticeshipPayment(orderId) {
     if (!availability.available) flagReason = "the apprentice calendar could not be read";
     if (slot) {
       const event = await createApprenticeshipEvent({
-        orderNumber,
+        orderNumber: orderNumber2,
         clientName: String(order.clientName || ""),
         clientEmail: String(order.clientEmail || ""),
         clientPhone: String(order.clientPhone || ""),
@@ -18337,7 +18360,7 @@ async function resolveLateApprenticeshipPayment(orderId) {
   await db$l().collection("agentLogs").add({
     agent: "travis",
     action: "Apprentice fee paid after hold expired",
-    summary: `Order ${orderNumber || orderId}: ${note}`,
+    summary: `Order ${orderNumber2 || orderId}: ${note}`,
     status: "flagged",
     relatedType: "order",
     relatedId: orderId,
@@ -18347,7 +18370,7 @@ async function resolveLateApprenticeshipPayment(orderId) {
   });
   return "flagged";
 }
-const router$u = Router();
+const router$v = Router();
 const db$k = () => appFirestore();
 const stripe$1 = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
   apiVersion: "2024-06-20"
@@ -18908,7 +18931,7 @@ async function applyDepositPayment({
     }
   }
 }
-router$u.post("/create-intent", requireAuth, async (req, res) => {
+router$v.post("/create-intent", requireAuth, async (req, res) => {
   try {
     if (!stripeReady()) {
       return res.status(503).json({ error: "Studio Noir Stripe payments are not configured yet." });
@@ -18946,7 +18969,7 @@ router$u.post("/create-intent", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to create payment intent." });
   }
 });
-router$u.post("/send-invoice", requireCoordinator, async (req, res) => {
+router$v.post("/send-invoice", requireCoordinator, async (req, res) => {
   try {
     const { invoiceId } = req.body;
     if (!invoiceId) return res.status(400).json({ error: "invoiceId required." });
@@ -18989,7 +19012,7 @@ router$u.post("/send-invoice", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to send invoice." });
   }
 });
-router$u.post("/send-receipt", requireCoordinator, async (req, res) => {
+router$v.post("/send-receipt", requireCoordinator, async (req, res) => {
   try {
     const { invoiceId } = req.body;
     if (!invoiceId) return res.status(400).json({ error: "invoiceId required." });
@@ -19012,7 +19035,7 @@ router$u.post("/send-receipt", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to send receipt." });
   }
 });
-router$u.get("/pay-at-close", async (_req, res) => {
+router$v.get("/pay-at-close", async (_req, res) => {
   res.setHeader("Cache-Control", "no-store");
   const adjustments = await loadPricingAdjustments();
   const offer = payAtCloseOfferFromAdjustments(process.env, adjustments);
@@ -19050,7 +19073,7 @@ async function beginPayAtCloseCheckout(invoiceDoc) {
       processing: invoice.processing,
       applyProcessing: false
     });
-    const shaped = shapePayAtCloseDraft({ ...draft, amountPaid: Number(invoice.amountPaid) || 0 }, offer);
+    const shaped = shapePayAtCloseDraft({ ...draft, amountPaid: Number(invoice.amountPaid) || 0 }, payAtCloseCustomerOffer(offer));
     payable = { ...invoice, ...shaped };
     await invoiceDoc.ref.update({
       lineItems: shaped.lineItems,
@@ -19108,7 +19131,7 @@ async function beginPayAtCloseCheckout(invoiceDoc) {
   }
   return { status: 200, body: { checkoutUrl: created.checkoutUrl, provider: PAY_AT_CLOSE_METHOD } };
 }
-router$u.post("/invoice/:id/pay-at-close", async (req, res) => {
+router$v.post("/invoice/:id/pay-at-close", async (req, res) => {
   try {
     const invoiceDoc = await loadInvoice(req.params.id);
     if (!invoiceDoc) return invoiceNotFound(res);
@@ -19129,7 +19152,7 @@ router$u.post("/invoice/:id/pay-at-close", async (req, res) => {
     return res.status(500).json({ error: "Pay at Close checkout could not be started." });
   }
 });
-router$u.post("/pay-at-close-webhook", async (req, res) => {
+router$v.post("/pay-at-close-webhook", async (req, res) => {
   try {
     const rawBody = await readSquareWebhookRawBody(req);
     if (rawBody === null) return res.status(400).json({ error: "Pay at Close webhook raw body is unavailable." });
@@ -19218,7 +19241,7 @@ router$u.post("/pay-at-close-webhook", async (req, res) => {
     return res.status(500).json({ error: "Pay at Close webhook handler failed." });
   }
 });
-router$u.get("/invoice/:id", async (req, res) => {
+router$v.get("/invoice/:id", async (req, res) => {
   try {
     const invoiceDoc = await loadInvoice(req.params.id);
     if (!invoiceDoc) return invoiceNotFound(res);
@@ -19294,7 +19317,7 @@ router$u.get("/invoice/:id", async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch invoice." });
   }
 });
-router$u.post("/invoice/:id/checkout", async (req, res) => {
+router$v.post("/invoice/:id/checkout", async (req, res) => {
   try {
     const invoiceDoc = await loadInvoice(req.params.id);
     if (!invoiceDoc) return invoiceNotFound(res);
@@ -19450,7 +19473,7 @@ router$u.post("/invoice/:id/checkout", async (req, res) => {
     return res.status(500).json({ error: "Failed to start checkout." });
   }
 });
-router$u.post("/invoice/:id/deposit-checkout", async (req, res) => {
+router$v.post("/invoice/:id/deposit-checkout", async (req, res) => {
   try {
     if (!seniorDepositCheckoutLive()) return invoiceNotFound(res);
     const invoiceDoc = await loadInvoice(req.params.id);
@@ -19504,7 +19527,7 @@ router$u.post("/invoice/:id/deposit-checkout", async (req, res) => {
     }
     if (!squareReady()) return res.status(503).json({ error: "Square payments are not configured yet." });
     await payTokenForLink(invoiceDoc);
-    const orderNumber = String(invoice.orderNumber || order.orderNumber || "");
+    const orderNumber2 = String(invoice.orderNumber || order.orderNumber || "");
     const response = await fetch(`${squareBaseUrl()}/v2/online-checkout/payment-links`, {
       method: "POST",
       headers: {
@@ -19515,7 +19538,7 @@ router$u.post("/invoice/:id/deposit-checkout", async (req, res) => {
       body: JSON.stringify({
         idempotency_key: `${invoiceDoc.id}-deposit`,
         quick_pay: {
-          name: orderSource === APPRENTICESHIP_ORDER_SOURCE || orderSource === HEADSHOTS_ORDER_SOURCE ? `Iconic Images booking fee ${orderNumber || invoice.invoiceNumber || invoiceDoc.id}` : `Iconic Images deposit ${invoice.invoiceNumber || invoiceDoc.id}`,
+          name: orderSource === APPRENTICESHIP_ORDER_SOURCE || orderSource === HEADSHOTS_ORDER_SOURCE ? `Iconic Images booking fee ${orderNumber2 || invoice.invoiceNumber || invoiceDoc.id}` : `Iconic Images deposit ${invoice.invoiceNumber || invoiceDoc.id}`,
           price_money: {
             amount: Math.round(depositAmount * 100),
             currency: "USD"
@@ -19523,7 +19546,7 @@ router$u.post("/invoice/:id/deposit-checkout", async (req, res) => {
           location_id: process.env.SQUARE_LOCATION_ID
         },
         checkout_options: {
-          redirect_url: `${appUrl$2()}${orderSource === HEADSHOTS_ORDER_SOURCE ? headshotBookingReturnPath(orderNumber) : orderSource === APPRENTICESHIP_ORDER_SOURCE ? apprenticeshipBookingReturnPath(orderNumber, invoice.depositReturn) : seniorLivingDepositReturnPath(orderNumber)}`
+          redirect_url: `${appUrl$2()}${orderSource === HEADSHOTS_ORDER_SOURCE ? headshotBookingReturnPath(orderNumber2) : orderSource === APPRENTICESHIP_ORDER_SOURCE ? apprenticeshipBookingReturnPath(orderNumber2, invoice.depositReturn) : seniorLivingDepositReturnPath(orderNumber2)}`
         },
         pre_populated_data: squareBuyerPrefill(invoice),
         payment_note: squarePaymentNote(invoiceDoc.id, invoice.invoiceNumber)
@@ -19549,7 +19572,7 @@ router$u.post("/invoice/:id/deposit-checkout", async (req, res) => {
     return res.status(500).json({ error: "Failed to start the deposit checkout." });
   }
 });
-router$u.post("/webhook", async (req, res) => {
+router$v.post("/webhook", async (req, res) => {
   const sig = req.headers["stripe-signature"];
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || "";
   let event;
@@ -19616,7 +19639,7 @@ async function findInvoiceForSquarePayment(payment) {
   const snap = await db$k().collection("invoices").doc(hit.id).get();
   return snap.exists ? snap : null;
 }
-router$u.post("/square-webhook", async (req, res) => {
+router$v.post("/square-webhook", async (req, res) => {
   try {
     const signatureKey = process.env.SQUARE_WEBHOOK_SIGNATURE_KEY;
     if (!signatureKey) {
@@ -19696,7 +19719,7 @@ router$u.post("/square-webhook", async (req, res) => {
     return res.status(500).json({ error: "Square webhook handler failed." });
   }
 });
-router$u.get("/transactions", requireCoordinator, async (req, res) => {
+router$v.get("/transactions", requireCoordinator, async (req, res) => {
   try {
     const { startDate, endDate, limit = "50" } = req.query;
     let query = db$k().collection("transactions").orderBy("createdAt", "desc");
@@ -19782,7 +19805,7 @@ async function handleStripeRefund(charge) {
     createdAt: admin.firestore.FieldValue.serverTimestamp()
   });
 }
-const router$t = Router();
+const router$u = Router();
 const db$j = () => admin.firestore();
 const VSAI_API_BASE = "https://api.virtualstagingai.app/v1";
 const VSAI_API_KEY = process.env.VSAI_API_KEY || process.env.VIRTUAL_STAGING_AI_API_KEY || "";
@@ -19790,7 +19813,7 @@ const VSAI_PRICE_CENTS = parseInt(process.env.VSAI_PRICE_CENTS || "1500", 10);
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
   apiVersion: "2024-06-20"
 });
-router$t.post("/create", requireAuth, async (req, res) => {
+router$u.post("/create", requireAuth, async (req, res) => {
   try {
     if (!VSAI_API_KEY) {
       console.error("[VSAI] VSAI_API_KEY is not set");
@@ -19865,7 +19888,7 @@ router$t.post("/create", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$t.get("/result/:jobId", requireAuth, async (req, res) => {
+router$u.get("/result/:jobId", requireAuth, async (req, res) => {
   try {
     const jobDoc = await db$j().collection("vsaiJobs").doc(req.params.jobId).get();
     if (!jobDoc.exists) return res.status(404).json({ error: "Job not found." });
@@ -19940,7 +19963,7 @@ router$t.get("/result/:jobId", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$t.get("/result/:jobId/file", requireAuth, async (req, res) => {
+router$u.get("/result/:jobId/file", requireAuth, async (req, res) => {
   try {
     const jobDoc = await db$j().collection("vsaiJobs").doc(req.params.jobId).get();
     if (!jobDoc.exists) return res.status(404).json({ error: "Job not found." });
@@ -19962,7 +19985,7 @@ router$t.get("/result/:jobId/file", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$t.post("/variation", requireAuth, async (req, res) => {
+router$u.post("/variation", requireAuth, async (req, res) => {
   try {
     const { jobId, style: newStyle, roomType: newRoomType } = req.body;
     if (!jobId) {
@@ -20046,7 +20069,7 @@ router$t.post("/variation", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$t.post("/checkout", requireAuth, async (req, res) => {
+router$u.post("/checkout", requireAuth, async (req, res) => {
   try {
     const { jobIds, successUrl, cancelUrl } = req.body;
     if (!jobIds || !Array.isArray(jobIds) || jobIds.length === 0) {
@@ -20115,7 +20138,7 @@ router$t.post("/checkout", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$t.post(
+router$u.post(
   "/webhook/stripe",
   // Raw body needed — mount before express.json() parses it
   async (req, res) => {
@@ -20153,7 +20176,7 @@ router$t.post(
     res.json({ received: true });
   }
 );
-router$t.get("/options", (_req, res) => {
+router$u.get("/options", (_req, res) => {
   return res.json({
     roomTypes: [
       { value: "living", label: "Living Room" },
@@ -20183,9 +20206,9 @@ router$t.get("/options", (_req, res) => {
 function capitalize(s) {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : "";
 }
-const router$s = Router();
+const router$t = Router();
 const db$i = () => admin.firestore();
-router$s.post("/email", requireStaff, async (req, res) => {
+router$t.post("/email", requireStaff, async (req, res) => {
   try {
     const { to, subject, body, orderId, clientId: clientId2 } = req.body;
     if (!to || !body?.trim()) {
@@ -20225,7 +20248,7 @@ router$s.post("/email", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to send email." });
   }
 });
-router$s.get("/:orderId", requireAuth, async (req, res) => {
+router$t.get("/:orderId", requireAuth, async (req, res) => {
   try {
     const orderDoc = await db$i().collection("orders").doc(req.params.orderId).get();
     if (!orderDoc.exists) return res.status(404).json({ error: "Order not found." });
@@ -20254,7 +20277,7 @@ router$s.get("/:orderId", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch messages." });
   }
 });
-router$s.post("/:orderId", requireAuth, async (req, res) => {
+router$t.post("/:orderId", requireAuth, async (req, res) => {
   try {
     const { content, attachments } = req.body;
     if (!content?.trim()) {
@@ -20309,7 +20332,7 @@ router$s.post("/:orderId", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to send message." });
   }
 });
-router$s.get("/unread/count", requireStaff, async (_req, res) => {
+router$t.get("/unread/count", requireStaff, async (_req, res) => {
   try {
     const snapshot = await db$i().collection("messages").where("isRead", "==", false).where("senderType", "==", "client").get();
     return res.json({ unreadCount: snapshot.size });
@@ -22346,13 +22369,13 @@ const handlePatchPortalWebsite = async (req, res) => {
     return sendKnownError$3(res, err, "Could not save the listing site.");
   }
 };
-const router$r = Router();
+const router$s = Router();
 const db$f = () => admin.firestore();
 const HOME_LIMIT = 100;
 function asRecord$3(value) {
   return value && typeof value === "object" ? value : {};
 }
-router$r.get("/", requireStaff, async (req, res) => {
+router$s.get("/", requireStaff, async (req, res) => {
   try {
     const { status: status2, search, limit = "50" } = req.query;
     let query = db$f().collection("clients").orderBy("createdAt", "desc");
@@ -22379,7 +22402,7 @@ function adminReady$3(res) {
   });
   return false;
 }
-router$r.post("/register", async (req, res) => {
+router$s.post("/register", async (req, res) => {
   if (!adminReady$3(res)) return;
   const firstName = cleanPersonName(req.body?.firstName);
   const lastName = cleanPersonName(req.body?.lastName);
@@ -22441,7 +22464,7 @@ router$r.post("/register", async (req, res) => {
     return res.status(500).json({ error: "Could not create the client account." });
   }
 });
-router$r.get("/me/home", requireAuth, async (req, res) => {
+router$s.get("/me/home", requireAuth, async (req, res) => {
   if (!adminReady$3(res)) return;
   try {
     const identity = await resolveClientIdentity(req.user.uid, req.user.email);
@@ -22590,14 +22613,14 @@ router$r.get("/me/home", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to load your portal." });
   }
 });
-router$r.get("/me/listings/:id", requireAuth, handleGetPortalListing);
-router$r.patch("/me/listings/:id/data", requireAuth, handlePatchPortalData);
-router$r.patch("/me/listings/:id/media", requireAuth, handlePatchPortalMedia);
-router$r.patch("/me/listings/:id/website", requireAuth, handlePatchPortalWebsite);
-router$r.post("/me/listings/:id/photo-edit-requests", requireAuth, handleCreatePhotoEditRequest);
-router$r.post("/me/listings/:id/uploads/url", requireAuth, handleCreatePortalUploadUrl);
-router$r.post("/me/listings/:id/uploads", requireAuth, handleRegisterPortalUpload);
-router$r.get("/me", requireAuth, async (req, res) => {
+router$s.get("/me/listings/:id", requireAuth, handleGetPortalListing);
+router$s.patch("/me/listings/:id/data", requireAuth, handlePatchPortalData);
+router$s.patch("/me/listings/:id/media", requireAuth, handlePatchPortalMedia);
+router$s.patch("/me/listings/:id/website", requireAuth, handlePatchPortalWebsite);
+router$s.post("/me/listings/:id/photo-edit-requests", requireAuth, handleCreatePhotoEditRequest);
+router$s.post("/me/listings/:id/uploads/url", requireAuth, handleCreatePortalUploadUrl);
+router$s.post("/me/listings/:id/uploads", requireAuth, handleRegisterPortalUpload);
+router$s.get("/me", requireAuth, async (req, res) => {
   try {
     const directDoc = await db$f().collection("clients").doc(req.user.uid).get();
     if (directDoc.exists) {
@@ -22613,7 +22636,7 @@ router$r.get("/me", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch profile." });
   }
 });
-router$r.get("/:id", requireStaff, async (req, res) => {
+router$s.get("/:id", requireStaff, async (req, res) => {
   try {
     const doc = await db$f().collection("clients").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Client not found." });
@@ -22630,7 +22653,7 @@ router$r.get("/:id", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch client." });
   }
 });
-router$r.post("/", requireCoordinator, async (req, res) => {
+router$s.post("/", requireCoordinator, async (req, res) => {
   try {
     const { firstName, lastName, email, phone, address, notes, tags } = req.body;
     if (!firstName || !lastName || !email) {
@@ -22660,7 +22683,7 @@ router$r.post("/", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to create client." });
   }
 });
-router$r.patch("/:id", requireCoordinator, async (req, res) => {
+router$s.patch("/:id", requireCoordinator, async (req, res) => {
   try {
     const allowed = ["firstName", "lastName", "phone", "address", "status", "notes", "tags", "company"];
     const updates = { updatedAt: admin.firestore.FieldValue.serverTimestamp() };
@@ -23344,7 +23367,7 @@ async function saveCard(actor2, requestedOwner, card) {
   });
   return getBilling(actor2, ownerClientId === actor2.clientId ? "" : ownerClientId);
 }
-const router$q = Router();
+const router$r = Router();
 function guard(handler) {
   return async (req, res) => {
     try {
@@ -23356,7 +23379,7 @@ function guard(handler) {
     }
   };
 }
-router$q.use((req, res, next) => {
+router$r.use((req, res, next) => {
   if (!req.path.startsWith("/me/hub")) return next();
   if (process.env.CLIENT_HUB_TEST_AUTH === "1" && typeof req.headers["x-client-hub-uid"] === "string") {
     req.user = {
@@ -23367,60 +23390,60 @@ router$q.use((req, res, next) => {
   }
   return requireAuth(req, res, next);
 });
-router$q.get("/me/hub/profile", guard(async (req, res) => {
+router$r.get("/me/hub/profile", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   res.json(await getProfile(await loadActor(req.user.uid, req.user.email || "")));
 }));
-router$q.patch("/me/hub/profile", guard(async (req, res) => {
+router$r.patch("/me/hub/profile", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   res.json(await saveProfile(await loadActor(req.user.uid, req.user.email || ""), req.body));
 }));
-router$q.post("/me/hub/profile/asset", guard(async (req, res) => {
+router$r.post("/me/hub/profile/asset", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   const kind = typeof req.body?.kind === "string" ? req.body.kind : "";
   const dataUrl = typeof req.body?.dataUrl === "string" ? req.body.dataUrl : "";
   res.json(await saveProfileAsset(await loadActor(req.user.uid, req.user.email || ""), kind, dataUrl));
 }));
-router$q.get("/me/hub/team", guard(async (req, res) => {
+router$r.get("/me/hub/team", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   res.json(await getTeam(await loadActor(req.user.uid, req.user.email || "")));
 }));
-router$q.post("/me/hub/team", guard(async (req, res) => {
+router$r.post("/me/hub/team", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   res.json(await saveTeam(await loadActor(req.user.uid, req.user.email || ""), req.body));
 }));
-router$q.patch("/me/hub/team", guard(async (req, res) => {
+router$r.patch("/me/hub/team", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   res.json(await saveTeam(await loadActor(req.user.uid, req.user.email || ""), req.body));
 }));
-router$q.post("/me/hub/team/members", guard(async (req, res) => {
+router$r.post("/me/hub/team/members", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   res.status(201).json(await addTeamMember(await loadActor(req.user.uid, req.user.email || ""), req.body, req.body?.invite === true));
 }));
-router$q.patch("/me/hub/team/members/:id", guard(async (req, res) => {
+router$r.patch("/me/hub/team/members/:id", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   res.json(await updateTeamMember(await loadActor(req.user.uid, req.user.email || ""), req.params.id, req.body));
 }));
-router$q.delete("/me/hub/team/members/:id", guard(async (req, res) => {
+router$r.delete("/me/hub/team/members/:id", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   res.json(await removeTeamMember(await loadActor(req.user.uid, req.user.email || ""), req.params.id));
 }));
-router$q.post("/me/hub/team/members/:id/invite", guard(async (req, res) => {
+router$r.post("/me/hub/team/members/:id/invite", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   res.json(await sendTeamInvite(await loadActor(req.user.uid, req.user.email || ""), req.params.id));
 }));
-router$q.get("/me/hub/clients.csv", guard(async (req, res) => {
+router$r.get("/me/hub/clients.csv", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   const { contacts } = await listContacts(await loadActor(req.user.uid, req.user.email || ""));
   res.setHeader("Content-Type", "text/csv; charset=utf-8");
   res.setHeader("Content-Disposition", 'attachment; filename="example-clients.csv"');
   res.send(contactsToCsv(contacts));
 }));
-router$q.get("/me/hub/clients", guard(async (req, res) => {
+router$r.get("/me/hub/clients", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   res.json(await listContacts(await loadActor(req.user.uid, req.user.email || "")));
 }));
-router$q.post("/me/hub/clients/import", guard(async (req, res) => {
+router$r.post("/me/hub/clients/import", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   const csv = typeof req.body?.csv === "string" ? req.body.csv : "";
   const parsed = parseContactsCsv(csv);
@@ -23429,29 +23452,29 @@ router$q.post("/me/hub/clients/import", guard(async (req, res) => {
   const saved = await importContacts(actor2, parsed.contacts.map((contact) => ({ ...contact, ownerClientId: actor2.clientId, teamId: "" })));
   res.status(201).json({ ...saved, errors: parsed.errors });
 }));
-router$q.post("/me/hub/clients", guard(async (req, res) => {
+router$r.post("/me/hub/clients", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   res.status(201).json(await saveContact(await loadActor(req.user.uid, req.user.email || ""), null, req.body));
 }));
-router$q.patch("/me/hub/clients/:id", guard(async (req, res) => {
+router$r.patch("/me/hub/clients/:id", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   res.json(await saveContact(await loadActor(req.user.uid, req.user.email || ""), req.params.id, req.body));
 }));
-router$q.delete("/me/hub/clients/:id", guard(async (req, res) => {
+router$r.delete("/me/hub/clients/:id", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   res.json(await deleteContact(await loadActor(req.user.uid, req.user.email || ""), req.params.id));
 }));
-router$q.get("/me/hub/billing", guard(async (req, res) => {
+router$r.get("/me/hub/billing", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   const owner = typeof req.query.account === "string" ? req.query.account : "";
   res.json(await getBilling(await loadActor(req.user.uid, req.user.email || ""), owner));
 }));
-router$q.patch("/me/hub/billing", guard(async (req, res) => {
+router$r.patch("/me/hub/billing", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   const owner = typeof req.query.account === "string" ? req.query.account : "";
   res.json(await saveBilling(await loadActor(req.user.uid, req.user.email || ""), owner, req.body));
 }));
-router$q.post("/me/hub/billing/card", guard(async (req, res) => {
+router$r.post("/me/hub/billing/card", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   if (containsRawCard(req.body)) throw new HubError(400, "Card numbers are not stored. Use the Square card form.");
   const sourceId = typeof req.body?.sourceId === "string" ? req.body.sourceId : "";
@@ -23470,7 +23493,7 @@ router$q.post("/me/hub/billing/card", guard(async (req, res) => {
   if ("error" in saved) throw new HubError(502, saved.error);
   res.json(await saveCard(actor2, owner, saved.card));
 }));
-router$q.use((req, res, next) => {
+router$r.use((req, res, next) => {
   if (req.path.startsWith("/me/hub")) return res.status(404).json({ error: "Settings path not found." });
   return next();
 });
@@ -24084,9 +24107,9 @@ async function setStaffPassword(staffId, password, actor2, replaceExisting) {
   await deleteManualDuplicates(email, uid);
   return { uid, mustChangePassword: true };
 }
-const router$p = Router();
+const router$q = Router();
 const db$c = () => admin.firestore();
-router$p.get("/", requireStaff, async (_req, res) => {
+router$q.get("/", requireStaff, async (_req, res) => {
   try {
     const snapshot = await db$c().collection("staff").where("isActive", "==", true).orderBy("firstName").get();
     return res.json(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
@@ -24104,7 +24127,7 @@ function staffLoginFailure(err, res, fallback) {
   console.error("[Staff] Login provision error.");
   return res.status(500).json({ error: fallback });
 }
-router$p.post("/", requireAdmin, async (req, res) => {
+router$q.post("/", requireAdmin, async (req, res) => {
   try {
     const result = await provisionStaffLogin(req.body || {}, actingAdmin(req));
     return res.status(result.created ? 201 : 200).json({
@@ -24118,7 +24141,7 @@ router$p.post("/", requireAdmin, async (req, res) => {
     return staffLoginFailure(err, res, "Failed to create staff member.");
   }
 });
-router$p.post("/:id/password", requireAdmin, async (req, res) => {
+router$q.post("/:id/password", requireAdmin, async (req, res) => {
   try {
     const result = await setStaffPassword(
       String(req.params.id || ""),
@@ -24131,7 +24154,7 @@ router$p.post("/:id/password", requireAdmin, async (req, res) => {
     return staffLoginFailure(err, res, "Failed to set the password.");
   }
 });
-router$p.patch("/:id", requireAdmin, async (req, res) => {
+router$q.patch("/:id", requireAdmin, async (req, res) => {
   try {
     const allowed = ["firstName", "lastName", "phone", "role", "isActive"];
     const updates = { updatedAt: admin.firestore.FieldValue.serverTimestamp() };
@@ -24171,7 +24194,7 @@ function requireSetupSecret(req, res) {
   }
   return true;
 }
-router$p.post("/playtest", async (req, res) => {
+router$q.post("/playtest", async (req, res) => {
   if (!requireSetupSecret(req, res)) return;
   if (!admin.apps.length) {
     return res.status(503).json({
@@ -24190,7 +24213,7 @@ router$p.post("/playtest", async (req, res) => {
     return res.status(500).json({ error: "Playtest setup failed." });
   }
 });
-router$p.post("/setup", async (req, res) => {
+router$q.post("/setup", async (req, res) => {
   try {
     if (isHostedDeployment(liveServerEnv())) {
       const secret = process.env.STAFF_SETUP_SECRET;
@@ -24233,7 +24256,7 @@ router$p.post("/setup", async (req, res) => {
     return res.status(500).json({ error: "Setup failed." });
   }
 });
-const router$o = Router();
+const router$p = Router();
 async function clearMustChangeFlag(uid) {
   const db2 = admin.firestore();
   const now = admin.firestore.FieldValue.serverTimestamp();
@@ -24249,7 +24272,7 @@ async function clearMustChangeFlag(uid) {
   await admin.auth().setCustomUserClaims(uid, claims);
   await admin.auth().revokeRefreshTokens(uid);
 }
-router$o.post("/password", requireAuth, async (req, res) => {
+router$p.post("/password", requireAuth, async (req, res) => {
   const password = String(req.body?.password || "");
   const problem = passwordPolicyError(password);
   if (problem) return res.status(400).json({ error: problem });
@@ -24291,7 +24314,7 @@ function kickStudioQueue(listingId, env = process.env) {
   });
   return { dispatched: true };
 }
-const router$n = Router();
+const router$o = Router();
 const db$b = () => admin.firestore();
 const DIRECT_UPLOAD_LIMIT = 3e6;
 function adminReady$2(res) {
@@ -24359,7 +24382,7 @@ function sendKnownError$2(res, err, fallback) {
   console.error("[Listings]", err);
   return res.status(500).json({ error: fallback });
 }
-router$n.get("/assigned", requirePhotographer, async (req, res) => {
+router$o.get("/assigned", requirePhotographer, async (req, res) => {
   if (!adminReady$2(res)) return;
   try {
     const uid = req.user.uid;
@@ -24388,7 +24411,7 @@ router$n.get("/assigned", requirePhotographer, async (req, res) => {
     return res.status(500).json({ error: "Failed to load assigned jobs." });
   }
 });
-router$n.get("/:id", requireAuth, async (req, res) => {
+router$o.get("/:id", requireAuth, async (req, res) => {
   if (!adminReady$2(res)) return;
   try {
     const listing = await assertListingAccess(req, req.params.id);
@@ -24403,7 +24426,7 @@ router$n.get("/:id", requireAuth, async (req, res) => {
     return sendKnownError$2(res, err, "Failed to load listing.");
   }
 });
-router$n.post("/:id/photos/upload-url", requirePhotographer, async (req, res) => {
+router$o.post("/:id/photos/upload-url", requirePhotographer, async (req, res) => {
   if (!adminReady$2(res)) return;
   try {
     const fileName2 = safeStorageFileName(req.body?.fileName);
@@ -24421,7 +24444,7 @@ router$n.post("/:id/photos/upload-url", requirePhotographer, async (req, res) =>
     return sendKnownError$2(res, err, "Failed to prepare the upload. Check FIREBASE_STORAGE_BUCKET.");
   }
 });
-router$n.post("/:id/photos", requirePhotographer, async (req, res) => {
+router$o.post("/:id/photos", requirePhotographer, async (req, res) => {
   if (!adminReady$2(res)) return;
   try {
     const listingId = req.params.id;
@@ -24467,7 +24490,7 @@ router$n.post("/:id/photos", requirePhotographer, async (req, res) => {
     return sendKnownError$2(res, err, "Failed to save the uploaded photo.");
   }
 });
-router$n.patch("/:id/photo-order", requirePhotographer, async (req, res) => {
+router$o.patch("/:id/photo-order", requirePhotographer, async (req, res) => {
   if (!adminReady$2(res)) return;
   try {
     await assertListingAccess(req, req.params.id);
@@ -24485,7 +24508,7 @@ router$n.patch("/:id/photo-order", requirePhotographer, async (req, res) => {
     return sendKnownError$2(res, err, "Failed to save the photo order.");
   }
 });
-router$n.patch("/:id/media-arrangement", requireStaff, async (req, res) => {
+router$o.patch("/:id/media-arrangement", requireStaff, async (req, res) => {
   if (!adminReady$2(res)) return;
   try {
     await assertListingAccess(req, req.params.id);
@@ -24495,7 +24518,7 @@ router$n.patch("/:id/media-arrangement", requireStaff, async (req, res) => {
     return sendKnownError$2(res, err, "Failed to save the media order.");
   }
 });
-router$n.post("/:id/gallery-sequence", requirePhotographer, async (req, res) => {
+router$o.post("/:id/gallery-sequence", requirePhotographer, async (req, res) => {
   if (!adminReady$2(res)) return;
   try {
     await assertListingAccess(req, req.params.id);
@@ -24506,7 +24529,7 @@ router$n.post("/:id/gallery-sequence", requirePhotographer, async (req, res) => 
     return sendKnownError$2(res, err, "Failed to upload the gallery in order.");
   }
 });
-const router$m = Router();
+const router$n = Router();
 const db$a = () => admin.firestore();
 function mailchimpConfig() {
   const apiKey = process.env.MAILCHIMP_API_KEY || "";
@@ -24534,7 +24557,7 @@ async function mailchimpRequest(path2, init = {}) {
   }
   return data;
 }
-router$m.get("/", requireCoordinator, async (_req, res) => {
+router$n.get("/", requireCoordinator, async (_req, res) => {
   try {
     const snapshot = await db$a().collection("campaigns").orderBy("createdAt", "desc").limit(50).get();
     return res.json(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
@@ -24542,7 +24565,7 @@ router$m.get("/", requireCoordinator, async (_req, res) => {
     return res.status(500).json({ error: "Failed to fetch campaigns." });
   }
 });
-router$m.get("/mailchimp/status", requireCoordinator, async (_req, res) => {
+router$n.get("/mailchimp/status", requireCoordinator, async (_req, res) => {
   try {
     const { apiKey, serverPrefix } = mailchimpConfig();
     if (!apiKey || !serverPrefix) {
@@ -24573,7 +24596,7 @@ router$m.get("/mailchimp/status", requireCoordinator, async (_req, res) => {
     });
   }
 });
-router$m.post("/mailchimp/sync", requireCoordinator, async (req, res) => {
+router$n.post("/mailchimp/sync", requireCoordinator, async (req, res) => {
   try {
     const { listId, audience = "all" } = req.body;
     if (!listId) return res.status(400).json({ error: "listId required." });
@@ -24636,7 +24659,7 @@ router$m.post("/mailchimp/sync", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: err instanceof Error ? err.message : "Failed to sync Mailchimp." });
   }
 });
-router$m.post("/", requireCoordinator, async (req, res) => {
+router$n.post("/", requireCoordinator, async (req, res) => {
   try {
     const { name, type, subject, body, audience, audienceIds, scheduledAt } = req.body;
     if (!name || !body || !audience) {
@@ -24661,7 +24684,7 @@ router$m.post("/", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to create campaign." });
   }
 });
-router$m.post("/:id/send", requireCoordinator, async (req, res) => {
+router$n.post("/:id/send", requireCoordinator, async (req, res) => {
   try {
     const campaignDoc = await db$a().collection("campaigns").doc(req.params.id).get();
     if (!campaignDoc.exists) return res.status(404).json({ error: "Campaign not found." });
@@ -25471,7 +25494,7 @@ function parseTabularUpload(input) {
   }
   return parseCsv(input.text || "");
 }
-const router$l = Router();
+const router$m = Router();
 const MAX_ROWS = 1e4;
 const unsubscribeLimit = createRateLimiter({ windowMs: 60 * 60 * 1e3, max: 20 });
 function requireMarketing$1(permission) {
@@ -25508,7 +25531,7 @@ function publicContact(contact, suppression) {
     suppressed: blocked ? reasonLabel(blocked.reason, blocked.hold) : ""
   };
 }
-router$l.get("/overview", requireMarketing$1("view"), async (_req, res) => {
+router$m.get("/overview", requireMarketing$1("view"), async (_req, res) => {
   const store = getMarketingStore();
   await store.ensureSeed();
   const [contacts, suppression, segments] = await Promise.all([
@@ -25524,7 +25547,7 @@ router$l.get("/overview", requireMarketing$1("view"), async (_req, res) => {
     segments: segments.length
   });
 });
-router$l.get("/contacts", requireMarketing$1("view"), async (req, res) => {
+router$m.get("/contacts", requireMarketing$1("view"), async (req, res) => {
   const store = getMarketingStore();
   await store.ensureSeed();
   const [contacts, suppression] = await Promise.all([store.listContacts(), store.listSuppression()]);
@@ -25540,7 +25563,7 @@ router$l.get("/contacts", requireMarketing$1("view"), async (req, res) => {
   const tags = [...new Set(contacts.flatMap((contact) => contact.tags))].sort((a, b) => a.localeCompare(b));
   res.json({ contacts: filtered, tags, total: contacts.length });
 });
-router$l.get("/contacts/detail", requireMarketing$1("view"), async (req, res) => {
+router$m.get("/contacts/detail", requireMarketing$1("view"), async (req, res) => {
   const email = normalizeEmail(req.query.email);
   if (!isValidEmail(email)) return res.status(400).json({ error: "A valid email is required." });
   const store = getMarketingStore();
@@ -25557,7 +25580,7 @@ router$l.get("/contacts/detail", requireMarketing$1("view"), async (req, res) =>
     activity: events.sort((a, b) => b.at.localeCompare(a.at))
   });
 });
-router$l.post("/contacts", requireMarketing$1("manage"), async (req, res) => {
+router$m.post("/contacts", requireMarketing$1("manage"), async (req, res) => {
   const email = normalizeEmail(req.body?.email);
   if (!isValidEmail(email)) return res.status(400).json({ error: "A valid email is required." });
   const store = getMarketingStore();
@@ -25582,7 +25605,7 @@ router$l.post("/contacts", requireMarketing$1("manage"), async (req, res) => {
   await store.saveContacts([contact]);
   res.json({ contact });
 });
-router$l.post("/contacts/tags", requireMarketing$1("manage"), async (req, res) => {
+router$m.post("/contacts/tags", requireMarketing$1("manage"), async (req, res) => {
   const emails = Array.isArray(req.body?.emails) ? req.body.emails.map((email) => normalizeEmail(email)) : [];
   const add = Array.isArray(req.body?.add) ? req.body.add.map(String) : [];
   const remove = Array.isArray(req.body?.remove) ? req.body.remove.map(String) : [];
@@ -25595,11 +25618,11 @@ router$l.post("/contacts/tags", requireMarketing$1("manage"), async (req, res) =
   await store.saveContacts(next);
   res.json({ updated: next.length });
 });
-router$l.post("/contacts/sync", requireMarketing$1("manage"), async (_req, res) => {
+router$m.post("/contacts/sync", requireMarketing$1("manage"), async (_req, res) => {
   const result = await syncCustomerContacts();
   res.json(result);
 });
-router$l.post("/imports/parse", requireMarketing$1("manage"), async (req, res) => {
+router$m.post("/imports/parse", requireMarketing$1("manage"), async (req, res) => {
   try {
     const table = parseTabularUpload({
       text: typeof req.body?.text === "string" ? req.body.text : "",
@@ -25619,7 +25642,7 @@ router$l.post("/imports/parse", requireMarketing$1("manage"), async (req, res) =
     res.status(400).json({ error: err instanceof Error ? err.message : "Could not read that file." });
   }
 });
-router$l.post("/imports/commit", requireMarketing$1("manage"), async (req, res) => {
+router$m.post("/imports/commit", requireMarketing$1("manage"), async (req, res) => {
   const headers = Array.isArray(req.body?.headers) ? req.body.headers.map(String) : [];
   const rows = Array.isArray(req.body?.rows) ? req.body.rows.map((row) => Array.isArray(row) ? row.map(String) : []) : [];
   const mapping = req.body?.mapping && typeof req.body.mapping === "object" ? req.body.mapping : {};
@@ -25637,7 +25660,7 @@ router$l.post("/imports/commit", requireMarketing$1("manage"), async (req, res) 
   await store.saveContacts(plan.upserts);
   res.json({ summary: plan.summary });
 });
-router$l.get("/segments", requireMarketing$1("view"), async (_req, res) => {
+router$m.get("/segments", requireMarketing$1("view"), async (_req, res) => {
   const store = getMarketingStore();
   const [segments, contacts] = await Promise.all([store.listSegments(), store.listContacts()]);
   res.json({
@@ -25647,7 +25670,7 @@ router$l.get("/segments", requireMarketing$1("view"), async (_req, res) => {
     }))
   });
 });
-router$l.post("/segments", requireMarketing$1("manage"), async (req, res) => {
+router$m.post("/segments", requireMarketing$1("manage"), async (req, res) => {
   const name = String(req.body?.name || "").trim();
   if (!name) return res.status(400).json({ error: "Name the segment." });
   const store = getMarketingStore();
@@ -25664,11 +25687,11 @@ router$l.post("/segments", requireMarketing$1("manage"), async (req, res) => {
   await store.saveSegment(segment);
   res.json({ segment });
 });
-router$l.delete("/segments/:id", requireMarketing$1("manage"), async (req, res) => {
+router$m.delete("/segments/:id", requireMarketing$1("manage"), async (req, res) => {
   await getMarketingStore().deleteSegment(req.params.id);
   res.json({ ok: true });
 });
-router$l.get("/suppression", requireMarketing$1("view"), async (_req, res) => {
+router$m.get("/suppression", requireMarketing$1("view"), async (_req, res) => {
   const store = getMarketingStore();
   await store.ensureSeed();
   const entries = await store.listSuppression();
@@ -25676,7 +25699,7 @@ router$l.get("/suppression", requireMarketing$1("view"), async (_req, res) => {
     entries: entries.sort((a, b) => a.value.localeCompare(b.value))
   });
 });
-router$l.post("/suppression", requireMarketing$1("manage"), async (req, res) => {
+router$m.post("/suppression", requireMarketing$1("manage"), async (req, res) => {
   const now = (/* @__PURE__ */ new Date()).toISOString();
   const entry2 = buildSuppression(now, {
     kind: req.body?.kind === "domain" || req.body?.kind === "name" ? req.body.kind : "email",
@@ -25695,11 +25718,11 @@ router$l.post("/suppression", requireMarketing$1("manage"), async (req, res) => 
   await store.saveSuppression({ ...entry2, createdAt: existing?.createdAt || now, source: existing?.source || "manual" });
   res.json({ entry: entry2 });
 });
-router$l.delete("/suppression/:id", requireMarketing$1("manage"), async (req, res) => {
+router$m.delete("/suppression/:id", requireMarketing$1("manage"), async (req, res) => {
   await getMarketingStore().deleteSuppression(decodeURIComponent(req.params.id));
   res.json({ ok: true });
 });
-router$l.post("/unsubscribe", async (req, res) => {
+router$m.post("/unsubscribe", async (req, res) => {
   const limit = unsubscribeLimit.check(clientIp(req));
   if (!limit.allowed) return res.status(429).json({ error: "Too many attempts. Try again later." });
   const email = normalizeEmail(req.body?.email);
@@ -26138,7 +26161,7 @@ function createGmassClient(env = process.env, fetchImpl = fetch) {
 function getGmassClient() {
   return createGmassClient();
 }
-const router$k = Router();
+const router$l = Router();
 function requireMarketing(permission) {
   return async (req, res, next) => {
     await requireStaff(req, res, () => {
@@ -26284,7 +26307,7 @@ function sendBlocked(res, gmass) {
   }
   return false;
 }
-router$k.get("/dashboard", requireMarketing("view"), async (_req, res) => {
+router$l.get("/dashboard", requireMarketing("view"), async (_req, res) => {
   const store = getMarketingStore();
   await store.ensureSeed();
   const [contacts, suppression, segments, campaigns, reports] = await Promise.all([
@@ -26319,11 +26342,11 @@ router$k.get("/dashboard", requireMarketing("view"), async (_req, res) => {
     alerts: rows.filter((row) => row.stats?.pauseRecommended)
   });
 });
-router$k.get("/campaigns", requireMarketing("view"), async (_req, res) => {
+router$l.get("/campaigns", requireMarketing("view"), async (_req, res) => {
   const campaigns = await getMarketingStore().listCampaigns();
   res.json({ campaigns: campaigns.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)) });
 });
-router$k.post("/campaigns", requireMarketing("manage"), async (req, res) => {
+router$l.post("/campaigns", requireMarketing("manage"), async (req, res) => {
   const store = getMarketingStore();
   const now = (/* @__PURE__ */ new Date()).toISOString();
   const settings = await store.getSettings();
@@ -26336,12 +26359,12 @@ router$k.post("/campaigns", requireMarketing("manage"), async (req, res) => {
   await store.saveCampaign(campaign);
   res.status(201).json({ campaign });
 });
-router$k.get("/campaigns/:id", requireMarketing("view"), async (req, res) => {
+router$l.get("/campaigns/:id", requireMarketing("view"), async (req, res) => {
   const campaign = await getMarketingStore().getCampaign(req.params.id);
   if (!campaign) return res.status(404).json({ error: "Campaign not found." });
   res.json({ campaign });
 });
-router$k.post("/campaigns/:id", requireMarketing("manage"), async (req, res) => {
+router$l.post("/campaigns/:id", requireMarketing("manage"), async (req, res) => {
   const store = getMarketingStore();
   const current = await store.getCampaign(req.params.id);
   if (!current) return res.status(404).json({ error: "Campaign not found." });
@@ -26356,7 +26379,7 @@ router$k.post("/campaigns/:id", requireMarketing("manage"), async (req, res) => 
   await store.saveCampaign(campaign);
   res.json({ campaign });
 });
-router$k.post("/campaigns/:id/duplicate", requireMarketing("manage"), async (req, res) => {
+router$l.post("/campaigns/:id/duplicate", requireMarketing("manage"), async (req, res) => {
   const store = getMarketingStore();
   const current = await store.getCampaign(req.params.id);
   if (!current) return res.status(404).json({ error: "Campaign not found." });
@@ -26378,7 +26401,7 @@ router$k.post("/campaigns/:id/duplicate", requireMarketing("manage"), async (req
   await store.saveCampaign(copy);
   res.status(201).json({ campaign: copy });
 });
-router$k.post("/campaigns/:id/preview", requireMarketing("send"), async (req, res) => {
+router$l.post("/campaigns/:id/preview", requireMarketing("send"), async (req, res) => {
   const store = getMarketingStore();
   const current = await store.getCampaign(req.params.id);
   if (!current) return res.status(404).json({ error: "Campaign not found." });
@@ -26397,7 +26420,7 @@ router$k.post("/campaigns/:id/preview", requireMarketing("send"), async (req, re
   await store.saveCampaign(campaign);
   res.json({ confirmation });
 });
-router$k.post("/campaigns/:id/test", requireMarketing("send"), async (req, res) => {
+router$l.post("/campaigns/:id/test", requireMarketing("send"), async (req, res) => {
   const to = normalizeEmail(req.body?.to);
   if (!isValidEmail(to)) return res.status(400).json({ error: "Enter a test email address." });
   const gmass = getGmassClient();
@@ -26426,7 +26449,7 @@ router$k.post("/campaigns/:id/test", requireMarketing("send"), async (req, res) 
   }
   res.json({ ok: true, to });
 });
-router$k.post("/campaigns/:id/send", requireMarketing("send"), async (req, res) => {
+router$l.post("/campaigns/:id/send", requireMarketing("send"), async (req, res) => {
   const store = getMarketingStore();
   const current = await store.getCampaign(req.params.id);
   if (!current) return res.status(404).json({ error: "Campaign not found." });
@@ -26530,7 +26553,7 @@ router$k.post("/campaigns/:id/send", requireMarketing("send"), async (req, res) 
     return res.status(502).json({ error: message });
   }
 });
-router$k.get("/campaigns/:id/report", requireMarketing("view"), async (req, res) => {
+router$l.get("/campaigns/:id/report", requireMarketing("view"), async (req, res) => {
   const store = getMarketingStore();
   const [campaign, report] = await Promise.all([
     store.getCampaign(req.params.id),
@@ -26539,7 +26562,7 @@ router$k.get("/campaigns/:id/report", requireMarketing("view"), async (req, res)
   if (!campaign) return res.status(404).json({ error: "Campaign not found." });
   res.json({ campaign, report });
 });
-router$k.post("/campaigns/:id/report", requireMarketing("view"), async (req, res) => {
+router$l.post("/campaigns/:id/report", requireMarketing("view"), async (req, res) => {
   const store = getMarketingStore();
   const campaign = await store.getCampaign(req.params.id);
   if (!campaign) return res.status(404).json({ error: "Campaign not found." });
@@ -26614,11 +26637,11 @@ router$k.post("/campaigns/:id/report", requireMarketing("view"), async (req, res
     res.status(502).json({ error: err instanceof Error ? err.message : "Could not refresh the GMass report." });
   }
 });
-router$k.get("/templates", requireMarketing("view"), async (_req, res) => {
+router$l.get("/templates", requireMarketing("view"), async (_req, res) => {
   const templates = await getMarketingStore().listTemplates();
   res.json({ templates });
 });
-router$k.post("/templates", requireMarketing("manage"), async (req, res) => {
+router$l.post("/templates", requireMarketing("manage"), async (req, res) => {
   const name = String(req.body?.name || "").trim();
   const html = String(req.body?.html || "");
   if (!name || !html) return res.status(400).json({ error: "A template needs a name and HTML." });
@@ -26633,15 +26656,15 @@ router$k.post("/templates", requireMarketing("manage"), async (req, res) => {
   await getMarketingStore().saveTemplate(template);
   res.json({ template });
 });
-router$k.delete("/templates/:id", requireMarketing("manage"), async (req, res) => {
+router$l.delete("/templates/:id", requireMarketing("manage"), async (req, res) => {
   await getMarketingStore().deleteTemplate(req.params.id);
   res.json({ ok: true });
 });
-router$k.get("/settings", requireMarketing("view"), async (_req, res) => {
+router$l.get("/settings", requireMarketing("view"), async (_req, res) => {
   const settings = await getMarketingStore().getSettings();
   res.json({ settings });
 });
-router$k.get("/account", requireMarketing("view"), async (_req, res) => {
+router$l.get("/account", requireMarketing("view"), async (_req, res) => {
   const settings = await getMarketingStore().getSettings();
   const gmass = getGmassClient();
   const base = {
@@ -26663,7 +26686,7 @@ router$k.get("/account", requireMarketing("view"), async (_req, res) => {
   ]);
   res.json({ ...base, user, warmup, domains });
 });
-router$k.post("/settings", requireMarketing("send"), async (req, res) => {
+router$l.post("/settings", requireMarketing("send"), async (req, res) => {
   const store = getMarketingStore();
   const current = await store.getSettings();
   const next = {
@@ -26686,7 +26709,7 @@ router$k.post("/settings", requireMarketing("send"), async (req, res) => {
   await store.saveSettings(next);
   res.json({ settings: next });
 });
-router$k.post("/account/unsubscribes", requireMarketing("send"), async (req, res) => {
+router$l.post("/account/unsubscribes", requireMarketing("send"), async (req, res) => {
   const gmass = getGmassClient();
   if (!gmass.configured) return res.status(503).json({ error: "Set GMASS_API_KEY before syncing a suppression to GMass." });
   const email = normalizeEmail(req.body?.email);
@@ -26706,7 +26729,7 @@ router$k.post("/account/unsubscribes", requireMarketing("send"), async (req, res
   }
   res.json({ ok: true });
 });
-router$k.post("/demo/sample-report", requireMarketing("send"), async (req, res) => {
+router$l.post("/demo/sample-report", requireMarketing("send"), async (req, res) => {
   if (process.env.MARKETING_DEMO !== "true" || isHostedDeployment(liveServerEnv())) {
     return res.status(404).json({ error: "Not found." });
   }
@@ -26744,7 +26767,7 @@ router$k.post("/demo/sample-report", requireMarketing("send"), async (req, res) 
   await store.saveReport(report);
   res.json({ campaign, report });
 });
-const router$j = Router();
+const router$k = Router();
 const db$8 = () => admin.firestore();
 function isAgentAuthorized(req) {
   const serviceKey = req.headers["x-agent-key"];
@@ -26786,7 +26809,7 @@ async function loadOrderForAppointment(appointment) {
   const orderDoc = await db$8().collection("orders").doc(String(appointment.orderId)).get();
   return orderDoc.exists ? { id: orderDoc.id, ref: orderDoc.ref, data: orderDoc.data() || {} } : null;
 }
-router$j.get("/briefing", requireStaff, async (_req, res) => {
+router$k.get("/briefing", requireStaff, async (_req, res) => {
   try {
     const today = /* @__PURE__ */ new Date();
     today.setHours(0, 0, 0, 0);
@@ -26985,9 +27008,9 @@ async function runReminderSweep(req, res) {
     return res.status(500).json({ error: "Failed to run reminder sweep." });
   }
 }
-router$j.get("/run-reminders", runReminderSweep);
-router$j.post("/run-reminders", runReminderSweep);
-router$j.get("/logs", requireStaff, async (req, res) => {
+router$k.get("/run-reminders", runReminderSweep);
+router$k.post("/run-reminders", runReminderSweep);
+router$k.get("/logs", requireStaff, async (req, res) => {
   try {
     const { agent, status: status2, requiresReview, limit = "50" } = req.query;
     let query = db$8().collection("agentLogs").orderBy("createdAt", "desc");
@@ -27002,7 +27025,7 @@ router$j.get("/logs", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch agent logs." });
   }
 });
-router$j.patch("/logs/:id/resolve", requireCoordinator, async (req, res) => {
+router$k.patch("/logs/:id/resolve", requireCoordinator, async (req, res) => {
   try {
     const { notes } = req.body;
     await db$8().collection("agentLogs").doc(req.params.id).update({
@@ -27017,7 +27040,7 @@ router$j.patch("/logs/:id/resolve", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to resolve flag." });
   }
 });
-router$j.post("/log", async (req, res) => {
+router$k.post("/log", async (req, res) => {
   try {
     if (!isAgentAuthorized(req)) {
       return res.status(401).json({ error: "Invalid agent key." });
@@ -27888,7 +27911,7 @@ async function revokeBotRoomKey(id) {
 function requestSecrets(presented) {
   return secretsInPlay(presented);
 }
-const router$i = Router();
+const router$j = Router();
 function sendBotRoomError(res, err) {
   if (res.headersSent) return;
   if (err instanceof BotRoomError) {
@@ -27969,14 +27992,14 @@ function queryFlag(value) {
 function queryString(value) {
   return typeof value === "string" ? value.trim() : "";
 }
-router$i.get("/openapi.json", (req, res) => {
+router$j.get("/openapi.json", (req, res) => {
   const forwardedProto = req.get("x-forwarded-proto");
   const proto = forwardedProto ? forwardedProto.split(",")[0].trim() : req.protocol;
   const forwardedHost = req.get("x-forwarded-host");
   const host = forwardedHost ? forwardedHost.split(",")[0].trim() : req.get("host");
   res.json(botRoomOpenApi(`${proto}://${host}/api/botroom`));
 });
-router$i.get("/messages", requireBotOrOwner, limitActor, wrap(async (req, res) => {
+router$j.get("/messages", requireBotOrOwner, limitActor, wrap(async (req, res) => {
   const limit = queryString(req.query.limit);
   const parsedLimit = limit ? Number(limit) : void 0;
   if (limit && !Number.isInteger(parsedLimit)) throw new BotRoomError(400, "limit must be a whole number.");
@@ -27989,7 +28012,7 @@ router$i.get("/messages", requireBotOrOwner, limitActor, wrap(async (req, res) =
   });
   res.json(result);
 }));
-router$i.post("/messages", requireBotOrOwner, limitActor, wrap(async (req, res) => {
+router$j.post("/messages", requireBotOrOwner, limitActor, wrap(async (req, res) => {
   const body = req.body && typeof req.body === "object" ? req.body : {};
   const message = await postBotRoomMessage({
     actor: actor$2(req),
@@ -27998,18 +28021,18 @@ router$i.post("/messages", requireBotOrOwner, limitActor, wrap(async (req, res) 
   });
   res.status(201).json({ message });
 }));
-router$i.post("/messages/:id/ack", requireBotOrOwner, limitActor, wrap(async (req, res) => {
+router$j.post("/messages/:id/ack", requireBotOrOwner, limitActor, wrap(async (req, res) => {
   const body = req.body && typeof req.body === "object" ? req.body : {};
   const message = await ackBotRoomMessage(req.params.id, actor$2(req), body);
   res.json({ message });
 }));
-router$i.get("/keys", wrap(async (req, res, next) => {
+router$j.get("/keys", wrap(async (req, res, next) => {
   await requireOwnerOrAdmin$1(req, res, next);
 }), wrap(async (_req, res) => {
   const keys = await listBotRoomKeys();
   res.json({ keys: keys.map(publicBotRoomKey) });
 }));
-router$i.post("/keys", wrap(async (req, res, next) => {
+router$j.post("/keys", wrap(async (req, res, next) => {
   await requireOwnerOrAdmin$1(req, res, next);
 }), wrap(async (req, res) => {
   const body = req.body && typeof req.body === "object" ? req.body : {};
@@ -28020,15 +28043,15 @@ router$i.post("/keys", wrap(async (req, res, next) => {
   });
   res.status(201).json(created);
 }));
-router$i.post("/keys/:id/revoke", wrap(async (req, res, next) => {
+router$j.post("/keys/:id/revoke", wrap(async (req, res, next) => {
   await requireOwnerOrAdmin$1(req, res, next);
 }), wrap(async (req, res) => {
   const record2 = await revokeBotRoomKey(req.params.id);
   res.json({ record: publicBotRoomKey(record2) });
 }));
-const router$h = Router();
+const router$i = Router();
 const db$7 = () => admin.firestore();
-router$h.get("/", requireStaff, async (req, res) => {
+router$i.get("/", requireStaff, async (req, res) => {
   try {
     const { status: status2, listingId, orderId, limit = "100" } = req.query;
     let q = db$7().collection("mediaJobs").orderBy("createdAt", "desc");
@@ -28042,7 +28065,7 @@ router$h.get("/", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch media jobs." });
   }
 });
-router$h.post("/", requireStaff, async (req, res) => {
+router$i.post("/", requireStaff, async (req, res) => {
   try {
     const {
       listingId,
@@ -28101,7 +28124,7 @@ router$h.post("/", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to create media job." });
   }
 });
-router$h.patch("/:id/status", requireCoordinator, async (req, res) => {
+router$i.patch("/:id/status", requireCoordinator, async (req, res) => {
   try {
     const { status: status2, resultItems = [], error = "", requiresHumanReview } = req.body;
     const valid = ["queued", "processing", "ready_for_review", "completed", "failed", "cancelled"];
@@ -28235,7 +28258,7 @@ async function moveMediaDelivery(input) {
     label: MEDIA_DELIVERY_LABELS[input.status]
   };
 }
-const router$g = Router();
+const router$h = Router();
 function adminReady$1(res) {
   if (admin.apps.length) return true;
   res.status(503).json({
@@ -28263,7 +28286,7 @@ function sendKnownError$1(res, err, fallback) {
   console.error("[Studio]", err);
   return res.status(500).json({ error: fallback });
 }
-router$g.get("/workspace", requireStaff, async (req, res) => {
+router$h.get("/workspace", requireStaff, async (req, res) => {
   if (!adminReady$1(res)) return;
   try {
     const listingId = typeof req.query.listingId === "string" ? req.query.listingId : "";
@@ -28285,7 +28308,7 @@ router$g.get("/workspace", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to load Studio.");
   }
 });
-router$g.get("/delivery-queue", requireStaff, async (req, res) => {
+router$h.get("/delivery-queue", requireStaff, async (req, res) => {
   if (!adminReady$1(res)) return;
   try {
     const rows = await listMediaDeliveryQueue({
@@ -28297,7 +28320,7 @@ router$g.get("/delivery-queue", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to load the delivery queue.");
   }
 });
-router$g.post("/delivery-queue/move", requireCoordinator, async (req, res) => {
+router$h.post("/delivery-queue/move", requireCoordinator, async (req, res) => {
   const galleryId = String(req.body?.galleryId || "").trim();
   const status2 = String(req.body?.status || "").trim();
   if (!/^[A-Za-z0-9_-]{8,128}$/.test(galleryId)) {
@@ -28334,7 +28357,7 @@ router$g.post("/delivery-queue/move", requireCoordinator, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to update delivery.");
   }
 });
-router$g.post("/order-edits", requireStaff, async (req, res) => {
+router$h.post("/order-edits", requireStaff, async (req, res) => {
   const listingId = String(req.body?.listingId || "").trim();
   if (!/^[A-Za-z0-9_-]{8,128}$/.test(listingId)) {
     return res.status(400).json({ error: "A valid listing id is required." });
@@ -28348,7 +28371,7 @@ router$g.post("/order-edits", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to queue the order edits.");
   }
 });
-router$g.post("/order-queue/tick", requireStaffOrQueueCron, async (req, res) => {
+router$h.post("/order-queue/tick", requireStaffOrQueueCron, async (req, res) => {
   let listingId = String(req.body?.listingId || "").trim();
   if (listingId && !/^[A-Za-z0-9_-]{8,128}$/.test(listingId)) {
     return res.status(400).json({ error: "A valid listing id is required." });
@@ -28378,7 +28401,7 @@ router$g.post("/order-queue/tick", requireStaffOrQueueCron, async (req, res) => 
     return sendKnownError$1(res, err, "Failed to advance the order edit queue.");
   }
 });
-router$g.post("/iconic-polish", requireStaff, async (req, res) => {
+router$h.post("/iconic-polish", requireStaff, async (req, res) => {
   const listingId = String(req.body?.listingId || "").trim();
   if (!/^[A-Za-z0-9_-]{8,128}$/.test(listingId)) {
     return res.status(400).json({ error: "A valid listing id is required." });
@@ -28395,7 +28418,7 @@ router$g.post("/iconic-polish", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to save Iconic Polish.");
   }
 });
-router$g.post("/ai-edit", requireStaff, async (req, res) => {
+router$h.post("/ai-edit", requireStaff, async (req, res) => {
   const parsed = parseAiEditRequest(req.body);
   if (parsed.ok === false) return res.status(400).json({ error: parsed.error });
   if (!adminReady$1(res)) return;
@@ -28415,7 +28438,7 @@ router$g.post("/ai-edit", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to enqueue the AI edit.");
   }
 });
-router$g.post("/adjust", requireStaff, async (req, res) => {
+router$h.post("/adjust", requireStaff, async (req, res) => {
   if (!adminReady$1(res)) return;
   try {
     const listingId = String(req.body?.listingId || "");
@@ -28438,7 +28461,7 @@ router$g.post("/adjust", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to save the adjustment.");
   }
 });
-router$g.post("/reject", requireStaff, async (req, res) => {
+router$h.post("/reject", requireStaff, async (req, res) => {
   if (!adminReady$1(res)) return;
   try {
     const listingId = String(req.body?.listingId || "");
@@ -28455,7 +28478,7 @@ router$g.post("/reject", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to reject the edit.");
   }
 });
-router$g.post("/approve", requireStaff, async (req, res) => {
+router$h.post("/approve", requireStaff, async (req, res) => {
   if (!adminReady$1(res)) return;
   try {
     const listingId = String(req.body?.listingId || "");
@@ -28540,8 +28563,8 @@ async function loadPhotographerPreview(staffId) {
     studioJobs
   };
 }
-const router$f = Router();
-router$f.get("/photographer-preview", requireAdmin, async (req, res) => {
+const router$g = Router();
+router$g.get("/photographer-preview", requireAdmin, async (req, res) => {
   const staffId = String(req.query.staffId || "").trim();
   if (!/^[A-Za-z0-9_-]{1,128}$/.test(staffId) || staffId === "demo-photographer") {
     return res.status(400).json({ error: "Choose a photographer." });
@@ -28673,16 +28696,16 @@ async function editScratchPhoto(input) {
     downloadName: scratchDownloadName(input.fileName || "scratch.jpg")
   };
 }
-const router$e = Router();
+const router$f = Router();
 function headerValue(value) {
   if (Array.isArray(value)) return value[0] || "";
   return value || "";
 }
-router$e.get("/", requireCoordinator, async (_req, res) => {
+router$f.get("/", requireCoordinator, async (_req, res) => {
   const grass = await grassReferenceStatus();
   return res.json({ grass, twilightPrompt: orderExteriorTwilightPrompt() });
 });
-router$e.post(
+router$f.post(
   "/",
   requireCoordinator,
   express.raw({ type: "image/jpeg", limit: "4mb" }),
@@ -28708,13 +28731,13 @@ router$e.post(
     }
   }
 );
-router$e.use((err, _req, res, next) => {
+router$f.use((err, _req, res, next) => {
   if (err?.type === "entity.too.large" || err?.status === 413) {
     return res.status(413).json({ error: "That photo is too large for the scratch pad. Export a smaller JPEG." });
   }
   return next(err);
 });
-const router$d = Router();
+const router$e = Router();
 const GOOGLE_KEY = process.env.GOOGLE_MAPS_API_KEY || "";
 function fromGoogle(p) {
   return {
@@ -28741,7 +28764,7 @@ function fromNominatim(r, idx) {
     secondary: parts.slice(1).join(", ")
   };
 }
-router$d.get("/autocomplete", async (req, res) => {
+router$e.get("/autocomplete", async (req, res) => {
   const input = (req.query.input || "").trim();
   if (!input || input.length < 2) {
     return res.json({ suggestions: [] });
@@ -28777,7 +28800,7 @@ router$d.get("/autocomplete", async (req, res) => {
     return res.json({ suggestions: [] });
   }
 });
-router$d.get("/distance", async (req, res) => {
+router$e.get("/distance", async (req, res) => {
   const destination = (req.query.destination || "").trim();
   const origin = (req.query.origin || process.env.STUDIO_ADDRESS || "The Woodlands, TX 77380").trim();
   if (!destination) {
@@ -28804,7 +28827,7 @@ router$d.get("/distance", async (req, res) => {
     return res.status(500).json({ error: "Failed to calculate distance." });
   }
 });
-const router$c = Router();
+const router$d = Router();
 const db$4 = () => admin.firestore();
 async function findOrderLikeDocument(id) {
   const orderRequestDoc = await db$4().collection("orderRequests").doc(id).get();
@@ -28813,7 +28836,7 @@ async function findOrderLikeDocument(id) {
   if (orderDoc.exists) return orderDoc;
   return null;
 }
-router$c.post("/send", requireStaff, async (req, res) => {
+router$d.post("/send", requireStaff, async (req, res) => {
   try {
     const { to, body, orderId } = req.body;
     if (!to || !body) return res.status(400).json({ error: "to and body required." });
@@ -28875,7 +28898,7 @@ router$c.post("/send", requireStaff, async (req, res) => {
     return res.status(500).json({ error: errorMessage });
   }
 });
-router$c.post("/remind/:orderId", requireStaff, async (req, res) => {
+router$d.post("/remind/:orderId", requireStaff, async (req, res) => {
   try {
     const { type = "24h" } = req.body;
     const orderDoc = await findOrderLikeDocument(req.params.orderId);
@@ -28917,7 +28940,7 @@ router$c.post("/remind/:orderId", requireStaff, async (req, res) => {
     return res.status(500).json({ error: errorMessage });
   }
 });
-router$c.post("/conversation", requireStaff, async (req, res) => {
+router$d.post("/conversation", requireStaff, async (req, res) => {
   try {
     const { orderId, photographerPhone, photographerName, clientPhone, clientName: clientName2 } = req.body;
     if (!orderId || !photographerPhone || !clientPhone) {
@@ -28969,7 +28992,7 @@ router$c.post("/conversation", requireStaff, async (req, res) => {
     return res.status(500).json({ error: errorMessage });
   }
 });
-router$c.get("/conversations", requireStaff, async (_req, res) => {
+router$d.get("/conversations", requireStaff, async (_req, res) => {
   try {
     const snapshot = await db$4().collection("conversations").orderBy("createdAt", "desc").limit(50).get();
     return res.json(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
@@ -28977,7 +29000,7 @@ router$c.get("/conversations", requireStaff, async (_req, res) => {
     return res.status(500).json({ error: "Failed to fetch conversations." });
   }
 });
-router$c.post("/conversation/:id/close", requireStaff, async (req, res) => {
+router$d.post("/conversation/:id/close", requireStaff, async (req, res) => {
   try {
     const convoDoc = await db$4().collection("conversations").doc(req.params.id).get();
     if (!convoDoc.exists) return res.status(404).json({ error: "Conversation not found." });
@@ -28989,7 +29012,7 @@ router$c.post("/conversation/:id/close", requireStaff, async (req, res) => {
     return res.status(500).json({ error: errorMessage });
   }
 });
-router$c.post("/webhook", express_raw_or_json, async (req, res) => {
+router$d.post("/webhook", express_raw_or_json, async (req, res) => {
   try {
     const authToken = process.env.TWILIO_AUTH_TOKEN;
     if (authToken && process.env.NODE_ENV === "production") {
@@ -29050,7 +29073,7 @@ router$c.post("/webhook", express_raw_or_json, async (req, res) => {
     return res.status(200).send("");
   }
 });
-router$c.post("/campaign/:id/send", requireCoordinator, async (req, res) => {
+router$d.post("/campaign/:id/send", requireCoordinator, async (req, res) => {
   try {
     const campaignDoc = await db$4().collection("campaigns").doc(req.params.id).get();
     if (!campaignDoc.exists) return res.status(404).json({ error: "Campaign not found." });
@@ -29093,7 +29116,7 @@ router$c.post("/campaign/:id/send", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: errorMessage });
   }
 });
-router$c.post("/opt-out", async (req, res) => {
+router$d.post("/opt-out", async (req, res) => {
   try {
     const { From, Body } = req.body;
     if (!From) return res.status(200).send("");
@@ -29112,8 +29135,8 @@ router$c.post("/opt-out", async (req, res) => {
 function express_raw_or_json(req, _res, next) {
   next();
 }
-const router$b = Router();
-router$b.post("/", async (req, res) => {
+const router$c = Router();
+router$c.post("/", async (req, res) => {
   try {
     const { name, email, subject, message, phone } = req.body;
     if (!name || !email || !subject || !message) {
@@ -29157,10 +29180,10 @@ router$b.post("/", async (req, res) => {
     });
   }
 });
-const router$a = Router();
+const router$b = Router();
 const SENIOR_LIVING_RATE_WINDOW_MS = 15 * 60 * 1e3;
 const SENIOR_LIVING_RATE_MAX = 5;
-const limiter$1 = createRateLimiter({
+const limiter$2 = createRateLimiter({
   windowMs: SENIOR_LIVING_RATE_WINDOW_MS,
   max: SENIOR_LIVING_RATE_MAX
 });
@@ -29181,11 +29204,11 @@ async function nextInvoiceNumber$1() {
     return `INV-${year}-${String(Date.now()).slice(-6)}`;
   }
 }
-router$a.get("/config", (_req, res) => {
+router$b.get("/config", (_req, res) => {
   res.json({ depositCheckoutLive: seniorDepositCheckoutLive() });
 });
-router$a.post("/order", async (req, res) => {
-  const limit = limiter$1.check(clientIp(req));
+router$b.post("/order", async (req, res) => {
+  const limit = limiter$2.check(clientIp(req));
   if (!limit.allowed) {
     res.setHeader("Retry-After", String(limit.retryAfterSec));
     return res.status(429).json({
@@ -29322,7 +29345,7 @@ router$a.post("/order", async (req, res) => {
       createdAt: now,
       updatedAt: now
     });
-    const orderNumber = buildAdminOrderTile({
+    const orderNumber2 = buildAdminOrderTile({
       id: orderRef.id,
       lineItems,
       selectedService: "Senior Living",
@@ -29356,7 +29379,7 @@ router$a.post("/order", async (req, res) => {
       ...placedRevenueFields(),
       payToken,
       invoiceNumber,
-      orderNumber,
+      orderNumber: orderNumber2,
       hosting: value.hosting,
       hostingLabel,
       notes: value.notes,
@@ -29368,17 +29391,17 @@ router$a.post("/order", async (req, res) => {
       updatedAt: now
     });
     await Promise.all([
-      orderRef.update({ invoiceId: invoiceRef.id, orderNumber, updatedAt: now }),
+      orderRef.update({ invoiceId: invoiceRef.id, orderNumber: orderNumber2, updatedAt: now }),
       requestRef.update({
         invoiceId: invoiceRef.id,
         convertedToOrderId: orderRef.id,
-        orderNumber,
+        orderNumber: orderNumber2,
         updatedAt: now
       })
     ]);
     const saved = {
       id: orderRef.id,
-      orderNumber,
+      orderNumber: orderNumber2,
       clientName: value.name,
       email: value.email,
       clientEmail: value.email,
@@ -29436,9 +29459,9 @@ router$a.post("/order", async (req, res) => {
           to: value.email,
           template: "senior_living_order",
           audience: "client",
-          subject: `Order ${orderNumber} received`,
-          html: `<p>We received order ${orderNumber}. ${depositCopy}</p>`,
-          variables: { clientName: value.name, orderNumber }
+          subject: `Order ${orderNumber2} received`,
+          html: `<p>We received order ${orderNumber2}. ${depositCopy}</p>`,
+          variables: { clientName: value.name, orderNumber: orderNumber2 }
         });
       } catch (error) {
         console.error("[SeniorLiving] Confirmation email failed:", error);
@@ -29448,7 +29471,7 @@ router$a.post("/order", async (req, res) => {
       success: true,
       orderId: orderRef.id,
       orderRequestId: requestRef.id,
-      orderNumber,
+      orderNumber: orderNumber2,
       invoiceId: invoiceRef.id,
       payToken,
       depositAmount: quote.depositAmount,
@@ -29461,8 +29484,8 @@ router$a.post("/order", async (req, res) => {
     });
   }
 });
-router$a.post("/", async (req, res) => {
-  const limit = limiter$1.check(clientIp(req));
+router$b.post("/", async (req, res) => {
+  const limit = limiter$2.check(clientIp(req));
   if (!limit.allowed) {
     res.setHeader("Retry-After", String(limit.retryAfterSec));
     return res.status(429).json({
@@ -29507,8 +29530,8 @@ router$a.post("/", async (req, res) => {
     });
   }
 });
-const router$9 = Router();
-const limiter = createRateLimiter({
+const router$a = Router();
+const limiter$1 = createRateLimiter({
   windowMs: 15 * 60 * 1e3,
   max: 5
 });
@@ -29547,7 +29570,7 @@ function publicAvailability(result, packageId) {
     fallback: result.available ? null : APPRENTICESHIP_CALENDAR_FALLBACK
   };
 }
-router$9.get("/config", (_req, res) => {
+router$a.get("/config", (_req, res) => {
   res.json({ depositCheckoutLive: seniorDepositCheckoutLive() });
 });
 function cronAuthorized$1(req) {
@@ -29565,9 +29588,9 @@ async function releaseHolds(req, res) {
     return res.status(500).json({ error: "Hold release failed." });
   }
 }
-router$9.get("/release-holds", releaseHolds);
-router$9.post("/release-holds", releaseHolds);
-router$9.get("/slots", async (req, res) => {
+router$a.get("/release-holds", releaseHolds);
+router$a.post("/release-holds", releaseHolds);
+router$a.get("/slots", async (req, res) => {
   const packageId = typeof req.query.package === "string" ? req.query.package : "apprentice-25";
   if (!findApprenticeshipPackage(packageId)) {
     return res.status(400).json({ error: "Choose an apprenticeship package." });
@@ -29576,7 +29599,7 @@ router$9.get("/slots", async (req, res) => {
   const result = await readApprenticeshipAvailability({ packageId });
   return res.json(publicAvailability(result, packageId));
 });
-router$9.get("/setup", requireStaff, async (_req, res) => {
+router$a.get("/setup", requireStaff, async (_req, res) => {
   const hours = apprenticeshipHoursFromEnv();
   const result = await readApprenticeshipAvailability({ packageId: "apprentice-25" });
   return res.json({
@@ -29592,8 +29615,8 @@ router$9.get("/setup", requireStaff, async (_req, res) => {
     }
   });
 });
-router$9.post("/order", async (req, res) => {
-  const limit = limiter.check(clientIp(req));
+router$a.post("/order", async (req, res) => {
+  const limit = limiter$1.check(clientIp(req));
   if (!limit.allowed) {
     res.setHeader("Retry-After", String(limit.retryAfterSec));
     return res.status(429).json({
@@ -29644,9 +29667,9 @@ router$9.post("/order", async (req, res) => {
   const { value } = parsed;
   const clientName2 = `${value.firstName} ${value.lastName}`.trim();
   const location = storedServiceLocationFields(value.address);
-  let orderNumber = "";
+  let orderNumber2 = "";
   try {
-    orderNumber = await nextOrderNumber();
+    orderNumber2 = await nextOrderNumber();
   } catch (error) {
     console.error("[Apprenticeship] Order number failed:", error);
     return res.status(500).json({
@@ -29657,7 +29680,7 @@ router$9.post("/order", async (req, res) => {
   if (slot) {
     try {
       calendarEvent = await createApprenticeshipEvent({
-        orderNumber,
+        orderNumber: orderNumber2,
         clientName: clientName2,
         clientEmail: value.email,
         clientPhone: value.phone,
@@ -29730,7 +29753,7 @@ router$9.post("/order", async (req, res) => {
       ...placedRevenueFields(),
       leadSource,
       ...value.gclid ? { gclid: value.gclid } : {},
-      orderNumber,
+      orderNumber: orderNumber2,
       packageName: quote.packageName,
       calendarEventId: calendarEvent?.eventId || null,
       calendarId: calendarEvent?.calendarId || null,
@@ -29770,7 +29793,7 @@ router$9.post("/order", async (req, res) => {
       source: APPRENTICESHIP_ORDER_SOURCE,
       ...placedRevenueFields(),
       leadSource,
-      orderNumber,
+      orderNumber: orderNumber2,
       packageName: quote.packageName,
       calendarEventId: calendarEvent?.eventId || null,
       calendarId: calendarEvent?.calendarId || null,
@@ -29805,7 +29828,7 @@ router$9.post("/order", async (req, res) => {
       payToken,
       depositReturn: value.returnPage,
       invoiceNumber,
-      orderNumber,
+      orderNumber: orderNumber2,
       notes: note,
       travelZone: quote.travel.travelZone,
       travelMiles: quote.travel.travelMiles,
@@ -29827,7 +29850,7 @@ router$9.post("/order", async (req, res) => {
         isNewOrder: true,
         saved: {
           id: orderRef.id,
-          orderNumber,
+          orderNumber: orderNumber2,
           clientName: clientName2,
           email: value.email,
           clientEmail: value.email,
@@ -29856,7 +29879,7 @@ router$9.post("/order", async (req, res) => {
       success: true,
       orderId: orderRef.id,
       orderRequestId: requestRef.id,
-      orderNumber,
+      orderNumber: orderNumber2,
       invoiceId: invoiceRef.id,
       payToken,
       depositAmount: quote.bookingFee,
@@ -30003,12 +30026,12 @@ async function deliverLiveChat(input) {
     notConfigured ? "not_configured" : "failed"
   );
 }
-const router$8 = Router();
+const router$9 = Router();
 const liveChatLimiter = createRateLimiter({
   windowMs: LIVE_CHAT_WINDOW_MS,
   max: LIVE_CHAT_MAX_PER_WINDOW
 });
-router$8.post("/live-chat", async (req, res) => {
+router$9.post("/live-chat", async (req, res) => {
   const parsed = parseLiveChatBody(req.body);
   if (parsed.ok === false) {
     return res.status(400).json({ error: parsed.error });
@@ -30238,7 +30261,7 @@ async function appendStaffReply(id, text2, senderName = "Iconic Images") {
   }));
   return updated ? toContactThreadView(updated) : null;
 }
-const router$7 = Router();
+const router$8 = Router();
 const THREAD_ID_RE = /^[a-f0-9]{32}$/;
 const postLimiter = createRateLimiter({
   windowMs: LIVE_CHAT_WINDOW_MS,
@@ -30252,7 +30275,7 @@ function threadToken(req) {
   const header = req.header("x-contact-thread-token");
   return typeof header === "string" ? header.trim() : "";
 }
-router$7.get("/staff/threads", requireCoordinator, async (_req, res) => {
+router$8.get("/staff/threads", requireCoordinator, async (_req, res) => {
   try {
     const threads = await listContactThreads();
     return res.json({ threads });
@@ -30261,7 +30284,7 @@ router$7.get("/staff/threads", requireCoordinator, async (_req, res) => {
     return res.status(500).json({ error: "Couldn't load contact chats." });
   }
 });
-router$7.post("/staff/threads/:id/reply", requireCoordinator, async (req, res) => {
+router$8.post("/staff/threads/:id/reply", requireCoordinator, async (req, res) => {
   const id = routeParam(req.params.id);
   if (!THREAD_ID_RE.test(id)) {
     return res.status(404).json({ error: "Conversation not found." });
@@ -30282,7 +30305,7 @@ router$7.post("/staff/threads/:id/reply", requireCoordinator, async (req, res) =
     return res.status(500).json({ error: "Couldn't save the reply." });
   }
 });
-router$7.get("/threads/:id", async (req, res) => {
+router$8.get("/threads/:id", async (req, res) => {
   const id = routeParam(req.params.id);
   const token = threadToken(req);
   if (!THREAD_ID_RE.test(id) || !token) {
@@ -30297,7 +30320,7 @@ router$7.get("/threads/:id", async (req, res) => {
     return res.status(500).json({ error: "Couldn't load this chat." });
   }
 });
-router$7.post("/threads", async (req, res) => {
+router$8.post("/threads", async (req, res) => {
   const parsed = parseLiveChatBody(req.body);
   if (parsed.ok === false) {
     return res.status(400).json({ error: parsed.error });
@@ -30791,7 +30814,7 @@ async function findUnifiedThread(id) {
 function threadsForPortal(threads, scope) {
   return threads.filter((thread) => threadVisibleTo(thread, scope));
 }
-const router$6 = Router();
+const router$7 = Router();
 const AUDIENCES = /* @__PURE__ */ new Set(["clients", "leads", "photographers", "socials"]);
 function ownerEmails() {
   return ownerAllowlist(process.env.OWNER_EMAILS);
@@ -30838,7 +30861,7 @@ async function portalScope(req) {
     return { kind: "client", uid, email, phone: "" };
   }
 }
-router$6.get("/threads", requireCoordinator, async (req, res) => {
+router$7.get("/threads", requireCoordinator, async (req, res) => {
   const audience = typeof req.query.audience === "string" ? req.query.audience : "";
   const q = typeof req.query.q === "string" ? req.query.q : "";
   try {
@@ -30850,7 +30873,7 @@ router$6.get("/threads", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Couldn't load conversations." });
   }
 });
-router$6.get("/mine", requireAuth, async (req, res) => {
+router$7.get("/mine", requireAuth, async (req, res) => {
   try {
     const scope = await portalScope(req);
     const threads = threadsForPortal(await listUnifiedThreads(), scope);
@@ -30860,7 +30883,7 @@ router$6.get("/mine", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Couldn't load your messages." });
   }
 });
-router$6.post("/mine/reply", requireAuth, async (req, res) => {
+router$7.post("/mine/reply", requireAuth, async (req, res) => {
   const threadId = typeof req.body?.threadId === "string" ? req.body.threadId.trim() : "";
   const content = typeof req.body?.body === "string" ? req.body.body.trim() : "";
   if (!threadId || !content) return res.status(400).json({ error: "Choose a thread and enter a reply." });
@@ -30895,7 +30918,7 @@ router$6.post("/mine/reply", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Couldn't save the reply." });
   }
 });
-router$6.post("/reply", requireCoordinator, async (req, res) => {
+router$7.post("/reply", requireCoordinator, async (req, res) => {
   const threadId = typeof req.body?.threadId === "string" ? req.body.threadId.trim() : "";
   const channel = req.body?.channel === "sms" ? "sms" : req.body?.channel === "email" ? "email" : "";
   const content = typeof req.body?.body === "string" ? req.body.body.trim() : "";
@@ -30965,7 +30988,7 @@ router$6.post("/reply", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Couldn't send the reply." });
   }
 });
-router$6.get("/assist/status", requireOwnerOrAdmin, (_req, res) => {
+router$7.get("/assist/status", requireOwnerOrAdmin, (_req, res) => {
   const status2 = assistantStatus();
   return res.json({
     openai: status2.openai,
@@ -30974,7 +30997,7 @@ router$6.get("/assist/status", requireOwnerOrAdmin, (_req, res) => {
     openaiNotice: status2.openaiNotice
   });
 });
-router$6.post("/assist", requireOwnerOrAdmin, async (req, res) => {
+router$7.post("/assist", requireOwnerOrAdmin, async (req, res) => {
   const provider = req.body?.provider === "grok" ? "grok" : req.body?.provider === "openai" ? "openai" : "";
   if (!provider) return res.status(400).json({ error: "Choose Grok or OpenAI." });
   const messages = parseAssistantTurns(req.body);
@@ -31578,7 +31601,7 @@ ${next}`;
 function escapeHtml$2(value) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
-const router$5 = Router();
+const router$6 = Router();
 const db$1 = () => admin.firestore();
 function originOf(req) {
   const configured = process.env.APP_URL;
@@ -31622,7 +31645,7 @@ async function loadPresentation(token, origin) {
   const galleries = await galleriesForListing(listing.id, listing);
   return buildPresentation({ token, listing, galleries, origin });
 }
-router$5.get("/presentations/:token", async (req, res) => {
+router$6.get("/presentations/:token", async (req, res) => {
   const token = String(req.params.token || "");
   if (!isPresentationToken(token)) {
     return res.status(400).json({ error: "That presentation link is not valid." });
@@ -31659,8 +31682,8 @@ const handlePresentationShell = async (req, res) => {
   const rendered = await renderPresentationShell(String(req.params.token || ""), originOf(req));
   res.status(rendered.status).type("html").send(rendered.html);
 };
-router$5.get("/presentations/shell/:token", handlePresentationShell);
-router$5.post("/listings/:id/presentation", requireStaff, async (req, res) => {
+router$6.get("/presentations/shell/:token", handlePresentationShell);
+router$6.post("/listings/:id/presentation", requireStaff, async (req, res) => {
   const listingId = String(req.params.id || "");
   if (!/^[A-Za-z0-9_-]{8,128}$/.test(listingId)) {
     return res.status(400).json({ error: "A valid listing id is required." });
@@ -31907,7 +31930,7 @@ function readSpaShell$2() {
 function escapeHtml(value) {
   return value.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch] || ch);
 }
-const router$4 = Router();
+const router$5 = Router();
 function adminReady(res) {
   if (admin.apps.length) return true;
   res.status(503).json({ error: "Firebase Admin is not configured. Set FIREBASE_SERVICE_ACCOUNT." });
@@ -31939,13 +31962,13 @@ async function advance(req, res, to) {
     return sendKnownError(res, err, "Could not update that edit request.");
   }
 }
-router$4.post("/listings/:id/photo-edit-requests/:requestId/sent", requireStaff, async (req, res) => {
+router$5.post("/listings/:id/photo-edit-requests/:requestId/sent", requireStaff, async (req, res) => {
   return advance(req, res, "sent_out");
 });
-router$4.post("/listings/:id/photo-edit-requests/:requestId/received", requireStaff, async (req, res) => {
+router$5.post("/listings/:id/photo-edit-requests/:requestId/received", requireStaff, async (req, res) => {
   return advance(req, res, "received_back");
 });
-router$4.post("/listings/:id/photo-edit-requests/:requestId/replacement", requireStaff, async (req, res) => {
+router$5.post("/listings/:id/photo-edit-requests/:requestId/replacement", requireStaff, async (req, res) => {
   if (!adminReady(res)) return;
   const listingId = portalListingId(req.params.id);
   const requestId = typeof req.params.requestId === "string" ? req.params.requestId.trim() : "";
@@ -34066,7 +34089,7 @@ const PAGES = [
   page("stock", "/stock-footage", "Stock footage", [
     block("hero", "Hero", [
       textField("title", "Headline", "Stock Footage Library"),
-      areaField("body", "Body", "Premium, professionally photographed real estate images by neighborhood. License instantly and use for your listings, marketing, or staging inspiration.")
+      areaField("body", "Body", "Neighborhood amenity photos from Iconic Images. Pay for a set and Iconic sends the files to you.")
     ])
   ]),
   page("virtualStaging", "/services/virtual-staging", "Virtual staging", [
@@ -34423,7 +34446,7 @@ async function importDropboxFile(rawUrl) {
   }
   throw new Error("Dropbox redirected too many times.");
 }
-const router$3 = Router();
+const router$4 = Router();
 function actor$1(req) {
   const email = req.user?.email || "";
   const name = email === "temp-admin@iconicimagestx.com" ? "Temporary Admin" : email || req.user?.uid || "Staff";
@@ -34490,18 +34513,18 @@ async function workspacePage(id) {
   const draft = await readDraft(id);
   return mergeContent(draft || (published ? stripPage(published) : base));
 }
-router$3.get("/", async (_req, res) => {
+router$4.get("/", async (_req, res) => {
   const pages = (await listPublished()).map((page2) => mergeContent(page2)).filter((page2) => Boolean(page2));
   return res.json({ pages });
 });
-router$3.get("/blob/:id", (req, res) => {
+router$4.get("/blob/:id", (req, res) => {
   const blob = siteMediaBlob(req.params.id);
   if (!blob) return res.status(404).json({ error: "File not found." });
   res.setHeader("Content-Type", blob.type);
   res.setHeader("Cache-Control", "public, max-age=3600");
   return res.send(blob.body);
 });
-router$3.get("/workspace", gate("view"), async (req, res) => {
+router$4.get("/workspace", gate("view"), async (req, res) => {
   const editorReq = req;
   const ids = knownPageIds();
   const pages = [];
@@ -34523,7 +34546,7 @@ router$3.get("/workspace", gate("view"), async (req, res) => {
     draftIds
   });
 });
-router$3.put("/:id", gate("edit"), async (req, res) => {
+router$4.put("/:id", gate("edit"), async (req, res) => {
   const id = req.params.id;
   if (!defaultPage(id)) return res.status(404).json({ error: "Unknown page." });
   const merged = mergeContent({ ...req.body, id });
@@ -34532,14 +34555,14 @@ router$3.put("/:id", gate("edit"), async (req, res) => {
   await writeDraft(merged, { at: (/* @__PURE__ */ new Date()).toISOString(), byUid: who.uid, byName: who.name });
   return res.json({ page: merged });
 });
-router$3.post("/:id/discard", gate("edit"), async (req, res) => {
+router$4.post("/:id/discard", gate("edit"), async (req, res) => {
   const id = req.params.id;
   if (!defaultPage(id)) return res.status(404).json({ error: "Unknown page." });
   await deleteDraft(id);
   const page2 = await workspacePage(id);
   return res.json({ page: page2 });
 });
-router$3.post("/:id/release", gate("publish"), async (req, res) => {
+router$4.post("/:id/release", gate("publish"), async (req, res) => {
   const id = req.params.id;
   if (!defaultPage(id)) return res.status(404).json({ error: "Unknown page." });
   const draft = await readDraft(id);
@@ -34560,7 +34583,7 @@ router$3.post("/:id/release", gate("publish"), async (req, res) => {
   await deleteDraft(id);
   return res.json({ page: stripPage(source), publishedAt: now, publishedByName: who.name });
 });
-router$3.post("/release-all", gate("publish"), async (req, res) => {
+router$4.post("/release-all", gate("publish"), async (req, res) => {
   const who = actor$1(req);
   const publishedIds = [];
   for (const id of await listDraftIds()) {
@@ -34581,7 +34604,7 @@ router$3.post("/release-all", gate("publish"), async (req, res) => {
   }
   return res.json({ publishedIds });
 });
-router$3.post("/:id/revert", gate("publish"), async (req, res) => {
+router$4.post("/:id/revert", gate("publish"), async (req, res) => {
   const id = req.params.id;
   if (!defaultPage(id)) return res.status(404).json({ error: "Unknown page." });
   const current = await readPublished(id);
@@ -34606,7 +34629,7 @@ function mediaFolder(pageIdRaw) {
   if (defaultPage(pageId)) return pageId;
   return null;
 }
-router$3.post("/media", gate("edit"), async (req, res) => {
+router$4.post("/media", gate("edit"), async (req, res) => {
   try {
     const folder = mediaFolder(req.body?.pageId);
     if (!folder) return res.status(404).json({ error: "Unknown page." });
@@ -34620,7 +34643,7 @@ router$3.post("/media", gate("edit"), async (req, res) => {
     return res.status(status2).json({ error: err instanceof Error ? err.message : "Upload failed." });
   }
 });
-router$3.post("/dropbox", gate("edit"), async (req, res) => {
+router$4.post("/dropbox", gate("edit"), async (req, res) => {
   try {
     const folder = mediaFolder(req.body?.pageId);
     if (!folder) return res.status(404).json({ error: "Unknown page." });
@@ -35046,7 +35069,7 @@ async function deleteInsight(id) {
   }
   await admin.firestore().collection(INSIGHT_COLLECTION).doc(id).delete();
 }
-const router$2 = Router();
+const router$3 = Router();
 const BLOB_URL = /^\/api\/site-content\/blob\/([A-Za-z0-9-]+)$/;
 const ALLOWED_ASSET_HOSTS = /* @__PURE__ */ new Set(["firebasestorage.googleapis.com", "storage.googleapis.com"]);
 function writerAllowed(req) {
@@ -35081,28 +35104,28 @@ async function withSlug(post) {
   const posts = await listInsights();
   return { ...post, slug: claimSlug(post.slug, post.id, posts) };
 }
-router$2.get("/", async (_req, res) => {
+router$3.get("/", async (_req, res) => {
   const posts = await listPublishedInsights();
   res.setHeader("Cache-Control", "no-store");
   return res.json({ posts: posts.map(toPublicInsight) });
 });
-router$2.get("/admin/posts", requireInsightsWriter, async (_req, res) => {
+router$3.get("/admin/posts", requireInsightsWriter, async (_req, res) => {
   const posts = await listInsights();
   return res.json({ posts });
 });
-router$2.post("/admin/posts", requireInsightsWriter, async (req, res) => {
+router$3.post("/admin/posts", requireInsightsWriter, async (req, res) => {
   const created = await withSlug(createInsightPost(req.body, actor(req)));
   await saveInsight(created);
   return res.status(201).json({ post: created });
 });
-router$2.put("/admin/posts/:id", requireInsightsWriter, async (req, res) => {
+router$3.put("/admin/posts/:id", requireInsightsWriter, async (req, res) => {
   const current = await getInsight(String(req.params.id || ""));
   if (!current) return res.status(404).json({ error: "That insight was not found." });
   const next = await withSlug(updateInsightPost(current, req.body));
   await saveInsight(next);
   return res.json({ post: next });
 });
-router$2.post("/admin/posts/:id/publish", requireInsightsWriter, async (req, res) => {
+router$3.post("/admin/posts/:id/publish", requireInsightsWriter, async (req, res) => {
   const current = await getInsight(String(req.params.id || ""));
   if (!current) return res.status(404).json({ error: "That insight was not found." });
   const edited = req.body && Object.keys(req.body).length ? updateInsightPost(current, req.body) : current;
@@ -35113,7 +35136,7 @@ router$2.post("/admin/posts/:id/publish", requireInsightsWriter, async (req, res
   await saveInsight(next);
   return res.json({ post: next });
 });
-router$2.post("/admin/posts/:id/unpublish", requireInsightsWriter, async (req, res) => {
+router$3.post("/admin/posts/:id/unpublish", requireInsightsWriter, async (req, res) => {
   const current = await getInsight(String(req.params.id || ""));
   if (!current) return res.status(404).json({ error: "That insight was not found." });
   const now = (/* @__PURE__ */ new Date()).toISOString();
@@ -35121,13 +35144,13 @@ router$2.post("/admin/posts/:id/unpublish", requireInsightsWriter, async (req, r
   await saveInsight(next);
   return res.json({ post: next });
 });
-router$2.delete("/admin/posts/:id", requireInsightsWriter, async (req, res) => {
+router$3.delete("/admin/posts/:id", requireInsightsWriter, async (req, res) => {
   const current = await getInsight(String(req.params.id || ""));
   if (!current) return res.status(404).json({ error: "That insight was not found." });
   await deleteInsight(current.id);
   return res.json({ ok: true });
 });
-router$2.get("/admin/posts/:id/social.zip", requireInsightsWriter, async (req, res) => {
+router$3.get("/admin/posts/:id/social.zip", requireInsightsWriter, async (req, res) => {
   const current = await getInsight(String(req.params.id || ""));
   if (!current) return res.status(404).json({ error: "That insight was not found." });
   if (!current.socialPack.assets.length) {
@@ -35151,7 +35174,7 @@ router$2.get("/admin/posts/:id/social.zip", requireInsightsWriter, async (req, r
   res.setHeader("Cache-Control", "no-store");
   return res.send(Buffer.from(zipStored(entries)));
 });
-router$2.get("/:slug", async (req, res) => {
+router$3.get("/:slug", async (req, res) => {
   const slug = String(req.params.slug || "");
   if (!isInsightSlug(slug)) return res.status(404).json({ error: "This insight is not published." });
   const post = await getPublishedInsightBySlug(slug);
@@ -35523,10 +35546,10 @@ function borderlineReason(record2) {
 }
 function knownOrderReason(record2) {
   if (record2.collection !== "orders") return null;
-  const orderNumber = text(record2.data.orderNumber);
-  if (!orderNumber) return null;
-  if (KNOWN_HASH_ORDER_NUMBERS.has(orderNumber)) return `known test order ${orderNumber}`;
-  if (KNOWN_ORD_L_ORDER_NUMBERS.has(orderNumber.toLowerCase())) return `known test order ${orderNumber}`;
+  const orderNumber2 = text(record2.data.orderNumber);
+  if (!orderNumber2) return null;
+  if (KNOWN_HASH_ORDER_NUMBERS.has(orderNumber2)) return `known test order ${orderNumber2}`;
+  if (KNOWN_ORD_L_ORDER_NUMBERS.has(orderNumber2.toLowerCase())) return `known test order ${orderNumber2}`;
   return null;
 }
 function linkedParent(record2, matchedIds) {
@@ -35789,8 +35812,8 @@ function firestoreHooks() {
     }
   };
 }
-const router$1 = Router();
-router$1.post("/dry-run", requireAdmin, async (_req, res) => {
+const router$2 = Router();
+router$2.post("/dry-run", requireAdmin, async (_req, res) => {
   try {
     return res.json(await dryRunTestData());
   } catch (err) {
@@ -35798,7 +35821,7 @@ router$1.post("/dry-run", requireAdmin, async (_req, res) => {
     return res.status(500).json({ error: err instanceof Error ? err.message : "Dry run failed." });
   }
 });
-router$1.post("/apply", requireAdmin, async (req, res) => {
+router$2.post("/apply", requireAdmin, async (req, res) => {
   if (req.body?.confirm !== "APPLY") {
     return res.status(400).json({ error: "Apply requires confirm: APPLY. Dry run is the default." });
   }
@@ -35821,7 +35844,7 @@ router$1.post("/apply", requireAdmin, async (req, res) => {
     });
   }
 });
-router$1.post("/unarchive", requireAdmin, async (req, res) => {
+router$2.post("/unarchive", requireAdmin, async (req, res) => {
   const runId = typeof req.body?.runId === "string" ? req.body.runId.trim() : "";
   if (req.body?.confirm !== "UNARCHIVE" || !runId) {
     return res.status(400).json({ error: "Unarchive requires confirm: UNARCHIVE and a runId." });
@@ -35835,7 +35858,7 @@ router$1.post("/unarchive", requireAdmin, async (req, res) => {
     return res.status(500).json({ error: err instanceof Error ? err.message : "Unarchive failed." });
   }
 });
-router$1.get("/backups/:runId", requireAdmin, async (req, res) => {
+router$2.get("/backups/:runId", requireAdmin, async (req, res) => {
   try {
     const backup = await readCleanupBackup(String(req.params.runId || ""));
     if (!backup) return res.status(404).json({ error: "That backup was not found." });
@@ -35920,8 +35943,8 @@ function mapOrderStatus(raw) {
   if (value === "archived") return "Archived";
   return "";
 }
-function lastOrderLabel(orderNumber, day) {
-  const ref = sheetText(orderNumber, 80);
+function lastOrderLabel(orderNumber2, day) {
+  const ref = sheetText(orderNumber2, 80);
   const date = /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : "";
   if (ref && date) return `${ref} · ${date}`;
   return ref || date;
@@ -36064,7 +36087,7 @@ function nodeFromChange(doc) {
   const clientId2 = asText(data.clientId);
   const clientIds = doc.collection === "clients" ? [doc.id] : clientId2 ? [clientId2] : [];
   if (!email && !phone && clientIds.length === 0 && !iconicClientId(data)) return null;
-  const orderNumber = asText(data.orderNumber) || asText(data.orderCode);
+  const orderNumber2 = asText(data.orderNumber) || asText(data.orderCode);
   const orderStatus = mapOrderStatus(data.status);
   const orderRank = doc.collection === "orders" ? 2 : doc.collection === "orderRequests" ? 1 : 0;
   const received = timestampMillis$1(data.createdAt) ?? timestampMillis$1(data.submittedAt) ?? doc.ms;
@@ -36082,7 +36105,7 @@ function nodeFromChange(doc) {
     company: asText(data.company) || asText(data.brokerage) || asText(data.companyName),
     city: cityFromData(data),
     leadSource: asText(data.leadSource),
-    orderNumber,
+    orderNumber: orderNumber2,
     orderStatus,
     orderRank,
     orderMs: orderRank > 0 ? doc.ms : 0,
@@ -36166,7 +36189,7 @@ function mergeGroup(group) {
   let city = "";
   let leadSource = "";
   let receivedMs = group[0].receivedMs;
-  let orderNumber = "";
+  let orderNumber2 = "";
   let orderStatus = "";
   let orderRank = 0;
   let orderMs = 0;
@@ -36183,13 +36206,13 @@ function mergeGroup(group) {
     if (node.orderRank > 0 && (node.orderRank > orderRank || node.orderRank === orderRank && node.orderMs >= orderMs)) {
       orderRank = node.orderRank;
       orderMs = node.orderMs;
-      orderNumber = node.orderNumber || orderNumber;
+      orderNumber2 = node.orderNumber || orderNumber2;
       orderStatus = node.orderStatus || orderStatus;
       orderDay = node.orderDay || orderDay;
     }
   }
   const notes = [
-    orderNumber ? `Order ${orderNumber}` : "",
+    orderNumber2 ? `Order ${orderNumber2}` : "",
     orderStatus,
     leadSource && !isTestRecord("note", { leadSource }) ? leadSource : ""
   ].filter(Boolean).join(" · ");
@@ -36206,7 +36229,7 @@ function mergeGroup(group) {
     notes: sheetText(notes, 400),
     source: "Website",
     receivedAt: compactUtc(receivedMs || group[0].ms),
-    lastOrder: lastOrderLabel(orderNumber, orderDay || (orderMs ? new Date(orderMs).toISOString().slice(0, 10) : "")),
+    lastOrder: lastOrderLabel(orderNumber2, orderDay || (orderMs ? new Date(orderMs).toISOString().slice(0, 10) : "")),
     orderStatus: sheetText(orderStatus, 40),
     harListingId: ""
   };
@@ -37156,7 +37179,7 @@ async function applyExternalLeads(leads) {
     message: "HAR leads were planned with the same dedupe as the website feed."
   });
 }
-const router = Router();
+const router$1 = Router();
 function cronAuthorized(req) {
   const secret = typeof process.env.CRON_SECRET === "string" ? process.env.CRON_SECRET.trim() : "";
   return Boolean(secret) && req.headers.authorization === `Bearer ${secret}`;
@@ -37195,11 +37218,11 @@ async function adminOrCron(req, res, next) {
   if (cronAuthorized(req)) return next();
   return requireAdmin(req, res, next);
 }
-router.get("/sync", handleSync);
-router.post("/sync", handleSync);
-router.get("/har", handleHar);
-router.post("/har", handleHar);
-router.get("/dry-run", adminOrCron, async (req, res) => {
+router$1.get("/sync", handleSync);
+router$1.post("/sync", handleSync);
+router$1.get("/har", handleHar);
+router$1.post("/har", handleHar);
+router$1.get("/dry-run", adminOrCron, async (req, res) => {
   const since = parseSince(req.query.since);
   if (since === "invalid") return res.status(400).json({ error: "since must be an ISO timestamp." });
   try {
@@ -37213,6 +37236,149 @@ router.get("/dry-run", adminOrCron, async (req, res) => {
     }
     return res.status(500).json({ ok: false, error: "Holy Grail dry run failed." });
   }
+});
+const AMENITY_STOCK_PRICE = 49.99;
+const AMENITY_STOCK_CARDS = [
+  {
+    id: "artavia",
+    neighborhood: "Artavia",
+    price: AMENITY_STOCK_PRICE,
+    imageCount: 6,
+    coverFile: "A7303322.jpg",
+    coverAlt: "Artavia entrance with a large letter A sculpture"
+  },
+  {
+    id: "benders-landing",
+    neighborhood: "Bender's Landing",
+    price: AMENITY_STOCK_PRICE,
+    imageCount: 6,
+    coverFile: "DJI_0002_edits.jpg",
+    coverAlt: "Aerial view of a Bender's Landing playground"
+  },
+  {
+    id: "carlton-woods",
+    neighborhood: "Carlton Woods",
+    price: AMENITY_STOCK_PRICE,
+    imageCount: 6,
+    coverFile: "MLU07984.jpg",
+    coverAlt: "Carlton Woods outdoor basketball court"
+  },
+  {
+    id: "east-shore",
+    neighborhood: "East Shore",
+    price: AMENITY_STOCK_PRICE,
+    imageCount: 6,
+    coverFile: "A6509322.jpg",
+    coverAlt: "East Shore clubhouse and the East Shore Club sign"
+  },
+  {
+    id: "woodlands-waterway",
+    neighborhood: "The Woodlands Waterway",
+    price: AMENITY_STOCK_PRICE,
+    imageCount: 6,
+    coverFile: "DJI_0100.jpg",
+    coverAlt: "The Woodlands Waterway with glass towers, a bridge, and a fountain"
+  },
+  {
+    id: "woodforest",
+    neighborhood: "Woodforest",
+    price: AMENITY_STOCK_PRICE,
+    imageCount: 6,
+    coverFile: "DJI_0088.jpg",
+    coverAlt: "Aerial view of the Woodforest pool and water slides"
+  }
+];
+const CARDS_BY_ID = new Map(AMENITY_STOCK_CARDS.map((card) => [card.id, card]));
+function amenityStockById(id) {
+  return CARDS_BY_ID.get(id) ?? null;
+}
+function amenityCoverUrl(card) {
+  return `/media/amenities/${card.id}/${card.coverFile}`;
+}
+function amenityCoverWebpUrl(card) {
+  return amenityCoverUrl(card).replace(/\.jpe?g$/i, ".webp");
+}
+const PUBLIC_AMENITY_FILES = new Set(
+  AMENITY_STOCK_CARDS.flatMap((card) => [amenityCoverUrl(card), amenityCoverWebpUrl(card)])
+);
+function decodePath(pathname) {
+  const pathOnly = pathname.split("?")[0]?.split("#")[0] ?? "";
+  if (!pathOnly.startsWith("/")) return null;
+  try {
+    return decodeURIComponent(pathOnly);
+  } catch {
+    return null;
+  }
+}
+function isAmenityMediaPath(pathname) {
+  return pathname === "/media/amenities" || pathname.startsWith("/media/amenities/");
+}
+function amenityMediaRequestAllowed(pathname) {
+  const decoded = decodePath(pathname);
+  if (!decoded || decoded.includes("\\") || decoded.includes("\0")) return false;
+  const normalized = decoded.replace(/\/{2,}/g, "/");
+  if (!isAmenityMediaPath(normalized)) return true;
+  if (normalized.includes("..")) return false;
+  return PUBLIC_AMENITY_FILES.has(normalized);
+}
+function amenityStockReturnPath(setId, orderNumber2) {
+  const params = new URLSearchParams({
+    paid: "1",
+    set: setId,
+    order: orderNumber2
+  });
+  return `/stock-footage?${params.toString()}`;
+}
+const SQUARE_HOST = /(^|\.)((square\.link)|(square\.site)|(squareup\.com)|(squareupsandbox\.com))$/i;
+function isSquareCheckoutUrl(value) {
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== "https:" || url.username || url.password) return false;
+  return SQUARE_HOST.test(url.hostname);
+}
+const router = Router();
+const limiter = createRateLimiter({ windowMs: 15 * 60 * 1e3, max: 12 });
+function orderNumber() {
+  return `STK-${randomBytes$1(4).toString("hex").toUpperCase()}`;
+}
+router.post("/checkout", async (req, res) => {
+  const limit = limiter.check(clientIp(req));
+  if (!limit.allowed) {
+    res.setHeader("Retry-After", String(limit.retryAfterSec));
+    return res.status(429).json({ error: "Too many checkout attempts. Please wait and try again." });
+  }
+  const id = typeof req.body?.id === "string" ? req.body.id.trim() : "";
+  const card = amenityStockById(id);
+  if (!card) return res.status(404).json({ error: "That amenity set is not available." });
+  let origin = "https://iconicimagestx.vercel.app";
+  try {
+    origin = publicSiteUrl();
+  } catch (err) {
+    console.error("[Amenity stock] Public site URL is not https. Using the Vercel app.", err);
+  }
+  const number = orderNumber();
+  const redirectUrl = `${origin}${amenityStockReturnPath(card.id, number)}`;
+  const linked = await createHolidaySquareCheckout({
+    invoiceId: `stk-${card.id}-${number}`,
+    amount: card.price,
+    itemName: `${card.neighborhood} amenity photos`,
+    leadSource: "Stock footage",
+    orderNumber: number,
+    redirectUrl,
+    logLabel: "Amenity stock"
+  });
+  if (linked.payment !== "square" || !linked.checkoutUrl || !isSquareCheckoutUrl(linked.checkoutUrl)) {
+    return res.status(503).json({ error: "Square checkout is not available right now." });
+  }
+  return res.json({
+    checkoutUrl: linked.checkoutUrl,
+    orderNumber: number,
+    manualDelivery: true
+  });
 });
 const SETTINGS_FILE = path.join(process.cwd(), "site_settings.json");
 const API_BUILD_MARKER = "auth-square-2026-09-28";
@@ -37251,6 +37417,11 @@ function createServer() {
   app.use("/api/payments/pay-at-close-webhook", express.raw({ type: "application/json" }));
   app.use("/api/site-content/media", express.json({ limit: "120mb" }));
   app.use("/api/site-content/dropbox", express.json({ limit: "1mb" }));
+  app.use((req, res, next) => {
+    if (amenityMediaRequestAllowed(req.path) && amenityMediaRequestAllowed(req.originalUrl || req.path)) return next();
+    res.setHeader("Cache-Control", "no-store");
+    return res.status(404).json({ error: "Not found." });
+  });
   app.use(express.json({ limit: "10mb" }));
   app.use(express.urlencoded({ extended: true }));
   app.use(blockUntilPasswordChanged);
@@ -37346,24 +37517,24 @@ function createServer() {
     res.json({ live: clientNotifyLive() });
   });
   mountOwners(app);
-  app.use("/api/bookings", router$y);
-  app.use("/api/headshots-10", router$x);
-  app.use("/api/orders", router$w);
+  app.use("/api/bookings", router$z);
+  app.use("/api/headshots-10", router$y);
+  app.use("/api/orders", router$x);
   app.patch("/api/admin/orders/:id/approval", handleOrderApproval);
-  app.use("/api/galleries", router$v);
-  app.use("/api/payments", router$u);
-  app.use("/api/vsai", router$t);
-  app.use("/api/messages", router$s);
-  app.use("/api/communications", router$6);
-  app.use("/api/clients", router$q);
+  app.use("/api/galleries", router$w);
+  app.use("/api/payments", router$v);
+  app.use("/api/vsai", router$u);
+  app.use("/api/messages", router$t);
+  app.use("/api/communications", router$7);
   app.use("/api/clients", router$r);
+  app.use("/api/clients", router$s);
   app.get("/api/portal/listings/:id", handleGetPublicPortalListing);
   app.get("/api/listing-sites/:slug", handleGetListingSite);
   app.post("/api/listing-sites/:slug/inquiry", handleListingSiteInquiry);
-  app.use("/api/staff", router$p);
-  app.use("/api/account", router$o);
-  app.use("/api/site-content", router$3);
-  app.use("/api/insights", router$2);
+  app.use("/api/staff", router$q);
+  app.use("/api/account", router$p);
+  app.use("/api/site-content", router$4);
+  app.use("/api/insights", router$3);
   app.get("/present/:token", (req, res, next) => {
     if (process.env.ICONIC_VITE_DEV === "1") return next();
     return handlePresentationShell(req, res);
@@ -37377,27 +37548,28 @@ function createServer() {
     if (req.params.slug === "prep") return next();
     return handleInsightShell(req, res);
   });
+  app.use("/api", router$6);
+  app.use("/api/listings", router$o);
   app.use("/api", router$5);
-  app.use("/api/listings", router$n);
-  app.use("/api", router$4);
-  app.use("/api/campaigns", router$m);
+  app.use("/api/campaigns", router$n);
+  app.use("/api/marketing", router$m);
   app.use("/api/marketing", router$l);
-  app.use("/api/marketing", router$k);
-  app.use("/api/agents", router$j);
-  app.use("/api/botroom", router$i);
-  app.use("/api/media-jobs", router$h);
-  app.use("/api/studio", router$g);
-  app.use("/api/ops", router$f);
-  app.use("/api/studio/scratch", router$e);
-  app.use("/api/places", router$d);
-  app.use("/api/sms", router$c);
-  app.use("/api/contact", router$7);
+  app.use("/api/agents", router$k);
+  app.use("/api/botroom", router$j);
+  app.use("/api/media-jobs", router$i);
+  app.use("/api/studio", router$h);
+  app.use("/api/ops", router$g);
+  app.use("/api/studio/scratch", router$f);
+  app.use("/api/places", router$e);
+  app.use("/api/sms", router$d);
   app.use("/api/contact", router$8);
-  app.use("/api/contact", router$b);
-  app.use("/api/senior-living", router$a);
-  app.use("/api/apprenticeship", router$9);
-  app.use("/api/admin/test-data", router$1);
-  app.use("/api/holy-grail", router);
+  app.use("/api/contact", router$9);
+  app.use("/api/contact", router$c);
+  app.use("/api/senior-living", router$b);
+  app.use("/api/stock-footage", router);
+  app.use("/api/apprenticeship", router$a);
+  app.use("/api/admin/test-data", router$2);
+  app.use("/api/holy-grail", router$1);
   app.use(
     (err, _req, res, _next) => {
       console.error("[Server] Unhandled error:", err);

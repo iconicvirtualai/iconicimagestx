@@ -420,7 +420,7 @@ const PAGES: ContentPage[] = [
   page("stock", "/stock-footage", "Stock footage", [
     block("hero", "Hero", [
       textField("title", "Headline", "Stock Footage Library"),
-      areaField("body", "Body", "Premium, professionally photographed real estate images by neighborhood. License instantly and use for your listings, marketing, or staging inspiration."),
+      areaField("body", "Body", "Neighborhood amenity photos from Iconic Images. Pay for a set and Iconic sends the files to you."),
     ]),
   ]),
 
