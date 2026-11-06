@@ -91,6 +91,7 @@ const PAGES: ContentPage[] = [
       textField("copyright", "Copyright name", LEGAL_BUSINESS_NAME),
     ], [
       linkItem("home", "Home", "/"),
+      linkItem("whatWeDo", "What we do", "/what-we-do"),
       linkItem("pricing", "Pricing", "/pricing"),
       linkItem("socials", "Socials", "/socials"),
       linkItem("portfolio", "Portfolio", "/portfolio"),
@@ -384,6 +385,64 @@ const PAGES: ContentPage[] = [
       areaField("body", "Body", "At Iconic Images, we don’t just capture real estate; we engineer market ownership. In a world of infinite scrolling, 'pretty pictures' are the bare minimum."),
       textField("philosophyTitle", "Philosophy title", "THE ICONIC PHILOSOPHY"),
       areaField("philosophy", "Philosophy", "We believe the agent is the architect of the deal, but the media is the fuel."),
+    ]),
+  ]),
+
+  page("whatWeDo", "/what-we-do", "What we do", [
+    block("hero", "Hero", [
+      textField("title", "Headline", "What does Iconic do?"),
+      areaField("line", "Line", "Photography, video, and listing media."),
+      videoField("video", "Hero video", "/media/home-v2/services-blaze/services-blaze-v1-muted.mp4"),
+      imageField("poster", "Poster", "/media/home-v2/services-blaze/services-blaze-v1-poster.jpg"),
+    ]),
+    block("who", "Who we are", [
+      textField("title", "Headline", "Real estate media."),
+      areaField("line", "Line", "Spring, The Woodlands, and Houston."),
+      imageField("image", "Photo", "/media/home-v2/lifestyle/studio-105-sweep.jpg"),
+      textField("alt", "Alt text", "Studio 105 white sweep with strobes"),
+    ]),
+    block("shoot", "What we shoot", [
+      textField("title", "Headline", "What we shoot."),
+      areaField("line", "Line", "Listing photos, film, and brand media."),
+    ], [
+      { id: "photos", fields: [textField("label", "Label", "Listing photos"), imageField("image", "Photo", "/media/launch/dining_room.jpg"), videoField("video", "Video", ""), imageField("poster", "Poster", "")] },
+      { id: "video", fields: [textField("label", "Label", "Property video"), imageField("image", "Photo", ""), videoField("video", "Video", "/media/home-v2/slider/02-premium-listing-nubenbrook.mp4"), imageField("poster", "Poster", "/media/home-v2/slider/02-premium-listing-nubenbrook.jpg")] },
+      { id: "aerial", fields: [textField("label", "Label", "Aerial drone"), imageField("image", "Photo", ""), videoField("video", "Video", "/media/home-v2/slider/06-aerial-lakefront.mp4"), imageField("poster", "Poster", "/media/home-v2/slider/06-aerial-lakefront.jpg")] },
+      { id: "reels", fields: [textField("label", "Label", "Iconic Snap Reels"), imageField("image", "Photo", ""), videoField("video", "Video", "/media/home-v2/snap-cards/woodville-blaze-v5.mp4"), imageField("poster", "Poster", "/media/home-v2/snap-cards/woodville-blaze-v5.jpg")] },
+      { id: "twilight", fields: [textField("label", "Label", "Iconic Twilight"), imageField("image", "Photo", "/media/home-v2/photo-edits/alt-marias-pool-warmdusk-after.jpg"), videoField("video", "Video", ""), imageField("poster", "Poster", "")] },
+      { id: "headshots", fields: [textField("label", "Label", "Headshots"), imageField("image", "Photo", "/media/photos/headshot-gracepoint-1.jpg"), videoField("video", "Video", ""), imageField("poster", "Poster", "")] },
+      { id: "commercial", fields: [textField("label", "Label", "Commercial"), imageField("image", "Photo", ""), videoField("video", "Video", "/media/home-v2/slider/04-commercial-king-metals.mp4"), imageField("poster", "Poster", "/media/home-v2/slider/04-commercial-king-metals.jpg")] },
+      { id: "staging", fields: [textField("label", "Label", "AI Virtual Staging"), imageField("image", "Photo", "/media/home-v2/staging/vs-living-after.jpg"), videoField("video", "Video", ""), imageField("poster", "Poster", "")] },
+    ]),
+    block("serve", "Who it's for", [
+      textField("title", "Headline", "Who it's for."),
+      areaField("line", "Line", "Agents, builders, businesses, and senior living."),
+    ], [
+      { id: "agents", fields: [textField("label", "Label", "Realtors & Brokers"), imageField("image", "Photo", "/media/photos/lifestyle-kennedy-mtz01127.jpg")] },
+      { id: "builders", fields: [textField("label", "Label", "Developers & Builders"), imageField("image", "Photo", "/media/pay-at-close/luxury/pool-rd/07-front-day.jpg")] },
+      { id: "business", fields: [textField("label", "Label", "Small Business Owners"), imageField("image", "Photo", "/media/photos/lifestyle-daughtery-mtz00636.jpg")] },
+      { id: "senior", fields: [textField("label", "Label", "Senior living"), imageField("image", "Photo", "/senior-living/senior-living-01-hero.jpg")] },
+    ]),
+    block("steps", "How it works", [
+      textField("title", "Headline", "How it works."),
+      areaField("line", "Line", "Placing an order with Iconic is as simple as it gets."),
+    ], [
+      { id: "step-1", fields: [textField("step", "Step", "STEP 1"), textField("title", "Title", "Book your session"), imageField("image", "Photo", "/media/launch/exterior_entry_day.jpg")] },
+      { id: "step-2", fields: [textField("step", "Step", "STEP 2"), textField("title", "Title", "We capture the vision"), imageField("image", "Photo", "/media/launch/aerial_neighborhood_drone.jpg")] },
+      { id: "step-3", fields: [textField("step", "Step", "STEP 3"), textField("title", "Title", "Rapid post-production"), imageField("image", "Photo", "/media/home-v2/photo-edits/pavilion-after-iconic.jpg")] },
+      { id: "step-4", fields: [textField("step", "Step", "STEP 4"), textField("title", "Title", "Delivery & launch"), imageField("image", "Photo", "/media/launch/primary_suite.jpg")] },
+    ]),
+    block("why", "Why it matters", [
+      textField("title", "Headline", "Show the house."),
+      areaField("line", "Line", "The story, and the reason someone should call."),
+      imageField("image", "Photo", "/media/photos/drone-hero.jpg"),
+      textField("alt", "Alt text", "Drone view of a waterfront luxury home"),
+    ]),
+    block("cta", "Close", [
+      textField("title", "Headline", "Book a shoot."),
+      areaField("line", "Line", "Or see the packages."),
+      linkField("book", "Book button", "Book Now", "/book"),
+      linkField("pricing", "Packages button", "Pricing", "/pricing"),
     ]),
   ]),
 

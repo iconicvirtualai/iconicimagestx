@@ -27,6 +27,7 @@ import SiteMeta from "./components/SiteMeta";
 // Public pages
 import Index from "./pages/Index";
 import About from "./pages/About";
+import WhatWeDo from "./pages/WhatWeDo";
 import Portfolio from "./pages/Portfolio";
 import Studio105 from "./pages/Studio105";
 import Contact from "./pages/Contact";
@@ -154,6 +155,7 @@ const App = () => (
             {/* ─── Public Routes ─────────────────────────────────────────── */}
             <Route path="/" element={<Index />} />
             <Route path="/about" element={<About />} />
+            <Route path="/what-we-do" element={<WhatWeDo />} />
             <Route path="/portfolio" element={<Portfolio />} />
             <Route path="/studio-105" element={<Studio105 />} />
             <Route path="/contact" element={<Contact />} />
