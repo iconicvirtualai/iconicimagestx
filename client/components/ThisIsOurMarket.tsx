@@ -1,15 +1,44 @@
+import { useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { useSiteText } from "@/content/siteContent";
 
 const MARKET_BODY = "Iconic was built here. We’ve invested here. We’ve shaped here. Winning brands don’t chase. They choose Iconic.";
+const BLAZE_VIDEO = "/media/home-v2/services-blaze/services-blaze-v1-muted.mp4";
+const BLAZE_POSTER = "/media/home-v2/services-blaze/services-blaze-v1-poster.jpg";
+const VISIBLE_RATIO = 0.15;
+
+function armMarketVideo(video: HTMLVideoElement) {
+  video.muted = true;
+  video.defaultMuted = true;
+}
 
 export default function ThisIsOurMarket() {
-  const settings = useSiteSettings();
   const titleLead = useSiteText("home", "market", "titleLead", "This Is");
   const titleAccent = useSiteText("home", "market", "titleAccent", "OUR");
   const titleTail = useSiteText("home", "market", "titleTail", "Market.");
   const body = useSiteText("home", "market", "body", MARKET_BODY);
+  const videoSrc = useSiteText("home", "market", "video", BLAZE_VIDEO);
+  const poster = useSiteText("home", "market", "poster", BLAZE_POSTER);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    armMarketVideo(video);
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        const node = entry.target as HTMLVideoElement;
+        armMarketVideo(node);
+        if (entry.intersectionRatio >= VISIBLE_RATIO) {
+          void node.play().catch(() => undefined);
+          continue;
+        }
+        node.pause();
+      }
+    }, { threshold: [0, VISIBLE_RATIO, 0.6] });
+    observer.observe(video);
+    return () => observer.disconnect();
+  }, [videoSrc]);
 
   return (
     <section className="py-24 bg-black overflow-hidden relative border-t border-white/5">
@@ -60,50 +89,36 @@ export default function ThisIsOurMarket() {
             </motion.div>
           </div>
 
-          {/* Right: Visual Content (Photo Grid/Composition) */}
-          <div className="w-full lg:w-2/5 flex items-center justify-center relative h-[500px]">
-            <div className="relative w-full h-full">
-              {/* Main Image */}
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                whileInView={{ opacity: 1, scale: 1 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.8 }}
-                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[400px] md:w-[350px] md:h-[450px] rounded-3xl overflow-hidden shadow-2xl z-20 border-8 border-[#111]"
-              >
-                <img
-                  src="/media/photos/lifestyle-kennedy-mtz01127.jpg"
-                  alt="Iconic lifestyle portrait"
-                  className="w-full h-full object-cover grayscale brightness-90 group-hover:grayscale-0 transition-all duration-700"
+          {/* Right: services blaze fills the circled portrait slot, scaled to the copy */}
+          <div className="flex w-full items-center justify-center lg:w-2/5">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.8 }}
+              className="w-[min(100%,256px)] rounded-[1.6rem] border-[6px] border-[#111] bg-black shadow-2xl sm:w-[280px] lg:w-[296px]"
+            >
+              <div className="relative aspect-[3/4] overflow-hidden rounded-[1.15rem]">
+                <video
+                  ref={videoRef}
+                  src={videoSrc}
+                  poster={poster}
+                  data-site-page="home"
+                  data-site-block="market"
+                  data-site-field="video"
+                  data-site-kind="video"
+                  className="absolute inset-0 h-full w-full object-cover"
+                  autoPlay
+                  muted
+                  loop
+                  playsInline
+                  preload="metadata"
+                  aria-label="Iconic services"
+                  onLoadedMetadata={(event) => armMarketVideo(event.currentTarget)}
+                  onPlay={(event) => armMarketVideo(event.currentTarget)}
                 />
-              </motion.div>
-
-              {/* Secondary Floating Image */}
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.8, delay: 0.2 }}
-                className="absolute top-[10%] -right-10 w-[200px] h-[260px] rounded-2xl overflow-hidden shadow-2xl z-30 border-4 border-[#222]"
-              >
-                <img
-                  src="/media/photos/drone-hero.jpg"
-                  alt="Iconic drone photograph of a luxury home"
-                  className="w-full h-full object-cover"
-                />
-              </motion.div>
-
-              {/* Third Floating Decor Element */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.8, delay: 0.4 }}
-                className="absolute bottom-10 -left-10 w-24 h-24 rounded-2xl shadow-xl z-10 p-4 border border-white/5 bg-white/5 backdrop-blur-md"
-              >
-                <div className="w-full h-full rounded-lg animate-pulse opacity-20 bg-teal-500"></div>
-              </motion.div>
-            </div>
+              </div>
+            </motion.div>
           </div>
         </div>
       </div>
