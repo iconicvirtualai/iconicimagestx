@@ -133,13 +133,16 @@ const PAGES: ContentPage[] = [
       textField("titleAccent", "Title accent", "ARE"),
       textField("titleTail", "Title tail", "the Bar."),
       areaField("body", "Body", "We don’t follow trends. We break patterns. We don’t undercut. We outperform."),
-      videoField("video", "Phone video", "/media/blaze/02_US_v3.mp4"),
+      videoField("video", "Phone video", "/media/video/content-web-clip.mp4"),
     ]),
     block("market", "Our market", [
       textField("titleLead", "Title lead", "This Is"),
       textField("titleAccent", "Title accent", "OUR"),
       textField("titleTail", "Title tail", "Market."),
       areaField("body", "Body", "Iconic was built here. We’ve invested here. We’ve shaped here. Winning brands don’t chase. They choose Iconic."),
+      videoField("underlay", "Right column underlay", "/media/blaze/02_US_v3.mp4"),
+      videoField("video", "Portrait video", "/media/home-v2/services-blaze/services-blaze-v1-muted.mp4"),
+      imageField("poster", "Poster", "/media/home-v2/services-blaze/services-blaze-v1-poster.jpg"),
     ]),
     block("solution", "High-impact video", [
       textField("badge", "Badge", "Built for Creative Excellence"),

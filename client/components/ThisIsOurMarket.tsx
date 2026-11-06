@@ -1,15 +1,49 @@
+import { useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { useSiteText } from "@/content/siteContent";
 
 const MARKET_BODY = "Iconic was built here. We’ve invested here. We’ve shaped here. Winning brands don’t chase. They choose Iconic.";
+const BLAZE_VIDEO = "/media/home-v2/services-blaze/services-blaze-v1-muted.mp4";
+const BLAZE_POSTER = "/media/home-v2/services-blaze/services-blaze-v1-poster.jpg";
+const BAR_UNDERLAY = "/media/blaze/02_US_v3.mp4";
+const VISIBLE_RATIO = 0.15;
+
+function armMarketVideo(video: HTMLVideoElement) {
+  video.muted = true;
+  video.defaultMuted = true;
+}
 
 export default function ThisIsOurMarket() {
-  const settings = useSiteSettings();
   const titleLead = useSiteText("home", "market", "titleLead", "This Is");
   const titleAccent = useSiteText("home", "market", "titleAccent", "OUR");
   const titleTail = useSiteText("home", "market", "titleTail", "Market.");
   const body = useSiteText("home", "market", "body", MARKET_BODY);
+  const videoSrc = useSiteText("home", "market", "video", BLAZE_VIDEO);
+  const poster = useSiteText("home", "market", "poster", BLAZE_POSTER);
+  const underlaySrc = useSiteText("home", "market", "underlay", BAR_UNDERLAY);
+  const columnRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const root = columnRef.current;
+    if (!root) return;
+    const videos = Array.from(root.querySelectorAll("video"));
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        const node = entry.target as HTMLVideoElement;
+        armMarketVideo(node);
+        if (entry.intersectionRatio >= VISIBLE_RATIO) {
+          void node.play().catch(() => undefined);
+          continue;
+        }
+        node.pause();
+      }
+    }, { threshold: [0, VISIBLE_RATIO, 0.6] });
+    for (const video of videos) {
+      armMarketVideo(video);
+      observer.observe(video);
+    }
+    return () => observer.disconnect();
+  }, [videoSrc, underlaySrc]);
 
   return (
     <section className="py-24 bg-black overflow-hidden relative border-t border-white/5">
@@ -60,48 +94,51 @@ export default function ThisIsOurMarket() {
             </motion.div>
           </div>
 
-          {/* Right: Visual Content (Photo Grid/Composition) */}
-          <div className="w-full lg:w-2/5 flex items-center justify-center relative h-[500px]">
-            <div className="relative w-full h-full">
-              {/* Main Image */}
+          {/* Right: bar mashup fills the column; services blaze sits on top */}
+          <div ref={columnRef} className="relative isolate min-h-[32rem] w-full overflow-hidden rounded-[1.75rem] lg:min-h-0 lg:w-2/5 lg:self-stretch">
+            <video
+              src={underlaySrc}
+              data-site-page="home"
+              data-site-block="market"
+              data-site-field="underlay"
+              data-site-kind="video"
+              className="absolute inset-0 h-full w-full object-cover"
+              autoPlay
+              muted
+              loop
+              playsInline
+              preload="metadata"
+              aria-hidden="true"
+              onLoadedMetadata={(event) => armMarketVideo(event.currentTarget)}
+              onPlay={(event) => armMarketVideo(event.currentTarget)}
+            />
+            <div className="relative z-10 flex h-full min-h-[32rem] items-center justify-center p-6 lg:min-h-full">
               <motion.div
                 initial={{ opacity: 0, scale: 0.9 }}
                 whileInView={{ opacity: 1, scale: 1 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.8 }}
-                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[400px] md:w-[350px] md:h-[450px] rounded-3xl overflow-hidden shadow-2xl z-20 border-8 border-[#111]"
+                className="w-[min(100%,240px)] rounded-[1.6rem] border-[6px] border-[#111] bg-black shadow-2xl sm:w-[260px]"
               >
-                <img
-                  src="/media/photos/lifestyle-kennedy-mtz01127.jpg"
-                  alt="Iconic lifestyle portrait"
-                  className="w-full h-full object-cover grayscale brightness-90 group-hover:grayscale-0 transition-all duration-700"
-                />
-              </motion.div>
-
-              {/* Secondary Floating Image */}
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.8, delay: 0.2 }}
-                className="absolute top-[10%] -right-10 w-[200px] h-[260px] rounded-2xl overflow-hidden shadow-2xl z-30 border-4 border-[#222]"
-              >
-                <img
-                  src="/media/photos/drone-hero.jpg"
-                  alt="Iconic drone photograph of a luxury home"
-                  className="w-full h-full object-cover"
-                />
-              </motion.div>
-
-              {/* Third Floating Decor Element */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.8, delay: 0.4 }}
-                className="absolute bottom-10 -left-10 w-24 h-24 rounded-2xl shadow-xl z-10 p-4 border border-white/5 bg-white/5 backdrop-blur-md"
-              >
-                <div className="w-full h-full rounded-lg animate-pulse opacity-20 bg-teal-500"></div>
+                <div className="relative aspect-[3/4] overflow-hidden rounded-[1.15rem]">
+                  <video
+                    src={videoSrc}
+                    poster={poster}
+                    data-site-page="home"
+                    data-site-block="market"
+                    data-site-field="video"
+                    data-site-kind="video"
+                    className="absolute inset-0 h-full w-full object-cover"
+                    autoPlay
+                    muted
+                    loop
+                    playsInline
+                    preload="metadata"
+                    aria-label="Iconic services"
+                    onLoadedMetadata={(event) => armMarketVideo(event.currentTarget)}
+                    onPlay={(event) => armMarketVideo(event.currentTarget)}
+                  />
+                </div>
               </motion.div>
             </div>
           </div>
