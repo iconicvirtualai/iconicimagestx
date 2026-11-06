@@ -5,6 +5,7 @@ import { useSiteText } from "@/content/siteContent";
 const MARKET_BODY = "Iconic was built here. We’ve invested here. We’ve shaped here. Winning brands don’t chase. They choose Iconic.";
 const BLAZE_VIDEO = "/media/home-v2/services-blaze/services-blaze-v1-muted.mp4";
 const BLAZE_POSTER = "/media/home-v2/services-blaze/services-blaze-v1-poster.jpg";
+const BAR_UNDERLAY = "/media/blaze/02_US_v3.mp4";
 const VISIBLE_RATIO = 0.15;
 
 function armMarketVideo(video: HTMLVideoElement) {
@@ -19,12 +20,13 @@ export default function ThisIsOurMarket() {
   const body = useSiteText("home", "market", "body", MARKET_BODY);
   const videoSrc = useSiteText("home", "market", "video", BLAZE_VIDEO);
   const poster = useSiteText("home", "market", "poster", BLAZE_POSTER);
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const underlaySrc = useSiteText("home", "market", "underlay", BAR_UNDERLAY);
+  const columnRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-    armMarketVideo(video);
+    const root = columnRef.current;
+    if (!root) return;
+    const videos = Array.from(root.querySelectorAll("video"));
     const observer = new IntersectionObserver((entries) => {
       for (const entry of entries) {
         const node = entry.target as HTMLVideoElement;
@@ -36,9 +38,12 @@ export default function ThisIsOurMarket() {
         node.pause();
       }
     }, { threshold: [0, VISIBLE_RATIO, 0.6] });
-    observer.observe(video);
+    for (const video of videos) {
+      armMarketVideo(video);
+      observer.observe(video);
+    }
     return () => observer.disconnect();
-  }, [videoSrc]);
+  }, [videoSrc, underlaySrc]);
 
   return (
     <section className="py-24 bg-black overflow-hidden relative border-t border-white/5">
@@ -89,36 +94,53 @@ export default function ThisIsOurMarket() {
             </motion.div>
           </div>
 
-          {/* Right: services blaze fills the circled portrait slot, scaled to the copy */}
-          <div className="flex w-full items-center justify-center lg:w-2/5">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.8 }}
-              className="w-[min(100%,256px)] rounded-[1.6rem] border-[6px] border-[#111] bg-black shadow-2xl sm:w-[280px] lg:w-[296px]"
-            >
-              <div className="relative aspect-[3/4] overflow-hidden rounded-[1.15rem]">
-                <video
-                  ref={videoRef}
-                  src={videoSrc}
-                  poster={poster}
-                  data-site-page="home"
-                  data-site-block="market"
-                  data-site-field="video"
-                  data-site-kind="video"
-                  className="absolute inset-0 h-full w-full object-cover"
-                  autoPlay
-                  muted
-                  loop
-                  playsInline
-                  preload="metadata"
-                  aria-label="Iconic services"
-                  onLoadedMetadata={(event) => armMarketVideo(event.currentTarget)}
-                  onPlay={(event) => armMarketVideo(event.currentTarget)}
-                />
-              </div>
-            </motion.div>
+          {/* Right: bar mashup fills the column; services blaze sits on top */}
+          <div ref={columnRef} className="relative isolate min-h-[32rem] w-full overflow-hidden rounded-[1.75rem] lg:min-h-0 lg:w-2/5 lg:self-stretch">
+            <video
+              src={underlaySrc}
+              data-site-page="home"
+              data-site-block="market"
+              data-site-field="underlay"
+              data-site-kind="video"
+              className="absolute inset-0 h-full w-full object-cover"
+              autoPlay
+              muted
+              loop
+              playsInline
+              preload="metadata"
+              aria-hidden="true"
+              onLoadedMetadata={(event) => armMarketVideo(event.currentTarget)}
+              onPlay={(event) => armMarketVideo(event.currentTarget)}
+            />
+            <div className="relative z-10 flex h-full min-h-[32rem] items-center justify-center p-6 lg:min-h-full">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.8 }}
+                className="w-[min(100%,240px)] rounded-[1.6rem] border-[6px] border-[#111] bg-black shadow-2xl sm:w-[260px]"
+              >
+                <div className="relative aspect-[3/4] overflow-hidden rounded-[1.15rem]">
+                  <video
+                    src={videoSrc}
+                    poster={poster}
+                    data-site-page="home"
+                    data-site-block="market"
+                    data-site-field="video"
+                    data-site-kind="video"
+                    className="absolute inset-0 h-full w-full object-cover"
+                    autoPlay
+                    muted
+                    loop
+                    playsInline
+                    preload="metadata"
+                    aria-label="Iconic services"
+                    onLoadedMetadata={(event) => armMarketVideo(event.currentTarget)}
+                    onPlay={(event) => armMarketVideo(event.currentTarget)}
+                  />
+                </div>
+              </motion.div>
+            </div>
           </div>
         </div>
       </div>

@@ -140,6 +140,7 @@ const PAGES: ContentPage[] = [
       textField("titleAccent", "Title accent", "OUR"),
       textField("titleTail", "Title tail", "Market."),
       areaField("body", "Body", "Iconic was built here. We’ve invested here. We’ve shaped here. Winning brands don’t chase. They choose Iconic."),
+      videoField("underlay", "Right column underlay", "/media/blaze/02_US_v3.mp4"),
       videoField("video", "Portrait video", "/media/home-v2/services-blaze/services-blaze-v1-muted.mp4"),
       imageField("poster", "Poster", "/media/home-v2/services-blaze/services-blaze-v1-poster.jpg"),
     ]),
