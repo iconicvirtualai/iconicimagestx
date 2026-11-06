@@ -34075,7 +34075,8 @@ const PAGES = [
   ]),
   page("whatWeDo", "/what-we-do", "What we do", [
     block("hero", "Hero", [
-      textField("title", "Headline", "What does Iconic do?"),
+      textField("titleLead", "Headline line 1", "What does"),
+      textField("titleTail", "Headline line 2", "Iconic do?"),
       areaField("line", "Line", "Photography, video, and listing media."),
       videoField("video", "Hero video", "/media/home-v2/services-blaze/services-blaze-v1-muted.mp4"),
       imageField("poster", "Poster", "/media/home-v2/services-blaze/services-blaze-v1-poster.jpg")
@@ -34083,8 +34084,8 @@ const PAGES = [
     block("who", "Who we are", [
       textField("title", "Headline", "Real estate media."),
       areaField("line", "Line", "Spring, The Woodlands, and Houston."),
-      imageField("image", "Photo", "/media/home-v2/lifestyle/studio-105-sweep.jpg"),
-      textField("alt", "Alt text", "Studio 105 white sweep with strobes")
+      imageField("image", "Photo", "/media/home-v2/lifestyle/interior-shoot-lighting.jpg"),
+      textField("alt", "Alt text", "On-camera session inside a listing")
     ]),
     block("shoot", "What we shoot", [
       textField("title", "Headline", "What we shoot."),
@@ -34092,21 +34093,21 @@ const PAGES = [
     ], [
       { id: "photos", fields: [textField("label", "Label", "Listing photos"), imageField("image", "Photo", "/media/launch/dining_room.jpg"), videoField("video", "Video", ""), imageField("poster", "Poster", "")] },
       { id: "video", fields: [textField("label", "Label", "Property video"), imageField("image", "Photo", ""), videoField("video", "Video", "/media/home-v2/slider/02-premium-listing-nubenbrook.mp4"), imageField("poster", "Poster", "/media/home-v2/slider/02-premium-listing-nubenbrook.jpg")] },
-      { id: "aerial", fields: [textField("label", "Label", "Aerial drone"), imageField("image", "Photo", ""), videoField("video", "Video", "/media/home-v2/slider/06-aerial-lakefront.mp4"), imageField("poster", "Poster", "/media/home-v2/slider/06-aerial-lakefront.jpg")] },
-      { id: "reels", fields: [textField("label", "Label", "Iconic Snap Reels"), imageField("image", "Photo", ""), videoField("video", "Video", "/media/home-v2/snap-cards/woodville-blaze-v5.mp4"), imageField("poster", "Poster", "/media/home-v2/snap-cards/woodville-blaze-v5.jpg")] },
+      { id: "aerial", fields: [textField("label", "Label", "Aerial drone"), imageField("image", "Photo", "/media/pay-at-close/luxury/marias/06-aerial-day.jpg"), videoField("video", "Video", ""), imageField("poster", "Poster", "")] },
+      { id: "podcast", fields: [textField("label", "Label", "Podcast"), imageField("image", "Photo", "/media/home-v2/lifestyle/podcast-crew-cameras.jpg"), videoField("video", "Video", ""), imageField("poster", "Poster", "")] },
       { id: "twilight", fields: [textField("label", "Label", "Iconic Twilight"), imageField("image", "Photo", "/media/home-v2/photo-edits/alt-marias-pool-warmdusk-after.jpg"), videoField("video", "Video", ""), imageField("poster", "Poster", "")] },
-      { id: "headshots", fields: [textField("label", "Label", "Headshots"), imageField("image", "Photo", "/media/photos/headshot-gracepoint-1.jpg"), videoField("video", "Video", ""), imageField("poster", "Poster", "")] },
+      { id: "headshots", fields: [textField("label", "Label", "Headshots"), imageField("image", "Photo", "/media/photos/headshot-gracepoint-4.jpg"), videoField("video", "Video", ""), imageField("poster", "Poster", "")] },
       { id: "commercial", fields: [textField("label", "Label", "Commercial"), imageField("image", "Photo", ""), videoField("video", "Video", "/media/home-v2/slider/04-commercial-king-metals.mp4"), imageField("poster", "Poster", "/media/home-v2/slider/04-commercial-king-metals.jpg")] },
       { id: "staging", fields: [textField("label", "Label", "AI Virtual Staging"), imageField("image", "Photo", "/media/home-v2/staging/vs-living-after.jpg"), videoField("video", "Video", ""), imageField("poster", "Poster", "")] }
     ]),
     block("serve", "Who it's for", [
       textField("title", "Headline", "Who it's for."),
-      areaField("line", "Line", "Agents, builders, businesses, and senior living.")
+      areaField("line", "Line", "Agents, builders, businesses, and literally everyone.")
     ], [
       { id: "agents", fields: [textField("label", "Label", "Realtors & Brokers"), imageField("image", "Photo", "/media/photos/lifestyle-kennedy-mtz01127.jpg")] },
       { id: "builders", fields: [textField("label", "Label", "Developers & Builders"), imageField("image", "Photo", "/media/pay-at-close/luxury/pool-rd/07-front-day.jpg")] },
       { id: "business", fields: [textField("label", "Label", "Small Business Owners"), imageField("image", "Photo", "/media/photos/lifestyle-daughtery-mtz00636.jpg")] },
-      { id: "senior", fields: [textField("label", "Label", "Senior living"), imageField("image", "Photo", "/senior-living/senior-living-01-hero.jpg")] }
+      { id: "everyone", fields: [textField("label", "Label", "Literally Everyone"), imageField("image", "Photo", "/media/photos/family-bryant-mtz09081.jpg")] }
     ]),
     block("steps", "How it works", [
       textField("title", "Headline", "How it works."),
@@ -34125,9 +34126,8 @@ const PAGES = [
     ]),
     block("cta", "Close", [
       textField("title", "Headline", "Book a shoot."),
-      areaField("line", "Line", "Or see the packages."),
-      linkField("book", "Book button", "Book Now", "/book"),
-      linkField("pricing", "Packages button", "Pricing", "/pricing")
+      linkField("book", "Shoot button", "Book a Shoot", "/book"),
+      linkField("studio", "Studio button", "Book our Studio", "/studio-105")
     ])
   ]),
   page("portfolio", "/portfolio", "Portfolio", [

@@ -9,7 +9,7 @@ const VISIBLE_RATIO = 0.15;
 
 const HERO_VIDEO = "/media/home-v2/services-blaze/services-blaze-v1-muted.mp4";
 const HERO_POSTER = "/media/home-v2/services-blaze/services-blaze-v1-poster.jpg";
-const WHO_IMAGE = "/media/home-v2/lifestyle/studio-105-sweep.jpg";
+const WHO_IMAGE = "/media/home-v2/lifestyle/interior-shoot-lighting.jpg";
 const WHY_IMAGE = "/media/photos/drone-hero.jpg";
 
 type MediaCard = {
@@ -24,10 +24,10 @@ type MediaCard = {
 const SHOOT: MediaCard[] = [
   { id: "photos", label: "Listing photos", image: "/media/launch/dining_room.jpg", video: "", poster: "" },
   { id: "video", label: "Property video", image: "", video: "/media/home-v2/slider/02-premium-listing-nubenbrook.mp4", poster: "/media/home-v2/slider/02-premium-listing-nubenbrook.jpg" },
-  { id: "aerial", label: "Aerial drone", image: "", video: "/media/home-v2/slider/06-aerial-lakefront.mp4", poster: "/media/home-v2/slider/06-aerial-lakefront.jpg" },
-  { id: "reels", label: "Iconic Snap Reels", image: "", video: "/media/home-v2/snap-cards/woodville-blaze-v5.mp4", poster: "/media/home-v2/snap-cards/woodville-blaze-v5.jpg" },
+  { id: "aerial", label: "Aerial drone", image: "/media/pay-at-close/luxury/marias/06-aerial-day.jpg", video: "", poster: "" },
+  { id: "podcast", label: "Podcast", image: "/media/home-v2/lifestyle/podcast-crew-cameras.jpg", video: "", poster: "" },
   { id: "twilight", label: "Iconic Twilight", image: "/media/home-v2/photo-edits/alt-marias-pool-warmdusk-after.jpg", video: "", poster: "" },
-  { id: "headshots", label: "Headshots", image: "/media/photos/headshot-gracepoint-1.jpg", video: "", poster: "" },
+  { id: "headshots", label: "Headshots", image: "/media/photos/headshot-gracepoint-4.jpg", video: "", poster: "" },
   { id: "commercial", label: "Commercial", image: "", video: "/media/home-v2/slider/04-commercial-king-metals.mp4", poster: "/media/home-v2/slider/04-commercial-king-metals.jpg" },
   { id: "staging", label: "AI Virtual Staging", image: "/media/home-v2/staging/vs-living-after.jpg", video: "", poster: "" },
 ];
@@ -36,7 +36,7 @@ const SERVE: MediaCard[] = [
   { id: "agents", label: "Realtors & Brokers", image: "/media/photos/lifestyle-kennedy-mtz01127.jpg", video: "", poster: "" },
   { id: "builders", label: "Developers & Builders", image: "/media/pay-at-close/luxury/pool-rd/07-front-day.jpg", video: "", poster: "" },
   { id: "business", label: "Small Business Owners", image: "/media/photos/lifestyle-daughtery-mtz00636.jpg", video: "", poster: "" },
-  { id: "senior", label: "Senior living", image: "/senior-living/senior-living-01-hero.jpg", video: "", poster: "" },
+  { id: "everyone", label: "Literally Everyone", image: "/media/photos/family-bryant-mtz09081.jpg", video: "", poster: "" },
 ];
 
 const STEPS: MediaCard[] = [
@@ -204,7 +204,8 @@ export default function WhatWeDo() {
   const whyHidden = useBlockHidden(PAGE, "why");
   const ctaHidden = useBlockHidden(PAGE, "cta");
 
-  const heroTitle = useSiteText(PAGE, "hero", "title", "What does Iconic do?");
+  const heroLead = useSiteText(PAGE, "hero", "titleLead", "What does");
+  const heroTail = useSiteText(PAGE, "hero", "titleTail", "Iconic do?");
   const heroLine = useSiteText(PAGE, "hero", "line", "Photography, video, and listing media.");
   const heroVideo = useSiteText(PAGE, "hero", "video", HERO_VIDEO);
   const heroPoster = useSiteText(PAGE, "hero", "poster", HERO_POSTER);
@@ -212,14 +213,14 @@ export default function WhatWeDo() {
   const whoTitle = useSiteText(PAGE, "who", "title", "Real estate media.");
   const whoLine = useSiteText(PAGE, "who", "line", "Spring, The Woodlands, and Houston.");
   const whoImage = useSiteText(PAGE, "who", "image", WHO_IMAGE);
-  const whoAlt = useSiteText(PAGE, "who", "alt", "Studio 105 white sweep with strobes");
+  const whoAlt = useSiteText(PAGE, "who", "alt", "On-camera session inside a listing");
 
   const shootTitle = useSiteText(PAGE, "shoot", "title", "What we shoot.");
   const shootLine = useSiteText(PAGE, "shoot", "line", "Listing photos, film, and brand media.");
   const shoot = cardsFrom(useSiteItems(PAGE, "shoot"), SHOOT);
 
   const serveTitle = useSiteText(PAGE, "serve", "title", "Who it's for.");
-  const serveLine = useSiteText(PAGE, "serve", "line", "Agents, builders, businesses, and senior living.");
+  const serveLine = useSiteText(PAGE, "serve", "line", "Agents, builders, businesses, and literally everyone.");
   const serve = cardsFrom(useSiteItems(PAGE, "serve"), SERVE);
 
   const stepsTitle = useSiteText(PAGE, "steps", "title", "How it works.");
@@ -232,11 +233,10 @@ export default function WhatWeDo() {
   const whyAlt = useSiteText(PAGE, "why", "alt", "Drone view of a waterfront luxury home");
 
   const ctaTitle = useSiteText(PAGE, "cta", "title", "Book a shoot.");
-  const ctaLine = useSiteText(PAGE, "cta", "line", "Or see the packages.");
-  const bookLabel = useSiteText(PAGE, "cta", "book", "Book Now");
+  const bookLabel = useSiteText(PAGE, "cta", "book", "Book a Shoot");
   const bookHref = useSiteHref(PAGE, "cta", "book", "/book");
-  const pricingLabel = useSiteText(PAGE, "cta", "pricing", "Pricing");
-  const pricingHref = useSiteHref(PAGE, "cta", "pricing", "/pricing");
+  const studioLabel = useSiteText(PAGE, "cta", "studio", "Book our Studio");
+  const studioHref = useSiteHref(PAGE, "cta", "studio", "/studio-105");
 
   useEffect(() => {
     const root = document.documentElement;
@@ -254,8 +254,9 @@ export default function WhatWeDo() {
           <section className="flex min-h-[100svh] scroll-mt-0 flex-col justify-center px-5 pb-16 pt-36 sm:px-8 md:px-12 lg:pt-32">
             <div className="mx-auto grid w-full max-w-6xl items-center gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:gap-16">
               <div>
-                <h1 data-site-page={PAGE} data-site-block="hero" data-site-field="title" data-site-kind="text" className="text-5xl font-black leading-[0.95] tracking-tight text-white sm:text-6xl md:text-7xl">
-                  {heroTitle}
+                <h1 className="text-5xl font-black leading-[0.92] tracking-tight text-white sm:text-6xl lg:text-7xl">
+                  <span data-site-page={PAGE} data-site-block="hero" data-site-field="titleLead" data-site-kind="text" className="block">{heroLead}</span>
+                  <span data-site-page={PAGE} data-site-block="hero" data-site-field="titleTail" data-site-kind="text" className="block whitespace-nowrap">{heroTail}</span>
                 </h1>
                 <p data-site-page={PAGE} data-site-block="hero" data-site-field="line" data-site-kind="text" className="mt-5 max-w-md text-xl leading-snug text-white/85 sm:text-2xl">
                   {heroLine}
@@ -370,29 +371,26 @@ export default function WhatWeDo() {
               <h2 data-site-page={PAGE} data-site-block="cta" data-site-field="title" data-site-kind="text" className="text-5xl font-black tracking-tight text-white sm:text-6xl">
                 {ctaTitle}
               </h2>
-              <p data-site-page={PAGE} data-site-block="cta" data-site-field="line" data-site-kind="text" className="mt-4 text-xl text-white/80">
-                {ctaLine}
-              </p>
-              <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
+              <div className="mx-auto mt-10 flex w-full max-w-xl flex-col items-stretch justify-center gap-3 sm:flex-row">
                 <Link
                   to={bookHref}
                   data-site-page={PAGE}
                   data-site-block="cta"
                   data-site-field="book"
                   data-site-kind="link"
-                  className="inline-flex min-h-12 w-full items-center justify-center rounded-full bg-[#0d9488] px-8 text-base font-bold text-white transition-colors hover:bg-teal-600 sm:w-auto"
+                  className="inline-flex min-h-12 flex-1 items-center justify-center rounded-full bg-[#0d9488] px-8 text-base font-bold text-white transition-colors hover:bg-teal-600"
                 >
                   {bookLabel}
                 </Link>
                 <Link
-                  to={pricingHref}
+                  to={studioHref}
                   data-site-page={PAGE}
                   data-site-block="cta"
-                  data-site-field="pricing"
+                  data-site-field="studio"
                   data-site-kind="link"
-                  className="inline-flex min-h-12 w-full items-center justify-center rounded-full border border-white/25 px-8 text-base font-bold text-white transition-colors hover:bg-white/10 sm:w-auto"
+                  className="inline-flex min-h-12 flex-1 items-center justify-center rounded-full border border-white/25 px-8 text-base font-bold text-white transition-colors hover:bg-white/10"
                 >
-                  {pricingLabel}
+                  {studioLabel}
                 </Link>
               </div>
             </div>
