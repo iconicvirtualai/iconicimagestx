@@ -415,6 +415,16 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // ─── Task board ──────────────────────────────────────────────────────────
+    // Admin checklist: manual tasks plus saved order, assignee, stage,
+    // priority, due date, and dismissals. Clients cannot read this.
+    // Publish this file in the Firebase console. Vercel does not deploy rules.
+    // Nothing in this collection sends email or texts.
+    match /taskBoardItems/{itemId} {
+      allow read: if isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+
     // ─── Catch-all: deny everything else ─────────────────────────────────────
     match /{document=**} {
       allow read, write: if false;

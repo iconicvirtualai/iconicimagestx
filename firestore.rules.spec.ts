@@ -17,6 +17,19 @@ describe("client hub firestore rules", () => {
   });
 });
 
+describe("task board firestore rules", () => {
+  const rules = readFileSync("firestore.rules", "utf8");
+
+  it("keeps the checklist admin-only and ahead of the catch-all deny", () => {
+    const board = rules.indexOf("match /taskBoardItems/{itemId}");
+    const catchAll = rules.indexOf("match /{document=**}");
+    expect(board).toBeGreaterThan(-1);
+    expect(board).toBeLessThan(catchAll);
+    expect(rules).toMatch(/match \/taskBoardItems\/\{itemId\}[\s\S]*allow read: if isAdmin\(\)/);
+    expect(rules).toMatch(/match \/taskBoardItems\/\{itemId\}[\s\S]*allow create, update, delete: if isAdmin\(\)/);
+  });
+});
+
 describe("communications firestore rules", () => {
   const rules = readFileSync("firestore.rules", "utf8");
 
