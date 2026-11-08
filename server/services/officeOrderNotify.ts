@@ -1,10 +1,12 @@
 /**
  * Staff-only alert for a brand-new saved order.
  * Recipients come from ADMIN_EMAIL and COORDINATOR_EMAIL.
- * The client address is never a recipient.
+ * The client address is never a To, Cc, or Bcc recipient.
+ * Reply-To is that client's mailbox so a normal Reply reaches the agent.
+ * The mailto control in the body only opens a draft. It does not send.
  */
 
-import { emailAllowed } from "../../shared/clientNotify";
+import { emailAllowed, mailboxAddress } from "../../shared/clientNotify";
 import { officeNewOrderEmail } from "../../shared/officeOrderEmail";
 import { sendEmail } from "./email";
 
@@ -35,12 +37,8 @@ export async function notifyOfficeOfOrder(input: {
 
   const env = input.env ?? process.env;
   const saved = input.saved || {};
-  const clientEmails = new Set(
-    [saved.email, saved.clientEmail]
-      .map((value) => (typeof value === "string" ? value.trim().toLowerCase() : ""))
-      .filter(Boolean),
-  );
-  const recipients = officeStaffRecipients(env).filter((email) => !clientEmails.has(email.toLowerCase()));
+  const clientEmails = clientMailboxSet(saved);
+  const recipients = officeStaffRecipients(env).filter((email) => !isClientAddress(email, clientEmails));
   if (recipients.length === 0) {
     console.warn("[Bookings] Office new-order email skipped — ADMIN_EMAIL and COORDINATOR_EMAIL are not set.");
     return { sent: false, reason: "no-recipients" };
@@ -50,12 +48,20 @@ export async function notifyOfficeOfOrder(input: {
   }
 
   const message = officeNewOrderEmail(saved, { adminUrl: input.adminUrl });
+  const replyTo = message.replyTo;
+  const to = replyTo ? recipients.filter((email) => !sameMailbox(email, replyTo)) : recipients;
+  if (to.length === 0) {
+    console.warn("[Bookings] Office new-order email skipped — ADMIN_EMAIL and COORDINATOR_EMAIL are not set.");
+    return { sent: false, reason: "no-recipients" };
+  }
   const result = await sendEmail({
-    to: recipients.join(", "),
+    to: to.join(", "),
+    ...(replyTo ? { replyTo } : {}),
     template: OFFICE_NEW_ORDER_EMAIL_TEMPLATE,
     audience: "staff",
     subject: message.subject,
     html: message.html,
+    text: message.text,
     variables: {
       subject: message.subject,
       body: message.text,
@@ -65,4 +71,28 @@ export async function notifyOfficeOfOrder(input: {
     },
   });
   return { sent: result.sent };
+}
+
+/** Raw client fields plus the parsed mailbox, so a display name cannot sneak into To. */
+function clientMailboxSet(saved: Record<string, unknown>): Set<string> {
+  const found = new Set<string>();
+  for (const value of [saved.email, saved.clientEmail]) {
+    if (typeof value !== "string") continue;
+    const trimmed = value.trim().toLowerCase();
+    if (trimmed) found.add(trimmed);
+    const mailbox = mailboxAddress(value);
+    if (mailbox) found.add(mailbox);
+  }
+  return found;
+}
+
+function isClientAddress(email: string, clientEmails: Set<string>): boolean {
+  if (clientEmails.has(email.trim().toLowerCase())) return true;
+  const mailbox = mailboxAddress(email);
+  return Boolean(mailbox && clientEmails.has(mailbox));
+}
+
+function sameMailbox(email: string, replyTo: string): boolean {
+  if (email.trim().toLowerCase() === replyTo) return true;
+  return mailboxAddress(email) === replyTo;
 }
