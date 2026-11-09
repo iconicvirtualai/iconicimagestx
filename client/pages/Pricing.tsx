@@ -227,7 +227,7 @@ export default function Pricing() {
         text: "Photos, Aerials, Twilight Renders by 7PM with Basic Edits - Reel, premium edits and 2D Floorplan Next Day"
       },
       features: [
-        { text: "50 Images" },
+        { text: "30 Images" },
         { text: "5 Aerials" },
         { text: "The 'Snap' Reel (15s)" },
         { text: "1 'Iconic' 3D Animated Reel (60s Vert)" },

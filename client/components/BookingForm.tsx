@@ -143,6 +143,14 @@ interface BookingFormProps {
   source?: "portal";
 }
 
+function publicDetailFeature(item: { id?: string; name?: string } | null | undefined, feature: string): string {
+  const id = String(item?.id || "");
+  const name = String(item?.name || "").trim().toLowerCase();
+  const showcase = id === "listing-showcase" || name === "the showcase";
+  if (!showcase) return feature;
+  return feature.replace(/\b50(\s+images)\b/gi, "30$1");
+}
+
 function ProcessingEstimateLine({ amount }: { amount: number }) {
   return (
     <div data-testid="booking-processing-line" className="mb-3 flex items-baseline justify-between gap-3 text-[11px]">
@@ -782,6 +790,10 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
     ? payAtCloseFeeDollars(customerPayAtClose.feeRate, customerPayAtClose.feeMode, estimate.processingBase)
     : 0;
   const estimateTotal = estimate.total + payAtCloseFee;
+  const submittedLines = buildSubmittedLineItems(priceInput);
+  const catalogServiceLine = selectedServiceData
+    ? undefined
+    : submittedLines.find((item) => item.id === formData.selectedService);
   const handleApplyPromo = () => {
     const promo = promoDiscountFor(promoInput, pricing.promos, serviceBase) ?? promoDiscountFor(promoInput);
     if (promo?.code === "ICONICAI") {
@@ -800,9 +812,15 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
       <h3 className="text-lg font-black text-black uppercase tracking-tight mb-4 pb-3 border-b">Order Summary</h3>
       <div className="space-y-3 mb-6">
         {selectedServiceData && (
-          <div className="flex items-baseline justify-between gap-3">
+          <div data-testid="order-summary-package" className="flex items-baseline justify-between gap-3">
             <span className="min-w-0 text-xs font-bold text-gray-700">{selectedServiceData.name}</span>
             <MoneyAmount className="text-sm font-black text-black">${selectedServiceData.price}</MoneyAmount>
+          </div>
+        )}
+        {catalogServiceLine && (
+          <div data-testid="order-summary-package" className="flex items-baseline justify-between gap-3">
+            <span className="min-w-0 text-xs font-bold text-gray-700">{catalogServiceLine.name}</span>
+            <MoneyAmount className="text-sm font-black text-black">${catalogServiceLine.price}</MoneyAmount>
           </div>
         )}
         {formData.selectedBasics.length > 0 && (
@@ -1668,6 +1686,23 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
             <div className="space-y-8 max-w-lg mx-auto">
                <div data-testid="order-summary-before-submit" className="rounded-2xl border border-gray-100 bg-gray-50 p-5 space-y-3">
                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Order summary</p>
+                 {submittedLines.map((item, index) => {
+                   const promo = String(item.id || "").startsWith("promo-") || item.name.startsWith("Promo Code:");
+                   const isPackage = !promo && (
+                     item.id === formData.selectedService
+                     || formData.selectedBasics.includes(String(item.id || ""))
+                   );
+                   return (
+                     <div
+                       key={`${item.id || item.name}-${index}`}
+                       data-testid={promo ? "order-summary-promo" : isPackage ? "order-summary-package" : "order-summary-addon"}
+                       className="flex items-baseline justify-between gap-3 text-sm"
+                     >
+                       <span className={`min-w-0 ${isPackage ? "font-bold text-black" : "font-bold text-gray-600"}`}>{item.name}</span>
+                       <MoneyAmount className={`font-black ${promo ? "text-teal-600" : "text-black"}`}>{item.price < 0 ? `-$${Math.abs(item.price).toFixed(2)}` : `$${item.price.toFixed(2)}`}</MoneyAmount>
+                     </div>
+                   );
+                 })}
                  <TravelFeeLine travel={travel} />
                  {chargeProcessing && hasBookingSelection(bookingPriceInput()) && (
                    <ProcessingEstimateLine amount={estimate.processing} />
@@ -2216,7 +2251,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
                       {selectedDetailItem.features.map((feature: string, idx: number) => (
                          <div key={idx} className="flex items-start gap-3 bg-gray-50 p-3 rounded-xl border border-gray-100">
                             <Check className="w-3.5 h-3.5 text-teal-500 mt-0.5 shrink-0" />
-                            <span className="text-[11px] font-bold text-gray-700 leading-tight">{feature}</span>
+                            <span className="text-[11px] font-bold text-gray-700 leading-tight">{publicDetailFeature(selectedDetailItem, feature)}</span>
                          </div>
                       ))}
                    </div>
