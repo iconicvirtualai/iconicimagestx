@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import Layout from "@/components/Layout";
 import ChatWidget from "@/components/ChatWidget";
 import { Button } from "@/components/ui/button";
@@ -7,6 +8,7 @@ import { toast } from "sonner";
 import { BUSINESS_CONTACT } from "@shared/businessContact";
 import { PublicContactLine } from "@/components/PublicContactLine";
 import { useSiteText } from "@/content/siteContent";
+import { pricingConsultSubject } from "@shared/pricingBookingLinks";
 
 interface FormData {
   name: string;
@@ -23,11 +25,12 @@ export default function Contact() {
   const intro = useSiteText("contact", "hero", "body", "Have a question or feedback? We'd love to hear from you. Send us a message and we'll respond as soon as possible.");
   const chatKicker = useSiteText("contact", "hero", "chatKicker", "LIVE CHAT");
   const chatLabel = useSiteText("contact", "hero", "chatLabel", "Start Chat");
+  const [params] = useSearchParams();
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState<FormData>({
     name: "",
-    subject: "",
+    subject: pricingConsultSubject(params.get("package")),
     email: "",
     phone: "",
     message: ""

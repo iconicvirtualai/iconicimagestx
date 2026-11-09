@@ -43,6 +43,8 @@ describe("Studio 105 microsite", () => {
     expect(home).toContain("Iconic Images");
     expect(home).toContain("Studio Noir");
     expect(home).toContain("Studio Blanc");
+    expect(home).toContain('href="/studio-105/book?room=studio-noir"');
+    expect(home).toContain('href="/studio-105/book?room=studio-blanc"');
     expect(home).toContain("does not charge a card");
     expect(home).toContain(BUSINESS_CONTACT.address);
     expect(home).not.toContain("Book Now");
@@ -71,8 +73,7 @@ describe("Studio 105 microsite", () => {
 
     const book = readFileSync(new URL("../client/pages/Book.tsx", import.meta.url), "utf8");
     expect(book).toContain("isStudioRoomId(requested)");
-    expect(book).toContain("STUDIO105_PATHS.book");
-    expect(book).toContain("?room=${requested}");
+    expect(book).toContain("studioRoomRequestHref(requested)");
 
     const form = readFileSync(new URL("../client/components/studio105/Studio105BookForm.tsx", import.meta.url), "utf8");
     expect(form).not.toMatch(/CLIENT_NOTIFY_LIVE|BOOKING_NOTIFY_LIVE|THANKFUL_RSVP_CONFIRM_LIVE/);
