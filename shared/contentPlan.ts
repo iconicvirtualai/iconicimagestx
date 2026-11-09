@@ -29,7 +29,7 @@ export interface CalendarMark {
   id: string;
   date: string;
   title: string;
-  kind: ContentKind | "insight";
+  kind: ContentKind | "insight" | "event";
   href: string;
   taskId: string | null;
   sample: boolean;
@@ -101,6 +101,7 @@ export function contentCalendar(
   tasks: TaskBoardTask[],
   insights: ContentInsight[],
   month: string,
+  events: Array<{ id: string; name: string; date: string; sample: boolean }> = [],
 ): CalendarMark[] {
   const marks: CalendarMark[] = [];
   const trackedInsights = new Set(tasks.map((task) => task.insightId).filter((id): id is string => Boolean(id)));
@@ -132,6 +133,18 @@ export function contentCalendar(
       href: `/admin/insights?post=${encodeURIComponent(insight.id)}`,
       taskId: null,
       sample: false,
+    });
+  }
+  for (const event of events) {
+    if (!event.date.startsWith(month)) continue;
+    marks.push({
+      id: `event:${event.id}`,
+      date: event.date,
+      title: event.name,
+      kind: "event",
+      href: `/admin/events/${encodeURIComponent(event.id)}`,
+      taskId: null,
+      sample: event.sample,
     });
   }
   return marks.sort((a, b) => a.date.localeCompare(b.date) || a.title.localeCompare(b.title));

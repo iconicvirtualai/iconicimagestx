@@ -23,6 +23,7 @@ export function ContentWorkspace({
   tasks,
   staff,
   insights,
+  events = [],
   today,
   month,
   section,
@@ -41,6 +42,7 @@ export function ContentWorkspace({
   tasks: TaskBoardTask[];
   staff: TaskAssignee[];
   insights: ContentInsight[];
+  events?: Array<{ id: string; name: string; date: string; sample: boolean }>;
   today: string;
   month: string;
   section: ContentSection;
@@ -57,7 +59,7 @@ export function ContentWorkspace({
   onTrackInsight: (insight: ContentInsight) => void;
 }) {
   const rows = section === "calendar" ? [] : contentTasks(tasks, section);
-  const marks = contentCalendar(tasks, insights, month);
+  const marks = contentCalendar(tasks, insights, month, events);
   const selected = tasks.find((task) => task.id === selectedId) || null;
 
   return (
@@ -86,6 +88,7 @@ export function ContentWorkspace({
           month={month}
           today={today}
           marks={marks}
+          sample={sample}
           onMonth={onMonth}
           onSelect={onSelect}
           onTrackInsight={onTrackInsight}
@@ -152,6 +155,7 @@ function Calendar({
   today,
   marks,
   insights,
+  sample,
   onMonth,
   onSelect,
   onTrackInsight,
@@ -160,6 +164,7 @@ function Calendar({
   today: string;
   marks: CalendarMark[];
   insights: ContentInsight[];
+  sample: boolean;
   onMonth: (month: string) => void;
   onSelect: (id: string) => void;
   onTrackInsight: (insight: ContentInsight) => void;
@@ -171,7 +176,7 @@ function Calendar({
       <header className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <div>
           <h3 className="text-sm font-semibold">{label}</h3>
-          <p className="text-[11px] text-slate-400">Publish dates from the content plan, plus Insights posts that are not tracked yet.</p>
+          <p className="text-[11px] text-slate-400">Publish dates, event dates, and Insights posts that are not tracked yet.</p>
         </div>
         <div className="flex gap-2">
           <button type="button" className="rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-semibold" onClick={() => onMonth(shiftMonth(month, -1))}>Previous</button>
@@ -190,13 +195,13 @@ function Calendar({
             <div key={day} className={`min-h-24 rounded-lg border p-1 ${inMonth ? "border-slate-100 bg-white" : "border-transparent bg-slate-50 text-slate-300"} ${day === today ? "ring-1 ring-[#0d9488]" : ""}`}>
               <p className="text-[10px] font-semibold">{Number(day.slice(-2))}</p>
               {dayMarks.map((mark) => (
-                mark.taskId ? (
-                  <button key={mark.id} type="button" onClick={() => onSelect(mark.taskId!)} className={`mt-1 block w-full truncate rounded px-1 text-left text-[10px] font-semibold ${mark.kind === "podcast" ? "bg-sky-50 text-sky-800" : "bg-amber-50 text-amber-800"}`}>
+                mark.kind === "podcast" || mark.kind === "promo" ? (
+                  <button key={mark.id} type="button" onClick={() => mark.taskId && onSelect(mark.taskId)} className={`mt-1 block w-full truncate rounded px-1 text-left text-[10px] font-semibold ${mark.kind === "podcast" ? "bg-sky-50 text-sky-800" : "bg-amber-50 text-amber-800"}`}>
                     {mark.title}
                   </button>
                 ) : (
-                  <Link key={mark.id} to={mark.href} className="mt-1 block truncate rounded bg-slate-100 px-1 text-[10px] font-semibold text-slate-600">
-                    Insights · {mark.title}
+                  <Link key={mark.id} to={keepSample(mark.href, sample)} className={`mt-1 block w-full truncate rounded px-1 text-left text-[10px] font-semibold ${mark.kind === "event" ? "bg-teal-50 text-teal-800" : "bg-slate-100 text-slate-600"}`}>
+                    {mark.kind === "event" ? mark.title : `Insights · ${mark.title}`}
                   </Link>
                 )
               ))}

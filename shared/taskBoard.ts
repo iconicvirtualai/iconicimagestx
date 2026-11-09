@@ -171,6 +171,8 @@ export interface TaskBoardTask {
   /** Calendar publish day. The checklist due date is updated with it. */
   publishOn?: string | null;
   insightId?: string | null;
+  /** Set when this row is one line on an event planning checklist. */
+  eventId?: string | null;
 }
 
 export interface TaskBoardOverlay {
@@ -212,6 +214,8 @@ export interface TaskBoardOverlay {
   publishOn?: string | null;
   publishTouched?: boolean;
   insightId?: string | null;
+  /** Set when this row is one line on an event planning checklist. */
+  eventId?: string | null;
 }
 
 export interface TaskBoardInput {
@@ -458,6 +462,7 @@ export function taskToOverlay(task: TaskBoardTask): TaskBoardOverlay {
     publishOn: task.publishOn || null,
     publishTouched: true,
     insightId: task.insightId || null,
+    eventId: task.eventId || null,
   };
 }
 
@@ -511,6 +516,7 @@ export function readTaskBoardOverlay(id: string, data: unknown): TaskBoardOverla
     publishOn: dateOnly(row.publishOn),
     publishTouched: row.publishTouched === true || "publishOn" in row,
     insightId: nullableText(row.insightId),
+    eventId: nullableText(row.eventId),
   };
 }
 
@@ -683,6 +689,79 @@ export function createContentItem(input: {
       activity: appendActivity([], input.at, "Added to the content plan"),
     },
   };
+}
+
+export function eventPlanTaskId(eventId: string, key: string): string {
+  return `event:${eventId}:${key}`;
+}
+
+/** One checklist line. The id is stable so the event page and the task board share it. */
+export function createEventPlanTask(input: {
+  eventId: string;
+  key: string;
+  title: string;
+  dueOn: string | null;
+  sample: boolean;
+  at: string;
+}): { ok: true; task: TaskBoardTask } | { ok: false; error: string } {
+  const title = input.title.replace(/\s+/g, " ").trim();
+  const eventId = text(input.eventId);
+  const key = text(input.key).replace(/[^A-Za-z0-9_-]/g, "").slice(0, 40);
+  if (!title) return { ok: false, error: "Add a planning task." };
+  if (!eventId || !key) return { ok: false, error: "That event task could not be saved." };
+  const id = eventPlanTaskId(eventId, key);
+  const dueOn = input.dueOn && /^\d{4}-\d{2}-\d{2}$/.test(input.dueOn) ? input.dueOn : null;
+  return {
+    ok: true,
+    task: {
+      id,
+      pipelineKey: id,
+      origin: "manual",
+      service: "event",
+      eventId,
+      stage: "queued",
+      stageLocked: true,
+      resumeStage: "queued",
+      status: "open",
+      title,
+      sourceLine: "Event · Planning",
+      primaryHref: `/admin/events/${encodeURIComponent(eventId)}`,
+      primaryHrefLabel: "Open event",
+      orderHref: null,
+      orderLabel: null,
+      galleryHref: null,
+      galleryLabel: null,
+      deliveryHref: null,
+      deliveryLabel: null,
+      clientRequest: null,
+      clientRequestFrom: null,
+      clientRequestAt: null,
+      assigneeId: null,
+      assigneeName: null,
+      priority: "normal",
+      dueOn,
+      publishOn: dueOn,
+      sort: null,
+      dismissed: false,
+      fingerprint: `event|${id}|${title}`,
+      sample: input.sample,
+      manual: true,
+      activity: appendActivity([], input.at, "Added to the event plan"),
+    },
+  };
+}
+
+export function addEventPlanTask(
+  tasks: TaskBoardTask[],
+  input: { eventId: string; title: string; dueOn: string | null; sample: boolean; at: string; key?: string },
+): { ok: true; tasks: TaskBoardTask[]; id: string } | { ok: false; error: string } {
+  const key = input.key || `t${Date.now().toString(36)}`;
+  const id = eventPlanTaskId(input.eventId, key);
+  const existing = tasks.find((task) => task.pipelineKey === id || (task.eventId === input.eventId && task.title === input.title.replace(/\s+/g, " ").trim()));
+  if (existing) return { ok: true, tasks, id: existing.id };
+  const created = createEventPlanTask({ ...input, key });
+  if (created.ok === false) return created;
+  return { ok: true, tasks: [...tasks, created.task], id: created.task.id };
 }
 
 export function withoutTask(tasks: TaskBoardTask[], id: string): { tasks: TaskBoardTask[]; removed: TaskBoardTask | null } {
@@ -1039,6 +1118,7 @@ function mergeOverlay(candidate: TaskBoardTask, overlay: TaskBoardOverlay): Task
     contentStage: overlay.contentStage || candidate.contentStage || null,
     publishOn: overlay.publishTouched ? overlay.publishOn || null : candidate.publishOn || null,
     insightId: overlay.insightId || candidate.insightId || null,
+    eventId: overlay.eventId || candidate.eventId || null,
   };
 }
 
@@ -1079,6 +1159,7 @@ function taskFromOverlay(overlay: TaskBoardOverlay): TaskBoardTask {
     contentStage: overlay.contentStage || null,
     publishOn: overlay.publishOn || null,
     insightId: overlay.insightId || null,
+    eventId: overlay.eventId || null,
   };
 }
 

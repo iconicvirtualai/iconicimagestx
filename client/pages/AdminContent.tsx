@@ -8,6 +8,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import AdminLayout from "@/components/AdminLayout";
 import { ContentWorkspace, type ContentSection } from "@/components/taskBoard/ContentWorkspace";
+import { useOfficeEvents } from "@/lib/useOfficeEvents";
 import { useTaskBoardData } from "@/lib/useTaskBoardData";
 import { fetchAdminInsights } from "@/lib/insightsApi";
 import {
@@ -32,6 +33,7 @@ function sectionFrom(value: string | null): ContentSection {
 
 export default function AdminContent() {
   const data = useTaskBoardData();
+  const office = useOfficeEvents(data.sample, data.today);
   const [params, setParams] = useSearchParams();
   const section = sectionFrom(params.get("section"));
   const [month, setMonth] = useState(data.today.slice(0, 7));
@@ -96,6 +98,7 @@ export default function AdminContent() {
           tasks={tasks}
           staff={data.staff}
           insights={insights}
+          events={office.events.map((event) => ({ id: event.id, name: event.name, date: event.date, sample: event.sample }))}
           today={data.today}
           month={month}
           section={section}

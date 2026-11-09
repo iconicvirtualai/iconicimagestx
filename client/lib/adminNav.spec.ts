@@ -42,7 +42,7 @@ describe("studio nav", () => {
       "Prices",
       "Invoice Presets",
       "Projects",
-      "Holiday RSVPs",
+      "Events",
     ]));
     expect(labels.filter((label) => label === "Prices")).toEqual(["Prices"]);
     expect(labels).not.toContain("Booking catalog");
@@ -50,8 +50,9 @@ describe("studio nav", () => {
     expect(hrefs).not.toContain("/admin/booking-catalog");
     expect(hrefs).not.toContain("/admin/current-pricing");
     expect(hrefs).toContain("/admin/pricing");
-    expect(hrefs).toContain("/admin/holiday-rsvps");
-    expect(mostSpecificNavHref("/admin/holiday-rsvps", hrefs)).toBe("/admin/holiday-rsvps");
+    expect(hrefs).toContain("/admin/events");
+    expect(hrefs).not.toContain("/admin/holiday-rsvps");
+    expect(mostSpecificNavHref("/admin/events/thankful-2026", hrefs)).toBe("/admin/events");
   });
 
   it("highlights Studio on photo editing, projects, and marketing kits", () => {

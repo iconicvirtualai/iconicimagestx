@@ -26,6 +26,7 @@ import {
   photosInboxNotice,
   type InboundClientEmail,
 } from "@shared/inboundEmail";
+import { sampleEventPlanTasks } from "@shared/officeEvents";
 import {
   TASK_BOARD_COLLECTION,
   buildTaskBoard,
@@ -48,7 +49,10 @@ export function useTaskBoardData() {
   const [params] = useSearchParams();
   const sample = params.get("sample") === "1";
   const today = chicagoToday();
-  const sampleModel = useMemo(() => sampleTaskBoard(today), [today]);
+  const sampleModel = useMemo(() => {
+    const board = sampleTaskBoard(today);
+    return { ...board, tasks: [...board.tasks, ...sampleEventPlanTasks(today)] };
+  }, [today]);
   const [orderRequests, setOrderRequests] = useState<Array<Record<string, unknown>>>([]);
   const [orders, setOrders] = useState<Array<Record<string, unknown>>>([]);
   const [galleries, setGalleries] = useState<Array<Record<string, unknown>>>([]);
