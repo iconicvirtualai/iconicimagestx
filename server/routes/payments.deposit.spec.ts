@@ -121,6 +121,12 @@ vi.mock("../services/headshotHolds", () => ({
 }));
 
 import paymentsRouter from "./payments";
+import { BUSINESS_CONTACT } from "../../shared/businessContact";
+import {
+  SQUARE_CHECKOUT_FAILURE,
+  SQUARE_DEPOSIT_CHECKOUT_FAILURE,
+  squarePaymentLinkIdempotencyKey,
+} from "../../shared/squareCheckout";
 
 const envBackup = {
   SQUARE_ACCESS_TOKEN: process.env.SQUARE_ACCESS_TOKEN,
@@ -184,9 +190,42 @@ afterAll(async () => {
   });
 });
 
+function squareSuccessResponse() {
+  return {
+    ok: true,
+    status: 200,
+    json: async () => ({
+      payment_link: {
+        id: "link-created",
+        url: "https://square.test/pay",
+        order_id: "sq-order-created",
+      },
+    }),
+  };
+}
+
+function installSquareFetch() {
+  fetchMock.mockImplementation((url: unknown, init?: RequestInit) => {
+    const target = String(url);
+    if (target.includes("squareup.com")) return Promise.resolve(squareSuccessResponse());
+    return realFetch(url as string, init);
+  });
+}
+
+function squareBodies() {
+  return fetchMock.mock.calls
+    .filter((call) => String(call[0]).includes("squareup.com"))
+    .map((call) => ({
+      url: String(call[0]),
+      headers: (call[1]?.headers || {}) as Record<string, string>,
+      body: JSON.parse(String(call[1]?.body || "{}")) as Record<string, any>,
+    }));
+}
+
 beforeEach(() => {
   store.collections = {};
   fetchMock.mockClear();
+  installSquareFetch();
   seed("invoices", "inv-book", {
     status: "draft",
     payToken: TOKEN,
@@ -261,7 +300,13 @@ describe("deposit checkout", () => {
     const squareCall = fetchMock.mock.calls.find((call) => String(call[0]).includes("squareup.com"));
     const sent = JSON.parse(String(squareCall?.[1].body));
     expect(sent.quick_pay.price_money.amount).toBe(12850);
-    expect(sent.idempotency_key).toBe("inv-sl-deposit");
+    expect(sent.idempotency_key).toBe(squarePaymentLinkIdempotencyKey({
+      invoiceId: "inv-sl",
+      purpose: "deposit",
+      amountCents: 12850,
+      attempt: 0,
+    }));
+    expect(sent.idempotency_key).not.toBe("inv-sl-deposit");
     expect(sent.checkout_options.redirect_url).toBe(
       "https://deposit.test/senior-living?deposit=received&order=ORD+-+L+-+10001",
     );
@@ -425,7 +470,12 @@ describe("deposit checkout", () => {
     expect(await second.json()).toMatchObject({ checkoutUrl: "https://square.test/pay", provider: "square" });
     const squareCalls = fetchMock.mock.calls.filter((call) => String(call[0]).includes("squareup.com"));
     expect(squareCalls).toHaveLength(1);
-    expect(JSON.parse(String(squareCalls[0][1].body)).idempotency_key).toBe("inv-sl-deposit");
+    expect(JSON.parse(String(squareCalls[0][1].body)).idempotency_key).toBe(squarePaymentLinkIdempotencyKey({
+      invoiceId: "inv-sl",
+      purpose: "deposit",
+      amountCents: 12850,
+      attempt: 0,
+    }));
   });
 
   it("refuses when the deposit is already recorded", async () => {
@@ -444,6 +494,302 @@ describe("deposit checkout", () => {
     });
     expect(response.status).toBe(409);
     expect(fetchMock.mock.calls.some((call) => String(call[0]).includes("squareup.com"))).toBe(false);
+  });
+
+  it("sends the QA phone as E.164 and does not jam a full address into line 1", async () => {
+    seed("invoices", "inv-sl", {
+      ...(store.collections.invoices.get("inv-sl") || {}),
+      clientPhone: "281.356.0965",
+      address: "100 Oak Street, Spring, TX 77380",
+      billToAddress: "100 Example Street, Suite 200, Spring, TX 77373",
+      depositAmount: 128.5,
+    });
+    const response = await fetch(`${baseUrl}/api/payments/invoice/inv-sl/deposit-checkout`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ t: TOKEN }),
+    });
+    expect(response.status).toBe(200);
+    const sent = squareBodies()[0].body;
+    expect(sent.quick_pay.price_money.amount).toBe(12850);
+    expect(sent.quick_pay.name.length).toBeLessThanOrEqual(255);
+    expect(sent.checkout_options.redirect_url.startsWith("https://")).toBe(true);
+    expect(sent.pre_populated_data.buyer_phone_number).toBe("+12813560965");
+    expect(sent.pre_populated_data.buyer_phone_number).not.toBe("281.356.0965");
+    expect(sent.pre_populated_data.buyer_address).toEqual({
+      address_line_1: "100 Example Street, Suite 200",
+      locality: "Spring",
+      administrative_district_level_1: "TX",
+      postal_code: "77373",
+      country: "US",
+    });
+    expect(sent.pre_populated_data.buyer_address.address_line_1).not.toContain("77373");
+    expect(squareBodies()[0].headers["Square-Version"]).toBe("2026-08-20");
+  });
+
+  it("omits a phone and address Square would reject", async () => {
+    seed("invoices", "inv-sl", {
+      ...(store.collections.invoices.get("inv-sl") || {}),
+      clientPhone: "12345",
+      billToAddress: "not, a, valid, address",
+    });
+    const response = await fetch(`${baseUrl}/api/payments/invoice/inv-sl/deposit-checkout`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ t: TOKEN }),
+    });
+    expect(response.status).toBe(200);
+    const sent = squareBodies()[0].body;
+    expect(sent.pre_populated_data.buyer_email).toBe("ada@example.com");
+    expect(sent.pre_populated_data.buyer_phone_number).toBeUndefined();
+    expect(sent.pre_populated_data.buyer_address).toBeUndefined();
+  });
+
+  it("retries once without prefill when Square returns INVALID_PHONE_NUMBER", async () => {
+    seed("invoices", "inv-sl", {
+      ...(store.collections.invoices.get("inv-sl") || {}),
+      clientPhone: "281.356.0965",
+      clientEmail: "ada@example.com",
+    });
+    const phoneError = {
+      errors: [
+        {
+          category: "INVALID_REQUEST_ERROR",
+          code: "INVALID_PHONE_NUMBER",
+          detail: "The provided phone number is invalid.",
+          field: "pre_populated_data.buyer_phone_number",
+        },
+      ],
+    };
+    let calls = 0;
+    fetchMock.mockImplementation((url: unknown, init?: RequestInit) => {
+      const target = String(url);
+      if (!target.includes("squareup.com")) return realFetch(url as string, init);
+      calls += 1;
+      if (calls === 1) {
+        return Promise.resolve({ ok: false, status: 400, json: async () => phoneError });
+      }
+      return Promise.resolve(squareSuccessResponse());
+    });
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const response = await fetch(`${baseUrl}/api/payments/invoice/inv-sl/deposit-checkout`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ t: TOKEN }),
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ checkoutUrl: "https://square.test/pay", provider: "square" });
+    const sent = squareBodies();
+    expect(sent).toHaveLength(2);
+    expect(sent[0].body.pre_populated_data.buyer_phone_number).toBe("+12813560965");
+    expect(sent[1].body.pre_populated_data).toBeUndefined();
+    expect(sent[0].body.idempotency_key).toBe(squarePaymentLinkIdempotencyKey({
+      invoiceId: "inv-sl",
+      purpose: "deposit",
+      amountCents: 12850,
+      attempt: 0,
+    }));
+    expect(sent[1].body.idempotency_key).toBe(squarePaymentLinkIdempotencyKey({
+      invoiceId: "inv-sl",
+      purpose: "deposit",
+      amountCents: 12850,
+      attempt: 1,
+    }));
+    expect(sent[0].body.idempotency_key).not.toBe(sent[1].body.idempotency_key);
+    expect(sent[0].body.quick_pay).toEqual(sent[1].body.quick_pay);
+    const logged = errorSpy.mock.calls.find((call) => String(call[0]).includes("Square deposit checkout error"));
+    expect(logged?.[1]).toMatchObject({
+      attempt: 0,
+      status: 400,
+      errors: [
+        {
+          category: "INVALID_REQUEST_ERROR",
+          code: "INVALID_PHONE_NUMBER",
+          field: "pre_populated_data.buyer_phone_number",
+          detail: "The provided phone number is invalid.",
+        },
+      ],
+    });
+    const loggedText = JSON.stringify(errorSpy.mock.calls);
+    expect(loggedText).not.toContain("sq-test");
+    expect(loggedText).not.toContain("Bearer");
+    expect(loggedText).not.toContain("ada@example.com");
+    expect(loggedText).not.toContain("281.356.0965");
+    expect((store.collections.invoices.get("inv-sl") || {}).squareDepositCheckoutUrl).toBe("https://square.test/pay");
+    expect((store.collections.invoices.get("inv-sl") || {}).status).toBe("draft");
+    errorSpy.mockRestore();
+  });
+
+  it("does not retry a Square error that is not about prefill", async () => {
+    fetchMock.mockImplementation((url: unknown, init?: RequestInit) => {
+      const target = String(url);
+      if (!target.includes("squareup.com")) return realFetch(url as string, init);
+      return Promise.resolve({
+        ok: false,
+        status: 400,
+        json: async () => ({
+          errors: [
+            {
+              category: "INVALID_REQUEST_ERROR",
+              code: "INVALID_VALUE",
+              detail: "The value is invalid.",
+              field: "quick_pay.price_money.amount",
+            },
+          ],
+        }),
+      });
+    });
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const response = await fetch(`${baseUrl}/api/payments/invoice/inv-sl/deposit-checkout`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ t: TOKEN }),
+    });
+    expect(response.status).toBe(500);
+    const body = await response.json();
+    expect(body).toEqual({ error: SQUARE_DEPOSIT_CHECKOUT_FAILURE });
+    expect(body.error).toContain(BUSINESS_CONTACT.phoneDisplay);
+    expect(body.error).not.toMatch(/INVALID_VALUE|stack|sq-test/i);
+    expect(squareBodies()).toHaveLength(1);
+    errorSpy.mockRestore();
+  });
+
+  it("returns the office number when Square still rejects the prefill retry", async () => {
+    const rejected = {
+      ok: false,
+      status: 400,
+      json: async () => ({
+        errors: [
+          {
+            category: "INVALID_REQUEST_ERROR",
+            code: "INVALID_EMAIL_ADDRESS",
+            detail: "Invalid email ada@example.com bearer sq-test",
+            field: "pre_populated_data.buyer_email",
+          },
+        ],
+      }),
+    };
+    fetchMock.mockImplementation((url: unknown, init?: RequestInit) => {
+      const target = String(url);
+      if (!target.includes("squareup.com")) return realFetch(url as string, init);
+      return Promise.resolve(rejected);
+    });
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const response = await fetch(`${baseUrl}/api/payments/invoice/inv-sl/deposit-checkout`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ t: TOKEN }),
+    });
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ error: SQUARE_DEPOSIT_CHECKOUT_FAILURE });
+    const sent = squareBodies();
+    expect(sent).toHaveLength(2);
+    expect(sent[1].body.pre_populated_data).toBeUndefined();
+    expect(sent[0].body.idempotency_key).not.toBe(sent[1].body.idempotency_key);
+    const loggedText = JSON.stringify(errorSpy.mock.calls);
+    expect(loggedText).toContain("INVALID_EMAIL_ADDRESS");
+    expect(loggedText).toContain("pre_populated_data.buyer_email");
+    expect(loggedText).not.toContain("ada@example.com");
+    expect(loggedText).not.toContain("sq-test");
+    expect((store.collections.invoices.get("inv-sl") || {}).squareDepositCheckoutUrl).toBeUndefined();
+    errorSpy.mockRestore();
+  });
+
+  it("normalizes prefill on the main Square checkout path", async () => {
+    seed("invoices", "inv-book", {
+      ...(store.collections.invoices.get("inv-book") || {}),
+      clientPhone: "281.356.0965",
+      billToAddress: "9 Navy Way",
+    });
+    const response = await fetch(`${baseUrl}/api/payments/invoice/inv-book/checkout`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ t: TOKEN }),
+    });
+    expect(response.status).toBe(200);
+    const sent = squareBodies()[0].body;
+    expect(sent.pre_populated_data.buyer_phone_number).toBe("+12813560965");
+    expect(sent.pre_populated_data.buyer_address).toEqual({
+      address_line_1: "9 Navy Way",
+      country: "US",
+    });
+    expect(sent.idempotency_key).toBe(squarePaymentLinkIdempotencyKey({
+      invoiceId: "inv-book",
+      purpose: "checkout",
+      amountCents: 25000,
+      attempt: 0,
+    }));
+  });
+
+  it("retries the main checkout without prefill and tells the client to call", async () => {
+    seed("invoices", "inv-book", {
+      ...(store.collections.invoices.get("inv-book") || {}),
+      clientPhone: "(281) 555-0199",
+      billToAddress: "100 Oak Street, Spring, TX 77380",
+    });
+    let calls = 0;
+    fetchMock.mockImplementation((url: unknown, init?: RequestInit) => {
+      const target = String(url);
+      if (!target.includes("squareup.com")) return realFetch(url as string, init);
+      calls += 1;
+      if (calls === 1) {
+        return Promise.resolve({
+          ok: false,
+          status: 400,
+          json: async () => ({
+            errors: [
+              {
+                category: "INVALID_REQUEST_ERROR",
+                code: "INVALID_VALUE",
+                detail: "Invalid address.",
+                field: "pre_populated_data.buyer_address.address_line_1",
+              },
+            ],
+          }),
+        });
+      }
+      return Promise.resolve(squareSuccessResponse());
+    });
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const response = await fetch(`${baseUrl}/api/payments/invoice/inv-book/checkout`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ t: TOKEN }),
+    });
+    expect(response.status).toBe(200);
+    const sent = squareBodies();
+    expect(sent).toHaveLength(2);
+    expect(sent[0].body.pre_populated_data.buyer_phone_number).toBe("+12815550199");
+    expect(sent[0].body.pre_populated_data.buyer_address.postal_code).toBe("77380");
+    expect(sent[1].body.pre_populated_data).toBeUndefined();
+    expect(sent[0].body.idempotency_key).not.toBe(sent[1].body.idempotency_key);
+    calls = 0;
+    fetchMock.mockImplementation((url: unknown, init?: RequestInit) => {
+      const target = String(url);
+      if (!target.includes("squareup.com")) return realFetch(url as string, init);
+      return Promise.resolve({
+        ok: false,
+        status: 400,
+        json: async () => ({
+          errors: [
+            {
+              category: "INVALID_REQUEST_ERROR",
+              code: "INVALID_PHONE_NUMBER",
+              detail: "The provided phone number is invalid.",
+              field: "pre_populated_data.buyer_phone_number",
+            },
+          ],
+        }),
+      });
+    });
+    const failed = await fetch(`${baseUrl}/api/payments/invoice/inv-book/checkout`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ t: TOKEN }),
+    });
+    expect(failed.status).toBe(500);
+    expect(await failed.json()).toEqual({ error: SQUARE_CHECKOUT_FAILURE });
+    errorSpy.mockRestore();
   });
 });
 

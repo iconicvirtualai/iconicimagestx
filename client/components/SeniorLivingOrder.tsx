@@ -34,6 +34,12 @@ const fieldClass =
 const buttonClass =
   "inline-flex min-h-12 w-full max-w-full items-center justify-center rounded-lg bg-neutral-950 px-6 py-3 text-center text-lg font-semibold leading-snug text-white disabled:opacity-60";
 
+function depositCheckoutAlert(serverError: string | undefined): string {
+  const message = (serverError || "We could not start the deposit checkout.").replace(/\s+/g, " ").trim();
+  if (message.includes(BUSINESS_CONTACT.phoneDisplay)) return message;
+  return `${message} Please call ${BUSINESS_CONTACT.phoneDisplay}.`;
+}
+
 export const seniorCheckoutNavigation = {
   assign(url: string) {
     window.location.assign(url);
@@ -170,10 +176,7 @@ export function SeniorLivingOrder({
       error?: string;
     } | null;
     if (!response.ok || !data?.checkoutUrl) {
-      setError(
-        data?.error ||
-          `We could not start the deposit checkout. Please call ${BUSINESS_CONTACT.phoneDisplay}.`,
-      );
+      setError(depositCheckoutAlert(data?.error));
       return;
     }
     seniorCheckoutNavigation.assign(data.checkoutUrl);

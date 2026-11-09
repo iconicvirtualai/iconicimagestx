@@ -471,7 +471,9 @@ describe("senior living page", () => {
       container?.querySelector("[data-testid='senior-hosting']")?.textContent,
     ).toBe(`Monthly hosting. ${SENIOR_LIVING_HOSTING_NOTE}`);
     await click("senior-pay-deposit");
-    expect(container?.querySelector("[role='alert']")?.textContent).toBe("Square is unavailable.");
+    expect(container?.querySelector("[role='alert']")?.textContent).toBe(
+      `Square is unavailable. Please call ${BUSINESS_CONTACT.phoneDisplay}.`,
+    );
     expect(assign).not.toHaveBeenCalled();
     expect(container?.textContent).not.toContain(SENIOR_LIVING_DEPOSIT_RECEIVED);
     expect(callsTo("/api/senior-living/order")).toHaveLength(1);
