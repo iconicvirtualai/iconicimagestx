@@ -11,6 +11,7 @@ import { GalleryDownloadLockNotice } from "@/components/GalleryDownloadLock";
 import { DoorsOpenDeliveryNote } from "@/components/DoorsOpenTour";
 import { ClientGalleryBoard } from "@/components/gallery/ClientGalleryMedia";
 import type { ClientGalleryItem } from "@/components/gallery/clientGalleryMedia";
+import { clientPortalEnabled } from "@shared/clientPortal";
 
 export interface PublicGalleryModel {
   address?: unknown;
@@ -118,8 +119,10 @@ export function PublicGalleryView({
 }
 
 export const PUBLIC_GALLERY_MISSING_COPY = "We couldn't find this gallery. Check the link in your email or sign in to your portal.";
+export const PUBLIC_GALLERY_MISSING_COPY_OFF = "We couldn't find this gallery. Check the link in your email, or email photos@iconicimagestx.com and we will help you get your files.";
 
 export function PublicGalleryMissing() {
+  const portalOpen = clientPortalEnabled();
   return (
     <div className="iframe-safe-page bg-white flex flex-col" data-gallery-state="missing">
       <header className="bg-black text-white">
@@ -130,10 +133,12 @@ export function PublicGalleryMissing() {
       </header>
       <main className="flex flex-1 items-center justify-center px-4 py-16">
         <div className="max-w-md text-center">
-          <p className="text-sm text-gray-600">{PUBLIC_GALLERY_MISSING_COPY}</p>
+          <p className="text-sm text-gray-600">{portalOpen ? PUBLIC_GALLERY_MISSING_COPY : PUBLIC_GALLERY_MISSING_COPY_OFF}</p>
+          {portalOpen ? (
           <Button asChild className="mt-6 bg-black hover:bg-gray-800 text-white rounded-xl">
             <Link to="/portal">Sign in to your portal</Link>
           </Button>
+          ) : null}
           <p className="mt-6 text-sm text-gray-500">
             <a href="mailto:photos@iconicimagestx.com" className="font-semibold text-black underline underline-offset-4">photos@iconicimagestx.com</a>
             {" / "}

@@ -11,6 +11,8 @@ import { formatChicagoDate } from "@shared/clientHome";
 import { clientGalleryDownloadsUnlocked, studioOffersDownloads } from "@shared/paymentAccess";
 import { GalleryDownloadLockNotice } from "@/components/GalleryDownloadLock";
 import { PublicContactLine } from "@/components/PublicContactLine";
+import { clientPortalEnabled } from "@shared/clientPortal";
+import { BUSINESS_CONTACT } from "@shared/businessContact";
 import { StudioGalleryTabs, type StudioGalleryTab, type StudioGalleryTabId } from "@/components/gallery/StudioGalleryTabs";
 
 export function blockPublicVideoMenu(event: { preventDefault: () => void }) {
@@ -341,11 +343,16 @@ export function ClientStudioView({
                 </button>
               ) : signedIn ? (
                 <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Revision saves need project edit access</p>
-              ) : (
+              ) : clientPortalEnabled() ? (
                 <Link to="/login" state={{ from: { pathname: `/studio/${listingId}` } }}
                   className="px-4 py-2 border border-gray-200 rounded-xl text-[10px] font-black uppercase tracking-widest text-gray-600">
                   Sign in to request a revision
                 </Link>
+              ) : (
+                <a href={BUSINESS_CONTACT.emailHref}
+                  className="px-4 py-2 border border-gray-200 rounded-xl text-[10px] font-black uppercase tracking-widest text-gray-600">
+                  Email {BUSINESS_CONTACT.email}
+                </a>
               )}
             </div>
             {revisions.length === 0 ? (

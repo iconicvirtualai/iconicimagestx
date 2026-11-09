@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { renderToString } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
-import { PublicGalleryMissing, PUBLIC_GALLERY_MISSING_COPY, PublicGalleryView, type PublicGalleryModel } from "./PublicGallery";
+import { PublicGalleryMissing, PublicGalleryView, type PublicGalleryModel } from "./PublicGallery";
 
 const INTERNAL = /fotello|collection|firestore/i;
 
@@ -11,7 +11,8 @@ function visibleText(html: string): string {
 }
 
 describe("public gallery not-found state", () => {
-  it("renders Iconic copy and a portal link with no internal strings", () => {
+  it("renders Iconic copy and contact help with no portal link while the portal is off", () => {
+    delete process.env.CLIENT_PORTAL_ENABLED;
     const html = visibleText(renderToString(
       <MemoryRouter>
         <PublicGalleryMissing />
@@ -20,9 +21,10 @@ describe("public gallery not-found state", () => {
 
     expect(html).toContain("Iconic Images");
     expect(html).toContain("Gallery not found");
-    expect(html).toContain(PUBLIC_GALLERY_MISSING_COPY);
-    expect(html).toContain('href="/portal"');
-    expect(html).toContain("Sign in to your portal");
+    expect(html).toContain("email photos@iconicimagestx.com");
+    expect(html).not.toContain('href="/portal"');
+    expect(html).not.toContain("Sign in to your portal");
+    expect(html).not.toContain("Client Login");
     expect(html).toContain("photos@iconicimagestx.com");
     expect(html).toContain("281.356.0965");
     expect(html).toContain('data-gallery-state="missing"');

@@ -5,6 +5,7 @@ import { LegalLinks } from "@/components/LegalLinks";
 import { PublicContactLine } from "@/components/PublicContactLine";
 import { LEGAL_BUSINESS_NAME } from "@shared/businessContact";
 import { itemLink, itemText, useSiteItems, useSiteText } from "@/content/siteContent";
+import { clientPortalEnabled, isClientLoginChrome } from "@shared/clientPortal";
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
@@ -25,6 +26,9 @@ export default function Footer() {
         { label: "Contact Us", href: "/contact" },
         { label: "Client Login", href: "/login" },
       ];
+  const visibleFooterLinks = clientPortalEnabled()
+    ? footerLinks
+    : footerLinks.filter((item) => !isClientLoginChrome(item.href, item.label));
   const socials = socialItems
     ? socialItems.map((item) => ({ label: itemText(item, "link"), href: itemLink(item, "link") }))
     : [
@@ -43,7 +47,7 @@ export default function Footer() {
               © {currentYear} {copyright}
             </span>
             <nav className="flex flex-wrap justify-center gap-6">
-              {footerLinks.map((item) => (
+              {visibleFooterLinks.map((item) => (
                 <Link key={item.href + item.label} to={item.href} className="text-sm font-medium hover:text-white/80 transition-colors">{item.label}</Link>
               ))}
             </nav>

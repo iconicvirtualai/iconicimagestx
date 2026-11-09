@@ -14,6 +14,7 @@ import { attachBookingClient, createRequestedAppointment, sendFirebasePasswordEm
 import { ensureBookingListingForRequest } from "../services/bookingListing";
 import { assignBookingPhotographerToListing } from "../services/bookingPhotographerAssign";
 import { clientNotifyBlockReason, clientNotifyLive, isNotifyTestAllowlisted } from "../../shared/clientNotify";
+import { clientPortalEnabled } from "../../shared/clientPortal";
 import { lifeOfTheListingCareSelected } from "../../shared/lifeOfTheListingCare";
 import { dotOptInSelected } from "../../shared/doorsOpenTour";
 import { buildBookingInvoiceDraft, existingInvoiceId } from "../../shared/bookingInvoice";
@@ -570,7 +571,9 @@ router.post("/", async (req, res) => {
     const normalizedEmail = orderRequest.email;
     // Password setup follows the client-mail gate. An exact allowlist address
     // can still receive it while notifications are off, including in RED.
-    const passwordSetupAllowed = clientNotifyLive() || isNotifyTestAllowlisted(normalizedEmail);
+    // The account is still created while CLIENT_PORTAL_ENABLED is off.
+    // The password email stays off until that flag is exactly "true".
+    const passwordSetupAllowed = clientPortalEnabled() && (clientNotifyLive() || isNotifyTestAllowlisted(normalizedEmail));
     let account: Awaited<ReturnType<typeof attachBookingClient>> = {
       clientId: null,
       createdAccount: false,
@@ -825,9 +828,12 @@ router.post("/", async (req, res) => {
     // order request.
     if (account.createdAccount) {
       if (!passwordSetupAllowed) {
-        passwordSetupStatus = "gated";
+        passwordSetupStatus = clientPortalEnabled() ? "gated" : "not_sent";
+        const why = clientPortalEnabled()
+          ? clientNotifyBlockReason()
+          : "CLIENT_PORTAL_ENABLED is not exactly true";
         console.info(
-          `[Bookings] Password-setup email not sent for request ${docRef.id}. ${clientNotifyBlockReason()}.`,
+          `[Bookings] Password-setup email not sent for request ${docRef.id}. ${why}.`,
         );
       } else if (account.passwordSetupLink) {
         passwordSetupStatus = await sendEmail({

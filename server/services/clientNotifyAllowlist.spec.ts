@@ -81,7 +81,8 @@ function mailedTo(): string {
 }
 
 describe("client notify test allowlist", () => {
-  it("sends delivery, invoice, receipt, and password setup to an allowlisted address while notifications are off", async () => {
+  it("sends delivery, invoice, and receipt to an allowlisted address while notifications are off", async () => {
+    delete process.env.CLIENT_PORTAL_ENABLED;
     useNotifyEnv({ NOTIFY_TEST_ALLOWLIST: ` ${QA.toUpperCase()} ` });
     for (const template of GATED) {
       sendMail.mockClear();
@@ -90,6 +91,11 @@ describe("client notify test allowlist", () => {
         template,
         variables: { clientName: "Ops", clientEmail: QA, setupUrl: "https://example.test/setup" },
       });
+      if (template === "account_password_setup") {
+        expect(result).toEqual({ sent: false, delivery: "suppressed" });
+        expect(sendMail).not.toHaveBeenCalled();
+        continue;
+      }
       expect(result).toEqual({ sent: true, delivery: "allowlist" });
       expect(sendMail).toHaveBeenCalledTimes(1);
       const message = lastSent();
@@ -99,6 +105,16 @@ describe("client notify test allowlist", () => {
       expect(message.replyTo).toBeUndefined();
       expect(mailedTo()).toBe(QA);
     }
+    process.env.CLIENT_PORTAL_ENABLED = "true";
+    sendMail.mockClear();
+    const password = await sendEmail({
+      to: `Ops QA <${QA}>`,
+      template: "account_password_setup",
+      variables: { clientName: "Ops", clientEmail: QA, setupUrl: "https://example.test/setup" },
+    });
+    expect(password).toEqual({ sent: true, delivery: "allowlist" });
+    expect(lastSent().to).toBe(QA);
+    delete process.env.CLIENT_PORTAL_ENABLED;
   });
 
   it("sends nothing to a client who is not on the allowlist", async () => {

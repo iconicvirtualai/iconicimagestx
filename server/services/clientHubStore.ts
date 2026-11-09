@@ -6,6 +6,7 @@
 
 import { randomBytes } from "node:crypto";
 import admin from "firebase-admin";
+import { clientPortalEnabled } from "../../shared/clientPortal";
 import { buildClientInvoice, buildClientListing, type ClientInvoiceStatement, type ClientListingCard } from "../../shared/clientHome";
 import {
   accountBalanceCents,
@@ -499,6 +500,7 @@ export async function sendTeamInvite(actor: HubActor, memberId: string) {
   requireTeamAdmin(actor, member.ownerClientId);
   const ownerName = profileDisplayName(actor.profile) || "Your team";
   let inviteEmail: TeamMemberRecord["inviteEmail"] = "paused";
+  const portalOpen = clientPortalEnabled();
   try {
     const result = await sendEmail({
       to: member.email,
@@ -506,8 +508,12 @@ export async function sendTeamInvite(actor: HubActor, memberId: string) {
       audience: "client",
       lockHtml: true,
       subject: `${ownerName} invited you to an Iconic Images team`,
-      text: `${ownerName} added you to their Iconic Images team. Sign in at the client portal when you are ready.`,
-      html: `<p>${ownerName} added you to their Iconic Images team.</p><p><a href="https://iconicimagestx.com/portal">Open the client portal</a></p>`,
+      text: portalOpen
+        ? `${ownerName} added you to their Iconic Images team. Sign in at the client portal when you are ready.`
+        : `${ownerName} added you to their Iconic Images team.`,
+      html: portalOpen
+        ? `<p>${ownerName} added you to their Iconic Images team.</p><p><a href="https://iconicimagestx.com/portal">Open the client portal</a></p>`
+        : `<p>${ownerName} added you to their Iconic Images team.</p>`,
     });
     inviteEmail = result.sent && teamInviteDelivery() === "send" ? "sent" : "paused";
   } catch (err) {

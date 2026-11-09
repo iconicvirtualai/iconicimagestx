@@ -2065,6 +2065,26 @@ function text$y(value) {
 function escapeHtml$a(value) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
+const EMAIL_QUESTIONS_WITH_PORTAL = "Questions? Reply to this email or message us through your client portal.";
+const EMAIL_QUESTIONS_WITHOUT_PORTAL = "Questions? Reply to this email.";
+function clientPortalEnabled(env) {
+  return readClientPortalFlag() === "true";
+}
+function readClientPortalFlag(env) {
+  const nodeEnv = globalThis.process?.env;
+  if (nodeEnv && Object.prototype.hasOwnProperty.call(nodeEnv, "CLIENT_PORTAL_ENABLED")) {
+    return nodeEnv.CLIENT_PORTAL_ENABLED;
+  }
+  return process.env.CLIENT_PORTAL_ENABLED;
+}
+function presentClientEmailHtml(html, env) {
+  if (!html || clientPortalEnabled()) return html;
+  return html.split(EMAIL_QUESTIONS_WITH_PORTAL).join(EMAIL_QUESTIONS_WITHOUT_PORTAL).replace(/<p[^>]*>\s*<a\b[^>]*>\s*View Your Portal\s*<\/a>\s*<\/p>/gi, "").replace(/<p[^>]*>\s*<a\b[^>]*>\s*Open the client portal\s*<\/a>\s*<\/p>/gi, "").replace(/<p[^>]*>[^<]*client portal login[^<]*<\/p>/gi, "").replace(/<p[^>]*>[^<]*sign in at\s*<a\b[^>]*>[\s\S]*?<\/a>\.?[^<]*<\/p>/gi, "").replace(/<p[^>]*>[^<]*Sign in at the client portal[^<]*<\/p>/gi, "");
+}
+function presentClientEmailText(text2, env) {
+  if (!text2 || clientPortalEnabled()) return text2;
+  return text2.split(EMAIL_QUESTIONS_WITH_PORTAL).join(EMAIL_QUESTIONS_WITHOUT_PORTAL).replace(/Sign in at the client portal when you are ready\.?\s*/gi, "");
+}
 const EMAIL_TEMPLATES_COLLECTION = "emailTemplates";
 const CLIENT_EMAIL_TEMPLATE_KEYS = [
   "booking_received",
@@ -2261,16 +2281,19 @@ function galleryDeliveryBuiltin(vars) {
     `);
 }
 function clientBuiltinEmailHtml(type, vars = {}) {
+  let html;
   if (type === "payment_receipt") {
     const branded = paymentReceiptFromVars(vars).html;
     const doorsOpen = doorsOpenReceiptEmailHtml(vars.dotOptInUrl || "");
-    return branded.includes("</body>") ? branded.replace("</body>", `${doorsOpen}</body>`) : `${branded}${doorsOpen}`;
+    html = branded.includes("</body>") ? branded.replace("</body>", `${doorsOpen}</body>`) : `${branded}${doorsOpen}`;
+  } else if (type === "gallery_delivery") {
+    html = galleryDeliveryBuiltin(vars);
+  } else if (!isClientEmailTemplate(type)) {
+    html = shell(`<p>You have a new notification from Iconic Images.</p>`);
+  } else {
+    html = fillEmailPlaceholders(HTML_SOURCE[type], vars);
   }
-  if (type === "gallery_delivery") return galleryDeliveryBuiltin(vars);
-  if (!isClientEmailTemplate(type)) {
-    return shell(`<p>You have a new notification from Iconic Images.</p>`);
-  }
-  return fillEmailPlaceholders(HTML_SOURCE[type], vars);
+  return presentClientEmailHtml(html);
 }
 ({
   lineItemsJson: JSON.stringify([{ name: "The Showcase", qty: 1, unitPrice: 549, price: 549 }])
@@ -2406,6 +2429,10 @@ async function sendEmail(options) {
     console.warn("[Email] No recipient specified, skipping.");
     return { sent: false, delivery: "suppressed" };
   }
+  if (template === "account_password_setup" && !clientPortalEnabled()) {
+    console.info("[Email] Suppressed account_password_setup. CLIENT_PORTAL_ENABLED is not exactly true.");
+    return { sent: false, delivery: "suppressed" };
+  }
   if (!emailAllowed(template, process.env, audience)) {
     const narrowed = narrowGatedClientRecipients({ to, cc, bcc, replyTo }, process.env);
     if (!narrowed) {
@@ -2442,6 +2469,10 @@ async function sendEmail(options) {
   } catch (err) {
     console.warn(`[Email] Template lookup failed for '${template}'. Using the built-in copy.`, err);
   }
+  if (audience !== "staff") {
+    htmlBody = presentClientEmailHtml(htmlBody);
+    if (textBody) textBody = presentClientEmailText(textBody);
+  }
   const delivery = emailAllowed(template, process.env, audience) ? "sent" : "allowlist";
   const transporter = createTransport();
   try {
@@ -2469,7 +2500,7 @@ function builtinEmailHtml(type, vars) {
   if (type === "booking_received" || type === "account_password_setup" || type === "order_confirmed" || type === "gallery_delivery" || type === "invoice" || type === "payment_receipt" || type === "contact_confirmation" || type === "clientConfirmation") {
     return clientBuiltinEmailHtml(type, vars);
   }
-  return getFallbackTemplate(type, vars);
+  return presentClientEmailHtml(getFallbackTemplate(type, vars));
 }
 function getFallbackTemplate(type, vars) {
   const base = (content) => `
@@ -11266,7 +11297,7 @@ router$B.post("/", async (req, res) => {
       }
     }
     const normalizedEmail = orderRequest.email;
-    const passwordSetupAllowed = clientNotifyLive() || isNotifyTestAllowlisted(normalizedEmail);
+    const passwordSetupAllowed = clientPortalEnabled() && (clientNotifyLive() || isNotifyTestAllowlisted(normalizedEmail));
     let account = {
       clientId: null,
       createdAccount: false,
@@ -11483,9 +11514,10 @@ router$B.post("/", async (req, res) => {
     }
     if (account.createdAccount) {
       if (!passwordSetupAllowed) {
-        passwordSetupStatus = "gated";
+        passwordSetupStatus = clientPortalEnabled() ? "gated" : "not_sent";
+        const why = clientPortalEnabled() ? clientNotifyBlockReason() : "CLIENT_PORTAL_ENABLED is not exactly true";
         console.info(
-          `[Bookings] Password-setup email not sent for request ${docRef.id}. ${clientNotifyBlockReason()}.`
+          `[Bookings] Password-setup email not sent for request ${docRef.id}. ${why}.`
         );
       } else if (account.passwordSetupLink) {
         passwordSetupStatus = await sendEmail({
@@ -22825,6 +22857,12 @@ function adminReady$3(res) {
   return false;
 }
 router$u.post("/register", async (req, res) => {
+  if (!clientPortalEnabled()) {
+    return res.status(403).json({
+      error: "Client portal signup is not available yet. Email photos@iconicimagestx.com for access to your media.",
+      code: "client_portal_disabled"
+    });
+  }
   if (!adminReady$3(res)) return;
   const firstName = cleanPersonName(req.body?.firstName);
   const lastName = cleanPersonName(req.body?.lastName);
@@ -23609,6 +23647,7 @@ async function sendTeamInvite(actor2, memberId) {
   requireTeamAdmin(actor2, member.ownerClientId);
   const ownerName = profileDisplayName(actor2.profile) || "Your team";
   let inviteEmail = "paused";
+  const portalOpen = clientPortalEnabled();
   try {
     const result = await sendEmail({
       to: member.email,
@@ -23616,8 +23655,8 @@ async function sendTeamInvite(actor2, memberId) {
       audience: "client",
       lockHtml: true,
       subject: `${ownerName} invited you to an Iconic Images team`,
-      text: `${ownerName} added you to their Iconic Images team. Sign in at the client portal when you are ready.`,
-      html: `<p>${ownerName} added you to their Iconic Images team.</p><p><a href="https://iconicimagestx.com/portal">Open the client portal</a></p>`
+      text: portalOpen ? `${ownerName} added you to their Iconic Images team. Sign in at the client portal when you are ready.` : `${ownerName} added you to their Iconic Images team.`,
+      html: portalOpen ? `<p>${ownerName} added you to their Iconic Images team.</p><p><a href="https://iconicimagestx.com/portal">Open the client portal</a></p>` : `<p>${ownerName} added you to their Iconic Images team.</p>`
     });
     inviteEmail = result.sent && teamInviteDelivery() === "send" ? "sent" : "paused";
   } catch (err) {
