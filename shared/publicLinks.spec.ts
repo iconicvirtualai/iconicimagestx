@@ -220,17 +220,18 @@ describe("public link check", () => {
     expect(follow("/holiday-event")).toEqual({ hops: ["/holiday-event", "/thankful"], status: 302 });
     expect(matchingRedirect("/forgot-password", HOST)).toBeUndefined();
     expect(matchingRedirect("/forgot-password/", HOST)).toBeUndefined();
-    expect(matchingRedirect("/studios", HOST)).toBeUndefined();
-    expect(matchingRedirect("/studios/", HOST)).toBeUndefined();
+    expect(follow("/studios")).toEqual({ hops: ["/studios", "/studio-105"], status: 307 });
+    expect(follow("/studios/")).toEqual({ hops: ["/studios/", "/studio-105"], status: 307 });
     const app = read("client/App.tsx");
     const vercel = read("vercel.json");
     const netlify = read("netlify.toml");
     for (const source of [app, vercel, netlify]) {
       expect(source).not.toContain('"/forgot-password"');
-      expect(source).not.toContain('"/studios"');
       expect(source).not.toContain("path=\"/forgot-password\"");
-      expect(source).not.toContain("path=\"/studios\"");
     }
+    expect(app).toContain('path="/studios"');
+    expect(vercel).toContain('"/studios"');
+    expect(netlify).toContain('from = "/studios"');
     expect(follow("/services")).toEqual({ hops: ["/services", "/pricing"], status: 301 });
     expect(follow("/services/virtual-staging").hops).toEqual(["/services/virtual-staging"]);
     expect(follow("/gallery")).toEqual({ hops: ["/gallery", "/portal"], status: 307 });

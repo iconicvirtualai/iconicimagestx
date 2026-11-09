@@ -3,7 +3,7 @@
  * The site does not publish to Instagram, Facebook, or any other network.
  */
 
-import { canonicalUrl, escapeHtml, ogImageUrl, SITE_ORIGIN } from "./siteSeo.ts";
+import { CANONICAL_WWW_ORIGIN, canonicalUrl, escapeHtml, ogImageUrl } from "./siteSeo.ts";
 
 export const INSIGHT_COLLECTION = "insightPosts";
 export const INSIGHT_BYLINE = "Iconic Images";
@@ -426,7 +426,7 @@ export function coverOf(post: Pick<PublicInsight, "coverUrl" | "blocks">): strin
   return "";
 }
 
-export function absoluteInsightImage(url: string, origin = SITE_ORIGIN): string {
+export function absoluteInsightImage(url: string, origin = CANONICAL_WWW_ORIGIN): string {
   if (!url) return ogImageUrl(origin);
   if (url.startsWith("https://") || url.startsWith("http://")) return url;
   if (url.startsWith("/")) return `${origin}${url}`;
@@ -477,7 +477,7 @@ export function embedSrc(value: string): string {
   return "";
 }
 
-export function insightHeadTags(post: PublicInsight, origin = SITE_ORIGIN): string {
+export function insightHeadTags(post: PublicInsight, origin = CANONICAL_WWW_ORIGIN): string {
   const title = escapeHtml(post.seoTitle || `${post.title} | Iconic Insights`);
   const description = escapeHtml(post.seoDescription || post.excerpt);
   const url = escapeHtml(canonicalUrl(`/insights/${post.slug}`, origin));

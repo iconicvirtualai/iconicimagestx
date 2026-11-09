@@ -201,8 +201,9 @@ const App = () => (
             <Route path="/listing-cards" element={<ProtectedRoute requiredRole="coordinator"><ListingCardPreview /></ProtectedRoute>} />
             <Route path="/admin/order-tiles" element={<AdminOrderTiles />} />
             <Route path="/admin/orders-preview" element={<ProtectedRoute requiredRole="coordinator"><AdminOrdersPreview /></ProtectedRoute>} />
-            {/* Bare /studio has no project id. Studio 105 is the public studio page. */}
+            {/* Bare /studio and /studios have no project id. Studio 105 is the public studio page. */}
             <Route path="/studio" element={<Navigate to="/studio-105" replace />} />
+            <Route path="/studios" element={<Navigate to="/studio-105" replace />} />
             {/* Bare /gallery has no project id. The client portal is the door. */}
             <Route path="/gallery" element={<Navigate to="/portal" replace />} />
             <Route path="/booking" element={<Navigate to="/book" replace />} />
