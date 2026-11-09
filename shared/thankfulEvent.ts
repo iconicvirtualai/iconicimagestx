@@ -30,6 +30,10 @@ export const THANKFUL_RSVP_CLOSE_UTC = "2026-11-01T04:59:00.000Z";
 export const THANKFUL_RSVP_CLOSED =
   "Headcount and menu votes closed Sat, Oct 31 at 11:59 PM CT.";
 
+/** Shown once the Nov 7 event day has passed. No new RSVP is stored or emailed. */
+export const THANKFUL_RSVP_EVENT_CLOSED =
+  "RSVPs are closed — thank you to everyone who joined us!";
+
 /** Day rate, in percent, by America/Chicago calendar day. */
 export const SOCIAL_RATE_BY_DATE: Record<string, number> = {
   "2026-10-16": 50,
@@ -81,6 +85,11 @@ export function chicagoDateKey(now: Date): string {
 
 export function thankfulRsvpOpen(now: Date): boolean {
   return now.getTime() <= Date.parse(THANKFUL_RSVP_CLOSE_UTC);
+}
+
+/** True on the America/Chicago day after Sat Nov 7, 2026. Nov 7 itself is not past. */
+export function thankfulEventDatePassed(now: Date): boolean {
+  return chicagoDateKey(now) > THANKFUL_EVENT_DATE;
 }
 
 const SOCIAL_DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;

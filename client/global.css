@@ -192,3 +192,12 @@ body:has(.iframe-safe-page.bg-gray-100) {
 body:has(.iframe-safe-page.bg-\[\#f4f7f8\]) {
   background-color: #f4f7f8;
 }
+
+/* Phone viewports on these public pages were rendering labels under 12px. */
+@media (max-width: 767px) {
+  body:has([data-site-page="portfolio"]) :is(.text-\[8px\], .text-\[9px\], .text-\[10px\], .text-\[11px\]),
+  body:has([data-site-page="pricing"]) :is(.text-\[8px\], .text-\[9px\], .text-\[10px\], .text-\[11px\]),
+  body:has([data-site-page="agents"]) :is(.text-\[8px\], .text-\[9px\], .text-\[10px\], .text-\[11px\]) {
+    font-size: 12px;
+  }
+}

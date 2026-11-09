@@ -19,8 +19,8 @@ export const ORDER_GALLERY_RELEASE = "hold_until_order_complete" as const;
 
 /**
  * Cadi locked Showcase delivery at 30 approved photos.
- * The live catalog feature still says "50 Images". The order plan and the
- * gallery gate both use this count instead of that catalog figure.
+ * Public copy says 30 images. The order plan and the gallery gate keep this
+ * count even if an older catalog line still says 50 images.
  */
 export const SHOWCASE_PHOTO_COUNT = 30;
 

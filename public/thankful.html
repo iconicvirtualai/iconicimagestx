@@ -24,7 +24,7 @@
   </div>
 </header>
 
-<div class="urgent"><div class="wrap"><span><b>Headcount &amp; menu vote close Sat, Oct 31</b></span><span class="cd" id="cd"></span><span>15-minute photo slots go fast. <a href="#rsvp">Claim yours →</a></span></div></div>
+<div class="urgent"><div class="wrap"><span><b>Headcount &amp; menu vote close Sat, Oct 31</b></span><span class="cd" id="cd"></span><span>The Nov 7 event has passed. <a href="#rsvp">RSVPs are closed →</a></span></div></div>
 
 <!-- 2. FESTIVE MIKE -->
 <section class="pad dark">
@@ -79,34 +79,8 @@
 <!-- 5. RSVP -->
 <section class="pad" id="rsvp">
   <div class="wrap">
-    <div class="head c"><div class="eyebrow">RSVP</div><h2>Save your spot <em>in under a minute.</em></h2><p class="lead">Pick a 15-minute photo time, tell us who's coming and vote on the menu by Sat, Oct 31.</p></div>
-    <form class="panel" id="rsvpform">
-      <h3><span class="no">1</span>Choose your photo time</h3>
-      <p class="sub">Saturday, Nov 7, 2026 · 15-minute slots from 11:00 AM to 2:45 PM CT</p>
-      <div class="slots" id="slots"></div>
-      <p class="slotnote">Taken times are removed automatically.</p>
-      <div class="divider"></div>
-      <h3><span class="no">2</span>Who's coming</h3>
-      <p class="sub">We'll confirm by email. Need a different time? Call 281.356.0965.</p>
-      <div class="grid2">
-        <div class="field full"><label for="n">Name</label><input id="n" placeholder="First and last name"></div>
-        <div class="field"><label for="e">Email</label><input id="e" type="email" placeholder="you@email.com"></div>
-        <div class="field"><label for="p">Phone</label><input id="p" type="tel" placeholder="(281) 555-0123"></div>
-        <div class="field"><label for="c">Headcount (adults + kids)</label><input id="c" type="number" min="1" value="2"></div>
-        <div class="field"><label>Photos with Santa?</label><div class="toggle"><label><input type="radio" name="santa" checked><span>Yes, please</span></label><label><input type="radio" name="santa"><span>No thanks</span></label></div></div>
-        <div class="field full"><label for="no">Notes <span style="font-weight:400;color:var(--mute)">(optional)</span></label><textarea id="no" rows="3" placeholder="Pets coming? Need a headshot update? Anything we should know?"></textarea></div>
-      </div>
-      <div class="divider"></div>
-      <h3 id="vote"><span class="no">3</span>Vote on Chef Steven's Holiday Menu</h3>
-      <p class="sub">Choose one. The winning menu is served at the event.</p>
-      <div class="menus">
-        <label class="menu"><input type="radio" name="menu" checked><span class="m"><small>Menu one</small><b>The Harvest Table</b><ul><li>Smoked Turkey Sliders</li><li>Three-Cheese Mac</li><li>Caesar Salad Deviled Eggs</li><li>Prosciutto Turnovers</li><li>Caramel Apple Crisp Cheesecake</li></ul></span></label>
-        <label class="menu"><input type="radio" name="menu"><span class="m"><small>Menu two</small><b>The Holiday Classic</b><ul><li>Thanksgiving Stack</li><li>Spinach &amp; Artichoke Gratin Stuffed Mushrooms</li><li>Ham &amp; Cheese Pinwheels</li><li>Creamed Corn</li><li>Valrhona Chocolate Pecan Pie</li></ul></span></label>
-        <label class="menu"><input type="radio" name="menu"><span class="m"><small>Menu three</small><b>The Grazing Board</b><ul><li>Seasonal Charcuterie</li><li>Bacon &amp; Bleu Cheese Deviled Eggs</li><li>Beef Tenderloin &amp; Caramelized Onion Crostini</li><li>Caprese Skewers</li><li>Pumpkin Cheesecake</li></ul></span></label>
-      </div>
-      <p class="drinks">Wine for the adults, plus non-alcoholic drinks for kids and anyone who prefers them. Both are served either way.</p>
-      <div class="submit"><button class="btn btn-cran">Send my RSVP <span class="arr">→</span></button><small>Headcount &amp; menu vote close Sat, Oct 31, 2026</small><span class="ok" id="rsvpok" hidden>You are on the list. We will confirm by text or email. Call <a href="tel:+12813560965">281.356.0965</a>.</span></div>
-    </form>
+    <div class="head c"><div class="eyebrow">RSVP</div><h2 id="vote">RSVPs are closed — thank you to everyone who joined us!</h2><p class="lead">The Iconic Client Holiday Event was Sat, Nov 7, 2026.</p></div>
+    <div class="panel" data-testid="thankful-rsvp-closed"><p class="lead" style="margin:0">RSVPs are closed — thank you to everyone who joined us!</p></div>
   </div>
 </section>
 
@@ -188,6 +162,7 @@ paintCountdown(now);
 let takenSlots=[];
 function renderSlots(){
   const sl=document.getElementById('slots');
+  if(!sl) return;
   const previous=sl.querySelector('input[name="slot"]:checked');
   const previousLabel=previous?previous.parentElement.querySelector('span').textContent:'';
   sl.innerHTML='';
@@ -206,8 +181,7 @@ async function loadTaken(){
   }catch(e){takenSlots=[];}
   renderSlots();
 }
-renderSlots();
-loadTaken();
+if(document.getElementById('slots')){renderSlots();loadTaken();}
 let P=null,dropsTomorrow=false,rateReady=false,rateError=false,rateKey='';
 function pctLabel(n){return Number.isInteger(n)?String(n):String(n)}
 function paintDial(){
@@ -321,7 +295,8 @@ async function sendOrder(body){const response=await fetch("/api/bookings",{metho
 function orderBody(opts){return {firstName:opts.firstName,lastName:opts.lastName,email:opts.email,phone:opts.phone,address:STUDIO,lineItems:[{name:opts.lineName,price:opts.price}],total:opts.price,pricing:{subtotal:opts.price,total:opts.price},vibeNote:"COMPLETE BOOKING DETAILS\nSite booking form\n"+opts.note,scheduledDate:opts.date,scheduledTime:opts.window,requestedTimeLabel:opts.timeLabel||"",photographerPreference:"No preference",accessMethod:"Studio 105 client event",propertyStatus:"Not specified",furnishingStatus:"Not specified",selectedService:opts.lineName,selectedAddOns:[],leadSource:opts.lead,...(opts.socialPackage?{socialPackage:opts.socialPackage,socialMonths:Number(opts.socialMonths)}:{})};}
 document.querySelectorAll("img").forEach(img=>img.addEventListener("error",()=>{if(img.classList.contains("title"))return;if((img.getAttribute("src")||"").includes("logo")){const s=document.createElement("span");s.className="missing";s.textContent=img.alt||"Iconic Images";img.replaceWith(s);return;}img.remove();}));
 
-document.getElementById("rsvpform").addEventListener("submit", async (event) => {
+const rsvpForm=document.getElementById("rsvpform");
+if(rsvpForm) rsvpForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const form = event.currentTarget;
   const button = form.querySelector("button");
