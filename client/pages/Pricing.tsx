@@ -18,9 +18,11 @@ const BRAND_STAGES = [
   {
     id: "standard",
     label: "Standard",
-    src: "/media/photos/standard-headshot.jpg",
-    alt: "Stiff standard headshot",
+    src: "/images/headshots-10/headshot-10.jpg",
+    alt: "Studio headshot",
     treatment: "grayscale contrast-75 brightness-90",
+    position: "object-[center_20%]",
+    avif: "",
     note: "Flat light. A stiff crop. Easy to scroll past.",
   },
   {
@@ -29,14 +31,18 @@ const BRAND_STAGES = [
     src: "/media/photos/lifestyle-mtz04327.jpg",
     alt: "Polished corporate lifestyle portrait in a royal blue suit",
     treatment: "",
+    position: "object-[center_18%]",
+    avif: "",
     note: "Polished, confident, and ready for the brand.",
   },
   {
     id: "lifestyle",
     label: "Iconic Lifestyle",
-    src: "/media/photos/lifestyle-kennedy-mtz01127.jpg",
-    alt: "Warm smiling lifestyle portrait",
+    src: "/media/photos/lifestyle-mtz08185.webp",
+    avif: "/media/photos/lifestyle-mtz08185.avif",
+    alt: "Lifestyle portrait seated at a kitchen island",
     treatment: "",
+    position: "object-[center_42%]",
     note: "Alive. Warm. The frame people actually stop for.",
   },
 ];
@@ -87,12 +93,15 @@ function BrandTransformation({
       </div>
 
       <div className="relative max-w-md mx-auto aspect-[3/4] rounded-[2rem] overflow-hidden shadow-xl border-4 border-white bg-zinc-200">
-        <img
-          src={current.src}
-          alt={current.alt}
-          data-site-page="pricing" data-site-block="brandStages" data-site-item={current.id} data-site-field="image" data-site-kind="image"
-          className={`absolute inset-0 h-full w-full object-cover object-[center_18%] ${current.treatment}`}
-        />
+        <picture className="absolute inset-0 block h-full w-full">
+          {current.avif ? <source srcSet={current.avif} type="image/avif" /> : null}
+          <img
+            src={current.src}
+            alt={current.alt}
+            data-site-page="pricing" data-site-block="brandStages" data-site-item={current.id} data-site-field="image" data-site-kind="image"
+            className={`h-full w-full object-cover ${current.position} ${current.treatment}`}
+          />
+        </picture>
         <div className="absolute inset-x-0 bottom-0 p-5 bg-gradient-to-t from-black/70 to-transparent text-left">
           <div className="inline-block rounded-full bg-black/70 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white">
             {current.label}
@@ -227,7 +236,7 @@ export default function Pricing() {
         text: "Photos, Aerials, Twilight Renders by 7PM with Basic Edits - Reel, premium edits and 2D Floorplan Next Day"
       },
       features: [
-        { text: "50 Images" },
+        { text: "30 Images" },
         { text: "5 Aerials" },
         { text: "The 'Snap' Reel (15s)" },
         { text: "1 'Iconic' 3D Animated Reel (60s Vert)" },

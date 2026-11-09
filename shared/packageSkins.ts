@@ -159,7 +159,7 @@ export const PACKAGE_SKINS: readonly PackageSkin[] = [
     title: "The Showcase",
     accent: "",
     badge: "The Showcase",
-    features: "50 images · 5 aerials · 3D reel · floorplan",
+    features: "30 images · 5 aerials · 3D reel · floorplan",
     chips: [{ label: "Aerials" }, { label: "3D Reel" }],
     price: "$549",
     priceNote: "per listing",

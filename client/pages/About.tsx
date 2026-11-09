@@ -6,11 +6,13 @@ import { Link } from "react-router-dom";
 import { itemText, useSiteItems, useSiteText } from "@/content/siteContent";
 import { DECADE_MASHUPS, type DecadeMashup } from "@shared/decadeMashups";
 
+const DECADE_BODY = "Est. 2016. 10 Years. Thousands of Listings. Millions in Commission Generated for our Partners.";
+
 export default function About() {
   const badge = useSiteText("about", "hero", "badge", "Decade of Excellence");
   const titleLead = useSiteText("about", "hero", "titleLead", "A Decade of");
   const titleAccent = useSiteText("about", "hero", "titleAccent", "Setting the Standard.");
-  const body = useSiteText("about", "hero", "body", "Est. 2016. 10 Years. Thousands of Listings. Millions in Commission Generated for our Partners.");
+  const body = useSiteText("about", "hero", "body", DECADE_BODY);
   const hubKicker = useSiteText("about", "hub", "kicker", "THE INTELLIGENCE HUB: BEYOND THE LENS");
   const hubTitle = useSiteText("about", "hub", "title", "Where Vision Meets Velocity.");
   const hubBody = useSiteText("about", "hub", "body", "At Iconic Images, we don’t just capture real estate; we engineer market ownership. In a world of infinite scrolling, 'pretty pictures' are the bare minimum.");
@@ -41,8 +43,13 @@ export default function About() {
             <h1 className="text-4xl md:text-6xl font-bold mb-4 tracking-tight">
               <span data-site-page="about" data-site-block="hero" data-site-field="titleLead" data-site-kind="text">{titleLead}</span> <span className="text-[#0d9488]" data-site-page="about" data-site-block="hero" data-site-field="titleAccent" data-site-kind="text">{titleAccent}</span>
             </h1>
-            <p className="text-lg md:text-xl text-gray-300 font-medium max-w-2xl mx-auto leading-relaxed">
-              <span data-site-page="about" data-site-block="hero" data-site-field="body" data-site-kind="text">{body}</span>
+            <p data-site-page="about" data-site-block="hero" data-site-field="body" data-site-kind="text" className="mx-auto max-w-3xl text-balance font-medium leading-relaxed text-gray-300">
+              {body === DECADE_BODY ? (
+                <>
+                  <span className="block whitespace-nowrap text-[clamp(11px,3.2vw,1.25rem)]">Est. 2016. 10 Years. Thousands of Listings.</span>
+                  <span className="block whitespace-nowrap text-[clamp(11px,3.2vw,1.25rem)]">Millions in Commission Generated for our Partners.</span>
+                </>
+              ) : body}
             </p>
 
             <DecadeMashupCarousel cards={mashups.length ? mashups : DECADE_MASHUPS} />

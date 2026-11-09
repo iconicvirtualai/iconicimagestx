@@ -28,7 +28,7 @@ import { applyServerTravel, isTravelFeeLine, travelInvoiceLine, travelSummaryTex
 import { planOrderPackageRepair } from "../../shared/orderPackageRepair";
 import { notifyOfficeOfOrder } from "../services/officeOrderNotify";
 import { HOLIDAY_RSVP_LEAD, HOLIDAY_SEASON_LEAD, HOLIDAY_SOCIAL_SAVES_LEAD, holidayCheckoutKind, holidayOrderReceivedHtml } from "../../shared/holidayCheckout";
-import { THANKFUL_RSVP_CLOSED, quoteThankfulSocialSave, socialRatePreviewAllowed, socialRateView, thankfulRsvpOpen } from "../../shared/thankfulEvent";
+import { THANKFUL_RSVP_CLOSED, THANKFUL_RSVP_EVENT_CLOSED, quoteThankfulSocialSave, socialRatePreviewAllowed, socialRateView, thankfulEventDatePassed, thankfulRsvpOpen } from "../../shared/thankfulEvent";
 import {
   THANKFUL_RSVP_CONFIRM_TEMPLATE,
   thankfulRsvpConfirmFieldsFromOrder,
@@ -199,6 +199,9 @@ router.post("/", async (req, res) => {
     }
 
     const requestedTimeLabel = typeof postedTimeLabel === "string" ? postedTimeLabel.trim().slice(0, 80) : "";
+    if (leadSource === HOLIDAY_RSVP_LEAD && thankfulEventDatePassed(new Date())) {
+      return res.status(400).json({ error: THANKFUL_RSVP_EVENT_CLOSED });
+    }
     if (leadSource === HOLIDAY_RSVP_LEAD && !thankfulRsvpOpen(new Date())) {
       return res.status(400).json({ error: THANKFUL_RSVP_CLOSED });
     }

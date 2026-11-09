@@ -18,8 +18,10 @@ import { addressText } from "../../shared/addressText";
 import { bookingDateLabel } from "../../shared/clientHome";
 import { amountStillDue, invoiceAllowsDownload, squarePaymentNote } from "../../shared/paymentAccess";
 import { invoiceEmailNumber, invoicePageInvoiceNumber, receiptEmailNumber } from "../../shared/orderProjectInvoice";
-import { fetchPublishedSquareInvoiceUrl, resolveSquareCheckoutUrl, squareApiBaseUrl } from "../../shared/squareInvoice";
+import { fetchPublishedSquareInvoiceUrl, resolveSquareCheckoutUrl } from "../../shared/squareInvoice";
 import { squareBuyerPrefill } from "../../shared/clientHubSettings";
+import { SQUARE_CHECKOUT_FAILURE, SQUARE_DEPOSIT_CHECKOUT_FAILURE } from "../../shared/squareCheckout";
+import { createSquareQuickPayLink } from "../services/squarePaymentLink";
 import { clientInvoiceUrl } from "../../shared/invoicePayLink";
 import { publicClientUrl } from "../../shared/publicSiteUrl";
 import { revenueStamp, sumTransactionAmounts } from "../../shared/revenueCount";
@@ -90,10 +92,6 @@ function stripeReady() {
 
 function squareReady() {
   return Boolean(process.env.SQUARE_ACCESS_TOKEN && process.env.SQUARE_LOCATION_ID);
-}
-
-function squareBaseUrl() {
-  return squareApiBaseUrl(process.env.SQUARE_ENVIRONMENT);
 }
 
 function invoiceProvider(invoice: Record<string, unknown>): "square" | "stripe" {
@@ -1255,54 +1253,35 @@ router.post("/invoice/:id/checkout", async (req: Request, res: Response) => {
 
       if (!squareReady()) return res.status(503).json({ error: "Square payments are not configured yet." });
 
-      const response = await fetch(`${squareBaseUrl()}/v2/online-checkout/payment-links`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Square-Version": process.env.SQUARE_VERSION || "2026-08-20",
-          Authorization: `Bearer ${process.env.SQUARE_ACCESS_TOKEN}`,
-        },
-        body: JSON.stringify({
-          idempotency_key: `${invoiceDoc.id}-${Date.now()}`,
-          quick_pay: {
-            name: `Iconic Images Invoice ${invoice.invoiceNumber || invoiceDoc.id}`,
-            price_money: {
-              amount: Math.round(amountDue * 100),
-              currency: "USD",
-            },
-            location_id: process.env.SQUARE_LOCATION_ID,
-          },
-          checkout_options: {
-            redirect_url: clientInvoiceUrl({
-              id: invoiceDoc.id,
-              payToken,
-              status: invoice.status,
-            }, undefined, { paid: "1" }) || invoiceUrl,
-          },
-          pre_populated_data: squareBuyerPrefill(invoice),
-          payment_note: squarePaymentNote(invoiceDoc.id, invoice.invoiceNumber),
-        }),
+      const created = await createSquareQuickPayLink({
+        invoiceId: invoiceDoc.id,
+        purpose: "checkout",
+        amountCents: Math.round(amountDue * 100),
+        name: `Iconic Images Invoice ${invoice.invoiceNumber || invoiceDoc.id}`,
+        redirectUrl: clientInvoiceUrl({
+          id: invoiceDoc.id,
+          payToken,
+          status: invoice.status,
+        }, undefined, { paid: "1" }) || invoiceUrl,
+        prefill: squareBuyerPrefill(invoice),
+        paymentNote: squarePaymentNote(invoiceDoc.id, invoice.invoiceNumber),
+        logLabel: "Square checkout error",
+        failureMessage: SQUARE_CHECKOUT_FAILURE,
       });
+      if (created.ok === false) return res.status(500).json({ error: created.message });
 
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        console.error("[Payments] Square checkout error:", result);
-        return res.status(500).json({ error: "Failed to start Square checkout." });
-      }
-
-      const link = result.payment_link;
       await invoiceDoc.ref.update({
         status: "sent",
         paymentProvider: "square",
         paymentMethod: "square",
-        paymentUrl: link?.url || invoiceUrl,
-        squarePaymentLinkId: link?.id || null,
-        squareOrderId: link?.order_id || null,
+        paymentUrl: created.checkoutUrl || invoiceUrl,
+        squarePaymentLinkId: created.linkId,
+        squareOrderId: created.orderId,
         sentAt: invoice.sentAt || admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      return res.json({ checkoutUrl: link?.url, provider: "square" });
+      return res.json({ checkoutUrl: created.checkoutUrl, provider: "square" });
     }
 
     if (!stripeReady()) {
@@ -1431,56 +1410,38 @@ router.post("/invoice/:id/deposit-checkout", async (req: Request, res: Response)
 
     await payTokenForLink(invoiceDoc);
     const orderNumber = String(invoice.orderNumber || order.orderNumber || "");
-    const response = await fetch(`${squareBaseUrl()}/v2/online-checkout/payment-links`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Square-Version": process.env.SQUARE_VERSION || "2026-08-20",
-        Authorization: `Bearer ${process.env.SQUARE_ACCESS_TOKEN}`,
-      },
-      body: JSON.stringify({
-        idempotency_key: `${invoiceDoc.id}-deposit`,
-        quick_pay: {
-          name: orderSource === APPRENTICESHIP_ORDER_SOURCE || orderSource === HEADSHOTS_ORDER_SOURCE
-            ? `Iconic Images booking fee ${orderNumber || invoice.invoiceNumber || invoiceDoc.id}`
-            : `Iconic Images deposit ${invoice.invoiceNumber || invoiceDoc.id}`,
-          price_money: {
-            amount: Math.round(depositAmount * 100),
-            currency: "USD",
-          },
-          location_id: process.env.SQUARE_LOCATION_ID,
-        },
-        checkout_options: {
-          redirect_url: `${appUrl()}${
-            orderSource === HEADSHOTS_ORDER_SOURCE
-              ? headshotBookingReturnPath(orderNumber)
-              : orderSource === APPRENTICESHIP_ORDER_SOURCE
-                ? apprenticeshipBookingReturnPath(orderNumber, invoice.depositReturn)
-                : seniorLivingDepositReturnPath(orderNumber)
-          }`,
-        },
-        pre_populated_data: squareBuyerPrefill(invoice),
-        payment_note: squarePaymentNote(invoiceDoc.id, invoice.invoiceNumber),
-      }),
+    const amountCents = Math.round(depositAmount * 100);
+    const created = await createSquareQuickPayLink({
+      invoiceId: invoiceDoc.id,
+      purpose: "deposit",
+      amountCents,
+      name: orderSource === APPRENTICESHIP_ORDER_SOURCE || orderSource === HEADSHOTS_ORDER_SOURCE
+        ? `Iconic Images booking fee ${orderNumber || invoice.invoiceNumber || invoiceDoc.id}`
+        : `Iconic Images deposit ${invoice.invoiceNumber || invoiceDoc.id}`,
+      redirectUrl: `${appUrl()}${
+        orderSource === HEADSHOTS_ORDER_SOURCE
+          ? headshotBookingReturnPath(orderNumber)
+          : orderSource === APPRENTICESHIP_ORDER_SOURCE
+            ? apprenticeshipBookingReturnPath(orderNumber, invoice.depositReturn)
+            : seniorLivingDepositReturnPath(orderNumber)
+      }`,
+      prefill: squareBuyerPrefill(invoice),
+      paymentNote: squarePaymentNote(invoiceDoc.id, invoice.invoiceNumber),
+      logLabel: "Square deposit checkout error",
+      failureMessage: SQUARE_DEPOSIT_CHECKOUT_FAILURE,
     });
-    const result = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      console.error("[Payments] Square deposit checkout error:", result);
-      return res.status(500).json({ error: "Failed to start the deposit checkout." });
-    }
-    const link = result.payment_link;
-    const checkoutUrl = typeof link?.url === "string" ? link.url : "";
+    if (created.ok === false) return res.status(500).json({ error: created.message });
     await invoiceDoc.ref.update({
-      squareDepositPaymentLinkId: link?.id || null,
-      squareDepositOrderId: link?.order_id || null,
-      ...(checkoutUrl ? { squareDepositCheckoutUrl: checkoutUrl } : {}),
+      squareDepositPaymentLinkId: created.linkId,
+      squareDepositOrderId: created.orderId,
+      ...(created.checkoutUrl ? { squareDepositCheckoutUrl: created.checkoutUrl } : {}),
       paymentProvider: "square",
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
-    return res.json({ checkoutUrl, provider: "square" });
+    return res.json({ checkoutUrl: created.checkoutUrl, provider: "square" });
   } catch (err) {
     console.error("[Payments] Deposit checkout error:", err);
-    return res.status(500).json({ error: "Failed to start the deposit checkout." });
+    return res.status(500).json({ error: SQUARE_DEPOSIT_CHECKOUT_FAILURE });
   }
 });
 

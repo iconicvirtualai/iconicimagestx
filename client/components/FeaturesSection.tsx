@@ -1,19 +1,66 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import StillToMotion from "@/components/StillToMotion";
 import { itemText, useSiteHref, useSiteItems, useSiteText } from "@/content/siteContent";
+
+const FIREPIT_DAY = "/media/home-v2/photo-edits/firepit-day.webp";
+const FIREPIT_DAY_AVIF = "/media/home-v2/photo-edits/firepit-day.avif";
+const FIREPIT_DUSK = "/media/home-v2/photo-edits/firepit-dusk.webp";
+const FIREPIT_DUSK_AVIF = "/media/home-v2/photo-edits/firepit-dusk.avif";
 
 const FEATURE_TITLE = "Go beyond basic editing with powerful add-on tools";
 const FEATURE_BODY = "Turn a still into motion, stage an empty room, finish a photo, and shape the cut in Studio.";
 
+function CompareImage({
+  src,
+  avif,
+  alt,
+  itemId,
+  field,
+  style,
+}: {
+  src: string;
+  avif?: string;
+  alt: string;
+  itemId: string;
+  field: string;
+  style?: { clipPath: string };
+}) {
+  return (
+    <picture className="absolute inset-0 block h-full w-full">
+      {avif ? <source srcSet={avif} type="image/avif" /> : null}
+      <img
+        src={src}
+        alt={alt}
+        data-site-page="home"
+        data-site-block="features"
+        data-site-item={itemId}
+        data-site-field={field}
+        data-site-kind="image"
+        className="h-full w-full object-cover"
+        style={style}
+      />
+    </picture>
+  );
+}
+
 function CompareSlider({
   before,
   after,
+  beforeAvif,
+  afterAvif,
+  beforeField = "before",
+  afterField = "after",
   beforeLabel = "Before",
   afterLabel = "After",
   itemId,
 }: {
   before: string;
   after: string;
+  beforeAvif?: string;
+  afterAvif?: string;
+  beforeField?: string;
+  afterField?: string;
   beforeLabel?: string;
   afterLabel?: string;
   itemId: string;
@@ -21,16 +68,13 @@ function CompareSlider({
   const [position, setPosition] = useState(52);
   return (
     <div className="relative h-56 overflow-hidden bg-gray-100 sm:h-64">
-      <img src={after} alt={afterLabel} data-site-page="home" data-site-block="features" data-site-item={itemId} data-site-field="after" data-site-kind="image" className="absolute inset-0 h-full w-full object-cover" />
-      <img
+      <CompareImage src={after} avif={afterAvif} alt={afterLabel} itemId={itemId} field={afterField} />
+      <CompareImage
         src={before}
+        avif={beforeAvif}
         alt={beforeLabel}
-        data-site-page="home"
-        data-site-block="features"
-        data-site-item={itemId}
-        data-site-field="before"
-        data-site-kind="image"
-        className="absolute inset-0 h-full w-full object-cover"
+        itemId={itemId}
+        field={beforeField}
         style={{ clipPath: `inset(0 ${100 - position}% 0 0)` }}
       />
       <div className="pointer-events-none absolute inset-y-0 z-10 w-0.5 bg-white" style={{ left: `${position}%` }} />
@@ -60,8 +104,6 @@ export default function FeaturesSection() {
     return item ? itemText(item, key, fallback) : fallback;
   };
 
-  const snapStill = field("snap", "still", "/media/home-v2/snap-feature/snap-still.jpg");
-  const snapVideo = field("snap", "video", "/media/home-v2/snap-feature/snap-motion.mp4");
   const bedroomBefore = field("staging", "bedroomBefore", "/media/home-v2/staging/vs-bedroom-before.jpg");
   const bedroomAfter = field("staging", "bedroomAfter", "/media/home-v2/staging/vs-bedroom-after.jpg");
   const moreAngles = field("staging", "moreAngles", "");
@@ -87,45 +129,12 @@ export default function FeaturesSection() {
         <div className="mx-auto grid max-w-6xl grid-cols-1 gap-6 lg:grid-cols-2">
           <article className="flex flex-col rounded-2xl border border-dashed border-[#99f6e4] bg-[#f8fdff] p-6 lg:col-span-2">
             <h3 data-site-page="home" data-site-block="features" data-site-item="snap" data-site-field="title" data-site-kind="text" className="text-balance text-xl font-bold text-black">
-              {field("snap", "title", "Iconic Snap Reels")}
+              {field("snap", "title", "Still Shots → To Motion")}
             </h3>
             <p data-site-page="home" data-site-block="features" data-site-item="snap" data-site-field="body" data-site-kind="text" className="mt-2 max-w-2xl text-sm leading-relaxed text-gray-500">
-              {field("snap", "body", "Photo to video. One listing still on the left, and that same photo in motion on the right.")}
+              {field("snap", "body", "A listing still opens into cinematic motion. Kitchen, living room, front elevation, and pool, from the same photo into the clip.")}
             </p>
-            <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <figure className="overflow-hidden rounded-xl border border-gray-100 bg-black">
-                <img
-                  src={snapStill}
-                  alt="Listing photo, still"
-                  data-site-page="home"
-                  data-site-block="features"
-                  data-site-item="snap"
-                  data-site-field="still"
-                  data-site-kind="image"
-                  className="aspect-[4/5] max-h-[420px] w-full object-cover"
-                />
-                <figcaption className="bg-white px-3 py-2 text-center text-[10px] font-black uppercase tracking-[0.18em] text-teal-700">Still</figcaption>
-              </figure>
-              <figure className="overflow-hidden rounded-xl border border-gray-100 bg-black">
-                <video
-                  src={snapVideo}
-                  poster={snapStill}
-                  data-site-page="home"
-                  data-site-block="features"
-                  data-site-item="snap"
-                  data-site-field="video"
-                  data-site-kind="video"
-                  className="aspect-[4/5] max-h-[420px] w-full object-cover"
-                  autoPlay
-                  muted
-                  loop
-                  playsInline
-                  preload="metadata"
-                  aria-label="The same listing photo, in motion"
-                />
-                <figcaption className="bg-white px-3 py-2 text-center text-[10px] font-black uppercase tracking-[0.18em] text-teal-700">In motion</figcaption>
-              </figure>
-            </div>
+            <StillToMotion />
           </article>
 
           <article className="flex flex-col overflow-hidden rounded-2xl border border-dashed border-[#99f6e4] bg-[#f8fdff] p-6">
@@ -168,12 +177,29 @@ export default function FeaturesSection() {
             <p data-site-page="home" data-site-block="features" data-site-item="edits" data-site-field="body" data-site-kind="text" className="mt-2 text-sm leading-relaxed text-gray-500">
               {field("edits", "body", "A daylight pavilion, finished so it feels lived in. A warm-dusk pool pair is saved beside this one if you want to swap it in.")}
             </p>
-            <div className="mt-5 overflow-hidden rounded-xl border border-gray-100 bg-white">
-              <CompareSlider
-                itemId="edits"
-                before={field("edits", "before", "/media/home-v2/photo-edits/pavilion-before.jpg")}
-                after={field("edits", "after", "/media/home-v2/photo-edits/pavilion-after-iconic.jpg")}
-              />
+            <div className="mt-5 space-y-4">
+              <div className="overflow-hidden rounded-xl border border-gray-100 bg-white">
+                <p className="bg-white px-3 pt-3 text-center text-[10px] font-black uppercase tracking-[0.18em] text-teal-700">Example 1 & 2</p>
+                <CompareSlider
+                  itemId="edits"
+                  before={field("edits", "before", "/media/home-v2/photo-edits/pavilion-before.jpg")}
+                  after={field("edits", "after", "/media/home-v2/photo-edits/pavilion-after-iconic.jpg")}
+                />
+              </div>
+              <div className="overflow-hidden rounded-xl border border-gray-100 bg-white">
+                <p className="bg-white px-3 pt-3 text-center text-[10px] font-black uppercase tracking-[0.18em] text-teal-700">Example 3 & 4 · AI twilight</p>
+                <CompareSlider
+                  itemId="edits"
+                  before={field("edits", "example3", FIREPIT_DAY)}
+                  after={field("edits", "example4", FIREPIT_DUSK)}
+                  beforeAvif={FIREPIT_DAY_AVIF}
+                  afterAvif={FIREPIT_DUSK_AVIF}
+                  beforeField="example3"
+                  afterField="example4"
+                  beforeLabel="Example 3"
+                  afterLabel="Example 4"
+                />
+              </div>
             </div>
           </article>
 
