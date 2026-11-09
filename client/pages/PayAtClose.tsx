@@ -199,7 +199,7 @@ export default function PayAtClose() {
 
   return (
     <div className="pac-page" data-testid="pay-at-close-landing">
-      <div className="urgency">Pay at Close · <span>financing by Titus</span></div>
+      <div className="urgency">Pay at Close · <span>Powered by Titus</span></div>
 
       <header className="nav">
         <div className="wrap nav-inner">
@@ -219,7 +219,7 @@ export default function PayAtClose() {
       <section className="hero" style={{ ["--hero" as string]: `url(${LUXURY}/marias/01-front-day.jpg)` }}>
         <div className="hero-bg" aria-hidden="true" />
         <div className="wrap hero-content">
-          <div className="pill">Pay at Close · financing by Titus</div>
+          <div className="pill">Pay at Close · Powered by Titus</div>
           <h1>Spoil your listing.<br /><em>Pay at closing.</em></h1>
           <p className="hero-lead">
             Premium listing media with financing arranged by Titus. Market Leader, Legacy cinema, Showcase aerials and more. Titus pays Iconic now, and it’s settled from proceeds when your listing closes.
@@ -487,7 +487,7 @@ export default function PayAtClose() {
       </footer>
 
       <div className="sticky-order">
-        <div className="so-copy"><strong>Financing by Titus</strong> Pay at Close · Order now</div>
+        <div className="so-copy"><strong>Powered by Titus</strong> Pay at Close · Order now</div>
         <Link className="btn btn-teal btn-sm" to={bookPayAtCloseHref()}>Order</Link>
       </div>
     </div>

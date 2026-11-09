@@ -265,8 +265,8 @@ describe("apprenticeship order", () => {
     const body = await response.json();
     expect(body.orderNumber).toBe("#042");
     expect(body.depositAmount).toBe(25);
-    expect(body.total).toBe(77.1);
-    expect(body.balanceDue).toBe(52.1);
+    expect(body.total).toBe(87.38);
+    expect(body.balanceDue).toBe(62.38);
     expect(createEvent).toHaveBeenCalledWith(expect.objectContaining({
       orderNumber: "#042",
       slot: SLOT,
@@ -280,8 +280,8 @@ describe("apprenticeship order", () => {
       source: "apprenticeship",
       status: "new",
       depositAmount: 25,
-      processing: 2.1,
-      total: 77.1,
+      processing: 2.38,
+      total: 87.38,
       calendarEventId: "evt-1",
     });
     expect(orders[0]).toMatchObject({
@@ -300,7 +300,7 @@ describe("apprenticeship order", () => {
       depositRequired: true,
       depositAmount: 25,
       paymentProvider: "square",
-      processing: 2.1,
+      processing: 2.38,
     });
     expect(notify).toHaveBeenCalled();
     expect(JSON.stringify(body).toLowerCase()).not.toContain("not configured");

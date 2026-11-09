@@ -6,6 +6,7 @@
 
 import { hostnameOf, PUBLIC_PAGES, wwwShellFile } from "./siteSeo";
 import { HEADSHOT_PREVIEW_SOURCES } from "./headshots10";
+import { STUDIO105_APP_SOURCES } from "./studio105";
 import { RE75_PREVIEW_SOURCES } from "./realestate75";
 import { publicAliasRedirects } from "./publicAliases";
 import { wixPathRedirects } from "./wixLaunch";
@@ -39,6 +40,7 @@ const APP_SHELL_SOURCES = [
   "/services/virtual-staging/ai-tool",
   "/services/virtual-staging/pro-order",
   "/dev/invoice-template",
+  ...STUDIO105_APP_SOURCES,
 ];
 
 /** Stays in APP_SHELL_SOURCES so rewrite order does not move. Served noindex. */

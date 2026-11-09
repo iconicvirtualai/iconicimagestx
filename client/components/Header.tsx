@@ -5,6 +5,11 @@ import { Button } from "@/components/ui/button";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { itemLink, itemText, useSiteHref, useSiteItems, useSiteText } from "@/content/siteContent";
 
+function isStudioNavItem(item: { label: string; href: string }): boolean {
+  const href = item.href.split("?")[0].replace(/\/$/, "") || "/";
+  return href === "/studio-105" || href.startsWith("/studio-105/") || /^studio\s*105$/i.test(item.label.trim());
+}
+
 export default function Header() {
   const settings = useSiteSettings();
   const location = useLocation();
@@ -25,7 +30,7 @@ export default function Header() {
   };
 
   const navItems = useSiteItems("chrome", "nav");
-  const menuItems = navItems
+  const menuItems = (navItems
     ? navItems.map((item) => ({ label: itemText(item, "link"), href: itemLink(item, "link") || "/" }))
     : [
         { label: "About", href: "/about" },
@@ -35,7 +40,9 @@ export default function Header() {
         { label: "Insights", href: "/insights" },
         { label: "Stock Footage", href: "/stock-footage" },
         { label: "Contact Us", href: "/contact" },
-      ];
+      ]
+  ).filter((item) => !isStudioNavItem(item));
+  const studioLabel = "Studio 105";
   const loginLabel = useSiteText("chrome", "headerCtas", "login", "Log in");
   const loginHref = useSiteHref("chrome", "headerCtas", "login", "/login");
   const bookLabel = useSiteText("chrome", "headerCtas", "book", "Book Now");
@@ -78,8 +85,15 @@ export default function Header() {
           ))}
         </nav>
 
-        {/* Right side buttons */}
+        {/* Studio 105 sits apart from the main link group, beside Log in and Book Now. */}
         <div className="hidden lg:flex items-center gap-4">
+          <Link
+            to="/studio-105"
+            data-testid="nav-studio-105"
+            className="inline-flex items-center rounded-full border border-[#2dd4bf] px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] text-[#2dd4bf] transition-colors hover:bg-[#2dd4bf] hover:text-black"
+          >
+            {studioLabel}
+          </Link>
           <Link to={loginHref}>
             <span data-site-page="chrome" data-site-block="headerCtas" data-site-field="login" data-site-kind="text" className="text-xs font-bold text-white/70 hover:text-white cursor-pointer transition-colors">{loginLabel}</span>
           </Link>
@@ -118,6 +132,13 @@ export default function Header() {
                 {item.label}
               </Link>
             ))}
+            <Link
+              to="/studio-105"
+              className="inline-flex w-fit items-center rounded-full border border-[#2dd4bf] px-4 py-2 text-[11px] font-black uppercase tracking-[0.14em] text-[#2dd4bf]"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              {studioLabel}
+            </Link>
             <Link
               to={loginHref}
               className="text-xs font-bold text-white/70 hover:text-white transition-colors"

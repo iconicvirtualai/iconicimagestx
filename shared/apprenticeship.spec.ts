@@ -24,7 +24,7 @@ describe("apprenticeship catalog copy", () => {
     const [twentyFive, fifty] = apprenticeshipPackageViews();
     expect(twentyFive).toMatchObject({
       id: "apprentice-25",
-      price: 75,
+      price: 85,
       appointmentLimit: "20 Minute Appointment ONLY",
       durationMinutes: 20,
       overage: APPRENTICESHIP_OVERAGE_LABEL,
@@ -118,13 +118,13 @@ describe("apprenticeship quote", () => {
     const fifty = quoteApprenticeship({ packageId: "apprentice-50" });
     expect(twentyFive.ok).toBe(true);
     if (!twentyFive.ok || !fifty.ok) return;
-    expect(twentyFive.quote.subtotal).toBe(75);
-    expect(twentyFive.quote.processing).toBe(2.1);
+    expect(twentyFive.quote.subtotal).toBe(85);
+    expect(twentyFive.quote.processing).toBe(2.38);
     expect(twentyFive.quote.processingLabel).toBe(BOOKING_PROCESSING_LABEL);
-    expect(twentyFive.quote.total).toBe(77.1);
+    expect(twentyFive.quote.total).toBe(87.38);
     expect(twentyFive.quote.bookingFee).toBe(APPRENTICESHIP_BOOKING_FEE);
     expect(twentyFive.quote.bookingFeeLine).toBe(APPRENTICESHIP_BOOKING_FEE_LINE);
-    expect(twentyFive.quote.balanceDue).toBe(52.1);
+    expect(twentyFive.quote.balanceDue).toBe(62.38);
     expect(twentyFive.quote.balanceLine).toBe(APPRENTICESHIP_BALANCE_LINE);
     expect(fifty.quote.processing).toBe(3.5);
     expect(fifty.quote.total).toBe(128.5);

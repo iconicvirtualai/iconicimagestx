@@ -10,6 +10,7 @@
 
 import { LEGAL_BUSINESS_NAME } from "./businessContact.ts";
 import { HEADSHOTS_SEO_DESCRIPTION, HEADSHOTS_SEO_TITLE } from "./headshots10.ts";
+import { STUDIO105_SEO_DESCRIPTION } from "./studio105.ts";
 
 export const DEFAULT_SITE_ORIGIN = "https://iconicimagestx.vercel.app";
 
@@ -248,8 +249,8 @@ export function metaPlan(pathname: string, origin = SITE_ORIGIN): MetaPlan {
   if (path === "/realestate-75" || path.startsWith("/realestate-75/")) {
     return {
       kind: "noindex",
-      title: "Listing Photos From $75 | Iconic Images",
-      description: "Apprentice listing photos from $75. 25 photos in 20 minutes, or 50 photos in 1 hour.",
+      title: "Listing Photos From $85 | Iconic Images",
+      description: "Apprentice listing photos from $85. 25 photos in 20 minutes, or 50 photos in 1 hour.",
     };
   }
   if (path === "/headshots-10" || path.startsWith("/headshots-10/")) {
@@ -262,6 +263,15 @@ export function metaPlan(pathname: string, origin = SITE_ORIGIN): MetaPlan {
   if (path === "/present" || path.startsWith("/present/")) return { kind: "hands-off" };
   if (path.startsWith("/insights/") && path !== "/insights/prep") return { kind: "hands-off" };
   if (path === "/go") return { kind: "preserve-title" };
+  if (path.startsWith("/studio-105/")) {
+    return {
+      kind: "public",
+      title: "Studio 105 | Iconic Images",
+      description: STUDIO105_SEO_DESCRIPTION,
+      canonical: canonicalUrl(path, origin),
+      image: ogImageUrl(origin),
+    };
+  }
   if (path === "/pay-at-close") {
     return {
       kind: "public",

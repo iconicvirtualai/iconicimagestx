@@ -430,7 +430,35 @@ const APPRENTICESHIP_RULES = [
 function isApprenticeshipPackage(id) {
   return id.startsWith("apprentice-");
 }
+const RETIRED_PUBLIC_PHOTO_IDS = ["photos-20", "photos-35", "photos-50"];
+function isRetiredPublicPhotoPackage(id) {
+  return RETIRED_PUBLIC_PHOTO_IDS.includes(id);
+}
 const basicsList = [
+  {
+    id: "photos-18",
+    name: "Photos Only — 18 photos",
+    cardTitle: "18 Photos",
+    price: 139,
+    description: "Just the basics. Next-day delivery.",
+    features: ["18 photos", "Next-day delivery"]
+  },
+  {
+    id: "photos-25-only",
+    name: "Photos Only — 25 photos",
+    cardTitle: "25 Photos",
+    price: 169,
+    description: "Just the basics. Next-day delivery.",
+    features: ["25 photos", "Next-day delivery"]
+  },
+  {
+    id: "photos-40",
+    name: "Photos Only — 40 photos",
+    cardTitle: "40 Photos",
+    price: 199,
+    description: "Just the basics. Next-day delivery.",
+    features: ["40 photos", "Next-day delivery"]
+  },
   {
     id: "photos-20",
     name: "20 Photos",
@@ -477,10 +505,17 @@ const basicsList = [
     ]
   },
   {
+    id: "aerial-only",
+    name: "Aerial Only",
+    price: 99,
+    description: "Aerial photos without a photo package.",
+    features: ["5 aerial photos"]
+  },
+  {
     id: "apprentice-25",
     name: "The Apprenticeship Program — 25 Photos",
     cardTitle: "25 photos",
-    price: 75,
+    price: 85,
     kicker: "The cheap one",
     appointmentLimit: "20 Minute Appointment ONLY",
     aside: "Twenty-five photos. Twenty minutes. You'll feel the savings — and the stopwatch.",
@@ -512,7 +547,9 @@ const basicsList = [
   }
 ];
 basicsList.filter((item) => isApprenticeshipPackage(item.id));
-basicsList.filter((item) => !isApprenticeshipPackage(item.id));
+basicsList.filter(
+  (item) => !isApprenticeshipPackage(item.id) && !isRetiredPublicPhotoPackage(item.id)
+);
 const BOOKING_PACKAGE_CATEGORY_ORDER = [
   "photography",
   "video",
@@ -1648,7 +1685,6 @@ const PAGES = [
     block("nav", "Navigation", [], [
       linkItem("about", "About", "/about"),
       linkItem("pricing", "Pricing", "/pricing"),
-      linkItem("studio", "Studio 105", "/studio-105"),
       linkItem("portfolio", "Portfolio", "/portfolio"),
       linkItem("insights", "Insights", "/insights"),
       linkItem("stock", "Stock Footage", "/stock-footage"),

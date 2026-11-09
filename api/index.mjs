@@ -456,6 +456,46 @@ const services = [
       "Post-Sale Marketing Package (Scheduled)"
     ]
   },
+  {
+    id: "hollywood",
+    name: "Hollywood",
+    category: "listings",
+    price: 199,
+    description: "A sharp, streamlined listing launch.",
+    features: ["30 daytime listing photos", "Branded listing website", "Grass replacement included"]
+  },
+  {
+    id: "hall-of-fame",
+    name: "Hall of Fame",
+    category: "listings",
+    price: 299,
+    description: "More coverage for homes that need to stand out.",
+    features: ["35 listing photos", "5 aerial photos", "Branded listing website", "Grass replacement included"]
+  },
+  {
+    id: "red-carpet",
+    name: "Red Carpet",
+    category: "listings",
+    price: 599,
+    description: "More story, more motion, more attention.",
+    features: ["45 listing photos", "5 aerials", "Social reel", "Amenity coverage", "Branded listing website", "Grass replacement included"]
+  },
+  {
+    id: "luxe-video",
+    name: "Luxe Video",
+    category: "listings",
+    price: 785,
+    description: "Standout-home coverage with a listing video.",
+    features: ["50 listing photos", "5 aerials", "Listing video", "Premium editing package", "Grass replacement included"]
+  },
+  {
+    id: "luxe-3d",
+    name: "Luxe 3D Tour",
+    category: "listings",
+    price: 785,
+    description: "Standout-home coverage with a 3D tour.",
+    features: ["50 listing photos", "5 aerials", "3D tour", "Premium editing package", "Grass replacement included"]
+  },
   // Branding
   {
     id: "branding-refresh",
@@ -555,7 +595,35 @@ const APPRENTICESHIP_RULES = [
 function isApprenticeshipPackage(id) {
   return id.startsWith("apprentice-");
 }
+const RETIRED_PUBLIC_PHOTO_IDS = ["photos-20", "photos-35", "photos-50"];
+function isRetiredPublicPhotoPackage(id) {
+  return RETIRED_PUBLIC_PHOTO_IDS.includes(id);
+}
 const basicsList = [
+  {
+    id: "photos-18",
+    name: "Photos Only — 18 photos",
+    cardTitle: "18 Photos",
+    price: 139,
+    description: "Just the basics. Next-day delivery.",
+    features: ["18 photos", "Next-day delivery"]
+  },
+  {
+    id: "photos-25-only",
+    name: "Photos Only — 25 photos",
+    cardTitle: "25 Photos",
+    price: 169,
+    description: "Just the basics. Next-day delivery.",
+    features: ["25 photos", "Next-day delivery"]
+  },
+  {
+    id: "photos-40",
+    name: "Photos Only — 40 photos",
+    cardTitle: "40 Photos",
+    price: 199,
+    description: "Just the basics. Next-day delivery.",
+    features: ["40 photos", "Next-day delivery"]
+  },
   {
     id: "photos-20",
     name: "20 Photos",
@@ -602,10 +670,17 @@ const basicsList = [
     ]
   },
   {
+    id: "aerial-only",
+    name: "Aerial Only",
+    price: 99,
+    description: "Aerial photos without a photo package.",
+    features: ["5 aerial photos"]
+  },
+  {
     id: "apprentice-25",
     name: "The Apprenticeship Program — 25 Photos",
     cardTitle: "25 photos",
-    price: 75,
+    price: 85,
     kicker: "The cheap one",
     appointmentLimit: "20 Minute Appointment ONLY",
     aside: "Twenty-five photos. Twenty minutes. You'll feel the savings — and the stopwatch.",
@@ -637,7 +712,9 @@ const basicsList = [
   }
 ];
 basicsList.filter((item) => isApprenticeshipPackage(item.id));
-basicsList.filter((item) => !isApprenticeshipPackage(item.id));
+basicsList.filter(
+  (item) => !isApprenticeshipPackage(item.id) && !isRetiredPublicPhotoPackage(item.id)
+);
 const addOns = [
   {
     category: "Speed & Social",
@@ -702,6 +779,20 @@ const addOns = [
         price: 50,
         description: "Capture the shared spaces and community features that add value.",
         features: ["Pool & Clubhouse Shots", "Parks & Shared Spaces", "Community Context"]
+      },
+      {
+        id: "essentials-aerial",
+        name: "Essentials Aerial Upgrade",
+        price: 89,
+        description: "Aerial upgrade for The Essentials.",
+        features: ["Aerial photos"]
+      },
+      {
+        id: "grass-replacement",
+        name: "Grass replacement",
+        price: 25,
+        description: "Grass replacement for the appointment.",
+        features: ["Grass replacement"]
       }
     ]
   },
@@ -709,11 +800,11 @@ const addOns = [
     category: "The Brand",
     items: [
       {
-        id: "agent-intro",
-        name: "Agent Intro/Outro",
-        price: 75,
-        description: "Put a face to the brand with a professional on-camera introduction.",
-        features: ["On-Camera Greeting", "Professional Audio Setup", "Call-to-Action Closing"]
+        id: "agent-intro-video",
+        name: "Agent intro/outro",
+        price: 59,
+        description: "On-camera agent intro or outro, priced per video.",
+        features: ["Agent intro/outro"]
       }
     ]
   }
@@ -780,95 +871,11 @@ const UPGRADES = [
 ];
 const publicBookingPackages = [
   {
-    id: "hollywood",
-    name: "Hollywood",
-    price: 199,
-    description: "A sharp, streamlined listing launch.",
-    features: ["30 daytime listing photos", "Branded listing website", "Grass replacement included"]
-  },
-  {
-    id: "hall-of-fame",
-    name: "Hall of Fame",
-    price: 299,
-    description: "More coverage for homes that need to stand out.",
-    features: ["35 listing photos", "5 aerial photos", "Branded listing website", "Grass replacement included"]
-  },
-  {
-    id: "red-carpet",
-    name: "Red Carpet",
-    price: 599,
-    description: "More story, more motion, more attention.",
-    features: ["45 listing photos", "5 aerials", "Social reel", "Amenity coverage", "Branded listing website", "Grass replacement included"]
-  },
-  {
-    id: "luxe-video",
-    name: "Luxe Video",
-    price: 785,
-    description: "Standout-home coverage with a listing video.",
-    features: ["50 listing photos", "5 aerials", "Listing video", "Premium editing package", "Grass replacement included"]
-  },
-  {
-    id: "luxe-3d",
-    name: "Luxe 3D Tour",
-    price: 785,
-    description: "Standout-home coverage with a 3D tour.",
-    features: ["50 listing photos", "5 aerials", "3D tour", "Premium editing package", "Grass replacement included"]
-  },
-  {
-    id: "photos-18",
-    name: "Photos Only — 18 photos",
-    price: 139,
-    description: "Photography only. Next-day delivery.",
-    features: ["18 photos", "Next-day delivery"]
-  },
-  {
-    id: "photos-25-only",
-    name: "Photos Only — 25 photos",
-    price: 169,
-    description: "Photography only. Next-day delivery.",
-    features: ["25 photos", "Next-day delivery"]
-  },
-  {
-    id: "photos-40",
-    name: "Photos Only — 40 photos",
-    price: 199,
-    description: "Photography only. Next-day delivery.",
-    features: ["40 photos", "Next-day delivery"]
-  },
-  {
-    id: "aerial-only",
-    name: "Aerial Only",
-    price: 99,
-    description: "Aerial photos without a photo package.",
-    features: ["5 aerial photos"]
-  },
-  {
-    id: "essentials-aerial",
-    name: "Essentials Aerial Upgrade",
-    price: 89,
-    description: "Aerial upgrade for The Essentials.",
-    features: ["Aerial photos"]
-  },
-  {
-    id: "grass-replacement",
-    name: "Grass replacement",
-    price: 25,
-    description: "Grass replacement for the appointment.",
-    features: ["Grass replacement"]
-  },
-  {
     id: "iconic-polish",
     name: "Iconic Polish",
     price: 75,
     description: "Premium digital finish.",
     features: ["Premium digital finish"]
-  },
-  {
-    id: "agent-intro-video",
-    name: "Agent intro/outro",
-    price: 59,
-    description: "On-camera agent intro or outro, priced per video on the public booking page.",
-    features: ["Agent intro/outro"]
   }
 ];
 function serviceCategory(service) {
@@ -1141,6 +1148,7 @@ function collectBookingOffer(catalog, include) {
       continue;
     }
     if (pkg.bookingKind === "basic") {
+      if (isRetiredPublicPhotoPackage(pkg.id) || isRetiredPublicPhotoPackage(pkg.bookingId)) continue;
       const known = basicsList.find((entry2) => entry2.id === pkg.id || entry2.id === pkg.bookingId);
       basics.push(offerItem(pkg, known));
       continue;
@@ -1177,7 +1185,11 @@ function bookingOffer(catalog = packagesForStaffEditor([])) {
   return collectBookingOffer(catalog, (pkg) => isPubliclyBookable(pkg));
 }
 function publicBookingCatalogResponse(catalog = packagesForStaffEditor([])) {
-  return { packages: catalog.filter((item) => isPubliclyBookable(item)) };
+  return {
+    packages: catalog.filter(
+      (item) => isPubliclyBookable(item) && !isRetiredPublicPhotoPackage(item.id) && !isRetiredPublicPhotoPackage(item.bookingId)
+    )
+  };
 }
 function chargeCatalog(input) {
   return input.catalog ?? packagesForStaffEditor([]);
@@ -3355,9 +3367,9 @@ const PACKAGE_SKINS = [
     badge: "Apprenticeship",
     features: "25 photos · 20 min · the cheap one",
     chips: [],
-    price: "$75",
+    price: "$85 / $125",
     priceNote: "",
-    priceDisplay: "$75",
+    priceDisplay: "$85 / $125",
     tier: "entry",
     rank: 1,
     matchPriority: 20,
@@ -8927,10 +8939,10 @@ const RE75_LEAD_SOURCE = "Real Estate $75 apprentice (Google Ads)";
 const RE75_PACKAGES = [
   {
     id: "apprentice-25",
-    name: "Apprentice 25 / $75",
+    name: "Apprentice 25 / $85",
     photos: 25,
     durationMinutes: 20,
-    subtotal: 75,
+    subtotal: 85,
     nudge: null
   },
   {
@@ -10707,6 +10719,10 @@ async function backfillHolidayCalendarEvents() {
   }
   return report;
 }
+const STUDIO105_LEAD_SOURCE = "Studio 105";
+function isStudio105Request(leadSource) {
+  return typeof leadSource === "string" && leadSource.trim() === STUDIO105_LEAD_SOURCE;
+}
 const CACHE_MS$1 = 15e3;
 let cache$1 = null;
 let loggedReadFailure = false;
@@ -10893,7 +10909,7 @@ router$B.post("/", async (req, res) => {
       const packageId = resolved.selectedBasics[0];
       const onlyApprentice = !resolved.selectedService && resolved.selectedBasics.length === 1 && isRealEstate75PackageId(packageId) && resolved.selectedAddOns.length === 0 && !resolved.premiumUpgrade && !(Number(resolved.virtualStagingCredits) > 0);
       if (!onlyApprentice) {
-        return res.status(400).json({ error: "This page books Apprentice 25 / $75 or Apprentice 50 / $125 only." });
+        return res.status(400).json({ error: "This page books Apprentice 25 / $85 or Apprentice 50 / $125 only." });
       }
       const pkg = realEstate75Package(packageId);
       serviceLines = serviceLines.map((item) => item.id === pkg.id ? { ...item, name: pkg.name } : item);
@@ -11256,6 +11272,7 @@ router$B.post("/", async (req, res) => {
     let smsStatus = phone ? "failed" : "skipped";
     const shownTime = requestedTimeLabel || (typeof scheduledTime === "string" ? scheduledTime : "");
     const isThankfulRsvp = leadSource === HOLIDAY_RSVP_LEAD;
+    const studio105Request = isStudio105Request(leadSource);
     const holidayMailKind = holidayCheckoutKind(leadSource, total);
     const holidayHtml = holidayMailKind === "none" || isThankfulRsvp ? "" : holidayOrderReceivedHtml({
       clientName: clientName2,
@@ -11315,6 +11332,12 @@ router$B.post("/", async (req, res) => {
         });
         smsStatus = phone ? "gated" : "skipped";
       }
+    } else if (studio105Request) {
+      clientEmailStatus = "gated";
+      smsStatus = phone ? "gated" : "skipped";
+      console.info(
+        `[Bookings] Studio 105 request ${docRef.id} was saved. booking_received was not sent.`
+      );
     } else {
       clientEmailStatus = await sendEmail({
         to: email,
@@ -34347,7 +34370,6 @@ const PAGES = [
     block("nav", "Navigation", [], [
       linkItem("about", "About", "/about"),
       linkItem("pricing", "Pricing", "/pricing"),
-      linkItem("studio", "Studio 105", "/studio-105"),
       linkItem("portfolio", "Portfolio", "/portfolio"),
       linkItem("insights", "Insights", "/insights"),
       linkItem("stock", "Stock Footage", "/stock-footage"),

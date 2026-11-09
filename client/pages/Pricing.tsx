@@ -10,9 +10,26 @@ import {
   APPRENTICESHIP_OVERAGE_LABEL,
   APPRENTICESHIP_PROGRAM_NAME,
   APPRENTICESHIP_RULES,
+  ICONIC_FINISH_PRICE,
+  SPECIALIZED_BOTH_NAME,
+  SPECIALIZED_BOTH_PRICE,
+  SPECIALIZED_SOCIAL_NAME,
+  SPECIALIZED_SOCIAL_PRICE,
+  addOns,
   apprenticeshipPackages,
   isApprenticeshipPackage,
+  photoOnlyPackages,
 } from "@shared/bookingCatalog";
+
+const PRICING_ADD_ONS = [
+  ...addOns.flatMap((group) => group.items.map((item) => ({
+    id: item.id,
+    label: item.name,
+    price: String(item.price),
+  }))),
+  { id: "specialized-social", label: SPECIALIZED_SOCIAL_NAME, price: String(SPECIALIZED_SOCIAL_PRICE) },
+  { id: "specialized-both", label: SPECIALIZED_BOTH_NAME, price: String(SPECIALIZED_BOTH_PRICE) },
+];
 
 const BRAND_STAGES = [
   {
@@ -751,13 +768,10 @@ export default function Pricing() {
                       <div className="space-y-6">
                         <h4 className="font-black text-xs uppercase tracking-widest mb-6" style={{ color: settings.global.primaryColor }}>Photo Packages</h4>
                         <div className="space-y-4">
-                          {[
-                            { label: "20 Photos", price: "99", id: "photos-20" },
-                            { label: "35 Photos", price: "150", id: "photos-35" },
-                            { label: "50 Photos", price: "200", id: "photos-50" }
-                          ].map((pkg) => (
+                          {photoOnlyPackages.map((pkg) => (
                             <div
                               key={pkg.id}
+                              data-testid={`pricing-photo-${pkg.id}`}
                               onClick={() => setSelectedPhotoPkg(selectedPhotoPkg === pkg.id ? null : pkg.id)}
                               className="flex items-center justify-between p-4 bg-white rounded-xl border transition-all cursor-pointer hover:shadow-md"
                               style={{
@@ -765,7 +779,7 @@ export default function Pricing() {
                                 backgroundColor: selectedPhotoPkg === pkg.id ? `${settings.global.primaryColor}05` : 'white'
                               }}
                             >
-                              <span className="font-bold text-gray-700">{pkg.label}</span>
+                              <span className="font-bold text-gray-700">{pkg.cardTitle || pkg.name}</span>
                               <span className="text-xl font-black text-black">${pkg.price}</span>
                             </div>
                           ))}
@@ -852,19 +866,11 @@ export default function Pricing() {
                           <p className="text-[10px] text-gray-400 font-bold italic mb-6">(Must already be on site doing a full service shoot)</p>
                         </div>
                         <div className="space-y-4">
-                          {[
-                            { label: "Aerial Add-On", price: "99", id: "aerial-addon" },
-                            { label: "Reel Add-On", price: "125", id: "reel-addon" },
-                            { label: "Video Add-On", price: "350-500+", id: "video-addon" },
-                            { label: "3D Matterport", price: "200+", id: "matterport" },
-                            { label: "2D Floorplan Add-On", price: "99", id: "floorplan-addon" },
-                            { label: "Amenity Add-On", price: "50", id: "amenity-addon" },
-                            { label: "Social Media Optimized", price: "85", id: "specialized-social" },
-                            { label: "MLS + Social Media Optimized", price: "125", id: "specialized-both" }
-                          ].map((addon) => (
-                            <div
-                              key={addon.id}
-                              onClick={() => {
+                          {PRICING_ADD_ONS.map((addon) => (
+                              <div
+                                key={addon.id}
+                                data-testid={`pricing-addon-${addon.id}`}
+                                onClick={() => {
                                 if (apprenticeSelected) return;
                                 toggleAddOn(addon.id);
                               }}
@@ -897,9 +903,9 @@ export default function Pricing() {
                                   THE ICONIC POLISH{" "}
                                   <span className="inline-block max-w-full">(Premium Upgrade)</span>
                                 </h4>
-                                <span className="shrink-0 whitespace-nowrap text-3xl font-black leading-none text-white">$75</span>
+                                <span className="shrink-0 whitespace-nowrap text-3xl font-black leading-none text-white">${ICONIC_FINISH_PRICE}</span>
                               </div>
-                              <p className="text-[11px] font-bold text-gray-100">Standard on Market Leader | <span className="whitespace-nowrap">$75</span> Add-on for all other packages (Next Day Delivery)</p>
+                              <p className="text-[11px] font-bold text-gray-100">Standard on Market Leader | <span className="whitespace-nowrap">${ICONIC_FINISH_PRICE}</span> Add-on for all other packages (Next Day Delivery)</p>
                             </div>
                             <div className="grid grid-cols-1 gap-3">
                               {[

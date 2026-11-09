@@ -45,7 +45,7 @@ const bookingsRoute = readFileSync(new URL("../server/routes/bookings.ts", impor
 const fixedSelection: BookingPriceInput = {
   selectedService: "listing-showcase",
   selectedBasics: ["photos-35"],
-  selectedAddOns: ["aerial-drone", "same-day", "agent-intro"],
+  selectedAddOns: ["aerial-drone", "same-day", "agent-intro-video"],
   premiumUpgrade: true,
   virtualStagingCredits: 2,
   specializedPhotography: "social",
@@ -60,16 +60,16 @@ describe("booking total contract", () => {
     const submitted = sumLineItemPrices(lineItems);
     const label = orderTotalLabel(submitted);
 
-    expect(sidebar).toBe(1118);
+    expect(sidebar).toBe(1102);
     expect(submitted).toBe(sidebar);
-    expect(label).toBe("$1118.00");
+    expect(label).toBe("$1102.00");
     expect(orderTotalLabel(sidebar)).toBe(label);
     expect(lineItems.map((item) => [item.name, item.price])).toEqual([
       ["The Showcase", 549],
       ["35 Photos", 150],
       ["Aerial Drone Stills", 99],
       ["Same-Day Delivery", 50],
-      ["Agent Intro/Outro", 75],
+      ["Agent intro/outro", 59],
       ["Iconic Finish (Premium Upgrade)", 75],
       ["Virtual Staging (2 credits)", 70],
       ["Social Media Optimized Photography", 85],
@@ -107,7 +107,7 @@ describe("booking total contract", () => {
       tier: "campaign",
     })));
     expect(sumLineItemPrices(normalized)).toBe(sumLineItemPrices(items));
-    expect(orderTotalLabel(sumLineItemPrices(normalized))).toBe("$1118.00");
+    expect(orderTotalLabel(sumLineItemPrices(normalized))).toBe("$1102.00");
     expect(normalized[0]).toMatchObject({
       description: "Staff note",
       category: "photography",
@@ -397,17 +397,17 @@ describe("booking catalog parity", () => {
   });
 
   it("prices apprenticeship packages at the hard time caps and seeds them with the basics", () => {
-    expect(calculateSidebarTotal({ selectedBasics: ["apprentice-25"] })).toBe(75);
+    expect(calculateSidebarTotal({ selectedBasics: ["apprentice-25"] })).toBe(85);
     expect(calculateSidebarTotal({ selectedBasics: ["apprentice-50"] })).toBe(125);
-    expect(sumLineItemPrices(buildSubmittedLineItems({ selectedBasics: ["apprentice-25", "apprentice-50"] }))).toBe(200);
+    expect(sumLineItemPrices(buildSubmittedLineItems({ selectedBasics: ["apprentice-25", "apprentice-50"] }))).toBe(210);
 
     const twentyFive = buildSubmittedLineItems({ selectedBasics: ["apprentice-25"] })[0];
     const fifty = buildSubmittedLineItems({ selectedBasics: ["apprentice-50"] })[0];
     expect(twentyFive).toMatchObject({
       id: "apprentice-25",
-      unitPrice: 75,
+      unitPrice: 85,
       qty: 1,
-      price: 75,
+      price: 85,
     });
     expect(fifty).toMatchObject({ id: "apprentice-50", unitPrice: 125, qty: 1, price: 125 });
     expect(twentyFive.name).toContain("20 Minute Appointment ONLY");
@@ -418,7 +418,7 @@ describe("booking catalog parity", () => {
     const apprentice25 = docs.find((doc) => doc.id === "apprentice-25");
     const apprentice50 = docs.find((doc) => doc.id === "apprentice-50");
     expect(apprentice25).toMatchObject({
-      price: 75,
+      price: 85,
       tier: "basic",
       bookingKind: "basic",
       category: "photography",
@@ -466,7 +466,11 @@ describe("booking catalog parity", () => {
     ].filter((id): id is string => Boolean(id));
     expect(new Set(ids).size).toBe(ids.length);
     expect(ids).toContain("listing-essentials");
-    expect(ids).toContain("photos-20");
+    expect(ids).toContain("photos-18");
+    expect(ids).not.toContain("photos-20");
+    expect(ids).not.toContain("photos-35");
+    expect(ids).not.toContain("photos-50");
+    expect(catalog.some((item) => item.id === "photos-20" && item.price === 99)).toBe(true);
     expect(ids).toContain("aerial-drone");
     expect(ids).toContain("apprentice-25");
 

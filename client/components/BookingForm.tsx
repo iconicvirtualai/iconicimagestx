@@ -35,6 +35,7 @@ import {
 import { BOOKING_PROCESSING_LABEL, estimateBookingCharge } from "@shared/invoiceProcessing";
 import SocialCountdownBanner from "@/components/SocialCountdownBanner";
 import { payAtCloseCustomerOffer, payAtCloseFeeDollars, type PayAtClosePublicOffer } from "@shared/payAtClose";
+import NewServiceAlert from "@/components/NewServiceAlert";
 import type { SocialRateStep } from "@shared/thankfulEvent";
 import { taxDollars, type PricingRates } from "@shared/pricingSettings";
 import { readPricingRates, seedPricingRates } from "@/lib/pricingAdjustments";
@@ -463,12 +464,14 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
       const specializedBoth = items.includes("specialized-both");
       const apprenticePick = items.find((id) => isApprenticeshipPackage(id));
 
+      const rest = items.filter((id) => id !== "specialized-social" && id !== "specialized-both");
+      const kindOf = (id: string) => catalog.find((entry) => entry.id === id || entry.bookingId === id)?.bookingKind;
       setFormData(prev => ({
         ...prev,
         selectedBasics: apprenticePick
           ? [apprenticePick]
-          : items.filter(i => i !== "specialized-social" && i !== "specialized-both"),
-        selectedAddOns: apprenticePick ? [] : prev.selectedAddOns,
+          : rest.filter((id) => kindOf(id) === "basic"),
+        selectedAddOns: apprenticePick ? [] : rest.filter((id) => kindOf(id) === "addon"),
         premiumUpgrade: apprenticePick ? false : premiumParam,
         virtualStagingCredits: apprenticePick ? 0 : prev.virtualStagingCredits,
         specializedPhotography: apprenticePick
@@ -1121,7 +1124,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
                           }`}
                         >
                           <div className="space-y-1 pr-6">
-                            <h4 className="font-black text-black uppercase text-sm">{b.name}</h4>
+                            <h4 className="font-black text-black uppercase text-sm">{b.cardTitle || b.name}</h4>
                             <span className="block whitespace-nowrap text-sm font-black tabular-nums text-black">${b.price}</span>
                           </div>
                           {formData.selectedBasics.includes(b.id) && (
@@ -2033,13 +2036,13 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
         {/* Sidebar Summary Area */}
         <div className="w-full lg:w-[380px]">
            <div className="flex flex-col gap-6 lg:sticky lg:top-32">
-           <Link to="/pay-at-close" data-testid="splurge-alert" className="block rounded-[2rem] bg-[#1c140c] p-6 text-[#fff7ed] shadow-xl ring-2 ring-[#FFD700]">
-              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#FFD700]">Pay later</p>
-              <h3 className="mt-2 text-2xl font-black leading-none text-white">Splurge Alert!!</h3>
-              <p className="mt-3 text-sm font-semibold leading-snug">Give every listing the budget it deserves, and pay at closing.</p>
-              <p className="mt-2 text-sm font-black text-[#FFD700]">The sale covers it when it closes.</p>
-              <span className="mt-4 inline-block text-sm font-black text-white">Pay Later at Closing →</span>
-           </Link>
+           <NewServiceAlert
+              to="/pay-at-close"
+              eyebrow="Pay later"
+              title="Splurge Alert!!"
+              body="Give every listing the budget it deserves, and pay at closing. The sale covers it when it closes."
+              cta="Pay Later at Closing →"
+           />
            {renderSummarySidebar()}
            <div className="p-6 bg-black rounded-[2rem] text-white space-y-4">
               <div className="flex items-center gap-2.5">

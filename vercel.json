@@ -1815,6 +1815,62 @@
       "destination": "/seo/app.html"
     },
     {
+      "source": "/studio-105/rooms",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/studio-105/rooms/",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/studio-105/noir",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/studio-105/noir/",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/studio-105/blanc",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/studio-105/blanc/",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/studio-105/rates",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/studio-105/rates/",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/studio-105/faq",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/studio-105/faq/",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/studio-105/location",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/studio-105/location/",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/studio-105/book",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/studio-105/book/",
+      "destination": "/seo/app.html"
+    },
+    {
       "source": "/realestate-75",
       "destination": "/seo/private.html"
     },
