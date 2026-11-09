@@ -4,9 +4,20 @@ import Studio105Shell from "@/components/studio105/Studio105Shell";
 import Studio105BookForm from "@/components/studio105/Studio105BookForm";
 import { itemText, useSiteItems, useSiteText } from "@/content/siteContent";
 import { BUSINESS_CONTACT } from "@shared/businessContact";
-import { STUDIO105_PATHS } from "@shared/studio105";
+import { STUDIO105_PATHS, studioRoomRequestHref, type StudioRoomId } from "@shared/studio105";
 
-const ROOMS = [
+const ROOMS: Array<{
+  id: StudioRoomId;
+  path: string;
+  name: string;
+  vibe: string;
+  summary: string;
+  uses: string[];
+  card: string;
+  chip: string;
+  button: string;
+  glow: string;
+}> = [
   {
     id: "studio-noir",
     path: STUDIO105_PATHS.noir,
@@ -113,7 +124,7 @@ function RoomCard({ room, bookLabel }: { room: (typeof ROOMS)[number]; bookLabel
         ))}
       </ul>
       <Button asChild className={`relative mt-8 rounded-full px-8 py-6 font-black uppercase tracking-widest text-xs ${room.button}`}>
-        <Link to={`${STUDIO105_PATHS.book}?room=${room.id}`}>{bookLabel || `Book ${room.name}`}</Link>
+        <Link to={studioRoomRequestHref(room.id)}>{bookLabel || `Book ${room.name}`}</Link>
       </Button>
       <p className="relative mt-4 text-xs opacity-60">
         Request the room and a time. We confirm availability and the rate. This page does not charge a card.
@@ -186,7 +197,7 @@ export default function Studio105() {
               </p>
               <div className="mt-10 grid gap-4 sm:grid-cols-2">
                 {rooms.map((room) => (
-                  <Link key={room.id} to={`${STUDIO105_PATHS.book}?room=${room.id}`} className="rounded-[1.5rem] border border-white/10 p-6 hover:border-[#2dd4bf]">
+                  <Link key={room.id} to={studioRoomRequestHref(room.id)} className="rounded-[1.5rem] border border-white/10 p-6 hover:border-[#2dd4bf]">
                     <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#2dd4bf]">{room.vibe}</p>
                     <h2 className="mt-3 text-2xl font-black uppercase">{room.name}</h2>
                     <p className="mt-3 text-sm leading-relaxed text-white/70">{room.summary}</p>

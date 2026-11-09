@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import Layout from "@/components/Layout";
 import { services } from "@/lib/services";
+import { pricingServiceHref } from "@shared/pricingBookingLinks";
 import { Button } from "@/components/ui/button";
 import { MessageCircle, X, Send, User, Sparkles, ArrowRight, ChevronRight, Check, DollarSign, Target, Rocket } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -41,7 +42,7 @@ const getPackageRecommendation = (id: string): PackageRecommendation | undefined
     name: service.name,
     price: service.price.toString(),
     description: service.description,
-    bookingUrl: `/book?service=${service.id}`,
+    bookingUrl: pricingServiceHref(service.id),
     icon: icons[service.id] || Sparkles
   };
 };

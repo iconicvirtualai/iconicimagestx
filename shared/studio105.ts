@@ -41,6 +41,11 @@ export function isStudioRoomId(value: string): value is StudioRoomId {
   return (STUDIO_ROOM_IDS as readonly string[]).includes(value);
 }
 
+/** Request form #225 uses. `room` preselects Studio Noir or Studio Blanc. */
+export function studioRoomRequestHref(roomId: StudioRoomId): string {
+  return `${STUDIO105_PATHS.book}?room=${roomId}`;
+}
+
 /**
  * Studio 105 room requests must not send booking_received.
  * That template is excluded from the client-notice pause, so the lead source

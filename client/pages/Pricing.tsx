@@ -20,6 +20,7 @@ import {
   isApprenticeshipPackage,
   photoOnlyPackages,
 } from "@shared/bookingCatalog";
+import { PRICING_SERVICE_CTAS, pricingBasicsHref, pricingCta } from "@shared/pricingBookingLinks";
 
 const PRICING_ADD_ONS = [
   ...addOns.flatMap((group) => group.items.map((item) => ({
@@ -187,18 +188,11 @@ export default function Pricing() {
 
   const apprenticeSelected = !!selectedPhotoPkg && isApprenticeshipPackage(selectedPhotoPkg);
 
-  const getBasicsBookingUrl = (premium = false) => {
-    const items = apprenticeSelected
-      ? [selectedPhotoPkg]
-      : [selectedPhotoPkg, ...selectedAddOns].filter(Boolean);
-
-    if (items.length === 0) return "/book";
-
-    const params = new URLSearchParams();
-    params.set("items", items.join(","));
-    if (premium && !apprenticeSelected) params.set("premium", "true");
-    return `/book?${params.toString()}`;
-  };
+  const basicsSelection = apprenticeSelected
+    ? [selectedPhotoPkg]
+    : [selectedPhotoPkg, ...selectedAddOns];
+  const basicsHref = pricingBasicsHref(basicsSelection);
+  const polishHref = apprenticeSelected ? null : pricingBasicsHref(basicsSelection, true);
 
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id);
@@ -216,6 +210,7 @@ export default function Pricing() {
   const listingTiers = [
     {
       name: "THE ESSENTIALS",
+      packageId: "listing-essentials",
       tagline: "The Fast & Fresh.",
       price: "249",
       period: "per listing",
@@ -239,6 +234,7 @@ export default function Pricing() {
     },
     {
       name: "THE SHOWCASE",
+      packageId: "listing-showcase",
       tagline: "The Full Story.",
       price: "549",
       period: "per listing",
@@ -265,6 +261,7 @@ export default function Pricing() {
     },
     {
       name: "THE LEGACY",
+      packageId: "listing-legacy",
       tagline: "The Signature Production.",
       price: "899",
       period: "per listing",
@@ -292,6 +289,7 @@ export default function Pricing() {
     },
     {
       name: "THE MARKET LEADER",
+      packageId: "listing-market-leader",
       tagline: "The Total Takeover",
       subheadline: "Your Full-Cycle Media Partner",
       price: "1,599",
@@ -322,6 +320,7 @@ export default function Pricing() {
   const brandingTiers = [
     {
       name: "THE REFRESH",
+      packageId: "branding-refresh",
       tagline: "The Modern Portrait.",
       price: "349",
       period: "PER SESSION",
@@ -340,6 +339,7 @@ export default function Pricing() {
     },
     {
       name: "THE CONTENT PARTNER",
+      packageId: "branding-content-partner",
       tagline: "30 days of content in 2 hours.",
       price: "999",
       period: "per month",
@@ -358,6 +358,7 @@ export default function Pricing() {
     },
     {
       name: "THE LOCAL LEGEND",
+      packageId: "branding-local-legend",
       tagline: "THE MARKET TAKEOVER CAMPAIGN",
       price: "2,499",
       period: "PER SESSION/CAMPAIGN",
@@ -390,7 +391,7 @@ export default function Pricing() {
       ],
       buttonText: "SIMPLIFY MY SOCIAL",
       ctaSubtext: "The Goal: Established Consistency.",
-      packageId: "content-starter"
+      packageId: "business-baseline"
     },
     {
       name: "THE GROWTH ENGINE",
@@ -407,13 +408,14 @@ export default function Pricing() {
       buttonText: "UNLOCK MY GROWTH",
       ctaSubtext: "The Goal: High Engagement & Inbound DMs.",
       isPopular: true,
-      packageId: "content-pro"
+      packageId: "business-growth-engine"
     }
   ];
 
   const phase2Tiers = [
     {
       name: "THE PROFESSIONAL SUITE",
+      packageId: "business-professional-suite",
       price: "1,500",
       period: "per month",
       tagline: "Your Digital Storefront, Fully Managed.",
@@ -427,6 +429,7 @@ export default function Pricing() {
     },
     {
       name: "THE SIGNATURE TIER",
+      packageId: "business-signature-tier",
       price: "2,800",
       period: "per month",
       tagline: "The High-Volume Authority.",
@@ -441,6 +444,7 @@ export default function Pricing() {
     },
     {
       name: "THE ICONIC PARTNERSHIP",
+      packageId: "business-iconic-partnership",
       price: "4,500",
       period: "per month",
       tagline: "Your Personal Media Agency.",
@@ -455,6 +459,7 @@ export default function Pricing() {
     },
     {
       name: "THE CONNECTED CORE",
+      packageId: "business-connected-core",
       price: "2,000",
       period: "per month",
       tagline: "Social + Database Penetration.",
@@ -469,6 +474,7 @@ export default function Pricing() {
     },
     {
       name: "THE AUTHORITY STACK",
+      packageId: "business-authority-stack",
       price: "3,200",
       period: "per month",
       tagline: "Total Audience Ownership.",
@@ -723,7 +729,7 @@ export default function Pricing() {
                       <Button asChild className={`w-full py-6 rounded-xl font-bold text-sm transition-all hover:scale-[1.02] ${
                         tier.isVIP ? 'bg-white text-black hover:bg-gray-100 border-2 border-[#FFD700]' : tier.isPopular ? 'text-white shadow-lg' : 'bg-black hover:bg-gray-800 text-white shadow-lg'
                       }`} style={{ backgroundColor: tier.isVIP ? undefined : tier.isPopular ? settings.global.primaryColor : undefined }}>
-                        <Link to={`/book?service=${tier.name === 'THE ESSENTIALS' ? 'listing-essentials' : tier.name === 'THE SHOWCASE' ? 'listing-showcase' : tier.name === 'THE LEGACY' ? 'listing-legacy' : 'listing-market-leader'}`}>
+                        <Link data-testid={`pricing-cta-${tier.packageId}`} to={pricingCta(tier.packageId).href}>
                           {tier.buttonText}
                         </Link>
                       </Button>
@@ -885,9 +891,15 @@ export default function Pricing() {
                             </div>
                           ))}
                         </div>
-                        <Button asChild className="w-full mt-4 bg-black hover:bg-gray-800 text-white font-bold py-6 rounded-xl transition-all shadow-lg" disabled={!selectedPhotoPkg && selectedAddOns.length === 0}>
-                          <Link to={getBasicsBookingUrl()}>ORDER BASICS</Link>
-                        </Button>
+                        {basicsHref ? (
+                          <Button asChild className="w-full mt-4 bg-black hover:bg-gray-800 text-white font-bold py-6 rounded-xl transition-all shadow-lg">
+                            <Link data-testid="pricing-cta-basics" to={basicsHref}>ORDER BASICS</Link>
+                          </Button>
+                        ) : (
+                          <Button type="button" disabled className="w-full mt-4 bg-black text-white font-bold py-6 rounded-xl shadow-lg">
+                            ORDER BASICS
+                          </Button>
+                        )}
                       </div>
 
                       {/* ICONIC Edits */}
@@ -930,9 +942,13 @@ export default function Pricing() {
                               <p className="mt-8 text-[11px] font-bold leading-relaxed text-gray-300">
                                 Apprentice photos are not eligible for Iconic Polish. You get what you pay for.
                               </p>
-                            ) : (
+                            ) : polishHref ? (
                               <Button asChild className="w-full mt-8 text-white font-black py-6 rounded-xl transition-all shadow-lg shadow-teal-900/20 bg-[#0d9488] hover:bg-[#0f766e]">
-                                <Link to={getBasicsBookingUrl(true)}>UPGRADE MY EDITS</Link>
+                                <Link data-testid="pricing-cta-polish" to={polishHref}>UPGRADE MY EDITS</Link>
+                              </Button>
+                            ) : (
+                              <Button type="button" disabled className="w-full mt-8 text-white font-black py-6 rounded-xl shadow-lg shadow-teal-900/20 bg-[#0d9488]">
+                                UPGRADE MY EDITS
                               </Button>
                             )}
                           </div>
@@ -1029,7 +1045,7 @@ export default function Pricing() {
                       <Button asChild className={`w-full py-6 rounded-xl font-bold text-sm transition-all hover:scale-[1.02] ${
                         tier.isPopular ? 'text-white shadow-lg' : 'bg-black hover:bg-gray-800 text-white shadow-lg'
                       }`} style={{ backgroundColor: tier.isPopular ? settings.global.primaryColor : undefined }}>
-                        <Link to={`/book?service=${tier.name === 'THE REFRESH' ? 'branding-refresh' : tier.name === 'THE CONTENT PARTNER' ? 'branding-content-partner' : 'branding-local-legend'}`}>
+                        <Link data-testid={`pricing-cta-${tier.packageId}`} to={pricingCta(tier.packageId).href}>
                           {tier.buttonText}
                         </Link>
                       </Button>
@@ -1047,6 +1063,32 @@ export default function Pricing() {
                         </div>
                       </div>
                     </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          <section id="studio-105" className="py-24 bg-[#fafafa]">
+            <div className="max-w-5xl mx-auto px-4">
+              <div className="text-center mb-12 max-w-2xl mx-auto">
+                <h2 className="text-4xl md:text-5xl font-bold text-black mb-4 tracking-tight">Studio 105</h2>
+                <p className="text-lg text-gray-500 leading-relaxed">
+                  Request Studio Noir or Studio Blanc and a time. We confirm availability and the rate. This does not charge a card.
+                </p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {PRICING_SERVICE_CTAS.filter((cta) => cta.kind === "studio-request").map((cta) => (
+                  <div key={cta.packageId} className="bg-white rounded-[2rem] p-8 border border-gray-100 flex flex-col">
+                    <h3 className="text-2xl font-black text-black mb-3">{cta.name}</h3>
+                    <p className="text-sm text-gray-500 leading-relaxed mb-8">
+                      {cta.packageId === "studio-noir"
+                        ? "The dark room for portraits with edge, branding films, and product that needs mood."
+                        : "The white room for crisp headshots, bright product, and holiday minis."}
+                    </p>
+                    <Button asChild className="mt-auto w-full py-6 rounded-xl bg-black hover:bg-gray-800 text-white font-bold">
+                      <Link data-testid={`pricing-cta-${cta.packageId}`} to={cta.href}>{cta.label}</Link>
+                    </Button>
                   </div>
                 ))}
               </div>
@@ -1100,7 +1142,7 @@ export default function Pricing() {
                         ))}
                       </div>
                       <Button asChild className="w-full py-6 rounded-xl bg-black hover:bg-gray-800 text-white font-bold transition-all shadow-lg">
-                        <Link to={`/book?service=${tier.packageId === 'content-starter' ? 'business-baseline' : 'business-growth-engine'}`}>
+                        <Link data-testid={`pricing-cta-${tier.packageId}`} to={pricingCta(tier.packageId).href}>
                           {tier.buttonText}
                         </Link>
                       </Button>
@@ -1140,7 +1182,7 @@ export default function Pricing() {
                           ))}
                         </div>
                         <Button asChild className={`w-full py-6 rounded-xl font-bold transition-all ${tier.isPopular ? 'text-white' : 'bg-black text-white'}`} style={{ backgroundColor: tier.isPopular ? settings.global.primaryColor : undefined }}>
-                          <Link to={`/book?service=${tier.name === 'THE PROFESSIONAL SUITE' ? 'business-professional-suite' : tier.name === 'THE SIGNATURE TIER' ? 'business-signature-tier' : tier.name === 'THE ICONIC PARTNERSHIP' ? 'business-iconic-partnership' : tier.name === 'THE CONNECTED CORE' ? 'business-connected-core' : 'business-authority-stack'}`}>
+                          <Link data-testid={`pricing-cta-${tier.packageId}`} to={pricingCta(tier.packageId).href}>
                             {tier.buttonText}
                           </Link>
                         </Button>
@@ -1167,7 +1209,7 @@ export default function Pricing() {
                             ))}
                           </div>
                           <Button asChild className="w-full py-6 rounded-xl bg-black text-white font-bold transition-all">
-                            <Link to={`/book?service=${tier.name === 'THE PROFESSIONAL SUITE' ? 'business-professional-suite' : tier.name === 'THE SIGNATURE TIER' ? 'business-signature-tier' : tier.name === 'THE ICONIC PARTNERSHIP' ? 'business-iconic-partnership' : tier.name === 'THE CONNECTED CORE' ? 'business-connected-core' : 'business-authority-stack'}`}>
+                            <Link data-testid={`pricing-cta-${tier.packageId}`} to={pricingCta(tier.packageId).href}>
                               {tier.buttonText}
                             </Link>
                           </Button>
@@ -1229,8 +1271,8 @@ export default function Pricing() {
                     ))}
                   </div>
                   <Button asChild className="w-full py-6 rounded-xl bg-black text-white hover:text-white transition-all" onMouseEnter={(e) => e.currentTarget.style.backgroundColor = settings.global.primaryColor} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'black'}>
-                    <Link to="/book?service=growth-foundation">
-                      START MY FOUNDATION →
+                    <Link data-testid="pricing-cta-growth-foundation" to={pricingCta("growth-foundation").href}>
+                      {pricingCta("growth-foundation").label}
                     </Link>
                   </Button>
                 </div>
@@ -1257,8 +1299,8 @@ export default function Pricing() {
                     ))}
                   </div>
                   <Button asChild className="w-full py-6 rounded-xl bg-black text-white hover:text-white transition-all" onMouseEnter={(e) => e.currentTarget.style.backgroundColor = settings.global.primaryColor} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'black'}>
-                    <Link to="/book?service=growth-evolution">
-                      START MY EVOLUTION →
+                    <Link data-testid="pricing-cta-growth-evolution" to={pricingCta("growth-evolution").href}>
+                      {pricingCta("growth-evolution").label}
                     </Link>
                   </Button>
                 </div>
@@ -1278,7 +1320,7 @@ export default function Pricing() {
                       </p>
                     </div>
                     <Button asChild className="text-white font-black px-12 py-8 text-xl rounded-2xl transition-all shadow-xl hover:scale-105 active:scale-95 shrink-0" style={{ backgroundColor: settings.global.primaryColor }}>
-                      <Link to="/book?service=growth-bundle">LET'S CHAT</Link>
+                      <Link data-testid="pricing-cta-growth-bundle" to={pricingCta("growth-bundle").href}>{pricingCta("growth-bundle").label}</Link>
                     </Button>
                   </div>
 
