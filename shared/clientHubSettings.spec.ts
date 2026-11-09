@@ -163,10 +163,16 @@ describe("profile autofill", () => {
     expect(squareBuyerPrefill({
       clientEmail: "example.agent@example.com",
       ...stamp,
-    })).toMatchObject({
+    })).toEqual({
       buyer_email: "example.billing@example.com",
-      buyer_phone_number: "(281) 555-0199",
-      buyer_address: { address_line_1: stamp.billToAddress, country: "US" },
+      buyer_phone_number: "+12815550199",
+      buyer_address: {
+        address_line_1: "100 Example Street, Suite 200",
+        locality: "Spring",
+        administrative_district_level_1: "TX",
+        postal_code: "77373",
+        country: "US",
+      },
     });
   });
 });
