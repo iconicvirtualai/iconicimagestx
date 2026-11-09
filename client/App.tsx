@@ -192,7 +192,7 @@ const App = () => (
             <Route path="/go" element={<Go />} />
             <Route path="/listing-cards" element={<ProtectedRoute requiredRole="coordinator"><ListingCardPreview /></ProtectedRoute>} />
             <Route path="/admin/order-tiles" element={<AdminOrderTiles />} />
-            <Route path="/admin/orders-preview" element={<AdminOrdersPreview />} />
+            <Route path="/admin/orders-preview" element={<ProtectedRoute requiredRole="coordinator"><AdminOrdersPreview /></ProtectedRoute>} />
             {/* Bare /studio has no project id. Studio 105 is the public studio page. */}
             <Route path="/studio" element={<Navigate to="/studio-105" replace />} />
             {/* Bare /gallery has no project id. The client portal is the door. */}
@@ -205,7 +205,7 @@ const App = () => (
             <Route path="/present/:token" element={<ListingPresentation />} />
             <Route path="/l/:slug" element={<ListingSite />} />
             <Route path="/invoice/:invoiceId" element={<ClientInvoice />} />
-            <Route path="/dev/invoice-template" element={<InvoiceTemplatePreview />} />
+            <Route path="/dev/invoice-template" element={<ProtectedRoute requiredRole="coordinator"><InvoiceTemplatePreview /></ProtectedRoute>} />
             <Route path="/services/virtual-staging" element={<VirtualStaging />} />
             <Route path="/services/virtual-staging/select" element={<VirtualStagingSelection />} />
             <Route path="/services/virtual-staging/ai-tool" element={<VirtualStagingAITool />} />

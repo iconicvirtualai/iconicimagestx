@@ -1760,7 +1760,7 @@ function receiptProcessing(input) {
   const status2 = text$y(input.invoice.status).toLowerCase();
   const paymentStatus = text$y(input.invoice.paymentStatus).toLowerCase();
   if (status2 === "comped" || paymentStatus === "comped") return 0;
-  const base = roundCents(input.subtotal - input.promotions + input.fees);
+  const base = roundCents$1(input.subtotal - input.promotions + input.fees);
   const stored = finite$1(input.invoice.processing);
   const quoted = stored != null ? Math.max(0, stored) : processingFee(base);
   const quotedCents = toCents(quoted);
@@ -1768,7 +1768,7 @@ function receiptProcessing(input) {
   const paidCents = toCents(input.totalPaid);
   const baseCents = toCents(base);
   if (paidCents + 1 < baseCents + quotedCents) return 0;
-  return roundCents(quotedCents / 100);
+  return roundCents$1(quotedCents / 100);
 }
 function receiptLogoUrl(env) {
   return publicClientUrl("/media/logos/iconic-graffiti-logo.png", env);
@@ -1790,8 +1790,8 @@ function receiptLines(lineItems) {
     const unit = finite$1(row.unitPrice);
     const linePrice = finite$1(row.price);
     const explicitTotal = finite$1(row.total);
-    const total = explicitTotal ?? linePrice ?? (unit != null ? roundCents(unit * qty) : 0);
-    const shownUnit = unit ?? (qty ? roundCents(total / qty) : total);
+    const total = explicitTotal ?? linePrice ?? (unit != null ? roundCents$1(unit * qty) : 0);
+    const shownUnit = unit ?? (qty ? roundCents$1(total / qty) : total);
     lines.push({ name, qty, unit: shownUnit, total });
   }
   return lines;
@@ -2031,7 +2031,7 @@ function receiptText(content) {
 function money$8(value) {
   return (Number(value) || 0).toLocaleString("en-US", { style: "currency", currency: "USD" });
 }
-function roundCents(value) {
+function roundCents$1(value) {
   return Math.round((Number(value) || 0) * 100) / 100;
 }
 function toCents(value) {
@@ -2909,6 +2909,9 @@ function assessTravel(value, zones = TRAVEL_ZONES) {
     if (row.address != null && row.address !== value) return assessTravel(row.address);
   }
   return unresolved();
+}
+function travelPriceKnown(travel) {
+  return typeof travel.travelZone === "number" && Number.isFinite(travel.travelZone) && travel.travelZone > 0 && typeof travel.travelFeeCents === "number" && Number.isFinite(travel.travelFeeCents) && travel.travelFeeCents >= 0;
 }
 function travelCustomerLine(travel) {
   if (travel.travelQuoted || travel.travelZone == null) {
@@ -6028,8 +6031,10 @@ function text$r(value) {
 const NOT_PROVIDED = "Not provided";
 function officeNewOrderEmail(saved, options) {
   const catalog = options?.catalog ?? packagesForStaffEditor([]);
-  const lines = orderServiceLines(saved).filter((line) => !isTravelFeeLine(line));
+  const rawLines = orderServiceLines(saved);
+  const lines = rawLines.filter((line) => !isTravelFeeLine(line) && !isProcessingChargeLine(line));
   const charges = orderChargeSummary(saved, lines);
+  const processingAmount = officeProcessingAmount(saved, rawLines);
   const packageLine = lines.find((line) => !isAddOn(line, catalog)) || lines[0];
   const addOns2 = packageLine ? lines.filter((line) => line !== packageLine) : lines;
   const features = packageFeatures(packageLine, catalog);
@@ -6041,6 +6046,7 @@ function officeNewOrderEmail(saved, options) {
   const requestedDate = firstDate(saved, ["scheduledDate", "requestedDate", "appointmentDate", "requestedDates"]);
   const clientName2 = clientNameOf(saved);
   const notes = notesOf(saved);
+  const subtotal = subtotalBeforeProcessing(saved, lines, processingAmount);
   const fields = [
     ["Order number", orderNumber2],
     ["Admin link", text$q(options?.adminUrl) || NOT_PROVIDED],
@@ -6066,7 +6072,8 @@ function officeNewOrderEmail(saved, options) {
     ["Turnaround", deliverables.turnaround],
     ["Add-ons", addOnText(addOns2)],
     ["Travel", travelTextForRecord(saved, { miles: true }) ?? NOT_PROVIDED],
-    ["Subtotal", moneyField(saved, "subtotal", lines.length ? charges.subtotal : null)],
+    ["Subtotal", subtotal],
+    ...processingAmount == null ? [] : [["Processing", formatMoney(processingAmount)]],
     ["Tax", moneyField(saved, "tax", lines.length ? charges.tax : null)],
     ["Total", moneyField(saved, "total", lines.length ? charges.total : null)],
     ["Payment", paymentOf(saved, lines.length ? charges.total : null)],
@@ -6140,8 +6147,54 @@ function digits$1(value) {
   return value === NOT_PROVIDED ? "" : value.replace(/\D/g, "");
 }
 function notesOf(saved) {
-  const parts = ["vibeNote", "notes", "specialInstructions", "internalNotes"].map((key) => text$q(saved[key])).filter(Boolean);
-  return parts.length ? parts.join("\n") : NOT_PROVIDED;
+  const seen = /* @__PURE__ */ new Set();
+  const lines = [];
+  for (const key of ["vibeNote", "notes", "specialInstructions", "internalNotes"]) {
+    const chunk2 = text$q(saved[key]);
+    if (!chunk2) continue;
+    for (const line of chunk2.split(/\n+/)) {
+      const trimmed = line.trim();
+      if (!trimmed || seen.has(trimmed)) continue;
+      seen.add(trimmed);
+      lines.push(trimmed);
+    }
+  }
+  return lines.length ? lines.join("\n") : NOT_PROVIDED;
+}
+function isProcessingChargeLine(item) {
+  if (adjustmentKind(item) === "processing") return true;
+  const id = String(item.id || "");
+  if (id === "processing" || id === "adjustment-processing") return true;
+  return /^processing fee\b/i.test(String(item.name || "").trim());
+}
+function officeProcessingAmount(saved, lines) {
+  const pricing = nested(saved.pricing);
+  const explicit = moneyOrNull(saved.processing) ?? moneyOrNull(pricing.processing);
+  if (explicit != null) return roundCents(explicit);
+  const feeLines = lines.filter((line) => isProcessingChargeLine(line));
+  if (feeLines.length === 0) return null;
+  return roundCents(feeLines.reduce((sum, line) => sum + line.price, 0));
+}
+function subtotalBeforeProcessing(saved, serviceLines, processingAmount) {
+  const pricing = nested(saved.pricing);
+  const stored = moneyOrNull(saved.subtotal) ?? moneyOrNull(pricing.subtotal);
+  const total = moneyOrNull(saved.total) ?? moneyOrNull(pricing.total);
+  const tax = moneyOrNull(saved.tax) ?? moneyOrNull(pricing.tax) ?? 0;
+  const fromLines = serviceLines.length ? roundCents(serviceLines.reduce((sum, line) => sum + line.price, 0)) : null;
+  if (processingAmount != null && processingAmount > 0 && total != null && stored != null && roundCents(stored) === roundCents(total)) {
+    return formatMoney(centsApart(total, processingAmount, tax));
+  }
+  if (fromLines != null && fromLines > 0) return formatMoney(fromLines);
+  if (stored != null) return formatMoney(roundCents(stored));
+  if (total != null) return formatMoney(centsApart(total, processingAmount ?? 0, tax));
+  return NOT_PROVIDED;
+}
+function centsApart(total, processing, tax) {
+  const cents2 = Math.round(total * 100) - Math.round(processing * 100) - Math.round(tax * 100);
+  return cents2 / 100;
+}
+function roundCents(value) {
+  return Math.round(value * 100) / 100;
 }
 function lockboxOf(saved) {
   const code = firstText$1(saved, ["lockboxCode", "supraCode"]);
@@ -12507,7 +12560,7 @@ function parseSeniorLivingOrder(body, rates) {
     rates
   });
   if (quoted.ok === false) return { ok: false, honeypot: false, error: quoted.error };
-  if (quoted.quote.travel.travelQuoted) {
+  if (!travelPriceKnown(quoted.quote.travel)) {
     return {
       ok: false,
       honeypot: false,
@@ -18626,7 +18679,7 @@ const db$l = () => appFirestore();
 const stripe$1 = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
   apiVersion: "2024-06-20"
 });
-function appUrl$3() {
+function appUrl$1() {
   return process.env.APP_URL || "https://iconicimagestx.com";
 }
 function stripeReady() {
@@ -19764,7 +19817,7 @@ router$x.post("/invoice/:id/deposit-checkout", async (req, res) => {
       purpose: "deposit",
       amountCents,
       name: orderSource === APPRENTICESHIP_ORDER_SOURCE || orderSource === HEADSHOTS_ORDER_SOURCE ? `Iconic Images booking fee ${orderNumber2 || invoice.invoiceNumber || invoiceDoc.id}` : `Iconic Images deposit ${invoice.invoiceNumber || invoiceDoc.id}`,
-      redirectUrl: `${appUrl$3()}${orderSource === HEADSHOTS_ORDER_SOURCE ? headshotBookingReturnPath(orderNumber2) : orderSource === APPRENTICESHIP_ORDER_SOURCE ? apprenticeshipBookingReturnPath(orderNumber2, invoice.depositReturn) : seniorLivingDepositReturnPath(orderNumber2)}`,
+      redirectUrl: `${appUrl$1()}${orderSource === HEADSHOTS_ORDER_SOURCE ? headshotBookingReturnPath(orderNumber2) : orderSource === APPRENTICESHIP_ORDER_SOURCE ? apprenticeshipBookingReturnPath(orderNumber2, invoice.depositReturn) : seniorLivingDepositReturnPath(orderNumber2)}`,
       prefill: squareBuyerPrefill(invoice),
       paymentNote: squarePaymentNote(invoiceDoc.id, invoice.invoiceNumber),
       logLabel: "Square deposit checkout error",
@@ -29443,9 +29496,6 @@ const limiter$2 = createRateLimiter({
   windowMs: SENIOR_LIVING_RATE_WINDOW_MS,
   max: SENIOR_LIVING_RATE_MAX
 });
-function appUrl$2() {
-  return process.env.APP_URL || "https://iconicimagestx.com";
-}
 const db$4 = () => admin.firestore();
 async function nextInvoiceNumber$1() {
   const year = (/* @__PURE__ */ new Date()).getFullYear();
@@ -29703,7 +29753,7 @@ router$d.post("/order", async (req, res) => {
       await notifyOfficeOfOrder({
         isNewOrder: true,
         saved,
-        adminUrl: `${appUrl$2()}/admin/orders`,
+        adminUrl: publicClientUrl("/admin/orders"),
         env: seniorLivingOfficeEnv()
       });
     } catch (error) {
@@ -29772,7 +29822,7 @@ router$d.post("/", async (req, res) => {
       await notifyOfficeOfOrder({
         isNewOrder: true,
         saved,
-        adminUrl: `${appUrl$2()}/admin/orders`,
+        adminUrl: publicClientUrl("/admin/orders"),
         env: seniorLivingOfficeEnv()
       });
     } catch (error) {
@@ -29791,9 +29841,6 @@ const limiter$1 = createRateLimiter({
   windowMs: 15 * 60 * 1e3,
   max: 5
 });
-function appUrl$1() {
-  return process.env.APP_URL || "https://iconicimagestx.com";
-}
 const db$3 = () => admin.firestore();
 async function loadCatalog() {
   try {
@@ -30126,7 +30173,7 @@ router$c.post("/order", async (req, res) => {
           scheduledDate: slot?.date || null,
           scheduledTime: slot?.time || value.preferredTime || null
         },
-        adminUrl: `${appUrl$1()}/admin/orders`
+        adminUrl: publicClientUrl("/admin/orders")
       });
     } catch (error) {
       console.error("[Apprenticeship] Office notify failed:", error);

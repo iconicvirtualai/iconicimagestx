@@ -1,5 +1,5 @@
 import type { PricingRates } from "./pricingSettings.ts";
-import { assessTravel, travelInvoiceLine, type TravelAssessment } from "./travelZones.ts";
+import { assessTravel, travelInvoiceLine, travelPriceKnown, type TravelAssessment } from "./travelZones.ts";
 
 /**
  * Senior living campaign pricing and request shape.
@@ -503,7 +503,7 @@ export function parseSeniorLivingOrder(
     rates,
   });
   if (quoted.ok === false) return { ok: false, honeypot: false, error: quoted.error };
-  if (quoted.quote.travel.travelQuoted) {
+  if (!travelPriceKnown(quoted.quote.travel)) {
     return {
       ok: false,
       honeypot: false,

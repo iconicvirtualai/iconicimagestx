@@ -204,7 +204,14 @@ describe("senior living request route", () => {
     expect(requestHandler).not.toContain("sendEmail");
     expect(requestHandler).not.toContain("booking_received");
     expect(source).toContain("clientNotifyLive");
+    expect(source).toContain('publicClientUrl("/admin/orders")');
+    expect(source).not.toContain("function appUrl");
+    expect(source).not.toContain("https://iconicimagestx.com/admin");
     expect(source).not.toContain(["cadi", "@"].join(""));
+    const apprenticeship = readFileSync(new URL("./apprenticeship.ts", import.meta.url), "utf8");
+    expect(apprenticeship).toContain('publicClientUrl("/admin/orders")');
+    expect(apprenticeship).not.toContain("function appUrl");
+    expect(apprenticeship).not.toContain("https://iconicimagestx.com/admin");
     expect(index).toContain(
       'app.use("/api/senior-living", seniorLivingRouter)',
     );
