@@ -12,6 +12,7 @@ import { doorsOpenDeliveryEmailHtml, doorsOpenReceiptEmailHtml } from "./doorsOp
 import { galleryDeliverySubject } from "./galleryDelivery.ts";
 import { BOOKING_PROCESSING_LABEL } from "./invoiceProcessing.ts";
 import { paymentReceiptFromVars } from "./paymentReceiptLayout.ts";
+import { presentClientEmailHtml } from "./clientPortal.ts";
 
 export const EMAIL_TEMPLATES_COLLECTION = "emailTemplates";
 
@@ -343,18 +344,21 @@ function galleryDeliveryBuiltin(vars: Record<string, string>): string {
 }
 
 export function clientBuiltinEmailHtml(type: string, vars: Record<string, string> = {}): string {
+  let html: string;
   if (type === "payment_receipt") {
     const branded = paymentReceiptFromVars(vars).html;
     const doorsOpen = doorsOpenReceiptEmailHtml(vars.dotOptInUrl || "");
-    return branded.includes("</body>")
+    html = branded.includes("</body>")
       ? branded.replace("</body>", `${doorsOpen}</body>`)
       : `${branded}${doorsOpen}`;
+  } else if (type === "gallery_delivery") {
+    html = galleryDeliveryBuiltin(vars);
+  } else if (!isClientEmailTemplate(type)) {
+    html = shell(`<p>You have a new notification from Iconic Images.</p>`);
+  } else {
+    html = fillEmailPlaceholders(HTML_SOURCE[type], vars);
   }
-  if (type === "gallery_delivery") return galleryDeliveryBuiltin(vars);
-  if (!isClientEmailTemplate(type)) {
-    return shell(`<p>You have a new notification from Iconic Images.</p>`);
-  }
-  return fillEmailPlaceholders(HTML_SOURCE[type], vars);
+  return presentClientEmailHtml(html);
 }
 
 export const CLIENT_EMAIL_SAMPLE: Record<string, string> = {

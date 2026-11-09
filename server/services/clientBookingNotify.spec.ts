@@ -83,20 +83,34 @@ describe("client booking mail and the notify switch", () => {
     expect(sendMail).not.toHaveBeenCalled();
   });
 
-  it("sends the appointment confirmation and password-setup email when the switch is on", async () => {
+  it("sends the appointment confirmation when notifications are on, and the password email only when the portal is on", async () => {
+    delete process.env.CLIENT_PORTAL_ENABLED;
     useNotifyEnv({ CLIENT_NOTIFY_LIVE: "true" });
     const confirmed = await sendEmail({
       to: client,
       template: "order_confirmed",
-      variables: { clientName: "Ada", address: "1 Main St" },
+      variables: { clientName: "Ada", address: "1 Main St", scheduledDate: "Monday", photographerName: "Alex" },
     });
-    const password = await sendEmail({
+    const passwordHeld = await sendEmail({
       to: client,
       template: "account_password_setup",
       variables: { clientName: "Ada", clientEmail: client, setupUrl: "https://example.test/setup" },
     });
     expect(confirmed).toEqual({ sent: true, delivery: "sent" });
+    expect(passwordHeld).toEqual({ sent: false, delivery: "suppressed" });
+    expect(sendMail).toHaveBeenCalledTimes(1);
+    expect(String(sendMail.mock.calls[0]?.[0]?.html || "")).not.toContain("View Your Portal");
+    expect(String(sendMail.mock.calls[0]?.[0]?.html || "")).not.toContain("client portal");
+    expect(String(sendMail.mock.calls[0]?.[0]?.html || "")).toContain("Monday");
+
+    process.env.CLIENT_PORTAL_ENABLED = "true";
+    const password = await sendEmail({
+      to: client,
+      template: "account_password_setup",
+      variables: { clientName: "Ada", clientEmail: client, setupUrl: "https://example.test/setup" },
+    });
     expect(password).toEqual({ sent: true, delivery: "sent" });
+    delete process.env.CLIENT_PORTAL_ENABLED;
     expect(sendMail).toHaveBeenCalledTimes(2);
     for (const call of sendMail.mock.calls) {
       expect(call[0].to).toBe(client);

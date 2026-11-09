@@ -4,6 +4,7 @@ import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { itemLink, itemText, useSiteHref, useSiteItems, useSiteText } from "@/content/siteContent";
+import { clientPortalEnabled, isClientLoginChrome } from "@shared/clientPortal";
 
 function isStudioNavItem(item: { label: string; href: string }): boolean {
   const href = item.href.split("?")[0].replace(/\/$/, "") || "/";
@@ -42,6 +43,10 @@ export default function Header() {
         { label: "Contact Us", href: "/contact" },
       ]
   ).filter((item) => !isStudioNavItem(item));
+  const portalOpen = clientPortalEnabled();
+  const visibleMenuItems = portalOpen
+    ? menuItems
+    : menuItems.filter((item) => !isClientLoginChrome(item.href, item.label));
   const studioLabel = "Studio 105";
   const loginLabel = useSiteText("chrome", "headerCtas", "login", "Log in");
   const loginHref = useSiteHref("chrome", "headerCtas", "login", "/login");
@@ -74,7 +79,7 @@ export default function Header() {
 
         {/* Desktop Navigation (Left Aligned) */}
         <nav className="hidden min-w-0 flex-1 items-center gap-x-3 overflow-visible lg:flex xl:ml-4 xl:gap-x-5">
-          {menuItems.map((item) => (
+          {visibleMenuItems.map((item) => (
             <Link
               key={item.href}
               to={item.href}
@@ -94,9 +99,11 @@ export default function Header() {
           >
             {studioLabel}
           </Link>
+          {portalOpen ? (
           <Link to={loginHref}>
             <span data-site-page="chrome" data-site-block="headerCtas" data-site-field="login" data-site-kind="text" className="text-xs font-bold text-white/70 hover:text-white cursor-pointer transition-colors">{loginLabel}</span>
           </Link>
+          ) : null}
           <Link to={bookHref}>
             <Button className="rounded-xl px-5 py-1.5 h-8 text-[10px] font-black uppercase tracking-widest bg-white text-black hover:bg-gray-200">
               <span data-site-page="chrome" data-site-block="headerCtas" data-site-field="book" data-site-kind="text">{bookLabel}</span>
@@ -122,7 +129,7 @@ export default function Header() {
       {isMenuOpen && (
         <div className="mt-4 mx-auto max-w-[400px] bg-black/95 backdrop-blur-xl border border-white/10 rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
           <nav className="px-8 py-10 flex flex-col gap-6">
-            {menuItems.map((item) => (
+            {visibleMenuItems.map((item) => (
               <Link
                 key={item.href}
                 to={item.href}
@@ -139,6 +146,7 @@ export default function Header() {
             >
               {studioLabel}
             </Link>
+            {portalOpen ? (
             <Link
               to={loginHref}
               className="text-xs font-bold text-white/70 hover:text-white transition-colors"
@@ -146,6 +154,7 @@ export default function Header() {
             >
               {loginLabel}
             </Link>
+            ) : null}
             <Link to={bookHref} onClick={() => setIsMenuOpen(false)}>
               <Button className="w-full rounded-xl px-5 py-1.5 h-10 text-[10px] font-black uppercase tracking-widest bg-white text-black hover:bg-gray-200">
                 {bookLabel}

@@ -19,6 +19,7 @@ import {
 import { resolveClientIdentity, upsertPortalClient } from "../services/clientAccounts";
 import { ensurePortalListingsForClient } from "../services/bookingListing";
 import { jsonSafe } from "../lib/firestoreJson";
+import { clientPortalEnabled } from "../../shared/clientPortal";
 import { handleCreatePhotoEditRequest, handleCreatePortalUploadUrl, handleGetPortalListing, handlePatchPortalData, handlePatchPortalMedia, handlePatchPortalWebsite, handleRegisterPortalUpload } from "./portalListing";
 
 const router = Router();
@@ -65,6 +66,12 @@ function adminReady(res: { status: (code: number) => { json: (body: unknown) => 
 
 // POST /api/clients/register — public client portal signup (never creates staff)
 router.post("/register", async (req, res) => {
+  if (!clientPortalEnabled()) {
+    return res.status(403).json({
+      error: "Client portal signup is not available yet. Email photos@iconicimagestx.com for access to your media.",
+      code: "client_portal_disabled",
+    });
+  }
   if (!adminReady(res)) return;
   const firstName = cleanPersonName(req.body?.firstName);
   const lastName = cleanPersonName(req.body?.lastName);

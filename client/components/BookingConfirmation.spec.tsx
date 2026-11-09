@@ -38,6 +38,7 @@ describe("booking confirmation screen", () => {
   });
 
   it("promises the confirmation email only when client notifications are live", () => {
+    process.env.CLIENT_PORTAL_ENABLED = "true";
     const html = renderToStaticMarkup(
       <BookingConfirmation
         result={{
@@ -55,5 +56,25 @@ describe("booking confirmation screen", () => {
     expect(html).toContain("A separate email has the link to set your portal password.");
     expect(html).not.toContain("password-setup");
     expect(html).not.toContain(INTERNAL_NOTE);
+    delete process.env.CLIENT_PORTAL_ENABLED;
+  });
+
+  it("leaves the order number and drops portal copy while the portal flag is off", () => {
+    delete process.env.CLIENT_PORTAL_ENABLED;
+    const html = renderToStaticMarkup(
+      <BookingConfirmation
+        result={{
+          orderNumber: "ORD - B - 22017",
+          accountCreated: true,
+          clientNotificationsLive: true,
+          notifications: { appointmentEmail: "sent", sms: "sent", passwordSetup: "sent" },
+        }}
+        onBookAnother={() => undefined}
+      />,
+    );
+    expect(html).toContain("ORD - B - 22017");
+    expect(html).toContain("A confirmation email is on its way.");
+    expect(html).not.toContain("portal");
+    expect(html).not.toContain("password");
   });
 });

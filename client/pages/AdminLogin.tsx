@@ -8,6 +8,7 @@ import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { staffLoginAction } from "@shared/staffAccess";
+import { clientPortalEnabled } from "@shared/clientPortal";
 import { CHANGE_PASSWORD_PATH } from "@shared/passwordAccount";
 import { openOwnerSession, ownerLoginNext } from "@/lib/openOwnerSession";
 import { Button } from "@/components/ui/button";
@@ -153,10 +154,15 @@ export default function AdminLogin() {
           </form>
 
         <p className="text-center text-zinc-700 text-xs mt-8">
-          Staff access only. Client portal →{" "}
-          <a href="/portal" className="text-zinc-500 hover:text-zinc-300">
-            iconicimagestx.com/portal
-          </a>
+          Staff access only.
+          {clientPortalEnabled() ? (
+            <>
+              {" "}Client portal →{" "}
+              <a href="/portal" className="text-zinc-500 hover:text-zinc-300">
+                iconicimagestx.com/portal
+              </a>
+            </>
+          ) : null}
         </p>
       </div>
     </div>

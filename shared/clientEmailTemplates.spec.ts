@@ -16,6 +16,7 @@ import {
   templateShowsMoney,
 } from "./clientEmailTemplates.ts";
 import { builtinEmailHtml } from "../server/services/email.ts";
+import { presentClientEmailHtml } from "./clientPortal.ts";
 import {
   CLIENT_CONFIRMATION_HTML,
   CLIENT_CONFIRMATION_SUBJECT,
@@ -138,7 +139,7 @@ describe("client email catalog", () => {
     expect(message.html).toContain("#104");
     expect(message.html).not.toContain("firestoreDocId");
     expect(message.html).toContain("100 Congress Ave, Austin, TX 78701");
-    expect(message.html).toBe(fillEmailPlaceholders(CLIENT_CONFIRMATION_HTML, {
+    expect(message.html).toBe(presentClientEmailHtml(fillEmailPlaceholders(CLIENT_CONFIRMATION_HTML, {
       clientName: "Drew Feig",
       clientEmail: "",
       clientPhone: "",
@@ -148,7 +149,9 @@ describe("client email catalog", () => {
       total: "0",
       notes: "Gate code is on the lockbox.",
       orderNumber: "#104",
-    }));
+    })));
+    expect(message.html).not.toContain("client portal");
+    expect(message.html).toContain("We'll be in touch to confirm your shoot time.");
     expect(message.html).toBe(clientBuiltinEmailHtml("clientConfirmation", {
       clientName: "Drew Feig",
       propertyAddress: "100 Congress Ave, Austin, TX 78701",

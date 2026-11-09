@@ -61,18 +61,30 @@ export function orderConfirmationTags(order: Record<string, unknown>): Record<st
   };
 }
 
+const EMAIL_QUESTIONS_WITH_PORTAL = "Questions? Reply to this email or message us through your client portal.";
+const EMAIL_QUESTIONS_WITHOUT_PORTAL = "Questions? Reply to this email.";
+
+/** Keep in sync with presentClientEmailHtml in shared/clientPortal.ts. */
+function hideClientPortalInEmail(html: string): string {
+  if (process.env.CLIENT_PORTAL_ENABLED === "true") return html;
+  return html
+    .split(EMAIL_QUESTIONS_WITH_PORTAL).join(EMAIL_QUESTIONS_WITHOUT_PORTAL)
+    .replace(/<p[^>]*>\s*<a\b[^>]*>\s*View Your Portal\s*<\/a>\s*<\/p>/gi, "")
+    .replace(/<p[^>]*>\s*<a\b[^>]*>\s*Open the client portal\s*<\/a>\s*<\/p>/gi, "");
+}
+
 export function resolveClientConfirmation(order: Record<string, unknown>, stored: unknown): { subject: string; html: string } {
   const tags = orderConfirmationTags(order);
   const override = readEmailTemplateOverride(stored);
   if (!override) {
     return {
       subject: clientConfirmationSubject(tags.orderNumber),
-      html: fillEmailPlaceholders(CLIENT_CONFIRMATION_HTML, tags),
+      html: hideClientPortalInEmail(fillEmailPlaceholders(CLIENT_CONFIRMATION_HTML, tags)),
     };
   }
   return {
     subject: fillEmailPlaceholders(override.subject, tags),
-    html: fillEmailPlaceholders(override.htmlBody, tags),
+    html: hideClientPortalInEmail(fillEmailPlaceholders(override.htmlBody, tags)),
   };
 }
 

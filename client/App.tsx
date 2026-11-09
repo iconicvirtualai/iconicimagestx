@@ -105,6 +105,7 @@ import AdminStudioScratch from "./pages/AdminStudioScratch";
 import LegacyStudioRedirect from "./components/studio/LegacyStudioRedirect";
 import AdminInsights from "./pages/AdminInsights";
 import Login from "./pages/Login";
+import { ClientPortalSurface } from "./pages/ClientPortalComingSoon";
 import ForgotPassword from "./pages/ForgotPassword";
 import ChangePassword from "./pages/ChangePassword";
 import ClientPortal from "./pages/ClientPortal";
@@ -220,17 +221,17 @@ const App = () => (
             <Route path="/services/virtual-staging/checkout" element={<Navigate to="/services/virtual-staging" replace />} />
 
             {/* ─── Login Routes ─────────────────────────────────────────── */}
-            <Route path="/login" element={<Login />} />
+            <Route path="/login" element={<ClientPortalSurface><Login /></ClientPortalSurface>} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/change-password" element={<ChangePassword />} />
-            <Route path="/portal" element={<Login />} />
-            <Route path="/portal/home" element={<ClientPortal />} />
-            <Route path="/portal/order" element={<PortalOrder />} />
-            <Route path="/portal/orders" element={<PortalQueryRedirect to="/portal/settings/billing" />} />
-            <Route path="/portal/order-history" element={<PortalQueryRedirect to="/portal/settings/billing" />} />
-            <Route path="/portal/settings" element={<PortalQueryRedirect to="/portal/settings/profile" />} />
-            <Route path="/portal/settings/:section" element={<PortalSettings />} />
-            <Route path="/portal/listings/:listingId" element={<PortalListingDetail />} />
+            <Route path="/portal" element={<ClientPortalSurface><Login /></ClientPortalSurface>} />
+            <Route path="/portal/home" element={<ClientPortalSurface><ClientPortal /></ClientPortalSurface>} />
+            <Route path="/portal/order" element={<ClientPortalSurface><PortalOrder /></ClientPortalSurface>} />
+            <Route path="/portal/orders" element={<ClientPortalSurface><PortalQueryRedirect to="/portal/settings/billing" /></ClientPortalSurface>} />
+            <Route path="/portal/order-history" element={<ClientPortalSurface><PortalQueryRedirect to="/portal/settings/billing" /></ClientPortalSurface>} />
+            <Route path="/portal/settings" element={<ClientPortalSurface><PortalQueryRedirect to="/portal/settings/profile" /></ClientPortalSurface>} />
+            <Route path="/portal/settings/:section" element={<ClientPortalSurface><PortalSettings /></ClientPortalSurface>} />
+            <Route path="/portal/listings/:listingId" element={<ClientPortalSurface><PortalListingDetail /></ClientPortalSurface>} />
             <Route path="/admin/login" element={<AdminLogin />} />
 
             {/* ─── Admin / Staff ────────────────────────────────────────── */}

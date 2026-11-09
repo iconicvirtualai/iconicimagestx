@@ -16,6 +16,7 @@ import {
   readEmailTemplateOverride,
 } from "../../shared/clientEmailTemplates";
 import { clientNotifyBlockReason, emailAllowed, narrowGatedClientRecipients, notifyTestAllowlist } from "../../shared/clientNotify";
+import { clientPortalEnabled, presentClientEmailHtml, presentClientEmailText } from "../../shared/clientPortal";
 import { DEFAULT_PUBLIC_SITE_URL } from "../../shared/publicSiteUrl";
 
 const db = () => admin.firestore();
@@ -116,6 +117,14 @@ export async function sendEmail(options: SendEmailOptions): Promise<{ sent: bool
     return { sent: false, delivery: "suppressed" };
   }
 
+  // Password-setup mail is not a client confirmation. It stays off until the
+  // portal flag is exactly true, including for allowlisted addresses.
+  // Confirmation and reminder templates keep the CLIENT_NOTIFY_LIVE gate below.
+  if (template === "account_password_setup" && !clientPortalEnabled()) {
+    console.info("[Email] Suppressed account_password_setup. CLIENT_PORTAL_ENABLED is not exactly true.");
+    return { sent: false, delivery: "suppressed" };
+  }
+
   // booking_received (order-received confirmation) always sends.
   // live_chat, office_new_order, and contact_form send only with audience "staff".
   // Other client mail stays off unless CLIENT_NOTIFY_LIVE is exactly "true"
@@ -163,6 +172,10 @@ export async function sendEmail(options: SendEmailOptions): Promise<{ sent: bool
     }
   } catch (err) {
     console.warn(`[Email] Template lookup failed for '${template}'. Using the built-in copy.`, err);
+  }
+  if (audience !== "staff") {
+    htmlBody = presentClientEmailHtml(htmlBody);
+    if (textBody) textBody = presentClientEmailText(textBody);
   }
   const delivery: EmailDelivery = emailAllowed(template, process.env, audience) ? "sent" : "allowlist";
   if (emailDeliveryOverride) {
@@ -217,7 +230,7 @@ export function builtinEmailHtml(
   ) {
     return clientBuiltinEmailHtml(type, vars);
   }
-  return getFallbackTemplate(type, vars);
+  return presentClientEmailHtml(getFallbackTemplate(type, vars));
 }
 
 function getFallbackTemplate(

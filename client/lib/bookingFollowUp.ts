@@ -1,5 +1,6 @@
 import { buildAdminOrderTile } from "@shared/adminOrderTile";
 import { BUSINESS_CONTACT } from "@shared/businessContact";
+import { clientPortalEnabled } from "@shared/clientPortal";
 
 export interface BookingSubmitResult {
   requestId?: string;
@@ -55,6 +56,7 @@ const PORTAL_PATH = "Sign in at the client portal (/portal), or use Forgot passw
 
 export function bookingFollowUp(result: BookingSubmitResult) {
   const live = result.clientNotificationsLive === true;
+  const portalOpen = clientPortalEnabled();
   const notes = ["We saved your appointment request. Nothing was charged today. Your invoice comes after the shoot."];
   const emailStatus = result.notifications?.appointmentEmail;
   if (live && emailStatus === "sent") notes.push("A confirmation email is on its way.");
@@ -63,11 +65,11 @@ export function bookingFollowUp(result: BookingSubmitResult) {
   if (result.notifications?.sms === "sent") {
     notes.push("A text confirmation was sent to the phone number on this form.");
   }
-  if (result.accountCreated && live && result.notifications?.passwordSetup === "sent") {
+  if (portalOpen && result.accountCreated && live && result.notifications?.passwordSetup === "sent") {
     notes.push("A separate email has the link to set your portal password.");
-  } else if (result.accountCreated) {
+  } else if (portalOpen && result.accountCreated) {
     notes.push(`Your portal login was created. ${PORTAL_PATH}`);
-  } else if (result.notifications?.accountAttached) {
+  } else if (portalOpen && result.notifications?.accountAttached) {
     notes.push("This request is on the portal account for this email.");
   }
   return notes.join(" ");

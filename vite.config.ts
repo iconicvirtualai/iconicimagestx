@@ -8,6 +8,9 @@ import { matchingRedirect, redirectLocation, redirectStatus } from "./shared/spa
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), ['VITE_', 'NEXT_PUBLIC_']);
+  // One non-secret flag for the browser bundle. Exactly "true" shows client login.
+  const fileEnv = loadEnv(mode, process.cwd(), "");
+  const portalFlag = (process.env.CLIENT_PORTAL_ENABLED ?? fileEnv.CLIENT_PORTAL_ENABLED) === "true" ? "true" : "";
   return {
     server: {
       host: "::",
@@ -23,7 +26,10 @@ export default defineConfig(({ mode }) => {
     plugins: [react(), expressPlugin()],
     envPrefix: ['VITE_', 'NEXT_PUBLIC_'],
     define: {
-      'process.env': env
+      'process.env': {
+        ...env,
+        CLIENT_PORTAL_ENABLED: portalFlag,
+      },
     },
     resolve: {
       alias: {

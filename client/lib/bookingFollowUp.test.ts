@@ -8,6 +8,7 @@ const INTERNAL_NOTE = "password-setup email stays off until client notifications
 
 describe("bookingFollowUp", () => {
   it("tells a new client about the confirmation email, the text, and the separate password email", () => {
+    process.env.CLIENT_PORTAL_ENABLED = "true";
     const note = bookingFollowUp({
       accountCreated: true,
       clientNotificationsLive: true,
@@ -19,9 +20,11 @@ describe("bookingFollowUp", () => {
     expect(note).toContain("separate email");
     expect(note).not.toContain(INTERNAL_NOTE);
     expect(note).not.toContain("password-setup");
+    delete process.env.CLIENT_PORTAL_ENABLED;
   });
 
   it("does not promise a confirmation email when client notifications are off", () => {
+    delete process.env.CLIENT_PORTAL_ENABLED;
     const note = bookingFollowUp({
       accountCreated: true,
       clientNotificationsLive: false,
@@ -35,9 +38,9 @@ describe("bookingFollowUp", () => {
     expect(note).not.toContain(INTERNAL_NOTE);
     expect(note).not.toContain("password-setup");
     expect(note).not.toContain("client notifications are live");
-    expect(note).toContain("Your portal login was created.");
-    expect(note).toContain("/portal");
-    expect(note).toContain("Forgot password");
+    expect(note).not.toContain("portal");
+    expect(note).not.toContain("password");
+    expect(note).not.toContain("Forgot password");
   });
 
   it("uses the public phone when notifications are live and the email was not sent", () => {
@@ -49,6 +52,7 @@ describe("bookingFollowUp", () => {
   });
 
   it("does not promise a text or a new password when the account already existed", () => {
+    process.env.CLIENT_PORTAL_ENABLED = "true";
     const note = bookingFollowUp({
       accountCreated: false,
       clientNotificationsLive: true,
@@ -59,6 +63,7 @@ describe("bookingFollowUp", () => {
     expect(note).not.toContain("text confirmation");
     expect(note).not.toContain("password");
     expect(note).not.toContain(INTERNAL_NOTE);
+    delete process.env.CLIENT_PORTAL_ENABLED;
   });
 
   it("uses the admin order code when the booking response only has the saved id", () => {
