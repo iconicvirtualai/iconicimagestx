@@ -6418,8 +6418,24 @@ function holidayReturnPath(leadSource, orderNumber2) {
 function holidayPaymentLinkBody(input) {
   const cents2 = Math.round(input.amount * 100);
   const key = `holiday-${input.invoiceId}`;
-  return {
-    idempotency_key: key.length <= 45 ? key : key.slice(0, 45),
+  const lines = (input.lineItems || []).filter((line) => line.name.trim() && line.amountCents !== 0);
+  const priced = lines.length > 0 ? {
+    order: {
+      location_id: input.locationId,
+      line_items: lines.filter((line) => line.amountCents > 0).map((line) => ({
+        name: line.name.slice(0, 255),
+        quantity: "1",
+        base_price_money: { amount: line.amountCents, currency: "USD" }
+      })),
+      ...lines.some((line) => line.amountCents < 0) ? {
+        discounts: lines.filter((line) => line.amountCents < 0).map((line) => ({
+          name: line.name.slice(0, 255),
+          amount_money: { amount: Math.abs(line.amountCents), currency: "USD" },
+          scope: "ORDER"
+        }))
+      } : {}
+    }
+  } : {
     quick_pay: {
       name: `Iconic Images ${input.itemName}`.slice(0, 255),
       price_money: {
@@ -6427,7 +6443,11 @@ function holidayPaymentLinkBody(input) {
         currency: "USD"
       },
       location_id: input.locationId
-    },
+    }
+  };
+  return {
+    idempotency_key: key.length <= 45 ? key : key.slice(0, 45),
+    ...priced,
     checkout_options: {
       redirect_url: input.redirectUrl
     },
@@ -7286,7 +7306,8 @@ async function createHolidaySquareCheckout(input) {
         itemName: input.itemName || "Holiday order",
         email: input.email,
         locationId: env.SQUARE_LOCATION_ID || "",
-        redirectUrl
+        redirectUrl,
+        lineItems: input.lineItems
       }))
     });
   } catch (err) {
@@ -7905,27 +7926,54 @@ function isMirroredPayAtCloseSquarePayment(payment, invoice) {
 const PAY_NOW_DISCOUNT_CENTS = 500;
 const PAY_NOW_METHOD = "pay_now";
 const PAY_LATER_METHOD = "pay_later";
-const PAY_NOW_OPTION_LABEL = "Pay Now (save $5)";
-const PAY_NOW_LINE_ID = "promo-pay-now";
+const PAY_NOW_SAVINGS_LABEL = "Pay Now savings";
+const PAY_NOW_LINE_ID = "pay-now-savings";
 function dollarsToCents(dollars2) {
   if (!Number.isFinite(dollars2) || dollars2 <= 0) return 0;
   return Math.round(dollars2 * 100);
 }
-function payNowDiscountCents(packageCents) {
-  const base = Number.isFinite(packageCents) ? Math.max(0, Math.round(packageCents)) : 0;
+function payNowDiscountCents(totalBeforeSavingsCents) {
+  const base = Number.isFinite(totalBeforeSavingsCents) ? Math.max(0, Math.round(totalBeforeSavingsCents)) : 0;
   return Math.min(PAY_NOW_DISCOUNT_CENTS, base);
 }
-function payNowDiscountLine(packageDollars) {
-  const discountCents = payNowDiscountCents(dollarsToCents(packageDollars));
-  if (discountCents <= 0) return null;
-  const price = -(discountCents / 100);
+function payNowSavingsLine(discountCents) {
+  if (!Number.isFinite(discountCents) || discountCents <= 0) return null;
+  const price = -(Math.round(discountCents) / 100);
   return {
     id: PAY_NOW_LINE_ID,
-    name: PAY_NOW_OPTION_LABEL,
+    name: PAY_NOW_SAVINGS_LABEL,
     unitPrice: price,
     qty: 1,
     price
   };
+}
+function isProcessingLine(item) {
+  return item.id === ADJUSTMENT_LINE_IDS.processing || item.category === ADJUSTMENT_LINE_IDS.processing;
+}
+function applyPayNowSavings(sale) {
+  const beforeCents = dollarsToCents(sale.total);
+  const discountCents = payNowDiscountCents(beforeCents);
+  const line = payNowSavingsLine(discountCents);
+  if (!line) return sale;
+  const without = sale.lineItems.filter((item) => item.id !== PAY_NOW_LINE_ID);
+  const processing = without.filter((item) => isProcessingLine(item));
+  const rest = without.filter((item) => !isProcessingLine(item));
+  const total = (beforeCents - discountCents) / 100;
+  return {
+    ...sale,
+    lineItems: [...rest, ...processing, line],
+    total,
+    amountDue: total
+  };
+}
+function payNowSquareLines(lineItems) {
+  return lineItems.flatMap((item) => {
+    const amountCents = Math.round(Number(item.price) * 100);
+    if (!Number.isFinite(amountCents) || amountCents === 0) return [];
+    const name = String(item.name || "").trim();
+    if (!name) return [];
+    return [{ name, amountCents }];
+  });
 }
 function hmacHex(secret, payload) {
   return createHmac("sha256", secret).update(payload).digest("hex");
@@ -10966,11 +11014,7 @@ router$B.post("/", async (req, res) => {
     const packageDollars = Math.max(0, sumLineItemPrices(traveled.lineItems.filter((item) => !isTravelFeeLine(item) && !isPromoInvoiceLine(item))) - promoDiscount);
     const wantsPayNow = req.body.paymentMethod === PAY_NOW_METHOD;
     const wantsPayLater = req.body.paymentMethod === PAY_LATER_METHOD;
-    const payNowLine = wantsPayNow ? payNowDiscountLine(packageDollars) : null;
-    if (payNowLine) {
-      traveled = { ...traveled, lineItems: [...traveled.lineItems, payNowLine] };
-    }
-    const serviceBase2 = Math.max(0, packageDollars - (payNowLine ? Math.abs(payNowLine.price) : 0));
+    const serviceBase2 = packageDollars;
     const tax = taxDollars(serviceBase2, rates);
     const adjustments = await loadPricingAdjustments();
     const payAtCloseOffer = payAtClosePublicOffer(process.env, adjustments);
@@ -10997,6 +11041,8 @@ router$B.post("/", async (req, res) => {
       const shaped = shapePayAtCloseDraft(sale, payAtCloseCustomerOffer(payAtCloseOffer));
       payAtCloseFee = shaped.payAtCloseFee;
       sale = shaped;
+    } else if (wantsPayNow) {
+      sale = applyPayNowSavings(sale);
     }
     const lineItems = sale.lineItems;
     const total = sale.total;
@@ -11559,6 +11605,7 @@ router$B.post("/", async (req, res) => {
           itemName: typeof selectedService === "string" && selectedService.trim() ? selectedService : "Booking",
           leadSource: typeof leadSource === "string" ? leadSource : "",
           orderNumber: orderNumber2,
+          lineItems: payNowSquareLines(lineItems),
           redirectUrl: publicClientUrl(`/book?paid=1&order=${encodeURIComponent(orderNumber2)}`),
           logLabel: "Pay Now"
         });

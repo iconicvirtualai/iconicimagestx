@@ -35,7 +35,7 @@ import {
 import { estimateBookingCharge, processingFeeLabel } from "@shared/invoiceProcessing";
 import SocialCountdownBanner from "@/components/SocialCountdownBanner";
 import { payAtCloseCustomerOffer, payAtCloseFeeDollars, type PayAtClosePublicOffer } from "@shared/payAtClose";
-import { PAY_NOW_OPTION_LABEL, payNowDiscountDollars } from "@shared/payNow";
+import { PAY_NOW_OPTION_LABEL, PAY_NOW_SAVINGS_LABEL, payNowDiscountDollars } from "@shared/payNow";
 import { PAY_AT_CLOSE_PACKAGES_FOOTNOTE } from "@shared/titusEstimate";
 import NewServiceAlert from "@/components/NewServiceAlert";
 import type { SocialRateStep } from "@shared/thankfulEvent";
@@ -786,31 +786,24 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
   const showPayAtClose = payAtCloseOffer.offered || devPayAtClosePreview;
   const payAtCloseSelected = showPayAtClose && paymentChoice === "pay_at_close";
   const payNowSelected = paymentChoice === "pay_now";
-  const netBeforePayNow = Math.max(0, serviceBase - (appliedPromo?.discount || 0));
-  const payNowDiscount = payNowSelected ? payNowDiscountDollars(netBeforePayNow) : 0;
-  const estimatePromoDiscount = (appliedPromo?.discount || 0) + payNowDiscount;
   const chargeProcessing = payAtCloseSelected
     ? payAtCloseOffer.chargeCardProcessing && processingOn && pricing.processingActive
     : processingOn && pricing.processingActive;
   const estimate = estimateBookingCharge(
-    {
-      ...priceInput,
-      promo: estimatePromoDiscount > 0
-        ? { code: appliedPromo?.code || "PAYNOW", discount: estimatePromoDiscount }
-        : null,
-    },
+    priceInput,
     showTravelLine ? travelFeeDollars(travel) : 0,
     chargeProcessing,
     {
       processingPercent: pricing.processingPercent,
-      tax: taxDollars(Math.max(0, serviceBase - estimatePromoDiscount), pricing),
+      tax: taxDollars(Math.max(0, serviceBase - (appliedPromo?.discount || 0)), pricing),
     },
   );
+  const payNowDiscount = payNowSelected ? payNowDiscountDollars(estimate.total) : 0;
   const customerPayAtClose = payAtCloseCustomerOffer(payAtCloseOffer);
   const payAtCloseFee = payAtCloseSelected
     ? payAtCloseFeeDollars(customerPayAtClose.feeRate, customerPayAtClose.feeMode, estimate.processingBase)
     : 0;
-  const estimateTotal = estimate.total + payAtCloseFee;
+  const estimateTotal = Math.max(0, estimate.total - payNowDiscount) + payAtCloseFee;
   const submittedLines = buildSubmittedLineItems(priceInput);
   const catalogServiceLine = selectedServiceData
     ? undefined
@@ -924,12 +917,6 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
              <MoneyAmount className="font-black text-teal-600">-${appliedPromo.discount}</MoneyAmount>
           </div>
         )}
-        {payNowDiscount > 0 && (
-          <div data-testid="pay-now-discount" className="flex items-baseline justify-between gap-3 text-[11px]">
-            <span className="min-w-0 font-bold text-teal-600">{PAY_NOW_OPTION_LABEL}</span>
-            <MoneyAmount className="font-black text-teal-600">-${payNowDiscount.toFixed(2)}</MoneyAmount>
-          </div>
-        )}
       </div>
 
       {/* Promo Code Input Section */}
@@ -958,6 +945,12 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
         )}
         {chargeProcessing && hasBookingSelection(bookingPriceInput()) && (
           <ProcessingEstimateLine amount={estimate.processing} percent={pricing.processingPercent} />
+        )}
+        {payNowDiscount > 0 && (
+          <div data-testid="pay-now-discount" className="mb-2 flex items-baseline justify-between gap-3 text-[11px]">
+            <span className="min-w-0 font-bold text-teal-600">{PAY_NOW_SAVINGS_LABEL}</span>
+            <MoneyAmount className="font-black text-teal-600">-${payNowDiscount.toFixed(2)}</MoneyAmount>
+          </div>
         )}
         {payAtCloseFee > 0 && (
           <div className="mb-2 flex justify-between text-xs font-bold text-neutral-700">
@@ -1730,15 +1723,15 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
                      </div>
                    );
                  })}
-                 {payNowDiscount > 0 && (
-                   <div data-testid="pay-now-discount" className="flex items-baseline justify-between gap-3 text-sm">
-                     <span className="min-w-0 font-bold text-teal-600">{PAY_NOW_OPTION_LABEL}</span>
-                     <MoneyAmount className="font-black text-teal-600">-${payNowDiscount.toFixed(2)}</MoneyAmount>
-                   </div>
-                 )}
                  <TravelFeeLine travel={travel} />
                  {chargeProcessing && hasBookingSelection(bookingPriceInput()) && (
                    <ProcessingEstimateLine amount={estimate.processing} percent={pricing.processingPercent} />
+                 )}
+                 {payNowDiscount > 0 && (
+                   <div data-testid="pay-now-discount" className="flex items-baseline justify-between gap-3 text-sm">
+                     <span className="min-w-0 font-bold text-teal-600">{PAY_NOW_SAVINGS_LABEL}</span>
+                     <MoneyAmount className="font-black text-teal-600">-${payNowDiscount.toFixed(2)}</MoneyAmount>
+                   </div>
                  )}
                  {payAtCloseFee > 0 && (
                    <div className="flex justify-between text-xs font-bold text-neutral-700">

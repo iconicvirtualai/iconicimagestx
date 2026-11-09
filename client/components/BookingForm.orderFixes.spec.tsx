@@ -164,8 +164,13 @@ describe("/book estimator processing line", () => {
       payNow?.querySelector("input")?.click();
     });
     const summaryAfter = container?.querySelector('[data-testid="order-summary-before-submit"]');
-    expect(summaryAfter?.textContent).toContain("Pay Now (save $5)");
-    expect(summaryAfter?.textContent).toContain("-$5.00");
+    const after = summaryAfter?.textContent || "";
+    expect(after).toContain("Pay Now savings");
+    expect(after).toContain("-$5.00");
+    expect(after).toContain("$21.98");
+    expect(after).toContain("$801.98");
+    expect(after.indexOf("Processing")).toBeLessThan(after.indexOf("Pay Now savings"));
+    expect(after.indexOf("Pay Now savings")).toBeLessThan(after.indexOf("Total estimate"));
   });
 
   it("keeps the processing percent dynamic and does not say the card is charged at booking", () => {

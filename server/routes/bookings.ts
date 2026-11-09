@@ -49,7 +49,7 @@ import { pricingRates, taxDollars } from "../../shared/pricingSettings";
 import { isPromoInvoiceLine } from "../../shared/invoiceFace";
 import { loadPricingAdjustments, loadPricingRates } from "../services/pricingAdjustments";
 import { PAY_AT_CLOSE_METHOD, PAY_AT_CLOSE_PENDING_STATUS, payAtCloseCustomerOffer, payAtClosePublicOffer, shapePayAtCloseDraft } from "../../shared/payAtClose";
-import { PAY_LATER_METHOD, PAY_NOW_METHOD, payNowDiscountLine } from "../../shared/payNow";
+import { PAY_LATER_METHOD, PAY_NOW_METHOD, applyPayNowSavings, payNowSquareLines } from "../../shared/payNow";
 import { createTitusCheckout } from "../services/payAtClose";
 import { normalizeEmail } from "../../shared/listingAccess";
 import { portalBillingStamp } from "../../shared/clientHubSettings";
@@ -285,11 +285,7 @@ router.post("/", async (req, res) => {
     ))) - promoDiscount);
     const wantsPayNow = req.body.paymentMethod === PAY_NOW_METHOD;
     const wantsPayLater = req.body.paymentMethod === PAY_LATER_METHOD;
-    const payNowLine = wantsPayNow ? payNowDiscountLine(packageDollars) : null;
-    if (payNowLine) {
-      traveled = { ...traveled, lineItems: [...traveled.lineItems, payNowLine] };
-    }
-    const serviceBase = Math.max(0, packageDollars - (payNowLine ? Math.abs(payNowLine.price) : 0));
+    const serviceBase = packageDollars;
     const tax = taxDollars(serviceBase, rates);
     // New bookings store the processing rate once. The kill switch is server-only.
     // Legacy invoices are not updated here. A removed processing fee stays off.
@@ -324,6 +320,8 @@ router.post("/", async (req, res) => {
       const shaped = shapePayAtCloseDraft(sale, payAtCloseCustomerOffer(payAtCloseOffer));
       payAtCloseFee = shaped.payAtCloseFee;
       sale = shaped as unknown as typeof sale;
+    } else if (wantsPayNow) {
+      sale = applyPayNowSavings(sale);
     }
     const lineItems = sale.lineItems;
     const total = sale.total;
@@ -966,6 +964,7 @@ router.post("/", async (req, res) => {
             : "Booking",
           leadSource: typeof leadSource === "string" ? leadSource : "",
           orderNumber,
+          lineItems: payNowSquareLines(lineItems as Array<{ name?: string; price?: number }>),
           redirectUrl: publicClientUrl(`/book?paid=1&order=${encodeURIComponent(orderNumber)}`),
           logLabel: "Pay Now",
         });
