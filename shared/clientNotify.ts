@@ -11,10 +11,13 @@
  * by RED or by this flag.
  * Do not set BOOKING_NOTIFY_LIVE.
  *
- * Staff-only inbound is also excluded: live chat from a site visitor to the
- * office (template live_chat with audience "staff", SMS kind staff_inbound).
- * That path never messages the visitor. staff_inbound may only be sent to
- * the Iconic Google Voice number.
+ * Staff-only mail is also excluded when audience is "staff": live chat
+ * (template live_chat), the saved new-order alert (template office_new_order),
+ * and the public contact form (template contact_form). Those staff sends
+ * are not narrowed to the allowlist. The contact-form client auto-reply
+ * (contact_confirmation) stays on the blast kill. staff_inbound SMS may
+ * only be sent to the Iconic Google Voice number. The live-chat path never
+ * messages the visitor.
  *
  * NOTIFY_TEST_ALLOWLIST is a comma-separated list of exact mailbox addresses
  * for QA. Matching is trim and lowercase only. A plus-tag is part of the
@@ -30,7 +33,8 @@
  * never left on the message, so a test send cannot fan out to a client.
  * When the switch is on, the allowlist is not consulted.
  * The booking_received, Thankful RSVP confirm (when THANKFUL_RSVP_CONFIRM_LIVE=true),
- * and staff carve-outs are unchanged and are not narrowed to the allowlist.
+ * and staff carve-outs (live_chat, office_new_order, contact_form) are not narrowed
+ * to the allowlist.
  */
 
 
@@ -41,6 +45,8 @@ export const ORDER_RECEIVED_SMS_KIND = "booking_confirmation";
 export const STAFF_INBOUND_EMAIL_TEMPLATE = "live_chat";
 /** Saved new-order alert → ADMIN_EMAIL and COORDINATOR_EMAIL. Not a client send. */
 export const OFFICE_NEW_ORDER_EMAIL_TEMPLATE = "office_new_order";
+/** Public contact form → CONTACT_FORM_EMAIL. Not a client send. */
+export const CONTACT_FORM_EMAIL_TEMPLATE = "contact_form";
 /** Visitor live chat → office Google Voice. Not a client send. */
 export const STAFF_INBOUND_SMS_KIND = "staff_inbound";
 /** Iconic Images Google Voice, E.164. */
@@ -53,7 +59,7 @@ export function clientNotifyLive(env: Record<string, string | undefined> = proce
 
 /**
  * booking_received always sends.
- * live_chat sends only when the caller marks audience "staff".
+ * live_chat, office_new_order, and contact_form send only when the caller marks audience "staff".
  * Every other template follows the blast kill.
  */
 export function emailAllowed(
@@ -66,6 +72,7 @@ export function emailAllowed(
   if (template === "thankful_rsvp_confirm" && env.THANKFUL_RSVP_CONFIRM_LIVE === "true") return true;
   if (audience === "staff" && template === STAFF_INBOUND_EMAIL_TEMPLATE) return true;
   if (audience === "staff" && template === OFFICE_NEW_ORDER_EMAIL_TEMPLATE) return true;
+  if (audience === "staff" && template === CONTACT_FORM_EMAIL_TEMPLATE) return true;
   return clientNotifyLive(env);
 }
 
