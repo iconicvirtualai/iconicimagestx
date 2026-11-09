@@ -62,6 +62,7 @@ import holyGrailRouter from "./routes/holyGrail";
 import { originForHost, robotsTxt, sitemapXml } from "../shared/siteSeo.ts";
 import { amenityMediaRequestAllowed } from "../shared/amenityStock.ts";
 import stockFootageRouter from "./routes/stockFootage";
+import virtualStagingProRouter from "./routes/virtualStagingPro";
 
 const SETTINGS_FILE = path.join(process.cwd(), "site_settings.json");
 const API_BUILD_MARKER = "auth-square-2026-09-28";
@@ -317,6 +318,7 @@ export function createServer() {
   app.use("/api/contact", liveChatRouter);
   app.use("/api/contact", contactRouter);
   app.use("/api/senior-living", seniorLivingRouter);
+  app.use("/api/virtual-staging-pro", virtualStagingProRouter);
   app.use("/api/stock-footage", stockFootageRouter);
   app.use("/api/apprenticeship", apprenticeshipRouter);
   app.use("/api/admin/test-data", testDataCleanupRouter);

@@ -117,6 +117,16 @@
       "statusCode": 301
     },
     {
+      "source": "/services/virtual-staging/checkout",
+      "destination": "/services/virtual-staging",
+      "statusCode": 301
+    },
+    {
+      "source": "/services/virtual-staging/checkout/",
+      "destination": "/services/virtual-staging",
+      "statusCode": 301
+    },
+    {
       "source": "/home",
       "destination": "/",
       "statusCode": 301
@@ -1794,14 +1804,6 @@
     },
     {
       "source": "/services/virtual-staging/pro-order/",
-      "destination": "/seo/app.html"
-    },
-    {
-      "source": "/services/virtual-staging/checkout",
-      "destination": "/seo/app.html"
-    },
-    {
-      "source": "/services/virtual-staging/checkout/",
       "destination": "/seo/app.html"
     },
     {
