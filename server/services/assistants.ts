@@ -3,6 +3,16 @@ export const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
 export const GROK_MISSING_MESSAGE = "Add XAI_API_KEY to enable Grok";
 export const OPENAI_MISSING_MESSAGE = "Add OPENAI_API_KEY to enable OpenAI";
 
+/** Staff site-chat model. gpt-4o-mini shuts down on 2027-01-14. */
+export const DEFAULT_OPENAI_CHAT_MODEL = "gpt-4o-mini";
+
+/** Trimmed OPENAI_CHAT_MODEL, or gpt-4o-mini when unset. */
+export function openAiChatModel(env: Record<string, string | undefined> = process.env): string {
+  const raw = env.OPENAI_CHAT_MODEL;
+  const trimmed = typeof raw === "string" ? raw.trim() : "";
+  return trimmed || DEFAULT_OPENAI_CHAT_MODEL;
+}
+
 export interface AssistantTurn {
   role: "user" | "assistant";
   content: string;
@@ -79,7 +89,7 @@ export async function completeAssistant(input: {
   const url = input.provider === "grok" ? GROK_API_URL : OPENAI_API_URL;
   const model = input.provider === "grok"
     ? (env.XAI_CHAT_MODEL || "grok-3")
-    : (env.OPENAI_CHAT_MODEL || "gpt-4o-mini");
+    : openAiChatModel(env);
   const fetchImpl = input.fetchImpl || fetchOverride || fetch;
 
   let response: Response;

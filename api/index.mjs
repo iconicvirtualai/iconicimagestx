@@ -16302,11 +16302,23 @@ function serializeDoc(id, data) {
   return jsonSafe({ id, ...data });
 }
 const OPENAI_IMAGE_EDITS_URL = "https://api.openai.com/v1/images/edits";
-const OPENAI_IMAGE_EDIT_MODEL = "gpt-image-1";
 const OPENAI_IMAGE_EDIT_TIMEOUT_MS = 45e3;
 const OPENAI_CHAT_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions";
-const OPENAI_INSPECTION_MODEL = "gpt-4o-mini";
 const OPENAI_INSPECTION_TIMEOUT_MS = 2e4;
+const DEFAULT_OPENAI_IMAGE_EDIT_MODEL = "gpt-image-2.5-sunburst";
+const DEFAULT_OPENAI_INSPECTION_MODEL = "gpt-4o-mini";
+function modelFromEnv(value, fallback) {
+  const trimmed = typeof value === "string" ? value.trim() : "";
+  return trimmed || fallback;
+}
+const OPENAI_IMAGE_EDIT_MODEL = modelFromEnv(
+  process.env.OPENAI_IMAGE_EDIT_MODEL,
+  DEFAULT_OPENAI_IMAGE_EDIT_MODEL
+);
+const OPENAI_INSPECTION_MODEL = modelFromEnv(
+  process.env.OPENAI_INSPECTION_MODEL,
+  DEFAULT_OPENAI_INSPECTION_MODEL
+);
 const DELIVERY_INSPECTION_NOTES = [
   "Photographer visible in a mirror or shadow.",
   "Photographer reflected in a doorway or glass.",
@@ -16436,7 +16448,6 @@ async function editListingPhotoWithOpenAI(input) {
   form.append("quality", "medium");
   form.append("output_format", "jpeg");
   form.append("output_compression", "85");
-  form.append("input_fidelity", "high");
   const fetchImpl = input.fetchImpl || fetch;
   const timeoutMs = input.timeoutMs ?? OPENAI_IMAGE_EDIT_TIMEOUT_MS;
   let response;
@@ -31075,6 +31086,12 @@ const GROK_API_URL = "https://api.x.ai/v1/chat/completions";
 const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
 const GROK_MISSING_MESSAGE = "Add XAI_API_KEY to enable Grok";
 const OPENAI_MISSING_MESSAGE = "Add OPENAI_API_KEY to enable OpenAI";
+const DEFAULT_OPENAI_CHAT_MODEL = "gpt-4o-mini";
+function openAiChatModel(env = process.env) {
+  const raw = env.OPENAI_CHAT_MODEL;
+  const trimmed = typeof raw === "string" ? raw.trim() : "";
+  return trimmed || DEFAULT_OPENAI_CHAT_MODEL;
+}
 let fetchOverride = null;
 function assistantStatus(env = process.env) {
   const openai = Boolean(env.OPENAI_API_KEY?.trim());
@@ -31121,7 +31138,7 @@ async function completeAssistant(input) {
   }
   const key = (input.provider === "grok" ? env.XAI_API_KEY : env.OPENAI_API_KEY || "").trim();
   const url = input.provider === "grok" ? GROK_API_URL : OPENAI_API_URL;
-  const model = input.provider === "grok" ? env.XAI_CHAT_MODEL || "grok-3" : env.OPENAI_CHAT_MODEL || "gpt-4o-mini";
+  const model = input.provider === "grok" ? env.XAI_CHAT_MODEL || "grok-3" : openAiChatModel(env);
   const fetchImpl = input.fetchImpl || fetchOverride || fetch;
   let response;
   try {

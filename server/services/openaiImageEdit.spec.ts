@@ -34,7 +34,12 @@ describe("OpenAI image edit request", () => {
     expect(readOpenAiApiKey({ OPENAI_API_KEY: "   " })).toBe("");
   });
 
-  it("picks a documented gpt-image-1 size from the photo", () => {
+  it("defaults to gpt-image-2.5-sunburst and gpt-4o-mini", () => {
+    expect(OPENAI_IMAGE_EDIT_MODEL).toBe("gpt-image-2.5-sunburst");
+    expect(OPENAI_INSPECTION_MODEL).toBe("gpt-4o-mini");
+  });
+
+  it("picks a documented gpt-image-2.5-sunburst size from the photo", () => {
     expect(imageSize(png(1600, 1000))).toEqual({ width: 1600, height: 1000 });
     expect(editSizeForImage(png(1600, 1000))).toBe("1536x1024");
     expect(editSizeForImage(png(800, 1200))).toBe("1024x1536");
@@ -50,11 +55,13 @@ describe("OpenAI image edit request", () => {
       expect((init.headers as Record<string, string>).Authorization).toBe("Bearer sk-test");
       const form = init.body as FormData;
       expect(form.get("model")).toBe(OPENAI_IMAGE_EDIT_MODEL);
+      expect(form.get("model")).toBe("gpt-image-2.5-sunburst");
       expect(form.get("prompt")).toContain("fireplace");
       expect(form.get("size")).toBe("1536x1024");
       expect(form.get("quality")).toBe("medium");
       expect(form.get("output_format")).toBe("jpeg");
-      expect(form.get("input_fidelity")).toBe("high");
+      expect(form.get("output_compression")).toBe("85");
+      expect(form.get("input_fidelity")).toBeNull();
       expect(form.get("response_format")).toBeNull();
       const image = form.get("image");
       expect(image).toBeInstanceOf(Blob);
@@ -124,6 +131,61 @@ describe("OpenAI image edit request", () => {
       contentType: "image/jpeg",
       fetchImpl: vi.fn() as unknown as typeof fetch,
     })).rejects.toBeInstanceOf(OpenAiEditError);
+  });
+
+  it("trims OPENAI_IMAGE_EDIT_MODEL and OPENAI_INSPECTION_MODEL, and falls back when blank", async () => {
+    const previousEdit = process.env.OPENAI_IMAGE_EDIT_MODEL;
+    const previousInspection = process.env.OPENAI_INSPECTION_MODEL;
+    const jpeg = Buffer.from("edited-jpeg-bytes-that-are-long-enough");
+    try {
+      process.env.OPENAI_IMAGE_EDIT_MODEL = "  gpt-image-2.5-flare  ";
+      process.env.OPENAI_INSPECTION_MODEL = "  gpt-4.1-mini  ";
+      vi.resetModules();
+      const overridden = await import("./openaiImageEdit");
+      expect(overridden.OPENAI_IMAGE_EDIT_MODEL).toBe("gpt-image-2.5-flare");
+      expect(overridden.OPENAI_INSPECTION_MODEL).toBe("gpt-4.1-mini");
+
+      const fetchImpl = vi.fn(async (_url: string, init: RequestInit) => {
+        const form = init.body as FormData;
+        expect(form.get("model")).toBe("gpt-image-2.5-flare");
+        expect(form.get("input_fidelity")).toBeNull();
+        expect(form.get("size")).toBe("1536x1024");
+        expect(form.get("quality")).toBe("medium");
+        expect(form.get("output_format")).toBe("jpeg");
+        return new Response(JSON.stringify({ data: [{ b64_json: jpeg.toString("base64") }] }), { status: 200 });
+      });
+      await overridden.editListingPhotoWithOpenAI({
+        apiKey: "sk-test",
+        prompt: "Add a fire in the fireplace",
+        bytes: png(1800, 1200),
+        contentType: "image/png",
+        fetchImpl: fetchImpl as unknown as typeof fetch,
+      });
+
+      const inspectFetch = vi.fn(async () => new Response(JSON.stringify({
+        choices: [{ message: { content: JSON.stringify({ status: "pass", notes: [] }) } }],
+      }), { status: 200 }));
+      await overridden.inspectFinishedListingJpeg({
+        apiKey: "sk-test",
+        bytes: jpeg,
+        fetchImpl: inspectFetch as unknown as typeof fetch,
+      });
+      const inspectBody = JSON.parse(String(inspectFetch.mock.calls[0][1].body));
+      expect(inspectBody.model).toBe("gpt-4.1-mini");
+
+      process.env.OPENAI_IMAGE_EDIT_MODEL = "   ";
+      process.env.OPENAI_INSPECTION_MODEL = "";
+      vi.resetModules();
+      const blank = await import("./openaiImageEdit");
+      expect(blank.OPENAI_IMAGE_EDIT_MODEL).toBe("gpt-image-2.5-sunburst");
+      expect(blank.OPENAI_INSPECTION_MODEL).toBe("gpt-4o-mini");
+    } finally {
+      if (previousEdit === undefined) delete process.env.OPENAI_IMAGE_EDIT_MODEL;
+      else process.env.OPENAI_IMAGE_EDIT_MODEL = previousEdit;
+      if (previousInspection === undefined) delete process.env.OPENAI_INSPECTION_MODEL;
+      else process.env.OPENAI_INSPECTION_MODEL = previousInspection;
+      vi.resetModules();
+    }
   });
 });
 

@@ -26,6 +26,7 @@ const saved = {
   CLIENT_NOTIFY_LIVE: process.env.CLIENT_NOTIFY_LIVE,
   XAI_API_KEY: process.env.XAI_API_KEY,
   OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+  OPENAI_CHAT_MODEL: process.env.OPENAI_CHAT_MODEL,
   OWNER_EMAILS: process.env.OWNER_EMAILS,
 };
 
@@ -215,9 +216,12 @@ describe("communications hub", () => {
     expect(grok.data.reply).toBe("Use the inbox filter.");
     expect(JSON.stringify(grok.data)).not.toContain("xai-test-secret");
 
+    const previousChatModel = process.env.OPENAI_CHAT_MODEL;
+    delete process.env.OPENAI_CHAT_MODEL;
     process.env.OPENAI_API_KEY = "sk-test-secret";
-    setAssistantFetchForTests(vi.fn(async (url: string) => {
+    setAssistantFetchForTests(vi.fn(async (url: string, init: RequestInit) => {
       expect(String(url)).toBe(OPENAI_API_URL);
+      expect(JSON.parse(String(init.body)).model).toBe("gpt-4o-mini");
       return new Response(JSON.stringify({ choices: [{ message: { content: "OpenAI ready." } }] }), { status: 200 });
     }) as typeof fetch);
     const openai = await api("/api/communications/assist", {
@@ -226,6 +230,19 @@ describe("communications hub", () => {
     });
     expect(openai.data.reply).toBe("OpenAI ready.");
     expect(JSON.stringify(openai.data)).not.toContain("sk-test-secret");
+
+    process.env.OPENAI_CHAT_MODEL = "  chat-model-override  ";
+    setAssistantFetchForTests(vi.fn(async (_url: string, init: RequestInit) => {
+      expect(JSON.parse(String(init.body)).model).toBe("chat-model-override");
+      return new Response(JSON.stringify({ choices: [{ message: { content: "Override ready." } }] }), { status: 200 });
+    }) as typeof fetch);
+    const overridden = await api("/api/communications/assist", {
+      method: "POST",
+      body: JSON.stringify({ provider: "openai", messages: [{ role: "user", content: "Hi again" }] }),
+    });
+    expect(overridden.data.reply).toBe("Override ready.");
+    if (previousChatModel === undefined) delete process.env.OPENAI_CHAT_MODEL;
+    else process.env.OPENAI_CHAT_MODEL = previousChatModel;
 
     const rules = readFileSync("firestore.rules", "utf8");
     expect(rules).toContain("resource.data.clientId == request.auth.uid");
