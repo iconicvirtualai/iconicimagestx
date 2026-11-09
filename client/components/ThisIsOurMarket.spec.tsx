@@ -7,7 +7,7 @@ const POSTER = "/media/home-v2/services-blaze/services-blaze-v1-poster.jpg";
 const UNDERLAY = "/media/blaze/02_US_v3.mp4";
 
 describe("This Is OUR Market services blaze", () => {
-  it("underlays the bar mashup and keeps the portrait blaze on top", () => {
+  it("stacks the portrait blaze over the teal-bordered card", () => {
     const html = renderToString(<ThisIsOurMarket />);
     const videos = html.match(/<video\b[^>]*>/gi) ?? [];
     const underlay = videos.find((video) => video.includes(UNDERLAY)) ?? "";
@@ -24,14 +24,22 @@ describe("This Is OUR Market services blaze", () => {
     }
     expect(underlay).toContain('data-site-field="underlay"');
     expect(underlay).toContain('aria-hidden="true"');
+    expect(underlay).not.toContain("opacity-30");
+    expect(underlay).not.toContain("inset-0");
     expect(blaze).toContain(POSTER);
     expect(blaze).toContain('data-site-field="video"');
     expect(html.indexOf(UNDERLAY)).toBeLessThan(html.indexOf(VIDEO));
-    expect(html).toContain("aspect-[3/4]");
-    expect(html).toContain("w-[min(100%,420px)]");
+    expect(html).toContain("aspect-[312/413]");
+    expect(html).toContain("left-[38%]");
+    expect(html).toContain("h-[71%]");
+    expect(html).toContain("w-[62%]");
+    expect(html).toContain("top-[25%]");
+    expect(html).toContain("h-[75%]");
+    expect(html).toContain("w-[74%]");
+    expect(html).toContain("border-[#75bed4]");
+    expect(html).toContain("border-[5px]");
+    expect(html).toContain("border-[#111]");
     expect(html).not.toContain("w-[min(100%,240px)]");
-    expect(underlay).toContain("opacity-30");
-    expect(underlay).not.toContain("inset-0");
     expect(html).toContain("This Is");
     expect(html).toContain("OUR");
     expect(html).not.toContain("lifestyle-kennedy");
