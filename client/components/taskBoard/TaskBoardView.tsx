@@ -212,6 +212,7 @@ export function TaskBoardView({
             <p className="px-4 pb-6 text-sm text-slate-500">No tasks in this view.</p>
           ) : view === "list" ? (
             <TaskList
+              sample={sample}
               tasks={visible}
               staff={staff}
               today={today}
@@ -229,6 +230,7 @@ export function TaskBoardView({
             />
           ) : (
             <TaskBoard
+              sample={sample}
               tasks={visible}
               today={today}
               selectedId={selected?.id || null}
@@ -267,6 +269,7 @@ export function TaskBoardView({
 }
 
 function TaskList({
+  sample,
   tasks,
   staff,
   today,
@@ -282,6 +285,7 @@ function TaskList({
   onStage,
   onReorder,
 }: {
+  sample: boolean;
   tasks: TaskBoardTask[];
   staff: TaskAssignee[];
   today: string;
@@ -356,7 +360,7 @@ function TaskList({
                   <span className="mt-0.5 flex flex-wrap items-center gap-x-1 text-[11px] text-slate-400">
                     <span>{task.sourceLine}</span>
                     {task.primaryHref && task.primaryHrefLabel ? (
-                      <Link to={task.primaryHref} data-testid="task-link" className="whitespace-nowrap font-semibold text-[#0d9488] hover:underline" onClick={(event) => event.stopPropagation()}>
+                        <Link to={keepSample(task.primaryHref, sample)} data-testid="task-link" className="whitespace-nowrap font-semibold text-[#0d9488] hover:underline" onClick={(event) => event.stopPropagation()}>
                         {task.primaryHrefLabel}
                       </Link>
                     ) : null}
@@ -381,6 +385,7 @@ function TaskList({
 }
 
 function TaskBoard({
+  sample,
   tasks,
   today,
   selectedId,
@@ -390,6 +395,7 @@ function TaskBoard({
   onStage,
   onReorder,
 }: {
+  sample: boolean;
   tasks: TaskBoardTask[];
   today: string;
   selectedId: string | null;
@@ -446,7 +452,7 @@ function TaskBoard({
                   <p className={`break-words text-sm font-medium ${task.status === "done" ? "text-slate-400 line-through" : "text-slate-900"}`} data-testid="task-title">{task.title}</p>
                   <p className="mt-1 text-[11px] text-slate-400">{task.sourceLine}</p>
                   {task.primaryHref && task.primaryHrefLabel ? (
-                    <Link to={task.primaryHref} data-testid="task-link" className="mt-1 inline-block text-[11px] font-semibold text-[#0d9488]" onClick={(event) => event.stopPropagation()}>
+                    <Link to={keepSample(task.primaryHref, sample)} data-testid="task-link" className="mt-1 inline-block text-[11px] font-semibold text-[#0d9488]" onClick={(event) => event.stopPropagation()}>
                       {task.primaryHrefLabel}
                     </Link>
                   ) : null}
@@ -814,6 +820,14 @@ function originLabel(task: TaskBoardTask): string {
   if (task.origin === "production") return "Production";
   if (task.origin === "manual") return "Manual";
   return "Order";
+}
+
+function keepSample(href: string, sample: boolean): string {
+  if (!sample) return href;
+  const [path, query = ""] = href.split("?");
+  const params = new URLSearchParams(query);
+  params.set("sample", "1");
+  return `${path}?${params.toString()}`;
 }
 
 function requestWhen(at: string | null): string {

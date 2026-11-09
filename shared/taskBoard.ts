@@ -9,7 +9,8 @@ import { adminOrderDetailHref, adminOrderNumberLabel, adminOrderQueue } from "./
 import { calendarDateKey } from "./clientHome.ts";
 import { addressText } from "./addressText.ts";
 import {
-  INBOUND_EMAIL_DISCONNECTED_NOTICE,
+  PHOTOS_MAILBOX,
+  photosInboxNotice,
   type InboundClientEmail,
 } from "./inboundEmail.ts";
 import { buildMediaDeliveryQueue, type DeliveryGallerySource, type DeliveryListingSource } from "./mediaDelivery.ts";
@@ -85,6 +86,52 @@ export interface TaskActivity {
 
 export type TaskOrigin = "schedule" | "delivery" | "production" | "edit" | "question" | "email" | "manual";
 
+export const CONTENT_STAGES = ["idea", "script", "record", "edit", "review", "scheduled", "published"] as const;
+export type ContentStage = (typeof CONTENT_STAGES)[number];
+export type ContentKind = "podcast" | "promo";
+
+export const CONTENT_STAGE_LABEL: Record<ContentStage, string> = {
+  idea: "Idea",
+  script: "Script",
+  record: "Record",
+  edit: "Edit",
+  review: "Review",
+  scheduled: "Scheduled",
+  published: "Published",
+};
+
+export function isContentStage(value: unknown): value is ContentStage {
+  return typeof value === "string" && (CONTENT_STAGES as readonly string[]).includes(value);
+}
+
+export function isContentKind(value: unknown): value is ContentKind {
+  return value === "podcast" || value === "promo";
+}
+
+export function boardStageForContent(stage: ContentStage): TaskStage {
+  if (stage === "idea" || stage === "script") return "queued";
+  if (stage === "record" || stage === "edit") return "production";
+  if (stage === "review") return "review";
+  if (stage === "scheduled") return "ready";
+  return "delivered";
+}
+
+/** Keep a finer content stage when it already sits in the board column. */
+export function contentStageForBoard(stage: TaskStage, current: ContentStage | null | undefined): ContentStage {
+  if (current && boardStageForContent(current) === stage) return current;
+  if (stage === "queued") return "idea";
+  if (stage === "production") return "edit";
+  if (stage === "review") return "review";
+  if (stage === "ready") return "scheduled";
+  return "published";
+}
+
+export function contentSectionHref(section: "podcast" | "promo" | "calendar", itemId?: string): string {
+  const params = new URLSearchParams({ section });
+  if (itemId) params.set("item", itemId);
+  return `/admin/content?${params.toString()}`;
+}
+
 export interface TaskBoardTask {
   id: string;
   pipelineKey: string;
@@ -118,6 +165,12 @@ export interface TaskBoardTask {
   sample: boolean;
   manual: boolean;
   activity: TaskActivity[];
+  /** Podcast or Iconic promo. Listing videos leave this empty. */
+  contentKind?: ContentKind | null;
+  contentStage?: ContentStage | null;
+  /** Calendar publish day. The checklist due date is updated with it. */
+  publishOn?: string | null;
+  insightId?: string | null;
 }
 
 export interface TaskBoardOverlay {
@@ -154,6 +207,11 @@ export interface TaskBoardOverlay {
   fingerprint: string;
   sample: boolean;
   activity: TaskActivity[];
+  contentKind?: ContentKind | null;
+  contentStage?: ContentStage | null;
+  publishOn?: string | null;
+  publishTouched?: boolean;
+  insightId?: string | null;
 }
 
 export interface TaskBoardInput {
@@ -356,9 +414,7 @@ export function buildTaskBoard(input: TaskBoardInput): TaskBoardModel {
   return {
     tasks,
     emailConnected: input.emailConnected === true,
-    emailNotice: input.emailConnected
-      ? "Inbound email is connected. New client mail is added to the queue. This board still does not send email."
-      : INBOUND_EMAIL_DISCONNECTED_NOTICE,
+    emailNotice: photosInboxNotice(input.emailConnected === true),
   };
 }
 
@@ -397,6 +453,11 @@ export function taskToOverlay(task: TaskBoardTask): TaskBoardOverlay {
     fingerprint: task.fingerprint,
     sample: task.sample,
     activity: task.activity.slice(-20),
+    contentKind: task.contentKind || null,
+    contentStage: task.contentStage || null,
+    publishOn: task.publishOn || null,
+    publishTouched: true,
+    insightId: task.insightId || null,
   };
 }
 
@@ -445,6 +506,11 @@ export function readTaskBoardOverlay(id: string, data: unknown): TaskBoardOverla
     fingerprint: text(row.fingerprint),
     sample: row.sample === true,
     activity: readActivity(row.activity),
+    contentKind: isContentKind(row.contentKind) ? row.contentKind : null,
+    contentStage: isContentStage(row.contentStage) ? row.contentStage : null,
+    publishOn: dateOnly(row.publishOn),
+    publishTouched: row.publishTouched === true || "publishOn" in row,
+    insightId: nullableText(row.insightId),
   };
 }
 
@@ -468,6 +534,7 @@ export function withStage(tasks: TaskBoardTask[], id: string, stage: TaskStage, 
     return {
       ...task,
       stage,
+      contentStage: task.contentKind ? contentStageForBoard(stage, task.contentStage) : task.contentStage,
       stageLocked: true,
       resumeStage: done ? (task.stage === "delivered" ? task.resumeStage : task.stage) : stage,
       status: done ? "done" : "open",
@@ -485,6 +552,7 @@ export function withToggled(tasks: TaskBoardTask[], id: string, at: string): Tas
         ...task,
         status: "open",
         stage,
+        contentStage: task.contentKind ? contentStageForBoard(stage, task.contentStage === "published" ? null : task.contentStage) : task.contentStage,
         stageLocked: true,
         activity: appendActivity(task.activity, at, "Marked open"),
       };
@@ -493,6 +561,7 @@ export function withToggled(tasks: TaskBoardTask[], id: string, at: string): Tas
       ...task,
       status: "done",
       stage: "delivered",
+      contentStage: task.contentKind ? "published" : task.contentStage,
       stageLocked: true,
       resumeStage: task.stage === "delivered" ? task.resumeStage : task.stage,
       activity: appendActivity(task.activity, at, "Marked complete"),
@@ -533,6 +602,87 @@ export function withDue(tasks: TaskBoardTask[], id: string, dueOn: string | null
       activity: appendActivity(task.activity, at, nextDue ? `Due date set to ${nextDue}` : "Due date cleared"),
     };
   });
+}
+
+export function withContentStage(tasks: TaskBoardTask[], id: string, contentStage: ContentStage, at: string): TaskBoardTask[] {
+  if (!isContentStage(contentStage)) return tasks;
+  const stage = boardStageForContent(contentStage);
+  return withStage(tasks.map((task) => (task.id === id ? { ...task, contentStage } : task)), id, stage, at);
+}
+
+/** Sets the calendar day and the checklist due date together. */
+export function withPublishOn(tasks: TaskBoardTask[], id: string, publishOn: string | null, at: string): TaskBoardTask[] {
+  const next = publishOn && /^\d{4}-\d{2}-\d{2}$/.test(publishOn) ? publishOn : null;
+  return tasks.map((task) => {
+    if (task.id !== id) return task;
+    return {
+      ...task,
+      publishOn: next,
+      dueOn: next,
+      activity: appendActivity(task.activity, at, next ? `Publish date set to ${next}` : "Publish date cleared"),
+    };
+  });
+}
+
+export function createContentItem(input: {
+  id: string;
+  kind: ContentKind;
+  title: string;
+  contentStage: ContentStage;
+  publishOn: string | null;
+  assignee: TaskAssignee | null;
+  sample: boolean;
+  insightId?: string | null;
+  at: string;
+}): { ok: true; task: TaskBoardTask } | { ok: false; error: string } {
+  const title = input.title.replace(/\s+/g, " ").trim();
+  if (!title) return { ok: false, error: "Add a title." };
+  if (!isContentKind(input.kind) || !isContentStage(input.contentStage)) return { ok: false, error: "That content type is not valid." };
+  const id = text(input.id);
+  if (!id) return { ok: false, error: "Could not save that item." };
+  const stage = boardStageForContent(input.contentStage);
+  const publishOn = input.publishOn && /^\d{4}-\d{2}-\d{2}$/.test(input.publishOn) ? input.publishOn : null;
+  const section = input.kind === "podcast" ? "podcast" : "promo";
+  return {
+    ok: true,
+    task: {
+      id,
+      pipelineKey: id,
+      origin: "manual",
+      service: input.kind,
+      contentKind: input.kind,
+      contentStage: input.contentStage,
+      stage,
+      stageLocked: true,
+      resumeStage: stage,
+      status: input.contentStage === "published" ? "done" : "open",
+      title,
+      sourceLine: input.kind === "podcast" ? "Podcast · Content plan" : "Marketing · Iconic promo",
+      primaryHref: contentSectionHref(section, id),
+      primaryHrefLabel: input.kind === "podcast" ? "Open podcast" : "Open promo",
+      orderHref: null,
+      orderLabel: null,
+      galleryHref: null,
+      galleryLabel: null,
+      deliveryHref: null,
+      deliveryLabel: null,
+      clientRequest: null,
+      clientRequestFrom: null,
+      clientRequestAt: null,
+      assigneeId: input.assignee?.id || null,
+      assigneeName: input.assignee?.name || null,
+      priority: "normal",
+      dueOn: publishOn,
+      publishOn,
+      insightId: input.insightId || null,
+      sort: null,
+      dismissed: false,
+      fingerprint: `${input.kind}|${id}|${title}`,
+      sample: input.sample,
+      manual: true,
+      activity: appendActivity([], input.at, "Added to the content plan"),
+    },
+  };
 }
 
 export function withoutTask(tasks: TaskBoardTask[], id: string): { tasks: TaskBoardTask[]; removed: TaskBoardTask | null } {
@@ -693,7 +843,7 @@ export function sampleTaskBoard(today: string): TaskBoardModel & { staff: TaskAs
     ["photo:sampleed126", { sort: 30, priority: "urgent", dueOn: addCalendarDays(today, -1), dueTouched: true, assigneeId: mike?.id || null, assigneeName: mike?.name || null, assigneeTouched: true, activity: sampleActivity(requestAt) }],
     ["message:sample-message-130", { sort: 40, priority: "normal", dueOn: today, dueTouched: true, assigneeId: cadi?.id || null, assigneeName: cadi?.name || null, assigneeTouched: true }],
     ["order:sample-order-127:video", { sort: 50, priority: "high", dueOn: addCalendarDays(today, 1), dueTouched: true }],
-    ["order:sample-order-129:podcast", { sort: 60, priority: "normal", dueOn: addCalendarDays(today, 1), dueTouched: true }],
+    ["order:sample-order-129:podcast", { sort: 60, priority: "normal", dueOn: addCalendarDays(today, 2), dueTouched: true, publishOn: addCalendarDays(today, 2), publishTouched: true }],
   ]);
   const overlaid = built.tasks.map((task) => applyPatch(task, patches.get(task.pipelineKey)));
   const manual = createManualTask({
@@ -723,6 +873,17 @@ export function sampleTaskBoard(today: string): TaskBoardModel & { staff: TaskAs
     manual.ok ? { ...manual.task, sourceLine: "Manual · Added on this board" } : null,
     done.ok ? { ...done.task, sourceLine: "System · Approval recorded", status: "done" as const, stage: "delivered" as const } : null,
   ].filter((task): task is TaskBoardTask => Boolean(task));
+  const promo = createContentItem({
+    id: "content:sample-promo",
+    kind: "promo",
+    title: "Iconic promo · Market week",
+    contentStage: "scheduled",
+    publishOn: addCalendarDays(today, 5),
+    assignee: cadi,
+    sample: true,
+    at: requestAt,
+  });
+  if (promo.ok) tasks.push({ ...promo.task, sort: 90 });
   tasks.sort(compareManual);
   return {
     tasks,
@@ -750,6 +911,7 @@ function applyPatch(task: TaskBoardTask, patch: Partial<TaskBoardOverlay> | unde
     assigneeId: patch.assigneeTouched ? patch.assigneeId ?? null : task.assigneeId,
     assigneeName: patch.assigneeTouched ? patch.assigneeName ?? null : task.assigneeName,
     activity: patch.activity ?? task.activity,
+    publishOn: patch.publishOn ?? task.publishOn,
   };
 }
 
@@ -873,6 +1035,10 @@ function mergeOverlay(candidate: TaskBoardTask, overlay: TaskBoardOverlay): Task
     fingerprint: candidate.fingerprint,
     activity: overlay.activity,
     sample: candidate.sample || overlay.sample,
+    contentKind: overlay.contentKind || candidate.contentKind || null,
+    contentStage: overlay.contentStage || candidate.contentStage || null,
+    publishOn: overlay.publishTouched ? overlay.publishOn || null : candidate.publishOn || null,
+    insightId: overlay.insightId || candidate.insightId || null,
   };
 }
 
@@ -909,6 +1075,10 @@ function taskFromOverlay(overlay: TaskBoardOverlay): TaskBoardTask {
     sample: overlay.sample,
     manual: overlay.manual,
     activity: overlay.activity,
+    contentKind: overlay.contentKind || null,
+    contentStage: overlay.contentStage || null,
+    publishOn: overlay.publishOn || null,
+    insightId: overlay.insightId || null,
   };
 }
 
@@ -1035,7 +1205,7 @@ function productionTask(
   const href = kind === "order"
     ? `/admin/order/${encodeURIComponent(id)}`
     : adminOrderDetailHref(id);
-  return baseTask({
+  const task = baseTask({
     pipelineKey: `order:${id}:${service}`,
     origin: "production",
     service,
@@ -1058,6 +1228,14 @@ function productionTask(
     fingerprint: `${service}|${id}|${text(row.status)}|${label}`,
     sample: row.sample === true,
   });
+  if (service !== "podcast") return task;
+  return {
+    ...task,
+    contentKind: "podcast",
+    contentStage: "edit",
+    primaryHref: contentSectionHref("podcast", task.id),
+    primaryHrefLabel: "Open podcast",
+  };
 }
 
 function editRequestTasks(rows: Array<Record<string, unknown>>, byId: Map<string, Record<string, unknown>>): TaskBoardTask[] {
@@ -1213,16 +1391,15 @@ function emailTasks(emails: InboundClientEmail[], byId: Map<string, Record<strin
     const id = text(email.id);
     if (!id) continue;
     const label = email.orderNumber ? orderLabel({ orderNumber: email.orderNumber }) : "";
-    const order = label
-      ? [...byId.values()].find((row) => orderLabel(row) === label)
-      : undefined;
+    const orderHits = label ? [...byId.values()].filter((row) => orderLabel(row) === label && (row.orderNumber != null || row.status != null)) : [];
+    const order = orderHits.length === 1 ? orderHits[0] : undefined;
     tasks.push(baseTask({
       pipelineKey: `email:${id}`,
       origin: "email",
       service: "email",
       stage: "queued",
       title: label ? `Email question · order ${label}` : `Email · ${clip(email.subject, 60) || "Client message"}`,
-      sourceLine: `Email · ${clip(email.subject, 42) || "Inbox"}`,
+      sourceLine: `Email · ${PHOTOS_MAILBOX}`,
       primaryHref: orderHref(order) || "/admin/communications",
       primaryHrefLabel: order ? "Open order" : "Open inbox",
       orderHref: orderHref(order),

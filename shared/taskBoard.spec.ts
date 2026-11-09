@@ -251,16 +251,16 @@ describe("task board derivation", () => {
     const board = sampleTaskBoard(TODAY);
     expect(board.tasks.every((task) => task.sample)).toBe(true);
     const stats = taskBoardStats(board.tasks, TODAY);
-    expect(stats.open.value).toBe(7);
+    expect(stats.open.value).toBe(8);
     expect(stats.production).toEqual({ value: 2, label: "Mike + Daniel" });
-    expect(stats.ready.value).toBe(1);
+    expect(stats.ready.value).toBe(2);
     expect(stats.overdue.value).toBe(1);
     expect(stats.completed).toBe(1);
     expect(board.tasks.find((task) => task.manual && task.status === "open")?.title).toBe("Prepare weekly team agenda");
     expect(board.tasks.find((task) => task.status === "done")?.title).toBe("Approve gallery · order #122");
     expect(dueLabel(board.tasks.find((task) => task.status === "done")?.dueOn || null, "done", TODAY)).toBe("Done");
     const counts = taskFilterCounts(board.tasks, "sample-cadi", TODAY);
-    expect(counts).toEqual({ all: 8, mine: 2, unassigned: 2, overdue: 1 });
+    expect(counts).toEqual({ all: 9, mine: 3, unassigned: 2, overdue: 1 });
     const listIds = displayTasks(board.tasks, {
       filter: "all",
       meId: null,

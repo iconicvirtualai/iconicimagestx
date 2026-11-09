@@ -50,10 +50,12 @@ describe("task board view", () => {
     expect(html).toContain("/admin/ops?stage=review");
     expect(html).toContain("Mike");
     expect(html).toContain("Daniel");
-    expect(html).toContain(">7<");
     expect(html).toContain("Mike + Daniel");
+    expect(html).toContain("Open podcast");
+    expect(html).toContain("Iconic promo");
     expect(html).toContain("Please replace the opening photo");
-    expect(html).toContain("Inbound email is not connected");
+    expect(html).toContain("photos@iconicimagestx.com");
+    expect(html).toContain("does not open the mailbox");
     expect(html).toContain("does not send email");
     expect(html).toContain("Delete removes this task only");
   });
@@ -74,13 +76,15 @@ describe("task board view", () => {
 describe("task board page safeguards", () => {
   it("writes the task collection only and does not send mail or texts", () => {
     const page = readFileSync("client/pages/AdminTaskBoard.tsx", "utf8");
+    const hook = readFileSync("client/lib/useTaskBoardData.ts", "utf8");
     const view = readFileSync("client/components/taskBoard/TaskBoardView.tsx", "utf8");
+    const content = readFileSync("client/pages/AdminContent.tsx", "utf8");
     const rules = readFileSync("firestore.rules", "utf8");
-    expect(page).not.toMatch(/nodemailer|twilio|sendSms|sendMail|updateDoc/);
+    expect(page + hook + content).not.toMatch(/nodemailer|twilio|sendSms|sendMail|updateDoc/);
     expect(view).not.toMatch(/nodemailer|twilio|sendSms|sendMail/);
-    expect(page).toContain("TASK_BOARD_COLLECTION");
-    expect(page).not.toContain('doc(db, "orders"');
-    expect(page).not.toContain('doc(db, "galleries"');
+    expect(hook).toContain("TASK_BOARD_COLLECTION");
+    expect(hook).not.toContain('doc(db, "orders"');
+    expect(hook).not.toContain('doc(db, "galleries"');
     expect(rules).toContain("match /taskBoardItems/{itemId}");
   });
 });
