@@ -236,6 +236,25 @@ describe("POST /api/virtual-staging-pro/order", () => {
     }));
   });
 
+  it("prices each full set of 10 at $200 and ignores a posted total", async () => {
+    const photos = Array.from({ length: 12 }, (_, index) => photo({
+      fileName: `room-${index}.jpg`,
+      price: 1,
+    }));
+    const response = await post("/api/virtual-staging-pro/order", orderBody({ total: 1, unitPrice: 1, photos }));
+    expect(response.status).toBe(201);
+    const body = await response.json() as { total: number };
+    expect(body.total).toBe(250);
+    const orders = [...(store.collections.orders || new Map()).values()];
+    expect(orders[0].total).toBe(250);
+    expect(orders[0].balanceDue).toBe(250);
+    expect(orders[0].lineItems).toEqual([
+      expect.objectContaining({ qty: 1, unitPrice: 200, price: 200 }),
+      expect.objectContaining({ qty: 2, unitPrice: 25, price: 50 }),
+    ]);
+    expect(sendEmail).toHaveBeenCalledWith(expect.objectContaining({ audience: "staff" }));
+  });
+
   it("confirms uploaded photos without another client or office send", async () => {
     const created = await post("/api/virtual-staging-pro/order", orderBody({ photos: [photo()] }));
     const body = await created.json() as {

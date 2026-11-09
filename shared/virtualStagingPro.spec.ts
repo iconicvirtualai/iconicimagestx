@@ -4,6 +4,7 @@ import { classifyTestData } from "./testDataCleanup";
 import {
   VIRTUAL_STAGING_PRO_UNIT_PRICE,
   parseVirtualStagingProOrder,
+  priceVirtualStagingPro,
   quoteVirtualStagingPro,
   virtualStagingProQaFlags,
 } from "./virtualStagingPro";
@@ -53,6 +54,23 @@ describe("virtual staging pro pricing", () => {
       total: 25,
       lineItems: [{ id: "virtual-staging-pro", qty: 1, unitPrice: 25, price: 25 }],
     });
+  });
+
+  it("charges $200 for each full set of 10 and $25 for the rest", () => {
+    expect(priceVirtualStagingPro(5)).toBe(125);
+    expect(priceVirtualStagingPro(9)).toBe(225);
+    expect(priceVirtualStagingPro(10)).toBe(200);
+    expect(priceVirtualStagingPro(12)).toBe(250);
+    expect(priceVirtualStagingPro(20)).toBe(400);
+    const twelve = quoteVirtualStagingPro(12);
+    expect(twelve?.total).toBe(250);
+    expect(twelve?.lineItems).toEqual([
+      { id: "virtual-staging-pro-10", name: "Pro Staging (10 photos)", qty: 1, unitPrice: 200, price: 200 },
+      { id: "virtual-staging-pro", name: "Pro Staging", qty: 2, unitPrice: 25, price: 50 },
+    ]);
+    expect(quoteVirtualStagingPro(20)?.lineItems).toEqual([
+      { id: "virtual-staging-pro-10", name: "Pro Staging (10 photos)", qty: 2, unitPrice: 200, price: 400 },
+    ]);
   });
 
   it("flags a QA TEST order so cleanup can archive it", () => {

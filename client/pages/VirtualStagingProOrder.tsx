@@ -9,7 +9,8 @@ import {
   VIRTUAL_STAGING_PRO_MAX_PHOTOS,
   VIRTUAL_STAGING_PRO_ROOM_TYPES,
   VIRTUAL_STAGING_PRO_STYLES,
-  VIRTUAL_STAGING_PRO_UNIT_PRICE,
+  VIRTUAL_STAGING_PRO_RATE_LINE,
+  quoteVirtualStagingPro,
   normalizeVirtualStagingPhotoType,
 } from "@shared/virtualStagingPro";
 
@@ -187,7 +188,8 @@ export default function VirtualStagingProOrder() {
     }
   };
 
-  const total = photos.length * VIRTUAL_STAGING_PRO_UNIT_PRICE;
+  const quote = quoteVirtualStagingPro(photos.length);
+  const total = quote?.total ?? 0;
 
   if (orderNumber) {
     return (
@@ -378,7 +380,10 @@ export default function VirtualStagingProOrder() {
 
               <div className="lg:col-span-1">
                 <div className="p-8 rounded-[2rem] bg-black text-white sticky top-32 shadow-2xl">
-                  <h3 className="text-xl font-bold mb-8">Order Summary</h3>
+                  <h3 className="text-xl font-bold mb-3">Order Summary</h3>
+                  <p className="mb-8 text-sm text-gray-300" data-testid="virtual-staging-pro-rate">
+                    {VIRTUAL_STAGING_PRO_RATE_LINE}
+                  </p>
                   <div className="space-y-6 mb-8">
                     <div className="flex justify-between items-center text-gray-400">
                       <span>Pro Staging ({photos.length} photos)</span>
@@ -394,7 +399,7 @@ export default function VirtualStagingProOrder() {
                     </div>
                     <div className="pt-6 border-t border-white/10 flex justify-between items-center">
                       <span className="text-lg font-bold">Total Cost</span>
-                      <span className="text-3xl font-bold accent-text-bordered">${total}</span>
+                      <span className="text-3xl font-bold accent-text-bordered" data-testid="virtual-staging-pro-total">${total}</span>
                     </div>
                     <p className="text-[11px] text-gray-400">No payment today. We&apos;ll email your invoice after review.</p>
                   </div>

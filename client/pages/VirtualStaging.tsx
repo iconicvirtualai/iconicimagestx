@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { CheckCircle2, Sparkles, UserCheck } from "lucide-react";
 import { beforeAfterById, type BeforeAfterPair } from "@/lib/beforeAfter";
 import { useSiteHref, useSiteText } from "@/content/siteContent";
+import { VIRTUAL_STAGING_PRO_RATE_LINE } from "@shared/virtualStagingPro";
 
 const SHOWCASE: BeforeAfterPair[] = [
   beforeAfterById("pavilion-lifestyle"),
@@ -172,16 +173,13 @@ export default function VirtualStaging() {
                     <span className="text-4xl font-bold text-[#0d9488]">$25</span>
                     <span className="text-gray-400">/ photo</span>
                   </div>
+                  <p className="mt-3 text-sm text-gray-300">{VIRTUAL_STAGING_PRO_RATE_LINE}</p>
                 </div>
 
                 <div className="space-y-4 mb-8">
                   <div className="flex items-center justify-between p-3 bg-white/10 rounded-xl">
                     <span className="font-medium">10 Photos</span>
                     <span className="font-bold text-[#0d9488]">$200</span>
-                  </div>
-                  <div className="flex items-center justify-between p-3 bg-white/10 rounded-xl">
-                    <span className="font-medium">20 Photos</span>
-                    <span className="font-bold text-[#0d9488]">$350</span>
                   </div>
                 </div>
 

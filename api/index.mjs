@@ -37992,6 +37992,8 @@ const VIRTUAL_STAGING_PRO_SERVICE = "Virtual Staging Pro";
 const VIRTUAL_STAGING_PRO_LINE_NAME = "Pro Staging";
 const VIRTUAL_STAGING_PRO_STATUS = "new";
 const VIRTUAL_STAGING_PRO_UNIT_PRICE = 25;
+const VIRTUAL_STAGING_PRO_BUNDLE_SIZE = 10;
+const VIRTUAL_STAGING_PRO_BUNDLE_PRICE = 200;
 const VIRTUAL_STAGING_PRO_MAX_PHOTOS = 20;
 const VIRTUAL_STAGING_PRO_MAX_PHOTO_BYTES = 12 * 1024 * 1024;
 const VIRTUAL_STAGING_PRO_STYLES = [
@@ -38047,23 +38049,43 @@ function normalizeVirtualStagingPhotoType(value, fileName2) {
   if (lower.endsWith(".webp")) return "image/webp";
   return raw;
 }
+function priceVirtualStagingPro(photoCount) {
+  const straight = photoCount * VIRTUAL_STAGING_PRO_UNIT_PRICE;
+  const bundled = Math.floor(photoCount / VIRTUAL_STAGING_PRO_BUNDLE_SIZE) * VIRTUAL_STAGING_PRO_BUNDLE_PRICE + photoCount % VIRTUAL_STAGING_PRO_BUNDLE_SIZE * VIRTUAL_STAGING_PRO_UNIT_PRICE;
+  return Math.min(straight, bundled);
+}
 function quoteVirtualStagingPro(photoCount) {
   if (!Number.isInteger(photoCount) || photoCount < 1 || photoCount > VIRTUAL_STAGING_PRO_MAX_PHOTOS) {
     return null;
   }
-  const total = photoCount * VIRTUAL_STAGING_PRO_UNIT_PRICE;
+  const bundles = Math.floor(photoCount / VIRTUAL_STAGING_PRO_BUNDLE_SIZE);
+  const remainder = photoCount % VIRTUAL_STAGING_PRO_BUNDLE_SIZE;
+  const lineItems = [];
+  if (bundles > 0) {
+    lineItems.push({
+      id: "virtual-staging-pro-10",
+      name: `${VIRTUAL_STAGING_PRO_LINE_NAME} (10 photos)`,
+      qty: bundles,
+      unitPrice: VIRTUAL_STAGING_PRO_BUNDLE_PRICE,
+      price: bundles * VIRTUAL_STAGING_PRO_BUNDLE_PRICE
+    });
+  }
+  if (remainder > 0) {
+    lineItems.push({
+      id: "virtual-staging-pro",
+      name: VIRTUAL_STAGING_PRO_LINE_NAME,
+      qty: remainder,
+      unitPrice: VIRTUAL_STAGING_PRO_UNIT_PRICE,
+      price: remainder * VIRTUAL_STAGING_PRO_UNIT_PRICE
+    });
+  }
+  const total = priceVirtualStagingPro(photoCount);
   return {
     unitPrice: VIRTUAL_STAGING_PRO_UNIT_PRICE,
     qty: photoCount,
     subtotal: total,
     total,
-    lineItems: [{
-      id: "virtual-staging-pro",
-      name: VIRTUAL_STAGING_PRO_LINE_NAME,
-      qty: photoCount,
-      unitPrice: VIRTUAL_STAGING_PRO_UNIT_PRICE,
-      price: total
-    }]
+    lineItems
   };
 }
 function virtualStagingProQaFlags(input) {

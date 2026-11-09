@@ -6,6 +6,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BUSINESS_CONTACT } from "@shared/businessContact";
+import { VIRTUAL_STAGING_PRO_RATE_LINE } from "@shared/virtualStagingPro";
 
 vi.mock("@/hooks/useSiteSettings", () => ({
   useSiteSettings: () => ({
@@ -48,12 +49,14 @@ function setValue(id: string, value: string) {
   input.dispatchEvent(new Event("change", { bubbles: true }));
 }
 
-function addPhoto() {
+function addPhotos(count: number, name = "living-room.jpg") {
   const input = container?.querySelector<HTMLInputElement>('[data-testid="virtual-staging-pro-files"]');
   if (!input) throw new Error("Missing file input");
-  const file = new File([new Uint8Array([1, 2, 3, 4])], "living-room.jpg", { type: "image/jpeg" });
   const transfer = new DataTransfer();
-  transfer.items.add(file);
+  for (let index = 0; index < count; index += 1) {
+    const fileName = count === 1 ? name : `room-${index}.jpg`;
+    transfer.items.add(new File([new Uint8Array([1, 2, 3, 4])], fileName, { type: "image/jpeg" }));
+  }
   input.files = transfer.files;
   input.dispatchEvent(new Event("change", { bubbles: true }));
 }
@@ -76,9 +79,26 @@ afterEach(() => {
 });
 
 describe("virtual staging pro order", () => {
+  it("shows the 10-photo bundle and a live total", async () => {
+    expect(container?.textContent).toContain(VIRTUAL_STAGING_PRO_RATE_LINE);
+    expect(container?.querySelector('[data-testid="virtual-staging-pro-total"]')?.textContent).toBe("$0");
+    await act(async () => {
+      addPhotos(5);
+    });
+    expect(container?.querySelector('[data-testid="virtual-staging-pro-total"]')?.textContent).toBe("$125");
+    await act(async () => {
+      addPhotos(5);
+    });
+    expect(container?.querySelector('[data-testid="virtual-staging-pro-total"]')?.textContent).toBe("$200");
+    await act(async () => {
+      addPhotos(2);
+    });
+    expect(container?.querySelector('[data-testid="virtual-staging-pro-total"]')?.textContent).toBe("$250");
+  });
+
   it("submits the order and shows the invoice-after-review confirmation", async () => {
     await act(async () => {
-      addPhoto();
+      addPhotos(1);
       setValue("vs-pro-name", "Ada Lovelace");
       setValue("vs-pro-email", "ada@woodlandsrealty.com");
       setValue("vs-pro-phone", "281-555-0199");
@@ -144,7 +164,7 @@ describe("virtual staging pro order", () => {
 
   it("shows the office phone when submit fails", async () => {
     await act(async () => {
-      addPhoto();
+      addPhotos(1);
       setValue("vs-pro-name", "Ada Lovelace");
       setValue("vs-pro-email", "ada@woodlandsrealty.com");
       setValue("vs-pro-phone", "281-555-0199");

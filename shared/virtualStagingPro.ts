@@ -1,11 +1,10 @@
 /**
  * Professional virtual staging requests from /services/virtual-staging/pro-order.
  *
- * The price is the rate that page shows: $25 per photo. The booking catalog
- * credit (VIRTUAL_STAGING_UNIT_PRICE) is a different product. The marketing
- * card also prints 10-for-$200 and 20-for-$350 bundles; this order does not
- * apply those bundles. The server quotes from VIRTUAL_STAGING_PRO_UNIT_PRICE
- * and ignores any total the browser sends. No payment is taken here.
+ * Price is $25 per photo, or $200 for every full set of 10. Remainder photos
+ * stay $25. The booking catalog credit (VIRTUAL_STAGING_UNIT_PRICE) is a
+ * different product. The server quotes with priceVirtualStagingPro and ignores
+ * any total the browser sends. No payment is taken here.
  */
 
 import { safeStorageFileName } from "./listingAccess.ts";
@@ -16,8 +15,11 @@ export const VIRTUAL_STAGING_PRO_SERVICE = "Virtual Staging Pro";
 export const VIRTUAL_STAGING_PRO_LINE_NAME = "Pro Staging";
 /** Status the admin orders list treats as a new request. */
 export const VIRTUAL_STAGING_PRO_STATUS = "new";
-/** Dollars per photo, matching the pro order summary. */
+/** Dollars per photo outside a full set of 10. */
 export const VIRTUAL_STAGING_PRO_UNIT_PRICE = 25;
+export const VIRTUAL_STAGING_PRO_BUNDLE_SIZE = 10;
+export const VIRTUAL_STAGING_PRO_BUNDLE_PRICE = 200;
+export const VIRTUAL_STAGING_PRO_RATE_LINE = "$25 per photo, or 10 photos for $200";
 export const VIRTUAL_STAGING_PRO_MAX_PHOTOS = 20;
 /** Direct-to-storage cap. Bytes do not pass through the API. */
 export const VIRTUAL_STAGING_PRO_MAX_PHOTO_BYTES = 12 * 1024 * 1024;
@@ -85,8 +87,8 @@ export interface VirtualStagingProOrderInput {
 }
 
 export interface VirtualStagingProLineItem {
-  id: "virtual-staging-pro";
-  name: typeof VIRTUAL_STAGING_PRO_LINE_NAME;
+  id: "virtual-staging-pro" | "virtual-staging-pro-10";
+  name: string;
   qty: number;
   unitPrice: number;
   price: number;
@@ -130,23 +132,50 @@ export function normalizeVirtualStagingPhotoType(value: unknown, fileName: strin
   return raw;
 }
 
+/**
+ * min(n * 25, floor(n / 10) * 200 + (n % 10) * 25).
+ * A full set of 10 is $200. Photos outside those sets stay $25.
+ * Nine photos stay $225; they are not pulled down to the next bundle.
+ */
+export function priceVirtualStagingPro(photoCount: number): number {
+  const straight = photoCount * VIRTUAL_STAGING_PRO_UNIT_PRICE;
+  const bundled = Math.floor(photoCount / VIRTUAL_STAGING_PRO_BUNDLE_SIZE) * VIRTUAL_STAGING_PRO_BUNDLE_PRICE
+    + (photoCount % VIRTUAL_STAGING_PRO_BUNDLE_SIZE) * VIRTUAL_STAGING_PRO_UNIT_PRICE;
+  return Math.min(straight, bundled);
+}
+
 export function quoteVirtualStagingPro(photoCount: number): VirtualStagingProQuote | null {
   if (!Number.isInteger(photoCount) || photoCount < 1 || photoCount > VIRTUAL_STAGING_PRO_MAX_PHOTOS) {
     return null;
   }
-  const total = photoCount * VIRTUAL_STAGING_PRO_UNIT_PRICE;
+  const bundles = Math.floor(photoCount / VIRTUAL_STAGING_PRO_BUNDLE_SIZE);
+  const remainder = photoCount % VIRTUAL_STAGING_PRO_BUNDLE_SIZE;
+  const lineItems: VirtualStagingProLineItem[] = [];
+  if (bundles > 0) {
+    lineItems.push({
+      id: "virtual-staging-pro-10",
+      name: `${VIRTUAL_STAGING_PRO_LINE_NAME} (10 photos)`,
+      qty: bundles,
+      unitPrice: VIRTUAL_STAGING_PRO_BUNDLE_PRICE,
+      price: bundles * VIRTUAL_STAGING_PRO_BUNDLE_PRICE,
+    });
+  }
+  if (remainder > 0) {
+    lineItems.push({
+      id: "virtual-staging-pro",
+      name: VIRTUAL_STAGING_PRO_LINE_NAME,
+      qty: remainder,
+      unitPrice: VIRTUAL_STAGING_PRO_UNIT_PRICE,
+      price: remainder * VIRTUAL_STAGING_PRO_UNIT_PRICE,
+    });
+  }
+  const total = priceVirtualStagingPro(photoCount);
   return {
     unitPrice: VIRTUAL_STAGING_PRO_UNIT_PRICE,
     qty: photoCount,
     subtotal: total,
     total,
-    lineItems: [{
-      id: "virtual-staging-pro",
-      name: VIRTUAL_STAGING_PRO_LINE_NAME,
-      qty: photoCount,
-      unitPrice: VIRTUAL_STAGING_PRO_UNIT_PRICE,
-      price: total,
-    }],
+    lineItems,
   };
 }
 
