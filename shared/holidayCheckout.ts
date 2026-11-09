@@ -43,6 +43,12 @@ export function holidayReturnPath(leadSource: string, orderNumber: string): stri
   return `/thankful?${query}#social-saves`;
 }
 
+export interface HolidayPaymentLine {
+  name: string;
+  /** Signed cents. A negative line is the Pay Now savings. */
+  amountCents: number;
+}
+
 export function holidayPaymentLinkBody(input: {
   invoiceId: string;
   invoiceNumber?: string;
@@ -51,19 +57,47 @@ export function holidayPaymentLinkBody(input: {
   email?: string;
   locationId: string;
   redirectUrl: string;
+  /**
+   * Itemized Square order. When present, this replaces quick_pay.
+   * Positive lines are Square line items. Negative lines are order discounts
+   * so the savings stays named and the charge cannot go below $0.
+   */
+  lineItems?: HolidayPaymentLine[];
 }): Record<string, unknown> {
   const cents = Math.round(input.amount * 100);
   const key = `holiday-${input.invoiceId}`;
+  const lines = (input.lineItems || []).filter((line) => line.name.trim() && line.amountCents !== 0);
+  const priced = lines.length > 0
+    ? {
+      order: {
+        location_id: input.locationId,
+        line_items: lines.filter((line) => line.amountCents > 0).map((line) => ({
+          name: line.name.slice(0, 255),
+          quantity: "1",
+          base_price_money: { amount: line.amountCents, currency: "USD" },
+        })),
+        ...(lines.some((line) => line.amountCents < 0) ? {
+          discounts: lines.filter((line) => line.amountCents < 0).map((line) => ({
+            name: line.name.slice(0, 255),
+            amount_money: { amount: Math.abs(line.amountCents), currency: "USD" },
+            scope: "ORDER",
+          })),
+        } : {}),
+      },
+    }
+    : {
+      quick_pay: {
+        name: `Iconic Images ${input.itemName}`.slice(0, 255),
+        price_money: {
+          amount: cents,
+          currency: "USD",
+        },
+        location_id: input.locationId,
+      },
+    };
   return {
     idempotency_key: key.length <= 45 ? key : key.slice(0, 45),
-    quick_pay: {
-      name: `Iconic Images ${input.itemName}`.slice(0, 255),
-      price_money: {
-        amount: cents,
-        currency: "USD",
-      },
-      location_id: input.locationId,
-    },
+    ...priced,
     checkout_options: {
       redirect_url: input.redirectUrl,
     },

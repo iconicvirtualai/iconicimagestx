@@ -56,7 +56,8 @@ export interface SendSMSOptions {
   body: string;        // message text (≤ 1600 chars)
   from?: string;       // override sender (defaults to TWILIO_PHONE_NUMBER)
   /**
-   * booking_confirmation: client order-received SMS. Excluded from the RED kill.
+   * booking_confirmation: client order-received SMS. sendSMS does not apply a
+   * second pause; the booking route gates this text before the call.
    * staff_inbound: office Google Voice only (+12813560965). Excluded from the RED kill.
    */
   kind?: "booking_confirmation" | "staff_inbound";

@@ -9,6 +9,7 @@ import {
   holidayPaymentLinkBody,
   holidayReturnPath,
   squareCheckoutMissingEnv,
+  type HolidayPaymentLine,
 } from "../../shared/holidayCheckout";
 import { publicSiteUrl } from "../../shared/publicSiteUrl";
 
@@ -20,6 +21,8 @@ export interface HolidaySquareCheckoutInput {
   itemName: string;
   leadSource: string;
   orderNumber: string;
+  /** Itemized charge. Omitted keeps the single quick_pay amount. */
+  lineItems?: HolidayPaymentLine[];
   /** Absolute https URL on the public site origin. Omitted uses the holiday return path. */
   redirectUrl?: string;
   /** Log prefix. Holiday checkout leaves this unset. */
@@ -113,6 +116,7 @@ export async function createHolidaySquareCheckout(
         email: input.email,
         locationId: env.SQUARE_LOCATION_ID || "",
         redirectUrl,
+        lineItems: input.lineItems,
       })),
     });
   } catch (err) {

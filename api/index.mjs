@@ -6418,8 +6418,24 @@ function holidayReturnPath(leadSource, orderNumber2) {
 function holidayPaymentLinkBody(input) {
   const cents2 = Math.round(input.amount * 100);
   const key = `holiday-${input.invoiceId}`;
-  return {
-    idempotency_key: key.length <= 45 ? key : key.slice(0, 45),
+  const lines = (input.lineItems || []).filter((line) => line.name.trim() && line.amountCents !== 0);
+  const priced = lines.length > 0 ? {
+    order: {
+      location_id: input.locationId,
+      line_items: lines.filter((line) => line.amountCents > 0).map((line) => ({
+        name: line.name.slice(0, 255),
+        quantity: "1",
+        base_price_money: { amount: line.amountCents, currency: "USD" }
+      })),
+      ...lines.some((line) => line.amountCents < 0) ? {
+        discounts: lines.filter((line) => line.amountCents < 0).map((line) => ({
+          name: line.name.slice(0, 255),
+          amount_money: { amount: Math.abs(line.amountCents), currency: "USD" },
+          scope: "ORDER"
+        }))
+      } : {}
+    }
+  } : {
     quick_pay: {
       name: `Iconic Images ${input.itemName}`.slice(0, 255),
       price_money: {
@@ -6427,7 +6443,11 @@ function holidayPaymentLinkBody(input) {
         currency: "USD"
       },
       location_id: input.locationId
-    },
+    }
+  };
+  return {
+    idempotency_key: key.length <= 45 ? key : key.slice(0, 45),
+    ...priced,
     checkout_options: {
       redirect_url: input.redirectUrl
     },
@@ -7286,7 +7306,8 @@ async function createHolidaySquareCheckout(input) {
         itemName: input.itemName || "Holiday order",
         email: input.email,
         locationId: env.SQUARE_LOCATION_ID || "",
-        redirectUrl
+        redirectUrl,
+        lineItems: input.lineItems
       }))
     });
   } catch (err) {
@@ -7901,6 +7922,58 @@ function payAtCloseSettlement(action, amountDue) {
 function isMirroredPayAtCloseSquarePayment(payment, invoice) {
   if (String(payment?.source_type || "").toUpperCase() !== "EXTERNAL") return false;
   return invoice?.paymentMethod === PAY_AT_CLOSE_METHOD || invoice?.paymentProvider === PAY_AT_CLOSE_METHOD || Boolean(text$m(invoice?.titusCheckoutId));
+}
+const PAY_NOW_DISCOUNT_CENTS = 500;
+const PAY_NOW_METHOD = "pay_now";
+const PAY_LATER_METHOD = "pay_later";
+const PAY_NOW_SAVINGS_LABEL = "Pay Now savings";
+const PAY_NOW_LINE_ID = "pay-now-savings";
+function dollarsToCents(dollars2) {
+  if (!Number.isFinite(dollars2) || dollars2 <= 0) return 0;
+  return Math.round(dollars2 * 100);
+}
+function payNowDiscountCents(totalBeforeSavingsCents) {
+  const base = Number.isFinite(totalBeforeSavingsCents) ? Math.max(0, Math.round(totalBeforeSavingsCents)) : 0;
+  return Math.min(PAY_NOW_DISCOUNT_CENTS, base);
+}
+function payNowSavingsLine(discountCents) {
+  if (!Number.isFinite(discountCents) || discountCents <= 0) return null;
+  const price = -(Math.round(discountCents) / 100);
+  return {
+    id: PAY_NOW_LINE_ID,
+    name: PAY_NOW_SAVINGS_LABEL,
+    unitPrice: price,
+    qty: 1,
+    price
+  };
+}
+function isProcessingLine(item) {
+  return item.id === ADJUSTMENT_LINE_IDS.processing || item.category === ADJUSTMENT_LINE_IDS.processing;
+}
+function applyPayNowSavings(sale) {
+  const beforeCents = dollarsToCents(sale.total);
+  const discountCents = payNowDiscountCents(beforeCents);
+  const line = payNowSavingsLine(discountCents);
+  if (!line) return sale;
+  const without = sale.lineItems.filter((item) => item.id !== PAY_NOW_LINE_ID);
+  const processing = without.filter((item) => isProcessingLine(item));
+  const rest = without.filter((item) => !isProcessingLine(item));
+  const total = (beforeCents - discountCents) / 100;
+  return {
+    ...sale,
+    lineItems: [...rest, ...processing, line],
+    total,
+    amountDue: total
+  };
+}
+function payNowSquareLines(lineItems) {
+  return lineItems.flatMap((item) => {
+    const amountCents = Math.round(Number(item.price) * 100);
+    if (!Number.isFinite(amountCents) || amountCents === 0) return [];
+    const name = String(item.name || "").trim();
+    if (!name) return [];
+    return [{ name, amountCents }];
+  });
 }
 function hmacHex(secret, payload) {
   return createHmac("sha256", secret).update(payload).digest("hex");
@@ -10938,7 +11011,10 @@ router$B.post("/", async (req, res) => {
     const travel = traveled.travel;
     const promoCode = resolved.promoCode;
     const promoDiscount = resolved.promoDiscount;
-    const serviceBase2 = Math.max(0, sumLineItemPrices(traveled.lineItems.filter((item) => !isTravelFeeLine(item) && !isPromoInvoiceLine(item))) - promoDiscount);
+    const packageDollars = Math.max(0, sumLineItemPrices(traveled.lineItems.filter((item) => !isTravelFeeLine(item) && !isPromoInvoiceLine(item))) - promoDiscount);
+    const wantsPayNow = req.body.paymentMethod === PAY_NOW_METHOD;
+    const wantsPayLater = req.body.paymentMethod === PAY_LATER_METHOD;
+    const serviceBase2 = packageDollars;
     const tax = taxDollars(serviceBase2, rates);
     const adjustments = await loadPricingAdjustments();
     const payAtCloseOffer = payAtClosePublicOffer(process.env, adjustments);
@@ -10946,6 +11022,7 @@ router$B.post("/", async (req, res) => {
     if (wantsPayAtClose && !payAtCloseOffer.offered) {
       return res.status(400).json({ error: "Pay at Close is not available." });
     }
+    const storedPaymentMethod = wantsPayAtClose ? PAY_AT_CLOSE_METHOD : wantsPayNow ? PAY_NOW_METHOD : wantsPayLater ? PAY_LATER_METHOD : void 0;
     const socialSaves = leadSource === HOLIDAY_SOCIAL_SAVES_LEAD;
     let sale = buildBookingInvoiceDraft({
       lineItems: traveled.lineItems,
@@ -10964,6 +11041,8 @@ router$B.post("/", async (req, res) => {
       const shaped = shapePayAtCloseDraft(sale, payAtCloseCustomerOffer(payAtCloseOffer));
       payAtCloseFee = shaped.payAtCloseFee;
       sale = shaped;
+    } else if (wantsPayNow) {
+      sale = applyPayNowSavings(sale);
     }
     const lineItems = sale.lineItems;
     const total = sale.total;
@@ -11058,8 +11137,8 @@ router$B.post("/", async (req, res) => {
       promoDiscount: Number(promoDiscount) || 0,
       processing: socialSaves ? 0 : sale.processing ?? 0,
       processingPolicy: socialSaves ? "waived" : sale.processingPolicy ?? (processingEnabled() ? "included" : "waived"),
+      ...storedPaymentMethod ? { paymentMethod: storedPaymentMethod } : {},
       ...wantsPayAtClose ? {
-        paymentMethod: PAY_AT_CLOSE_METHOD,
         paymentStatus: PAY_AT_CLOSE_PENDING_STATUS,
         payAtCloseFee
       } : {},
@@ -11246,7 +11325,8 @@ router$B.post("/", async (req, res) => {
         promoDiscount,
         travel,
         clientId: account.clientId,
-        prepared: sale
+        prepared: sale,
+        paymentMethod: storedPaymentMethod
       });
       invoiceId = created.invoiceId;
       try {
@@ -11366,20 +11446,28 @@ router$B.post("/", async (req, res) => {
         return "failed";
       });
       if (phone) {
-        smsStatus = await sendSMS({
-          to: phone,
-          kind: "booking_confirmation",
-          body: SMS_TEMPLATES.bookingConfirmation(
-            firstName,
-            bookingDateLabel(scheduledDate, "TBD — we'll confirm shortly"),
-            displayAddress,
-            money$3(total)
-          )
-        }).then((result) => "suppressed" in result && result.suppressed ? "failed" : "sent").catch((err) => {
-          console.error("[Bookings] Confirmation SMS failed:", err);
-          const message = err instanceof Error ? err.message : String(err);
-          return /TWILIO_|not configured|not set/i.test(message) ? "not_configured" : "failed";
-        });
+        const clientSmsAllowed = clientNotifyLive() || isNotifyTestAllowlisted(normalizedEmail);
+        if (!clientSmsAllowed) {
+          smsStatus = "gated";
+          console.info(
+            `[Bookings] Client confirmation SMS skipped for request ${docRef.id}. ${clientNotifyBlockReason()}. No message sent.`
+          );
+        } else {
+          smsStatus = await sendSMS({
+            to: phone,
+            kind: "booking_confirmation",
+            body: SMS_TEMPLATES.bookingConfirmation(
+              firstName,
+              bookingDateLabel(scheduledDate, "TBD — we'll confirm shortly"),
+              displayAddress,
+              money$3(total)
+            )
+          }).then((result) => "suppressed" in result && result.suppressed ? "failed" : "sent").catch((err) => {
+            console.error("[Bookings] Confirmation SMS failed:", err);
+            const message = err instanceof Error ? err.message : String(err);
+            return /TWILIO_|not configured|not set/i.test(message) ? "not_configured" : "failed";
+          });
+        }
       }
     }
     if (process.env.ADMIN_PHONE) {
@@ -11503,6 +11591,39 @@ router$B.post("/", async (req, res) => {
         }
       }
     }
+    let payNowCheckoutUrl = "";
+    if (wantsPayNow && !wantsPayAtClose && holidayKind === "none" && invoiceId) {
+      try {
+        const invoiceSnap = await db$x().collection("invoices").doc(invoiceId).get();
+        const invoiceData = invoiceSnap.data() || {};
+        const invoiceNumber = typeof invoiceData.invoiceNumber === "string" ? invoiceData.invoiceNumber : void 0;
+        const linked = await createHolidaySquareCheckout({
+          invoiceId,
+          invoiceNumber,
+          amount: Number(total) || 0,
+          email: normalizedEmail,
+          itemName: typeof selectedService === "string" && selectedService.trim() ? selectedService : "Booking",
+          leadSource: typeof leadSource === "string" ? leadSource : "",
+          orderNumber: orderNumber2,
+          lineItems: payNowSquareLines(lineItems),
+          redirectUrl: publicClientUrl(`/book?paid=1&order=${encodeURIComponent(orderNumber2)}`),
+          logLabel: "Pay Now"
+        });
+        if (linked.payment === "square" && linked.checkoutUrl) {
+          payNowCheckoutUrl = linked.checkoutUrl;
+          await db$x().collection("invoices").doc(invoiceId).update({
+            paymentMethod: PAY_NOW_METHOD,
+            paymentProvider: "square",
+            paymentUrl: linked.checkoutUrl,
+            squarePaymentLinkId: linked.linkId || null,
+            squareOrderId: linked.squareOrderId || null,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+          }).catch((err) => console.error("[Bookings] Pay Now payment link was not saved:", err));
+        }
+      } catch (err) {
+        console.error("[Bookings] Pay Now checkout failed:", err);
+      }
+    }
     let payAtCloseCheckoutUrl = "";
     if (wantsPayAtClose && invoiceId) {
       try {
@@ -11548,7 +11669,8 @@ router$B.post("/", async (req, res) => {
       notifications,
       ...holidayCheckout ? { payment: holidayCheckout.payment } : {},
       ...payAtCloseCheckoutUrl ? { checkoutUrl: payAtCloseCheckoutUrl, payment: "pay_at_close" } : {},
-      ...holidayCheckout?.checkoutUrl && !payAtCloseCheckoutUrl ? { checkoutUrl: holidayCheckout.checkoutUrl } : {},
+      ...payNowCheckoutUrl && !payAtCloseCheckoutUrl ? { checkoutUrl: payNowCheckoutUrl, payment: PAY_NOW_METHOD } : {},
+      ...holidayCheckout?.checkoutUrl && !payAtCloseCheckoutUrl && !payNowCheckoutUrl ? { checkoutUrl: holidayCheckout.checkoutUrl } : {},
       ...holidayCheckout?.missingEnv ? { missingEnv: holidayCheckout.missingEnv } : {},
       message: "Booking request received. We'll confirm shortly!"
     });
@@ -12252,6 +12374,7 @@ async function createBookingInvoiceDraft(input) {
   const paymentUrl = clientInvoiceUrl({ id: invoiceRef.id, status: "draft", payToken });
   await invoiceRef.set({
     ...draft,
+    ...input.paymentMethod ? { paymentMethod: input.paymentMethod } : {},
     ...input.billing || {},
     ...placedRevenueFields(),
     invoiceNumber: await generateInvoiceNumber(),

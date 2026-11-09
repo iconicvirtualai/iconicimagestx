@@ -5,7 +5,10 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
+import { readFileSync } from "node:fs";
 import { BOOKING_PROCESSING_LABEL } from "@shared/invoiceProcessing";
+
+const PROCESSING_ESTIMATE_LABEL = `${BOOKING_PROCESSING_LABEL}, charged on the invoice`;
 
 vi.mock("framer-motion", async () => {
   const React = await import("react");
@@ -80,14 +83,14 @@ describe("/book estimator processing line", () => {
 
     const estimator = container?.querySelector('[data-testid="booking-estimator"]');
     const text = estimator?.textContent || "";
-    expect(text).toContain(BOOKING_PROCESSING_LABEL);
+    expect(text).toContain(PROCESSING_ESTIMATE_LABEL);
     expect(text).toContain("$85");
     expect(text).toContain("$2.38");
     expect(text).toContain("$87.38");
-    expect(text.indexOf(BOOKING_PROCESSING_LABEL)).toBeLessThan(text.indexOf("Total Estimate"));
+    expect(text.indexOf(PROCESSING_ESTIMATE_LABEL)).toBeLessThan(text.indexOf("Total Estimate"));
     expect(text.indexOf("$2.38")).toBeLessThan(text.indexOf("$87.38"));
     const line = container?.querySelector('[data-testid="booking-processing-line"]');
-    expect(line?.textContent).toContain(BOOKING_PROCESSING_LABEL);
+    expect(line?.textContent).toContain(PROCESSING_ESTIMATE_LABEL);
     expect(line?.textContent).toContain("$2.38");
   });
 
@@ -97,7 +100,7 @@ describe("/book estimator processing line", () => {
     root = createRoot(container);
     await act(async () => {
       root?.render(
-        <MemoryRouter initialEntries={["/book?package=luxe-video&example=1"]}>
+        <MemoryRouter initialEntries={["/book?package=luxe-video&example=1&pacPreview=1"]}>
           <BookingForm />
         </MemoryRouter>,
       );
@@ -139,11 +142,70 @@ describe("/book estimator processing line", () => {
     const processing = summary?.querySelector('[data-testid="booking-processing-line"]');
     expect(packageLine?.textContent).toContain("Luxe Video");
     expect(packageLine?.textContent).toContain("$785.00");
-    expect(processing?.textContent).toContain(BOOKING_PROCESSING_LABEL);
+    expect(processing?.textContent).toContain(PROCESSING_ESTIMATE_LABEL);
     expect(processing?.textContent).toContain("$21.98");
-    expect(text.indexOf("Luxe Video")).toBeLessThan(text.indexOf(BOOKING_PROCESSING_LABEL));
-    expect(text.indexOf(BOOKING_PROCESSING_LABEL)).toBeLessThan(text.indexOf("Total estimate"));
+    expect(text.indexOf("Luxe Video")).toBeLessThan(text.indexOf(PROCESSING_ESTIMATE_LABEL));
+    expect(text.indexOf(PROCESSING_ESTIMATE_LABEL)).toBeLessThan(text.indexOf("Total estimate"));
     expect(text).toContain("$806.98");
+
+    const pay = container?.querySelector('[data-testid="payment-options"]');
+    const payText = pay?.textContent || "";
+    expect(payText).toContain("Pay Now (save $5)");
+    expect(payText).toContain("Pay Later");
+    expect(payText).toContain("Pay at Close");
+    expect(payText).toContain("Nothing is charged today. After your shoot we send your invoice with a secure Square card link. Card processing applies when it is turned on.");
+    expect(payText).toContain("$0 due until closing with financing arranged by Titus.");
+    expect(payText).not.toContain("Square checkout on this same invoice.");
+
+    const payNow = Array.from(pay?.querySelectorAll("label") || []).find((label) =>
+      label.textContent?.includes("Pay Now (save $5)"),
+    );
+    await act(async () => {
+      payNow?.querySelector("input")?.click();
+    });
+    const summaryAfter = container?.querySelector('[data-testid="order-summary-before-submit"]');
+    const after = summaryAfter?.textContent || "";
+    expect(after).toContain("Pay Now savings");
+    expect(after).toContain("-$5.00");
+    expect(after).toContain("$21.98");
+    expect(after).toContain("$801.98");
+    expect(after.indexOf("Processing")).toBeLessThan(after.indexOf("Pay Now savings"));
+    expect(after.indexOf("Pay Now savings")).toBeLessThan(after.indexOf("Total estimate"));
+    const payNowProcessing = summaryAfter?.querySelector('[data-testid="booking-processing-line"]');
+    expect(payNowProcessing?.textContent).toContain("Processing (2.8%)");
+    expect(payNowProcessing?.textContent).not.toContain("charged on the invoice");
+
+    const payLater = Array.from(pay?.querySelectorAll("label") || []).find((label) =>
+      label.textContent?.includes("Pay Later"),
+    );
+    await act(async () => {
+      payLater?.querySelector("input")?.click();
+    });
+    const laterSummary = container?.querySelector('[data-testid="order-summary-before-submit"]');
+    const laterProcessing = laterSummary?.querySelector('[data-testid="booking-processing-line"]');
+    expect(laterProcessing?.textContent).toContain(PROCESSING_ESTIMATE_LABEL);
+    expect(laterSummary?.textContent).not.toContain("Pay Now savings");
+
+    const payAtClose = pay?.querySelector('[data-testid="pay-at-close-option"]');
+    await act(async () => {
+      payAtClose?.querySelector("input")?.click();
+    });
+    const closeProcessing = container?.querySelector('[data-testid="order-summary-before-submit"] [data-testid="booking-processing-line"]');
+    expect(closeProcessing).toBeNull();
+  });
+
+  it("keeps the processing percent dynamic and does not say the card is charged at booking", () => {
+    const source = readFileSync("client/components/BookingForm.tsx", "utf8");
+    expect(source).toContain("processingFeeLabel(percent)");
+    expect(source).toContain("percent={pricing.processingPercent}");
+    expect(source).toContain("chargedOnInvoice={!payNowSelected}");
+    expect(source).toContain(", charged on the invoice");
+    expect(source).toContain(">Pay Later</span>");
+    expect(source).toContain("Nothing is charged today. After your shoot we send your invoice with a secure Square card link. Card processing applies when it is turned on.");
+    expect(source).toContain("PAY_NOW_OPTION_LABEL");
+    expect(source).toContain("PAY_AT_CLOSE_PACKAGES_FOOTNOTE");
+    expect(source).not.toContain(">Pay by card</span>");
+    expect(source).not.toContain("Square checkout on this same invoice.");
   });
 
   it("shows 30 Images in the Showcase details popup and keeps the $549 price", async () => {

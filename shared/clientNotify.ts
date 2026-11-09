@@ -6,9 +6,12 @@
  * AND CLIENT_COMMS_ZONE is not "RED". Unset, empty, "TRUE", "1", or
  * "false" stays OFF.
  *
- * Order-received client confirmation is excluded: email template booking_received
- * and SMS kind booking_confirmation. Both stay default-on and are not blocked
- * by RED or by this flag.
+ * Order-received client email (template booking_received) stays default-on
+ * and is not blocked by RED or by this flag.
+ * SMS kind booking_confirmation stays allowed inside sendSMS so that call is
+ * not paused a second time. The public booking route gates that text on
+ * clientNotifyLive, with the exact NOTIFY_TEST_ALLOWLIST exception, before
+ * it calls sendSMS.
  * Do not set BOOKING_NOTIFY_LIVE.
  *
  * Staff-only mail is also excluded when audience is "staff": live chat
@@ -77,7 +80,8 @@ export function emailAllowed(
 }
 
 /**
- * Client bookingConfirmation SMS always sends.
+ * booking_confirmation stays allowed here so sendSMS does not apply a second
+ * pause. The booking route gates that text before the call.
  * staff_inbound (office Voice only) always sends.
  * Every other SMS follows the blast kill.
  */

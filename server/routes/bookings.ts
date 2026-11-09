@@ -49,6 +49,7 @@ import { pricingRates, taxDollars } from "../../shared/pricingSettings";
 import { isPromoInvoiceLine } from "../../shared/invoiceFace";
 import { loadPricingAdjustments, loadPricingRates } from "../services/pricingAdjustments";
 import { PAY_AT_CLOSE_METHOD, PAY_AT_CLOSE_PENDING_STATUS, payAtCloseCustomerOffer, payAtClosePublicOffer, shapePayAtCloseDraft } from "../../shared/payAtClose";
+import { PAY_LATER_METHOD, PAY_NOW_METHOD, applyPayNowSavings, payNowSquareLines } from "../../shared/payNow";
 import { createTitusCheckout } from "../services/payAtClose";
 import { normalizeEmail } from "../../shared/listingAccess";
 import { portalBillingStamp } from "../../shared/clientHubSettings";
@@ -279,9 +280,12 @@ router.post("/", async (req, res) => {
     const travel = traveled.travel;
     const promoCode = resolved.promoCode;
     const promoDiscount = resolved.promoDiscount;
-    const serviceBase = Math.max(0, sumLineItemPrices(traveled.lineItems.filter((item) => (
+    const packageDollars = Math.max(0, sumLineItemPrices(traveled.lineItems.filter((item) => (
       !isTravelFeeLine(item) && !isPromoInvoiceLine(item)
     ))) - promoDiscount);
+    const wantsPayNow = req.body.paymentMethod === PAY_NOW_METHOD;
+    const wantsPayLater = req.body.paymentMethod === PAY_LATER_METHOD;
+    const serviceBase = packageDollars;
     const tax = taxDollars(serviceBase, rates);
     // New bookings store the processing rate once. The kill switch is server-only.
     // Legacy invoices are not updated here. A removed processing fee stays off.
@@ -291,6 +295,13 @@ router.post("/", async (req, res) => {
     if (wantsPayAtClose && !payAtCloseOffer.offered) {
       return res.status(400).json({ error: "Pay at Close is not available." });
     }
+    const storedPaymentMethod = wantsPayAtClose
+      ? PAY_AT_CLOSE_METHOD
+      : wantsPayNow
+        ? PAY_NOW_METHOD
+        : wantsPayLater
+          ? PAY_LATER_METHOD
+          : undefined;
     const socialSaves = leadSource === HOLIDAY_SOCIAL_SAVES_LEAD;
     let sale = buildBookingInvoiceDraft({
       lineItems: traveled.lineItems,
@@ -309,6 +320,8 @@ router.post("/", async (req, res) => {
       const shaped = shapePayAtCloseDraft(sale, payAtCloseCustomerOffer(payAtCloseOffer));
       payAtCloseFee = shaped.payAtCloseFee;
       sale = shaped as unknown as typeof sale;
+    } else if (wantsPayNow) {
+      sale = applyPayNowSavings(sale);
     }
     const lineItems = sale.lineItems;
     const total = sale.total;
@@ -418,8 +431,8 @@ router.post("/", async (req, res) => {
       promoDiscount: Number(promoDiscount) || 0,
       processing: socialSaves ? 0 : (sale.processing ?? 0),
       processingPolicy: socialSaves ? "waived" : (sale.processingPolicy ?? (processingEnabled() ? "included" : "waived")),
+      ...(storedPaymentMethod ? { paymentMethod: storedPaymentMethod } : {}),
       ...(wantsPayAtClose ? {
-        paymentMethod: PAY_AT_CLOSE_METHOD,
         paymentStatus: PAY_AT_CLOSE_PENDING_STATUS,
         payAtCloseFee,
       } : {}),
@@ -619,6 +632,7 @@ router.post("/", async (req, res) => {
         travel,
         clientId: account.clientId,
         prepared: sale,
+        paymentMethod: storedPaymentMethod,
       });
       invoiceId = created.invoiceId;
       try {
@@ -759,23 +773,34 @@ router.post("/", async (req, res) => {
         return "failed" as const;
       });
 
-      // Order-received SMS to the client. Same carve-out as booking_received:
-      // not blocked by RED or a missing CLIENT_NOTIFY_LIVE.
+      // Client confirmation text uses the same CLIENT_NOTIFY_LIVE / RED check as
+      // other client mail and the admin text. An exact NOTIFY_TEST_ALLOWLIST
+      // address can still receive it. booking_received email is not part of this
+      // gate. smsAllowed still lets kind booking_confirmation through, so the
+      // route has to skip the Twilio call itself.
       if (phone) {
-        smsStatus = await sendSMS({
-          to: phone,
-          kind: "booking_confirmation",
-          body: SMS_TEMPLATES.bookingConfirmation(
-            firstName,
-            bookingDateLabel(scheduledDate, "TBD — we'll confirm shortly"),
-            displayAddress,
-            money(total)
-          ),
-        }).then((result) => ("suppressed" in result && result.suppressed ? "failed" as const : "sent" as const)).catch((err) => {
-          console.error("[Bookings] Confirmation SMS failed:", err);
-          const message = err instanceof Error ? err.message : String(err);
-          return /TWILIO_|not configured|not set/i.test(message) ? "not_configured" as const : "failed" as const;
-        });
+        const clientSmsAllowed = clientNotifyLive() || isNotifyTestAllowlisted(normalizedEmail);
+        if (!clientSmsAllowed) {
+          smsStatus = "gated";
+          console.info(
+            `[Bookings] Client confirmation SMS skipped for request ${docRef.id}. ${clientNotifyBlockReason()}. No message sent.`,
+          );
+        } else {
+          smsStatus = await sendSMS({
+            to: phone,
+            kind: "booking_confirmation",
+            body: SMS_TEMPLATES.bookingConfirmation(
+              firstName,
+              bookingDateLabel(scheduledDate, "TBD — we'll confirm shortly"),
+              displayAddress,
+              money(total)
+            ),
+          }).then((result) => ("suppressed" in result && result.suppressed ? "failed" as const : "sent" as const)).catch((err) => {
+            console.error("[Bookings] Confirmation SMS failed:", err);
+            const message = err instanceof Error ? err.message : String(err);
+            return /TWILIO_|not configured|not set/i.test(message) ? "not_configured" as const : "failed" as const;
+          });
+        }
       }
     }
 
@@ -871,8 +896,9 @@ router.post("/", async (req, res) => {
     }).catch((err) => console.error("[Bookings] Notification status was not saved:", err));
 
     // Firestore draft stays for staff. Square invoices still wait until after the shoot.
-    // Holiday Buy Now is the exception: a payment link for this order's total.
-    // A free RSVP does not get one. Missing Square env vars keep the text-a-link fallback.
+    // Holiday Buy Now and Pay Now are the exceptions: a payment link for this order's
+    // total, not a new client email or text. A free RSVP does not get one.
+    // Missing Square env vars keep the text-a-link fallback.
     let holidayCheckout: {
       payment: "square" | "free" | "fallback";
       checkoutUrl?: string;
@@ -922,6 +948,42 @@ router.post("/", async (req, res) => {
       }
     }
 
+    let payNowCheckoutUrl = "";
+    if (wantsPayNow && !wantsPayAtClose && holidayKind === "none" && invoiceId) {
+      try {
+        const invoiceSnap = await db().collection("invoices").doc(invoiceId).get();
+        const invoiceData = invoiceSnap.data() || {};
+        const invoiceNumber = typeof invoiceData.invoiceNumber === "string" ? invoiceData.invoiceNumber : undefined;
+        const linked = await createHolidaySquareCheckout({
+          invoiceId,
+          invoiceNumber,
+          amount: Number(total) || 0,
+          email: normalizedEmail,
+          itemName: typeof selectedService === "string" && selectedService.trim()
+            ? selectedService
+            : "Booking",
+          leadSource: typeof leadSource === "string" ? leadSource : "",
+          orderNumber,
+          lineItems: payNowSquareLines(lineItems as Array<{ name?: string; price?: number }>),
+          redirectUrl: publicClientUrl(`/book?paid=1&order=${encodeURIComponent(orderNumber)}`),
+          logLabel: "Pay Now",
+        });
+        if (linked.payment === "square" && linked.checkoutUrl) {
+          payNowCheckoutUrl = linked.checkoutUrl;
+          await db().collection("invoices").doc(invoiceId).update({
+            paymentMethod: PAY_NOW_METHOD,
+            paymentProvider: "square",
+            paymentUrl: linked.checkoutUrl,
+            squarePaymentLinkId: linked.linkId || null,
+            squareOrderId: linked.squareOrderId || null,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          }).catch((err) => console.error("[Bookings] Pay Now payment link was not saved:", err));
+        }
+      } catch (err) {
+        console.error("[Bookings] Pay Now checkout failed:", err);
+      }
+    }
+
     let payAtCloseCheckoutUrl = "";
     if (wantsPayAtClose && invoiceId) {
       try {
@@ -968,7 +1030,8 @@ router.post("/", async (req, res) => {
       notifications,
       ...(holidayCheckout ? { payment: holidayCheckout.payment } : {}),
       ...(payAtCloseCheckoutUrl ? { checkoutUrl: payAtCloseCheckoutUrl, payment: "pay_at_close" } : {}),
-      ...(holidayCheckout?.checkoutUrl && !payAtCloseCheckoutUrl ? { checkoutUrl: holidayCheckout.checkoutUrl } : {}),
+      ...(payNowCheckoutUrl && !payAtCloseCheckoutUrl ? { checkoutUrl: payNowCheckoutUrl, payment: PAY_NOW_METHOD } : {}),
+      ...(holidayCheckout?.checkoutUrl && !payAtCloseCheckoutUrl && !payNowCheckoutUrl ? { checkoutUrl: holidayCheckout.checkoutUrl } : {}),
       ...(holidayCheckout?.missingEnv ? { missingEnv: holidayCheckout.missingEnv } : {}),
       message: "Booking request received. We'll confirm shortly!",
     });
@@ -1787,6 +1850,7 @@ async function createBookingInvoiceDraft(input: {
   clientId?: string | null;
   prepared?: ReturnType<typeof buildBookingInvoiceDraft> | null;
   billing?: { billingEmail?: string; billingPhone?: string; billToAddress?: string };
+  paymentMethod?: string;
 }): Promise<{ invoiceId: string; clientId: string | null }> {
   const clientId = input.clientId || await linkClientIdByEmail(input.email);
   const draft = input.prepared
@@ -1808,6 +1872,7 @@ async function createBookingInvoiceDraft(input: {
   const paymentUrl = clientInvoiceUrl({ id: invoiceRef.id, status: "draft", payToken });
   await invoiceRef.set({
     ...draft,
+    ...(input.paymentMethod ? { paymentMethod: input.paymentMethod } : {}),
     ...(input.billing || {}),
     ...placedRevenueFields(),
     invoiceNumber: await generateInvoiceNumber(),
