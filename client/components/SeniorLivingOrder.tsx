@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   addMonths,
@@ -27,6 +27,7 @@ import {
   seniorLivingHostingLabel,
   type SeniorLivingHostingId,
 } from "@shared/seniorLiving";
+import { travelPriceKnown } from "@shared/travelZones";
 
 const fieldClass =
   "mt-2 block min-h-12 w-full max-w-full rounded-lg border border-neutral-400 bg-white px-3 text-lg leading-snug text-neutral-950";
@@ -113,6 +114,14 @@ export function SeniorLivingOrder({
     address,
     rates,
   });
+  const travelKnown = quoted.ok && travelPriceKnown(quoted.quote.travel);
+
+  useEffect(() => {
+    if (!travelKnown) return;
+    setError((current) => (
+      current.startsWith("We could not price travel") ? "" : current
+    ));
+  }, [travelKnown]);
 
   function payload() {
     return {
@@ -144,12 +153,20 @@ export function SeniorLivingOrder({
       return;
     }
     if (step === 2) {
+      if (quoted.ok === false) {
+        setError(quoted.error);
+        return;
+      }
+      if (!travelPriceKnown(quoted.quote.travel)) {
+        setError("We could not price travel for that address. Call us and we will quote the trip.");
+        return;
+      }
       const parsed = parseSeniorLivingOrder({
         ...payload(),
         scheduledDate: format(new Date(), "yyyy-MM-dd"),
         scheduledTime: SENIOR_LIVING_SCHEDULE_TIMES[0],
-      });
-      if (parsed.ok === false && parsed.honeypot !== true) {
+      }, rates);
+      if (parsed.ok === false && parsed.honeypot !== true && !parsed.error.startsWith("We could not price travel")) {
         setError(parsed.error);
         return;
       }
@@ -188,7 +205,7 @@ export function SeniorLivingOrder({
       goNext();
       return;
     }
-    const parsed = parseSeniorLivingOrder(payload());
+    const parsed = parseSeniorLivingOrder(payload(), rates);
     if (parsed.ok === false) {
       if (parsed.honeypot === true) {
         setConfirmation({
@@ -417,11 +434,13 @@ export function SeniorLivingOrder({
             <textarea id="senior-notes" rows={4} value={notes} onChange={(event) => setNotes(event.target.value)} className={fieldClass} />
           </label>
           <p className="text-lg leading-relaxed text-neutral-950" data-testid="senior-travel">
-            Travel fee{" "}
-            {quoted.ok && !quoted.quote.travel.travelQuoted ? (
-              <MoneyAmount className="min-w-0 text-left">
-                {formatUsd(quoted.quote.travelLine.price)}
-              </MoneyAmount>
+            {travelKnown && quoted.ok ? (
+              <>
+                {quoted.quote.travelLine.name}{" "}
+                <MoneyAmount className="min-w-0 text-left">
+                  {formatUsd(quoted.quote.travelLine.price)}
+                </MoneyAmount>
+              </>
             ) : (
               "Travel quoted"
             )}

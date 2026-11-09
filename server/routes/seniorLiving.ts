@@ -32,6 +32,7 @@ import { createRateLimiter } from "../lib/rateLimit";
 import { sendEmail } from "../services/email";
 import { notifyOfficeOfOrder } from "../services/officeOrderNotify";
 import { placedRevenueFields } from "../../shared/revenueCount";
+import { publicClientUrl } from "../../shared/publicSiteUrl";
 
 const router = Router();
 
@@ -45,10 +46,6 @@ const limiter = createRateLimiter({
 
 export function resetSeniorLivingRateLimit() {
   limiter.reset();
-}
-
-function appUrl() {
-  return process.env.APP_URL || "https://iconicimagestx.com";
 }
 
 const db = () => admin.firestore();
@@ -324,7 +321,7 @@ router.post("/order", async (req, res) => {
       await notifyOfficeOfOrder({
         isNewOrder: true,
         saved,
-        adminUrl: `${appUrl()}/admin/orders`,
+        adminUrl: publicClientUrl("/admin/orders"),
         env: seniorLivingOfficeEnv(),
       });
     } catch (error) {
@@ -402,7 +399,7 @@ router.post("/", async (req, res) => {
       await notifyOfficeOfOrder({
         isNewOrder: true,
         saved,
-        adminUrl: `${appUrl()}/admin/orders`,
+        adminUrl: publicClientUrl("/admin/orders"),
         env: seniorLivingOfficeEnv(),
       });
     } catch (error) {

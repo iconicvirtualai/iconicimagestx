@@ -410,6 +410,41 @@ describe("senior living page", () => {
     expect(container?.textContent).not.toContain(SENIOR_LIVING_DEPOSIT_RECEIVED);
   });
 
+  it("drops the travel warning when a Woodlands address prices at Zone 1 for $0", async () => {
+    await act(async () => {
+      container?.querySelector<HTMLInputElement>('input[type="checkbox"]')?.click();
+      container?.querySelector<HTMLInputElement>('input[name="hosting"]')?.click();
+    });
+    await click("senior-next");
+    await act(async () => {
+      setValue("senior-community", "A Woodlands-area senior living community");
+      setValue("senior-address", "123 Main St, Conroe, TX");
+      setValue("senior-name", "Ada Lovelace");
+      setValue("senior-title", "Director");
+      setValue("senior-phone", "281-555-0199");
+      setValue("senior-email", "ada@community.example");
+      setValue("senior-onsite", "Front desk");
+    });
+    await click("senior-next");
+    expect(container?.querySelector("[role='alert']")?.textContent).toBe(
+      "We could not price travel for that address. Call us and we will quote the trip.",
+    );
+    expect(container?.querySelector("[data-testid='senior-step-label']")?.textContent).toContain("Step 2");
+
+    await act(async () => {
+      setValue("senior-address", "9595 Six Pines Dr, The Woodlands, TX 77380");
+    });
+    const travel = container?.querySelector("[data-testid='senior-travel']")?.textContent || "";
+    expect(travel).toContain("Zone 1");
+    expect(travel).toContain("$0");
+    expect(travel).not.toContain("Travel quoted");
+    expect(container?.querySelector("[role='alert']")).toBeNull();
+
+    await click("senior-next");
+    expect(container?.querySelector("[role='alert']")).toBeNull();
+    expect(container?.querySelector("[data-testid='senior-step-label']")?.textContent).toContain("Step 3");
+  });
+
   it("pays the deposit online when checkout is live and shows deposit received after Square returns", async () => {
     const assign = vi.spyOn(seniorCheckoutNavigation, "assign").mockImplementation(() => undefined);
     let checkoutOk = true;

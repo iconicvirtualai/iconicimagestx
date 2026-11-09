@@ -1627,9 +1627,7 @@ const BUILDER_PAIRS = [
 ];
 const STILL_PAIRS = [
   pairItem("twilight-pool", "Twilight conversion", "/media/before-after/twilight-pool-day.jpg", "/media/before-after/twilight-pool-lifestyle.jpg"),
-  pairItem("pavilion-lifestyle", "Lifestyle staging", "/media/before-after/pavilion-empty.jpg", "/media/before-after/pavilion-lifestyle.jpg"),
-  pairItem("pasture-lifestyle", "Pasture lifestyle", "/media/before-after/pasture-animals.jpg", "/media/before-after/pasture-lifestyle.jpg"),
-  pairItem("living-declutter", "Virtual declutter", "/media/before-after/living-occupied.jpg", "/media/before-after/living-declutter.jpg")
+  pairItem("pavilion-lifestyle", "Lifestyle staging", "/media/before-after/pavilion-empty.jpg", "/media/before-after/pavilion-lifestyle.jpg")
 ];
 function page(id, path2, label, blocks, title, description) {
   const meta = seo(path2);
@@ -1740,10 +1738,10 @@ const PAGES = [
       textField("title", "Headline", "From vision to viral in minutes, not days"),
       areaField("body", "Body", "Placing an order with Iconic is as simple as it gets. We handle the heavy lifting so you can focus on growth.")
     ], [
-      { id: "step-1", fields: [textField("step", "Step", "STEP 1"), textField("title", "Title", "Book your session"), areaField("body", "Body", "Select your creative service and schedule a time through our seamless partnership portal in just a few clicks."), imageField("image", "Photo", "/media/photos/lifestyle-mtz04327.jpg")] },
-      { id: "step-2", fields: [textField("step", "Step", "STEP 2"), textField("title", "Title", "We capture the vision"), areaField("body", "Body", "Our professional creative team arrives on-site with state-of-the-art equipment to capture high-impact raw media."), imageField("image", "Photo", "/media/photos/luxury-exterior.jpg")] },
-      { id: "step-3", fields: [textField("step", "Step", "STEP 3"), textField("title", "Title", "Rapid post-production"), areaField("body", "Body", "Our expert editors transform raw clips into polished, cinematic masterpieces that perfectly align with your brand."), imageField("image", "Photo", "/media/photos/luxury-interior.jpg")] },
-      { id: "step-4", fields: [textField("step", "Step", "STEP 4"), textField("title", "Title", "Delivery & launch"), areaField("body", "Body", "Receive your ready-to-post assets within 24 hours. Download, publish, and dominate your social feed instantly."), imageField("image", "Photo", "/media/launch/living_room_bright.jpg")] }
+      { id: "step-1", fields: [textField("step", "Step", "STEP 1"), textField("title", "Title", "Book your session"), areaField("body", "Body", "Select your creative service and schedule a time through our seamless partnership portal in just a few clicks."), imageField("image", "Photo", "/media/home-v2/steps/order-1.webp")] },
+      { id: "step-2", fields: [textField("step", "Step", "STEP 2"), textField("title", "Title", "We capture the vision"), areaField("body", "Body", "Our professional creative team arrives on-site with state-of-the-art equipment to capture high-impact raw media."), imageField("image", "Photo", "/media/about/03_gear_bts_camera_16x9.jpg")] },
+      { id: "step-3", fields: [textField("step", "Step", "STEP 3"), textField("title", "Title", "Rapid post-production"), areaField("body", "Body", "Our expert editors transform raw clips into polished, cinematic masterpieces that perfectly align with your brand."), imageField("image", "Photo", "/media/before-after/twilight-pool-lifestyle.jpg")] },
+      { id: "step-4", fields: [textField("step", "Step", "STEP 4"), textField("title", "Title", "Delivery & launch"), areaField("body", "Body", "Receive your ready-to-post assets within 24 hours. Download, publish, and dominate your social feed instantly."), imageField("image", "Photo", "/media/pay-at-close/luxury/marias/01-front-day.jpg")] }
     ]),
     block("network", "The network", [
       textField("titleLead", "Title lead", "Built Bigger Than"),
@@ -1786,10 +1784,10 @@ const PAGES = [
       areaField("body", "Body", "Turn a still into motion, stage an empty room, finish a photo, and shape the cut in Studio.")
     ], [
       { id: "snap", fields: [
-        textField("title", "Title", "Iconic Snap Reels"),
-        areaField("body", "Body", "Photo to video. One listing still on the left, and that same photo in motion on the right."),
-        imageField("still", "Still photo — must match the video", "/media/home-v2/snap-feature/snap-still.jpg"),
-        videoField("video", "Motion video — same photo", "/media/home-v2/snap-feature/snap-motion.mp4")
+        textField("title", "Title", "Still Shots → To Motion"),
+        areaField("body", "Body", "A listing still opens into cinematic motion. Kitchen, living room, front elevation, and pool, from the same photo into the clip."),
+        imageField("still", "Still photo — must match the video", "/media/home-v2/still-to-motion/kitchen.webp"),
+        videoField("video", "Motion video — same photo", "/media/home-v2/still-to-motion/kitchen-1.mp4")
       ] },
       { id: "staging", fields: [
         textField("title", "Title", "AI Virtual Staging"),
@@ -1807,6 +1805,8 @@ const PAGES = [
         areaField("body", "Body", "A daylight pavilion, finished so it feels lived in. A warm-dusk pool pair is saved beside this one if you want to swap it in."),
         imageField("before", "Before", "/media/home-v2/photo-edits/pavilion-before.jpg"),
         imageField("after", "After Iconic", "/media/home-v2/photo-edits/pavilion-after-iconic.jpg"),
+        imageField("example3", "Example 3 — daylight firepit", "/media/home-v2/photo-edits/firepit-day.webp"),
+        imageField("example4", "Example 4 — AI twilight", "/media/home-v2/photo-edits/firepit-dusk.webp"),
         imageField("altBefore", "Alt before — pool", "/media/home-v2/photo-edits/alt-marias-pool-before.jpg"),
         imageField("altAfter", "Alt after — warm dusk", "/media/home-v2/photo-edits/alt-marias-pool-warmdusk-after.jpg")
       ] },
@@ -1885,9 +1885,9 @@ const PAGES = [
       textField("titleAccent", "Title accent", "Personal Brand"),
       areaField("body", "Body", "Three beats. A stiff standard headshot, a polished Iconic corporate portrait, then a lifestyle frame with some life in it.")
     ], [
-      { id: "standard", fields: [textField("label", "Label", "Standard"), imageField("image", "Photo", "/media/photos/standard-headshot.jpg"), textField("note", "Note", "Flat light. A stiff crop. Easy to scroll past.")] },
+      { id: "standard", fields: [textField("label", "Label", "Standard"), imageField("image", "Photo", "/images/headshots-10/headshot-10.jpg"), textField("note", "Note", "Flat light. A stiff crop. Easy to scroll past.")] },
       { id: "corporate", fields: [textField("label", "Label", "Iconic Corporate"), imageField("image", "Photo", "/media/photos/lifestyle-mtz04327.jpg"), textField("note", "Note", "Polished, confident, and ready for the brand.")] },
-      { id: "lifestyle", fields: [textField("label", "Label", "Iconic Lifestyle"), imageField("image", "Photo", "/media/photos/lifestyle-kennedy-mtz01127.jpg"), textField("note", "Note", "Alive. Warm. The frame people actually stop for.")] }
+      { id: "lifestyle", fields: [textField("label", "Label", "Iconic Lifestyle"), imageField("image", "Photo", "/media/photos/lifestyle-mtz08185.webp"), textField("note", "Note", "Alive. Warm. The frame people actually stop for.")] }
     ])
   ]),
   page("book", "/book", "Book", [

@@ -12,6 +12,7 @@ import {
   travelCustomerLine,
   travelFeeDollars,
   travelInvoiceLine,
+  travelPriceKnown,
   travelSummaryText,
   type TravelAssessment,
 } from "./travelZones.ts";
@@ -116,6 +117,27 @@ describe("zone boundaries", () => {
     expect(travelSummaryText(austin)).toBe("Travel quoted");
     expect(travelSummaryText(austin)).not.toMatch(/\$0/);
     expect(travelFeeDollars(austin)).toBe(0);
+    expect(travelPriceKnown(austin)).toBe(false);
+  });
+
+  it("treats Zone 1 at $0 as a determined price, including when the quoted flag is set", () => {
+    const woodlands = assessTravel("9595 Six Pines Dr, The Woodlands, TX 77380");
+    expect(woodlands.travelZone).toBe(1);
+    expect(woodlands.travelFeeCents).toBe(0);
+    expect(woodlands.travelQuoted).toBe(false);
+    expect(travelPriceKnown(woodlands)).toBe(true);
+    expect(travelPriceKnown({
+      travelZone: 1,
+      travelMiles: woodlands.travelMiles,
+      travelFeeCents: 0,
+      travelQuoted: true,
+    })).toBe(true);
+    expect(travelFeeDollars({
+      travelZone: 1,
+      travelMiles: 0,
+      travelFeeCents: 0,
+      travelQuoted: true,
+    })).toBe(0);
   });
 });
 
