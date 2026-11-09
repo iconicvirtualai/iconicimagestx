@@ -20,6 +20,7 @@ import {
 
 const bookings = readFileSync(new URL("../server/routes/bookings.ts", import.meta.url), "utf8");
 const payments = readFileSync(new URL("../server/routes/payments.ts", import.meta.url), "utf8");
+const paymentLink = readFileSync(new URL("../server/services/squarePaymentLink.ts", import.meta.url), "utf8");
 const squareService = readFileSync(new URL("../server/services/squareInvoices.ts", import.meta.url), "utf8");
 const apiBundle = readFileSync(new URL("../api/index.mjs", import.meta.url), "utf8");
 
@@ -218,8 +219,10 @@ describe("checkout prefers the Square invoice URL", () => {
     const checkout = payments.slice(checkoutStart, checkoutEnd);
 
     expect(checkout.indexOf("resolveSquareCheckoutUrl")).toBeGreaterThan(-1);
-    expect(checkout.indexOf("resolveSquareCheckoutUrl")).toBeLessThan(checkout.indexOf("quick_pay"));
-    expect(checkout).toContain("payment_note: squarePaymentNote");
+    expect(checkout.indexOf("resolveSquareCheckoutUrl")).toBeLessThan(checkout.indexOf("createSquareQuickPayLink"));
+    expect(checkout).toContain("paymentNote: squarePaymentNote");
+    expect(paymentLink).toContain("quick_pay:");
+    expect(paymentLink).toContain("payment_note: input.paymentNote");
     const updateStart = squareService.indexOf("await ref.update({");
     const update = squareService.slice(updateStart, squareService.indexOf("});", updateStart));
     expect(update).toContain("squareInvoiceId: result.squareInvoiceId");

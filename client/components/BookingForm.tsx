@@ -144,6 +144,14 @@ interface BookingFormProps {
   source?: "portal";
 }
 
+function publicDetailFeature(item: { id?: string; name?: string } | null | undefined, feature: string): string {
+  const id = String(item?.id || "");
+  const name = String(item?.name || "").trim().toLowerCase();
+  const showcase = id === "listing-showcase" || name === "the showcase";
+  if (!showcase) return feature;
+  return feature.replace(/\b50(\s+images)\b/gi, "30$1");
+}
+
 function ProcessingEstimateLine({ amount }: { amount: number }) {
   return (
     <div data-testid="booking-processing-line" className="mb-3 flex items-baseline justify-between gap-3 text-[11px]">
@@ -785,6 +793,10 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
     ? payAtCloseFeeDollars(customerPayAtClose.feeRate, customerPayAtClose.feeMode, estimate.processingBase)
     : 0;
   const estimateTotal = estimate.total + payAtCloseFee;
+  const submittedLines = buildSubmittedLineItems(priceInput);
+  const catalogServiceLine = selectedServiceData
+    ? undefined
+    : submittedLines.find((item) => item.id === formData.selectedService);
   const handleApplyPromo = () => {
     const promo = promoDiscountFor(promoInput, pricing.promos, serviceBase) ?? promoDiscountFor(promoInput);
     if (promo?.code === "ICONICAI") {
@@ -803,9 +815,15 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
       <h3 className="text-lg font-black text-black uppercase tracking-tight mb-4 pb-3 border-b">Order Summary</h3>
       <div className="space-y-3 mb-6">
         {selectedServiceData && (
-          <div className="flex items-baseline justify-between gap-3">
+          <div data-testid="order-summary-package" className="flex items-baseline justify-between gap-3">
             <span className="min-w-0 text-xs font-bold text-gray-700">{selectedServiceData.name}</span>
             <MoneyAmount className="text-sm font-black text-black">${selectedServiceData.price}</MoneyAmount>
+          </div>
+        )}
+        {catalogServiceLine && (
+          <div data-testid="order-summary-package" className="flex items-baseline justify-between gap-3">
+            <span className="min-w-0 text-xs font-bold text-gray-700">{catalogServiceLine.name}</span>
+            <MoneyAmount className="text-sm font-black text-black">${catalogServiceLine.price}</MoneyAmount>
           </div>
         )}
         {formData.selectedBasics.length > 0 && (
@@ -1057,7 +1075,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
                                     </div>
                                   )}
                                   {cat === "business" && socialOffLabel ? (
-                                    <span className="absolute right-3 top-2 z-10 rounded-full bg-[#FFD700] px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-black shadow">
+                                    <span className="absolute right-3 top-2 z-10 whitespace-nowrap rounded-full bg-[#FFD700] px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-black shadow">
                                       {socialOffLabel} off
                                     </span>
                                   ) : null}
@@ -1065,8 +1083,8 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
                                     <h4 className="font-black text-black uppercase text-[11px] leading-tight">{s.name}</h4>
                                     <p className="text-[10px] text-gray-500 leading-relaxed line-clamp-2">{s.description}</p>
                                   </div>
-                                  <div className="mt-3 flex items-end justify-between">
-                                     <div className="text-sm font-black text-black">
+                                  <div className="mt-3 flex items-end justify-between gap-2">
+                                     <div className="shrink-0 whitespace-nowrap text-sm font-black tabular-nums text-black">
                                        {s.price > 0 ? `$${s.price}` : ""}
                                      </div>
                                      {formData.selectedService === s.id && (
@@ -1107,7 +1125,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
                         >
                           <div className="space-y-1 pr-6">
                             <h4 className="font-black text-black uppercase text-sm">{b.cardTitle || b.name}</h4>
-                            <span className="text-sm font-black text-black block">${b.price}</span>
+                            <span className="block whitespace-nowrap text-sm font-black tabular-nums text-black">${b.price}</span>
                           </div>
                           {formData.selectedBasics.includes(b.id) && (
                             <div className="absolute top-4 right-4 w-5 h-5 rounded-full bg-black flex items-center justify-center">
@@ -1146,7 +1164,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
                             <div className="space-y-1.5 pr-6">
                               <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">{b.kicker}</p>
                               <h4 className="text-2xl font-black leading-none text-black">{b.cardTitle || b.name}</h4>
-                              <span className="text-xl font-black text-black block">${b.price}</span>
+                              <span className="block whitespace-nowrap text-xl font-black tabular-nums text-black">${b.price}</span>
                               {b.appointmentLimit && (
                                 <p className="text-[10px] font-medium leading-snug text-gray-400">{b.appointmentLimit}</p>
                               )}
@@ -1248,9 +1266,9 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
                       }`}
                     >
                       <div>
-                        <div className="flex justify-between items-start mb-1">
-                          <span className="text-[11px] font-black uppercase text-black">{style.name}</span>
-                          {style.price > 0 && <span className="text-[10px] font-black text-teal-500">+${style.price}</span>}
+                        <div className="mb-1 pr-5">
+                          <span className="block text-[11px] font-black uppercase leading-tight text-black [overflow-wrap:normal] [word-break:normal]">{style.name}</span>
+                          {style.price > 0 && <span className="mt-1 inline-block whitespace-nowrap text-[10px] font-black tabular-nums text-teal-500">+${style.price}</span>}
                         </div>
                         <p className="text-[9px] text-gray-500 leading-tight">{style.description}</p>
                       </div>
@@ -1287,7 +1305,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
                         >
                           <div className="flex flex-col">
                              <span className="text-[10px] font-black uppercase text-black">{item.name}</span>
-                             <span className="text-[9px] font-bold" style={{ color: settings.global.primaryColor }}>+${item.price}</span>
+                             <span className="whitespace-nowrap text-[9px] font-bold tabular-nums" style={{ color: settings.global.primaryColor }}>+${item.price}</span>
                           </div>
                           {formData.selectedAddOns.includes(item.id) && (
                             <div className="w-3.5 h-3.5 rounded-full bg-black flex items-center justify-center">
@@ -1671,6 +1689,23 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
             <div className="space-y-8 max-w-lg mx-auto">
                <div data-testid="order-summary-before-submit" className="rounded-2xl border border-gray-100 bg-gray-50 p-5 space-y-3">
                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Order summary</p>
+                 {submittedLines.map((item, index) => {
+                   const promo = String(item.id || "").startsWith("promo-") || item.name.startsWith("Promo Code:");
+                   const isPackage = !promo && (
+                     item.id === formData.selectedService
+                     || formData.selectedBasics.includes(String(item.id || ""))
+                   );
+                   return (
+                     <div
+                       key={`${item.id || item.name}-${index}`}
+                       data-testid={promo ? "order-summary-promo" : isPackage ? "order-summary-package" : "order-summary-addon"}
+                       className="flex items-baseline justify-between gap-3 text-sm"
+                     >
+                       <span className={`min-w-0 ${isPackage ? "font-bold text-black" : "font-bold text-gray-600"}`}>{item.name}</span>
+                       <MoneyAmount className={`font-black ${promo ? "text-teal-600" : "text-black"}`}>{item.price < 0 ? `-$${Math.abs(item.price).toFixed(2)}` : `$${item.price.toFixed(2)}`}</MoneyAmount>
+                     </div>
+                   );
+                 })}
                  <TravelFeeLine travel={travel} />
                  {chargeProcessing && hasBookingSelection(bookingPriceInput()) && (
                    <ProcessingEstimateLine amount={estimate.processing} />
@@ -2097,7 +2132,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
                   }}
                   className="bg-black hover:bg-gray-800 text-white font-black py-8 text-sm rounded-2xl transition-all shadow-xl group"
                 >
-                   UPGRADE TO ICONIC FINISH (+${iconicFinishPrice})
+                   UPGRADE TO ICONIC FINISH (<span className="whitespace-nowrap">+${iconicFinishPrice}</span>)
                    <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
                 </Button>
                 <button
@@ -2139,7 +2174,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
              <div className="bg-gray-50 rounded-2xl p-6 flex items-center justify-between border border-gray-100">
                 <div className="space-y-1">
                    <h4 className="text-xs font-black uppercase text-black tracking-widest">Staging Credits</h4>
-                   <p className="text-[10px] text-gray-400 font-bold">${virtualStagingUnitPrice} Per Image</p>
+                   <p className="whitespace-nowrap text-[10px] font-bold text-gray-400">${virtualStagingUnitPrice} Per Image</p>
                 </div>
                 <div className="flex items-center gap-4">
                    <button
@@ -2219,7 +2254,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
                       {selectedDetailItem.features.map((feature: string, idx: number) => (
                          <div key={idx} className="flex items-start gap-3 bg-gray-50 p-3 rounded-xl border border-gray-100">
                             <Check className="w-3.5 h-3.5 text-teal-500 mt-0.5 shrink-0" />
-                            <span className="text-[11px] font-bold text-gray-700 leading-tight">{feature}</span>
+                            <span className="text-[11px] font-bold text-gray-700 leading-tight">{publicDetailFeature(selectedDetailItem, feature)}</span>
                          </div>
                       ))}
                    </div>

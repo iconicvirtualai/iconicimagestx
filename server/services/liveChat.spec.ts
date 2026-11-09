@@ -51,6 +51,19 @@ describe("liveChatSmsBody", () => {
     expect(body.length).toBeLessThanOrEqual(640);
     expect(body).not.toContain("\n\n\n");
   });
+
+  it("keeps the admin link when the visitor message is long", () => {
+    const url = "https://iconicimagestx.vercel.app/admin/messages?tab=contact&thread=abc123";
+    const body = liveChatSmsBody({
+      name: "Ada",
+      email: "ada@example.com",
+      phone: "281-555-0100",
+      message: "x".repeat(500),
+    }, url);
+    expect(body).toContain(url);
+    expect(body).toContain("Ada");
+    expect(body.length).toBeLessThanOrEqual(640);
+  });
 });
 
 describe("live chat staff routing", () => {

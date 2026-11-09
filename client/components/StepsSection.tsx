@@ -1,6 +1,7 @@
 import { ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import VisionStepMedia from "@/components/VisionStepMedia";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { itemText, useSiteItems, useSiteText } from "@/content/siteContent";
 
@@ -16,25 +17,21 @@ export default function StepsSection() {
       step: "STEP 1",
       title: "Book your session",
       description: "Select your creative service and schedule a time through our seamless partnership portal in just a few clicks.",
-      image: "/media/photos/lifestyle-mtz04327.jpg",
     },
     {
       step: "STEP 2",
       title: "We capture the vision",
       description: "Our professional creative team arrives on-site with state-of-the-art equipment to capture high-impact raw media.",
-      image: "/media/photos/luxury-exterior.jpg",
     },
     {
       step: "STEP 3",
       title: "Rapid post-production",
       description: "Our expert editors transform raw clips into polished, cinematic masterpieces that perfectly align with your brand.",
-      image: "/media/photos/luxury-interior.jpg",
     },
     {
       step: "STEP 4",
       title: "Delivery & launch",
       description: "Receive your ready-to-post assets within 24 hours. Download, publish, and dominate your social feed instantly.",
-      image: "/media/launch/living_room_bright.jpg",
     },
   ];
   const shown = steps.map((item, index) => {
@@ -46,7 +43,6 @@ export default function StepsSection() {
       step: itemText(saved, "step", item.step),
       title: itemText(saved, "title", item.title),
       description: itemText(saved, "body", item.description),
-      image: itemText(saved, "image", item.image),
     };
   });
 
@@ -89,18 +85,8 @@ export default function StepsSection() {
                 </p>
               </div>
 
-              <div className="group/still relative mt-auto aspect-[4/3] overflow-hidden rounded-xl border border-teal-100 bg-teal-50">
-                <img
-                  src={item.image}
-                  alt=""
-                  data-site-page="home"
-                  data-site-block="steps"
-                  data-site-item={item.id}
-                  data-site-field="image"
-                  data-site-kind="image"
-                  className="h-full w-full object-cover transition duration-500 ease-out motion-safe:group-hover/still:scale-105"
-                />
-                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#0f766e]/45 via-transparent to-[#14b8a6]/15 transition duration-500 motion-safe:group-hover/still:from-[#0f766e]/25" />
+              <div className="relative mt-auto aspect-[4/3] overflow-hidden rounded-xl border border-teal-100 bg-black">
+                <VisionStepMedia title={item.title} index={index} />
               </div>
             </div>
           ))}

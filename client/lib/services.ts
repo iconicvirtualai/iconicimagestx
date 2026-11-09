@@ -36,7 +36,7 @@ export const services: Service[] = [
     description: "A complete visual deep-dive. We capture the details, the angles, and the atmosphere.",
     isPopular: true,
     features: [
-      "50 Images",
+      "30 Images",
       "5 Aerials",
       "The 'Snap' Reel (15s)",
       "1 'Iconic' 3D Animated Reel (60s Vert)",

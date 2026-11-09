@@ -90,4 +90,74 @@ describe("/book estimator processing line", () => {
     expect(line?.textContent).toContain(BOOKING_PROCESSING_LABEL);
     expect(line?.textContent).toContain("$2.38");
   });
+
+  it("shows Luxe Video and its price on the final step, with processing on its own line", async () => {
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    await act(async () => {
+      root?.render(
+        <MemoryRouter initialEntries={["/book?package=luxe-video&example=1"]}>
+          <BookingForm />
+        </MemoryRouter>,
+      );
+    });
+
+    async function clickNext() {
+      const next = Array.from(container?.querySelectorAll("button") || []).find((button) =>
+        button.textContent?.includes("Next Stage"),
+      );
+      expect(next).toBeTruthy();
+      await act(async () => {
+        next?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      });
+    }
+
+    await clickNext();
+    const skipFinish = Array.from(document.body.querySelectorAll("button") || []).find((button) =>
+      button.textContent?.includes("No thanks"),
+    );
+    if (skipFinish) {
+      await act(async () => {
+        skipFinish.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      });
+    }
+    await clickNext();
+    const address = container?.querySelector<HTMLInputElement>("#service-location");
+    expect(address).toBeTruthy();
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+      setter?.call(address, "123 Luxury Lane, Houston, TX");
+      address?.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await clickNext();
+    await clickNext();
+
+    const summary = container?.querySelector('[data-testid="order-summary-before-submit"]');
+    const text = summary?.textContent || "";
+    const packageLine = summary?.querySelector('[data-testid="order-summary-package"]');
+    const processing = summary?.querySelector('[data-testid="booking-processing-line"]');
+    expect(packageLine?.textContent).toContain("Luxe Video");
+    expect(packageLine?.textContent).toContain("$785.00");
+    expect(processing?.textContent).toContain(BOOKING_PROCESSING_LABEL);
+    expect(processing?.textContent).toContain("$21.98");
+    expect(text.indexOf("Luxe Video")).toBeLessThan(text.indexOf(BOOKING_PROCESSING_LABEL));
+    expect(text.indexOf(BOOKING_PROCESSING_LABEL)).toBeLessThan(text.indexOf("Total estimate"));
+    expect(text).toContain("$806.98");
+  });
+
+  it("shows 30 Images in the Showcase details popup and keeps the $549 price", async () => {
+    await renderForm();
+    const showcase = Array.from(container?.querySelectorAll("button") || []).find((button) =>
+      button.textContent?.includes("The Showcase"),
+    );
+    expect(showcase).toBeTruthy();
+    await act(async () => {
+      showcase?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    const dialog = document.body.querySelector('[role="dialog"]');
+    expect(dialog?.textContent).toContain("30 Images");
+    expect(dialog?.textContent).not.toContain("50 Images");
+    expect(dialog?.textContent).toContain("$549");
+  });
 });

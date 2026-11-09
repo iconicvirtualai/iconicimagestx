@@ -737,6 +737,33 @@ describe("public booking calendar hold", () => {
     const closedBody = await closed.json();
     expect(closed.status).toBe(400);
     expect(closedBody.error).toBe("Headcount and menu votes closed Sat, Oct 31 at 11:59 PM CT.");
+
+    vi.setSystemTime(new Date("2026-11-09T18:00:00.000Z"));
+    const ordersBefore = docs("orderRequests").size;
+    const emailsBefore = sent.length;
+    const afterEvent = await fetch(`${baseUrl}/api/bookings`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        firstName: "Cara",
+        lastName: "Client",
+        email: "cara@example.com",
+        phone: "281-555-0199",
+        address: "26410 Oakridge Dr. Ste 105 - 108, Spring, TX 77380",
+        lineItems: [{ name: "Client Holiday Event RSVP", price: 0 }],
+        total: 0,
+        scheduledDate: "2026-11-07",
+        scheduledTime: "Afternoon",
+        requestedTimeLabel: "12:15 PM",
+        selectedService: "Client Holiday Event RSVP",
+        leadSource: "Thankful client holiday event RSVP",
+      }),
+    });
+    const afterEventBody = await afterEvent.json();
+    expect(afterEvent.status).toBe(400);
+    expect(afterEventBody.error).toBe("RSVPs are closed — thank you to everyone who joined us!");
+    expect(docs("orderRequests").size).toBe(ordersBefore);
+    expect(sent.length).toBe(emailsBefore);
     } finally {
       vi.useRealTimers();
     }

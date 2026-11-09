@@ -5,6 +5,13 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 
 const POLL_MS = 2000;
+const THREAD_ID_RE = /^[a-f0-9]{32}$/;
+
+function requestedThreadId(): string | null {
+  if (typeof window === "undefined") return null;
+  const id = new URLSearchParams(window.location.search).get("thread")?.trim() ?? "";
+  return THREAD_ID_RE.test(id) ? id : null;
+}
 
 function clock(iso: string) {
   const date = new Date(iso);
@@ -23,7 +30,7 @@ export default function ContactLiveChat() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [threads, setThreads] = useState<ContactThreadView[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(requestedThreadId);
   const [reply, setReply] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");

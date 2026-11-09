@@ -76,6 +76,8 @@ const HOME_MEDIA = [
   "client/components/AudienceSection.tsx",
   "client/components/TestimonialsSection.tsx",
   "client/components/StepsSection.tsx",
+  "client/components/VisionStepMedia.tsx",
+  "client/components/StillToMotion.tsx",
   "client/pages/WhatWeDo.tsx",
   "client/lib/beforeAfter.ts",
   "client/lib/snapReels.ts",

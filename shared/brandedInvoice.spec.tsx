@@ -10,6 +10,7 @@ const clientInvoice = readFileSync(new URL("../client/pages/ClientInvoice.tsx", 
 const orderHistory = readFileSync(new URL("../client/components/client-home/ClientHomeDashboard.tsx", import.meta.url), "utf8");
 const brandedInvoice = readFileSync(new URL("../client/components/invoice/BrandedInvoice.tsx", import.meta.url), "utf8");
 const payments = readFileSync(new URL("../server/routes/payments.ts", import.meta.url), "utf8");
+const paymentLink = readFileSync(new URL("../server/services/squarePaymentLink.ts", import.meta.url), "utf8");
 const presetsPage = readFileSync(new URL("../client/pages/AdminInvoicePresets.tsx", import.meta.url), "utf8");
 const presetsLib = readFileSync(new URL("../client/lib/invoicePresets.ts", import.meta.url), "utf8");
 const rules = readFileSync(new URL("../firestore.rules", import.meta.url), "utf8");
@@ -208,7 +209,8 @@ describe("client invoice page", () => {
     expect(clientInvoice).toContain('href="/"');
     expect(clientInvoice).toContain("Back to Home");
     const checkout = payments.slice(payments.indexOf('router.post("/invoice/:id/checkout"'));
-    expect(checkout).toContain("quick_pay:");
+    expect(checkout).toContain("createSquareQuickPayLink");
+    expect(paymentLink).toContain("quick_pay:");
     expect(payments).toContain("processing: invoice.processing ?? null");
     expect(presetsLib).toContain('const COLLECTION = "invoicePresets"');
     expect(presetsPage).toContain("createInvoicePreset");

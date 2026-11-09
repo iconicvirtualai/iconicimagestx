@@ -13,7 +13,16 @@ import { createServer } from "../index";
 import { sendEmail } from "../services/email";
 import { sendSMS } from "../services/sms";
 import { LIVE_CHAT_MAX_PER_WINDOW } from "../services/liveChat";
-import { resetContactThreadStoreForTests } from "../services/contactThreads";
+import {
+  readContactThreadAlert,
+  resetContactThreadStoreForTests,
+  STAFF_THREAD_ALERT_INTERVAL_MS,
+} from "../services/contactThreads";
+import {
+  contactThreadAdminUrl,
+  resetContactThreadAlertLimiterForTests,
+  setContactThreadAlertClockForTests,
+} from "../services/contactThreadAlert";
 
 const sendEmailMock = vi.mocked(sendEmail);
 const sendSMSMock = vi.mocked(sendSMS);
@@ -60,11 +69,33 @@ afterAll(async () => {
 
 beforeEach(() => {
   resetContactThreadStoreForTests();
+  resetContactThreadAlertLimiterForTests();
+  setContactThreadAlertClockForTests(null);
   sendEmailMock.mockReset();
   sendSMSMock.mockReset();
   sendEmailMock.mockResolvedValue({ sent: true, delivery: "sent" });
   sendSMSMock.mockResolvedValue({ sid: "SM123", status: "queued" });
 });
+
+function expectStaffAlerts(times: number) {
+  expect(sendEmailMock).toHaveBeenCalledTimes(times);
+  expect(sendSMSMock).toHaveBeenCalledTimes(times);
+  for (const [email] of sendEmailMock.mock.calls) {
+    expect(email.to).toBe(process.env.CONTACT_FORM_EMAIL || "photos@iconicimagestx.com");
+    expect(email.to).not.toBe(validBody.email);
+    expect(email.cc).toBeUndefined();
+    expect(email.bcc).toBeUndefined();
+    expect(email.template).toBe("live_chat");
+    expect(email.audience).toBe("staff");
+    expect(email.replyTo).toBe(validBody.email);
+    expect(JSON.stringify(email)).not.toContain("contact_confirmation");
+  }
+  for (const [sms] of sendSMSMock.mock.calls) {
+    expect(sms.to).toBe("+12813560965");
+    expect(sms.kind).toBe("staff_inbound");
+    expect(sms.to).not.toContain("281-555-0199");
+  }
+}
 
 function postThread(body: unknown, ip = "203.0.113.40") {
   return fetch(`${baseUrl}/api/contact/threads`, {
@@ -92,12 +123,31 @@ const validBody = {
 };
 
 describe("contact thread routes", () => {
-  it("lets staff reply on the visitor thread without email or text", async () => {
+  it("alerts staff when a visitor starts a thread and not when staff reply", async () => {
     const createdRes = await postThread(validBody, "203.0.113.41");
     const created = await createdRes.json();
     expect(createdRes.status).toBe(201);
     expect(created.thread.messages).toHaveLength(1);
     expect(created.accessToken).toBeTruthy();
+    expect(JSON.stringify(created)).not.toContain("staffAlert");
+    expect(JSON.stringify(created)).not.toContain("lastStaffAlertAt");
+
+    expectStaffAlerts(1);
+    const email = sendEmailMock.mock.calls[0][0];
+    expect(email.variables).toMatchObject({
+      senderName: "Ada Lovelace",
+      senderEmail: "ada@example.com",
+      senderPhone: "281-555-0199",
+    });
+    expect(email.variables?.message).toContain(validBody.message);
+    expect(email.variables?.message).toContain(created.thread.id);
+    expect(email.variables?.message).toContain("/admin/messages");
+    expect(email.variables?.adminUrl).toContain(created.thread.id);
+    const sms = sendSMSMock.mock.calls[0][0];
+    expect(sms.body).toContain(contactThreadAdminUrl(created.thread.id));
+    expect(sms.body).toContain("Ada Lovelace");
+    expect(sms.body).toContain("Thursday");
+    expect((await readContactThreadAlert(created.thread.id))?.staffAlertStatus).toBe("sent");
 
     const listRes = await fetch(`${baseUrl}/api/contact/staff/threads`, {
       headers: staffHeaders(),
@@ -132,13 +182,19 @@ describe("contact thread routes", () => {
     expect(seen.thread.messages[1].text).toBe("Thursday morning works.");
     expect(seen.accessToken).toBeUndefined();
 
-    expect(sendEmailMock).not.toHaveBeenCalled();
-    expect(sendSMSMock).not.toHaveBeenCalled();
+    expectStaffAlerts(1);
   });
 
-  it("keeps a follow-up visitor message on the same thread", async () => {
+  it("throttles a quick follow-up and alerts again after 10 minutes", async () => {
+    expect(STAFF_THREAD_ALERT_INTERVAL_MS).toBe(10 * 60 * 1000);
+    let clock = new Date("2026-11-09T15:00:00.000Z");
+    setContactThreadAlertClockForTests(() => clock);
+
     const createdRes = await postThread(validBody, "203.0.113.42");
     const created = await createdRes.json();
+    expect(createdRes.status).toBe(201);
+    expectStaffAlerts(1);
+
     const follow = await postThread({
       ...validBody,
       message: "Morning is better.",
@@ -149,8 +205,29 @@ describe("contact thread routes", () => {
     expect(follow.status).toBe(200);
     expect(body.thread.messages).toHaveLength(2);
     expect(body.thread.id).toBe(created.thread.id);
-    expect(sendEmailMock).not.toHaveBeenCalled();
-    expect(sendSMSMock).not.toHaveBeenCalled();
+    expect(JSON.stringify(body)).not.toContain("staffAlert");
+    expectStaffAlerts(1);
+    const throttled = await readContactThreadAlert(created.thread.id);
+    expect(throttled?.staffAlertStatus).toBe("throttled");
+    expect(throttled?.lastStaffAlertAt).toBe("2026-11-09T15:00:00.000Z");
+
+    clock = new Date(clock.getTime() + STAFF_THREAD_ALERT_INTERVAL_MS);
+    const later = await postThread({
+      ...validBody,
+      message: "Afternoon works too.",
+      threadId: created.thread.id,
+      accessToken: created.accessToken,
+    }, "203.0.113.42");
+    const laterBody = await later.json();
+    expect(later.status).toBe(200);
+    expect(laterBody.thread.messages).toHaveLength(3);
+    expectStaffAlerts(2);
+    const sent = await readContactThreadAlert(created.thread.id);
+    expect(sent?.staffAlertStatus).toBe("sent");
+    expect(sent?.lastStaffAlertAt).toBe(clock.toISOString());
+    expect(sendEmailMock.mock.calls[1][0].variables?.message).toContain("Afternoon works too.");
+    expect(sendEmailMock.mock.calls[1][0].to).not.toBe(validBody.email);
+    expect(sendSMSMock.mock.calls[1][0].to).toBe("+12813560965");
   });
 
   it("hides the thread from a missing or wrong token and from anonymous staff calls", async () => {
@@ -177,8 +254,7 @@ describe("contact thread routes", () => {
     });
     const seenBody = await seen.json();
     expect(seenBody.thread.messages).toHaveLength(1);
-    expect(sendEmailMock).not.toHaveBeenCalled();
-    expect(sendSMSMock).not.toHaveBeenCalled();
+    expectStaffAlerts(1);
   });
 
   it("does not deliver a visitor message that has no reply path", async () => {
@@ -191,7 +267,7 @@ describe("contact thread routes", () => {
     expect(sendSMSMock).not.toHaveBeenCalled();
   });
 
-  it("rate-limits visitor posts without sending email or text", async () => {
+  it("rate-limits visitor posts and does not alert the blocked one", async () => {
     const ip = "203.0.113.45";
     for (let i = 0; i < LIVE_CHAT_MAX_PER_WINDOW; i += 1) {
       const ok = await postThread({ ...validBody, message: `Message ${i}` }, ip);
@@ -200,7 +276,68 @@ describe("contact thread routes", () => {
     const blocked = await postThread(validBody, ip);
     expect(blocked.status).toBe(429);
     expect(blocked.headers.get("retry-after")).toBeTruthy();
-    expect(sendEmailMock).not.toHaveBeenCalled();
-    expect(sendSMSMock).not.toHaveBeenCalled();
+    expectStaffAlerts(LIVE_CHAT_MAX_PER_WINDOW);
+  });
+
+  it("saves the visitor message when the staff alert throws", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    sendEmailMock.mockRejectedValue(new Error("smtp down"));
+    sendSMSMock.mockRejectedValue(new Error("twilio down"));
+    try {
+      const res = await postThread(validBody, "203.0.113.60");
+      const body = await res.json();
+      expect(res.status).toBe(201);
+      expect(body.error).toBeUndefined();
+      expect(body.thread.messages).toHaveLength(1);
+      expect(body.thread.messages[0].text).toBe(validBody.message);
+      expect(JSON.stringify(body)).not.toContain("staffAlert");
+      expect((await readContactThreadAlert(body.thread.id))?.staffAlertStatus).toBe("failed");
+      expect(sendEmailMock).toHaveBeenCalledTimes(1);
+      expect(sendEmailMock.mock.calls[0][0].to).not.toBe(validBody.email);
+      expect(sendSMSMock).toHaveBeenCalledTimes(1);
+      expect(sendSMSMock.mock.calls[0][0].to).toBe("+12813560965");
+      expect(sendSMSMock.mock.calls[0][0].to).not.toBe(validBody.phone);
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  it("caps office alerts across visitors without dropping the message", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      for (let i = 0; i < LIVE_CHAT_MAX_PER_WINDOW; i += 1) {
+        const ok = await postThread({ ...validBody, message: `Global ${i}` }, `198.51.100.${i + 1}`);
+        expect(ok.status).toBe(201);
+      }
+      expectStaffAlerts(LIVE_CHAT_MAX_PER_WINDOW);
+
+      const extra = await postThread({ ...validBody, message: "One more office chat" }, "198.51.100.50");
+      const body = await extra.json();
+      expect(extra.status).toBe(201);
+      expect(body.thread.messages[0].text).toBe("One more office chat");
+      expectStaffAlerts(LIVE_CHAT_MAX_PER_WINDOW);
+      const alert = await readContactThreadAlert(body.thread.id);
+      expect(alert?.staffAlertStatus).toBe("throttled");
+      expect(alert?.lastStaffAlertAt).toBeUndefined();
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it("truncates a long visitor message and still links the admin thread", async () => {
+    const message = `Hello ${"word ".repeat(200)}ENDMARK`;
+    const res = await postThread({ ...validBody, message }, "203.0.113.70");
+    const created = await res.json();
+    expect(res.status).toBe(201);
+    expect(created.thread.messages[0].text).toBe(message);
+    expectStaffAlerts(1);
+    const email = sendEmailMock.mock.calls[0][0];
+    expect(email.variables?.message).toContain("Hello");
+    expect(email.variables?.message).not.toContain("ENDMARK");
+    expect(email.variables?.message).toContain(created.thread.id);
+    expect(email.variables?.message).toContain("...");
+    const sms = sendSMSMock.mock.calls[0][0];
+    expect(sms.body).toContain(contactThreadAdminUrl(created.thread.id));
+    expect(sms.body.length).toBeLessThanOrEqual(640);
   });
 });
