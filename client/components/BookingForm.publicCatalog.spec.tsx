@@ -49,7 +49,7 @@ describe("public booking catalog", () => {
     expect(apprentice).toContain("25 photos");
     expect(apprentice).toMatch(/data-testid="apprentice-25"[^>]*aria-pressed="true"/);
     expect(apprentice).toMatch(/data-testid="apprentice-50"[^>]*aria-pressed="false"/);
-    expect(apprentice).toContain("$<!-- -->75");
+    expect(apprentice).toContain("$<!-- -->85");
     expect(apprentice).toContain('data-testid="booking-total"');
     expect(apprentice).not.toContain("The Essentials");
   });

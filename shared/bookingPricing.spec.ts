@@ -397,17 +397,17 @@ describe("booking catalog parity", () => {
   });
 
   it("prices apprenticeship packages at the hard time caps and seeds them with the basics", () => {
-    expect(calculateSidebarTotal({ selectedBasics: ["apprentice-25"] })).toBe(75);
+    expect(calculateSidebarTotal({ selectedBasics: ["apprentice-25"] })).toBe(85);
     expect(calculateSidebarTotal({ selectedBasics: ["apprentice-50"] })).toBe(125);
-    expect(sumLineItemPrices(buildSubmittedLineItems({ selectedBasics: ["apprentice-25", "apprentice-50"] }))).toBe(200);
+    expect(sumLineItemPrices(buildSubmittedLineItems({ selectedBasics: ["apprentice-25", "apprentice-50"] }))).toBe(210);
 
     const twentyFive = buildSubmittedLineItems({ selectedBasics: ["apprentice-25"] })[0];
     const fifty = buildSubmittedLineItems({ selectedBasics: ["apprentice-50"] })[0];
     expect(twentyFive).toMatchObject({
       id: "apprentice-25",
-      unitPrice: 75,
+      unitPrice: 85,
       qty: 1,
-      price: 75,
+      price: 85,
     });
     expect(fifty).toMatchObject({ id: "apprentice-50", unitPrice: 125, qty: 1, price: 125 });
     expect(twentyFive.name).toContain("20 Minute Appointment ONLY");
@@ -418,7 +418,7 @@ describe("booking catalog parity", () => {
     const apprentice25 = docs.find((doc) => doc.id === "apprentice-25");
     const apprentice50 = docs.find((doc) => doc.id === "apprentice-50");
     expect(apprentice25).toMatchObject({
-      price: 75,
+      price: 85,
       tier: "basic",
       bookingKind: "basic",
       category: "photography",
@@ -466,7 +466,11 @@ describe("booking catalog parity", () => {
     ].filter((id): id is string => Boolean(id));
     expect(new Set(ids).size).toBe(ids.length);
     expect(ids).toContain("listing-essentials");
-    expect(ids).toContain("photos-20");
+    expect(ids).toContain("photos-18");
+    expect(ids).not.toContain("photos-20");
+    expect(ids).not.toContain("photos-35");
+    expect(ids).not.toContain("photos-50");
+    expect(catalog.some((item) => item.id === "photos-20" && item.price === 99)).toBe(true);
     expect(ids).toContain("aerial-drone");
     expect(ids).toContain("apprentice-25");
 

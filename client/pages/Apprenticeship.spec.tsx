@@ -105,7 +105,7 @@ describe("apprenticeship landing", () => {
     const text = container?.textContent || "";
     expect(text).toContain("The Apprenticeship Program");
     expect(text).toContain("25 photos");
-    expect(text).toContain("$75");
+    expect(text).toContain("$85");
     expect(text).toContain("20 Minute Appointment ONLY");
     expect(text).toContain("50 photos");
     expect(text).toContain("$125");
@@ -115,7 +115,7 @@ describe("apprenticeship landing", () => {
     expect(text).toContain(APPRENTICESHIP_BOOKING_FEE_LINE);
     expect(text).toContain(APPRENTICESHIP_BALANCE_LINE);
     expect(text).toContain(BOOKING_PROCESSING_LABEL);
-    expect(text).toContain("$2.10");
+    expect(text).toContain("$2.38");
     expect(text).toContain(BUSINESS_CONTACT.line);
     expect(text.toLowerCase()).not.toContain("not configured");
     expect(text).not.toContain("cadi@");

@@ -48,6 +48,16 @@ export function isApprenticeshipPackage(id: string): boolean {
   return id.startsWith("apprentice-");
 }
 
+/**
+ * Older photo counts. They stay in the seed so old orders and admin can
+ * still price them. Public forms do not offer them.
+ */
+export const RETIRED_PUBLIC_PHOTO_IDS = ["photos-20", "photos-35", "photos-50"] as const;
+
+export function isRetiredPublicPhotoPackage(id: string): boolean {
+  return (RETIRED_PUBLIC_PHOTO_IDS as readonly string[]).includes(id);
+}
+
 /** Photo-count packages are one choice: standard photos-only, aerial only, or apprenticeship. */
 export function isExclusivePhotoPackage(id: string): boolean {
   return id.startsWith("photos-") || id === "aerial-only" || isApprenticeshipPackage(id);
@@ -138,7 +148,7 @@ export const basicsList: CatalogItem[] = [
     id: "apprentice-25",
     name: "The Apprenticeship Program — 25 Photos",
     cardTitle: "25 photos",
-    price: 75,
+    price: 85,
     kicker: "The cheap one",
     appointmentLimit: "20 Minute Appointment ONLY",
     aside: "Twenty-five photos. Twenty minutes. You'll feel the savings — and the stopwatch.",
@@ -173,7 +183,9 @@ export const basicsList: CatalogItem[] = [
 ];
 
 export const apprenticeshipPackages = basicsList.filter((item) => isApprenticeshipPackage(item.id));
-export const photoOnlyPackages = basicsList.filter((item) => !isApprenticeshipPackage(item.id));
+export const photoOnlyPackages = basicsList.filter(
+  (item) => !isApprenticeshipPackage(item.id) && !isRetiredPublicPhotoPackage(item.id),
+);
 
 export const addOns: Array<{ category: string; items: CatalogItem[] }> = [
   {
@@ -868,6 +880,7 @@ function collectBookingOffer(
     }
 
     if (pkg.bookingKind === "basic") {
+      if (isRetiredPublicPhotoPackage(pkg.id) || isRetiredPublicPhotoPackage(pkg.bookingId)) continue;
       const known = basicsList.find((entry) => entry.id === pkg.id || entry.id === pkg.bookingId);
       basics.push(offerItem(pkg, known));
       continue;
@@ -924,7 +937,13 @@ export interface PublicBookingCatalogResponse {
 export function publicBookingCatalogResponse(
   catalog: StaffCatalogPackage[] = packagesForStaffEditor([]),
 ): PublicBookingCatalogResponse {
-  return { packages: catalog.filter((item) => isPubliclyBookable(item)) };
+  return {
+    packages: catalog.filter((item) =>
+      isPubliclyBookable(item)
+      && !isRetiredPublicPhotoPackage(item.id)
+      && !isRetiredPublicPhotoPackage(item.bookingId),
+    ),
+  };
 }
 
 /**
@@ -938,6 +957,7 @@ export function resolvePublicPackageDeepLink(
 ): { selectedId: string; hidden: boolean } {
   const key = requestedId.trim();
   if (!key) return { selectedId: "", hidden: false };
+  if (isRetiredPublicPhotoPackage(key)) return { selectedId: "", hidden: true };
   const item = catalog.find((entry) => entry.id === key || entry.bookingId === key);
   if (!item) return { selectedId: key, hidden: false };
   if (!isPubliclyBookable(item)) return { selectedId: "", hidden: true };

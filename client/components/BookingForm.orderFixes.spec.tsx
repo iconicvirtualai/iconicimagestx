@@ -63,7 +63,7 @@ beforeEach(() => {
 });
 
 describe("/book estimator processing line", () => {
-  it("adds Processing (2.8%) on top of a $75 package", async () => {
+  it("adds Processing (2.8%) on top of the apprentice 25 package", async () => {
     await renderForm();
     const basics = Array.from(container?.querySelectorAll("button") || []).find((button) =>
       button.textContent?.includes("The Basics (Photos-Only)"),
@@ -81,13 +81,13 @@ describe("/book estimator processing line", () => {
     const estimator = container?.querySelector('[data-testid="booking-estimator"]');
     const text = estimator?.textContent || "";
     expect(text).toContain(BOOKING_PROCESSING_LABEL);
-    expect(text).toContain("$75");
-    expect(text).toContain("$2.10");
-    expect(text).toContain("$77.10");
+    expect(text).toContain("$85");
+    expect(text).toContain("$2.38");
+    expect(text).toContain("$87.38");
     expect(text.indexOf(BOOKING_PROCESSING_LABEL)).toBeLessThan(text.indexOf("Total Estimate"));
-    expect(text.indexOf("$2.10")).toBeLessThan(text.indexOf("$77.10"));
+    expect(text.indexOf("$2.38")).toBeLessThan(text.indexOf("$87.38"));
     const line = container?.querySelector('[data-testid="booking-processing-line"]');
     expect(line?.textContent).toContain(BOOKING_PROCESSING_LABEL);
-    expect(line?.textContent).toContain("$2.10");
+    expect(line?.textContent).toContain("$2.38");
   });
 });

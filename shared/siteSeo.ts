@@ -249,8 +249,8 @@ export function metaPlan(pathname: string, origin = SITE_ORIGIN): MetaPlan {
   if (path === "/realestate-75" || path.startsWith("/realestate-75/")) {
     return {
       kind: "noindex",
-      title: "Listing Photos From $75 | Iconic Images",
-      description: "Apprentice listing photos from $75. 25 photos in 20 minutes, or 50 photos in 1 hour.",
+      title: "Listing Photos From $85 | Iconic Images",
+      description: "Apprentice listing photos from $85. 25 photos in 20 minutes, or 50 photos in 1 hour.",
     };
   }
   if (path === "/headshots-10" || path.startsWith("/headshots-10/")) {

@@ -1,7 +1,7 @@
 /**
  * Apprentice listing shoots (/realestate-75).
  *
- * Two catalog packages: Apprentice 25 ($75, 20 minutes) and Apprentice 50
+ * Two catalog packages: Apprentice 25 ($85, 20 minutes) and Apprentice 50
  * ($125, 1 hour). Hours are America/Chicago and differ from the company /book
  * week: weekdays 8:00–5:00, Saturday 9:00–12:00, Sunday closed. A slot must
  * finish inside the window and start strictly before Saturday noon. The order
@@ -24,17 +24,17 @@ export interface RealEstate75Package {
   photos: number;
   durationMinutes: number;
   subtotal: number;
-  /** Honest upgrade line on the $125 card. The $75 card has none. */
+  /** Honest upgrade line on the $125 card. The $85 card has none. */
   nudge: string | null;
 }
 
 export const RE75_PACKAGES: readonly RealEstate75Package[] = [
   {
     id: "apprentice-25",
-    name: "Apprentice 25 / $75",
+    name: "Apprentice 25 / $85",
     photos: 25,
     durationMinutes: 20,
-    subtotal: 75,
+    subtotal: 85,
     nudge: null,
   },
   {
@@ -50,8 +50,8 @@ export const RE75_PACKAGES: readonly RealEstate75Package[] = [
 export type RealEstate75PackageId = RealEstate75Package["id"];
 
 export const RE75_PACKAGE_ID: RealEstate75PackageId = "apprentice-25";
-export const RE75_PACKAGE_NAME = "Apprentice 25 / $75";
-export const RE75_SUBTOTAL = 75;
+export const RE75_PACKAGE_NAME = "Apprentice 25 / $85";
+export const RE75_SUBTOTAL = 85;
 export const RE75_DURATION_MINUTES = 20;
 export const RE75_TIME_ZONE = "America/Chicago";
 export const RE75_HORIZON_DAYS = 14;
@@ -63,13 +63,13 @@ export const RE75_TRAVEL_TBD_NOTE =
   "Travel fees for Cypress and Willis are still being confirmed (TBD). We will tell you before any travel fee is added.";
 export const RE75_GALLERY_CAPTION = "Recent Iconic Images listing photos";
 export const RE75_GALLERY_DISCLAIMER =
-  "$75 and $125 shoots are photographed by an Iconic Images apprentice. Gallery shows recent Iconic Images listing work.";
+  "$85 and $125 shoots are photographed by an Iconic Images apprentice. Gallery shows recent Iconic Images listing work.";
 
 export function isRealEstate75PackageId(value: unknown): value is RealEstate75PackageId {
   return value === "apprentice-25" || value === "apprentice-50";
 }
 
-/** Unknown ids fall back to the $75 package. Callers that must reject them check the id first. */
+/** Unknown ids fall back to the $85 package. Callers that must reject them check the id first. */
 export function realEstate75Package(value: unknown): RealEstate75Package {
   return RE75_PACKAGES.find((item) => item.id === value) ?? RE75_PACKAGES[0];
 }

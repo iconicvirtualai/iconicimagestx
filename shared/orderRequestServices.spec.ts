@@ -54,7 +54,7 @@ describe("order request catalog choices", () => {
     const apprentice = choices.find((choice) => choice.packageId === "apprentice-25");
     const showcase = choices.find((choice) => choice.packageId === "listing-showcase");
     expect(apprentice?.durationMinutes).toBe(20);
-    expect(apprentice?.price).toBe(75);
+    expect(apprentice?.price).toBe(85);
     expect(showcase?.durationMinutes).toBeNull();
     expect(formatAppointmentLength(20)).toBe("20 min");
     expect(formatAppointmentLength(60)).toBe("1 hour");

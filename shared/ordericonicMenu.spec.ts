@@ -32,16 +32,21 @@ describe("ordericonic is the shared price list", () => {
     expect(mismatches).toEqual([]);
   });
 
-  it("shows the ordericonic photo cards, including the older 20, 35, and 50 counts", () => {
+  it("shows the public photo cards and keeps the retired counts in the seed only", () => {
     expect(photoOnlyPackages.map((item) => [item.cardTitle || item.name, item.price])).toEqual([
       ["18 Photos", 139],
       ["25 Photos", 169],
       ["40 Photos", 199],
-      ["20 Photos", 99],
-      ["35 Photos", 150],
-      ["50 Photos", 200],
       ["Aerial Only", 99],
     ]);
+    expect(basicsList.map((item) => item.id)).toEqual(expect.arrayContaining(["photos-20", "photos-35", "photos-50"]));
+    expect(photoOnlyPackages.map((item) => item.id)).not.toEqual(expect.arrayContaining(["photos-20", "photos-35", "photos-50"]));
+    expect(html).not.toContain("photos-20");
+    expect(html).not.toContain("photos-35");
+    expect(html).not.toContain("photos-50");
+    expect(html).toContain('data-catalog="apprentice-25" data-seed="85"');
+    expect(html).toContain("Apprentice Shoot — 25 photos — $85");
+    expect(html).toContain('data-seed="125"');
     expect(basicsList.map((item) => item.id)).toContain("photos-18");
     expect(services.map((item) => item.id)).toEqual(expect.arrayContaining([
       "hollywood",

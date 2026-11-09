@@ -80,21 +80,21 @@ describe("real estate $75 service area", () => {
 });
 
 describe("real estate $75 fee", () => {
-  it("prices Apprentice 25 at $75 plus 2.8% ($77.10)", () => {
-    expect(processingFeeCents(RE75_SUBTOTAL * 100)).toBe(210);
+  it("prices Apprentice 25 at $85 plus 2.8% ($87.38)", () => {
+    expect(processingFeeCents(RE75_SUBTOTAL * 100)).toBe(238);
     const quote = realEstate75Quote(true);
     expect(quote.packageName).toBe(RE75_PACKAGE_NAME);
-    expect(quote.subtotal).toBe(75);
-    expect(quote.processing).toBe(2.1);
-    expect(quote.total).toBe(77.1);
-    expect(quote.priceLine).toBe("$75 + 2.8% processing fee ($77.10 total by card).");
+    expect(quote.subtotal).toBe(85);
+    expect(quote.processing).toBe(2.38);
+    expect(quote.total).toBe(87.38);
+    expect(quote.priceLine).toBe("$85 + 2.8% processing fee ($87.38 total by card).");
   });
 
   it("drops the processing line when the server kill switch is off", () => {
     const quote = realEstate75Quote(false);
     expect(quote.processing).toBe(0);
-    expect(quote.total).toBe(75);
-    expect(quote.priceLine).toBe("$75.00");
+    expect(quote.total).toBe(85);
+    expect(quote.priceLine).toBe("$85.00");
   });
 
   it("prices Apprentice 50 at $125 plus 2.8% ($128.50)", () => {

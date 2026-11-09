@@ -37,7 +37,7 @@ import {
 const GCLID_KEY = "re75-gclid";
 const DRAFT_KEY = "re75-booking-draft";
 const CONVERSION_PREFIX = "re75-conversion-";
-const HERO_ALT = "25 listing photos for $75, 20-minute shoot by Iconic apprentices";
+const HERO_ALT = "25 listing photos for $85, 20-minute shoot by Iconic apprentices";
 /** Where /realestate-75 is embedded. Return from Square lands on /realestate-75/schedule?booking=received. */
 const RETURN_PAGE = "realestate-75";
 /** Wix parent site. Links that leave this landing page open there, not inside the embed. */
@@ -501,7 +501,7 @@ function OfferCta({ scheduleHref }: { scheduleHref: (packageId: RealEstate75Pack
           to={scheduleHref("apprentice-25")}
           className="inline-flex min-h-12 flex-1 items-center justify-center rounded-xl bg-black px-5 text-base font-semibold text-white hover:bg-neutral-800"
         >
-          Schedule from $75
+          Schedule from $85
         </Link>
         <a
           href={BUSINESS_CONTACT.phoneHref}
@@ -526,7 +526,7 @@ function Hero({
   return (
     <section>
       <div className="mx-auto w-full max-w-[1200px]">
-        <Link to={scheduleHref("apprentice-25")} className="block" aria-label="Schedule the $75 shoot">
+        <Link to={scheduleHref("apprentice-25")} className="block" aria-label="Schedule the $85 shoot">
           <img
             src="/realestate-75-hero.png"
             alt={HERO_ALT}
@@ -543,7 +543,7 @@ function Hero({
             to={scheduleHref("apprentice-25")}
             className="inline-flex min-h-14 flex-1 items-center justify-center rounded-xl bg-black px-6 text-lg font-semibold text-white hover:bg-neutral-800"
           >
-            Schedule from $75
+            Schedule from $85
           </Link>
           <a
             href={BUSINESS_CONTACT.phoneHref}
@@ -553,14 +553,14 @@ function Hero({
           </a>
         </div>
         <h1 className="mt-8 text-4xl font-black leading-[1.05] tracking-tight text-neutral-950 sm:text-5xl">
-          Listing Photos From $75
+          Listing Photos From $85
         </h1>
         <p className="mt-4 text-lg leading-relaxed text-neutral-700">
           Two apprentice options. 25 photos in 20 minutes, or 50 photos in 1 hour. Made for listing refreshes, relists and lease listings in The Woodlands, Spring, Conroe, Willis and Cypress.
         </p>
-        <p className="mt-4 text-base font-semibold text-neutral-950">From $75. {starter.priceLine} Or {upgrade.priceLine}</p>
+        <p className="mt-4 text-base font-semibold text-neutral-950">From $85. {starter.priceLine} Or {upgrade.priceLine}</p>
         <ul className="mt-5 flex flex-wrap gap-2">
-          {["From $75", "25 or 50 photos", "20 minutes or 1 hour", "Shot by Iconic apprentices", "Photos only"].map((item) => (
+          {["From $85", "25 or 50 photos", "20 minutes or 1 hour", "Shot by Iconic apprentices", "Photos only"].map((item) => (
             <li key={item} className="rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1.5 text-sm font-semibold text-neutral-800">
               {item}
             </li>
@@ -583,7 +583,7 @@ function OfferCards({
       <div className="mx-auto max-w-6xl">
         <h2 className="text-3xl font-black tracking-tight sm:text-4xl">Pick a package</h2>
         <p className="mt-3 max-w-2xl text-lg leading-relaxed text-neutral-700">
-          From $75. Same apprentices and the same photos-only rules. Choose the option that fits the house.
+          From $85. Same apprentices and the same photos-only rules. Choose the option that fits the house.
         </p>
         <div className="mt-8 grid gap-4 md:grid-cols-2">
           {RE75_PACKAGES.map((item) => {
@@ -685,7 +685,7 @@ function WhatYouGet({ processingOn }: { processingOn: boolean }) {
   const starter = realEstate75Quote(processingOn, "apprentice-25");
   const upgrade = realEstate75Quote(processingOn, "apprentice-50");
   const items = [
-    ["From $75", "25 photos for $75, or 50 photos for $125. Photos only."],
+    ["From $85", "25 photos for $85, or 50 photos for $125. Photos only."],
     ["Two appointment lengths", `20 minutes for 25 photos. 1 hour for 50 photos. Overages are ${APPRENTICESHIP_OVERAGE_LABEL}.`],
     ["Service area", "The Woodlands, Spring, Conroe, Willis, and Cypress."],
     ["Price", `${starter.priceLine} ${upgrade.priceLine}`],
@@ -1108,7 +1108,7 @@ function FinalCta({
   return (
     <section className="border-t border-neutral-200 bg-neutral-950 px-4 py-16 text-white md:px-8">
       <div className="mx-auto max-w-3xl text-center">
-        <h2 className="text-3xl font-black tracking-tight sm:text-5xl">Schedule from $75</h2>
+        <h2 className="text-3xl font-black tracking-tight sm:text-5xl">Schedule from $85</h2>
         <p className="mt-4 text-lg text-neutral-200">{starter.priceLine}</p>
         <p className="mt-2 text-lg text-neutral-200">{upgrade.priceLine}</p>
         <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
@@ -1116,7 +1116,7 @@ function FinalCta({
             to={scheduleHref("apprentice-25")}
             className="inline-flex min-h-14 items-center justify-center rounded-xl bg-white px-8 text-lg font-semibold text-black hover:bg-neutral-200"
           >
-            Schedule · $75
+            Schedule · $85
           </Link>
           <Link
             to={scheduleHref("apprentice-50")}

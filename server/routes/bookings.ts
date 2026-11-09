@@ -241,7 +241,7 @@ router.post("/", async (req, res) => {
         && !resolved.premiumUpgrade
         && !(Number(resolved.virtualStagingCredits) > 0);
       if (!onlyApprentice) {
-        return res.status(400).json({ error: "This page books Apprentice 25 / $75 or Apprentice 50 / $125 only." });
+        return res.status(400).json({ error: "This page books Apprentice 25 / $85 or Apprentice 50 / $125 only." });
       }
       const pkg = realEstate75Package(packageId);
       serviceLines = serviceLines.map((item) => (
