@@ -35,6 +35,8 @@ import {
 import { estimateBookingCharge, processingFeeLabel } from "@shared/invoiceProcessing";
 import SocialCountdownBanner from "@/components/SocialCountdownBanner";
 import { payAtCloseCustomerOffer, payAtCloseFeeDollars, type PayAtClosePublicOffer } from "@shared/payAtClose";
+import { PAY_NOW_OPTION_LABEL, payNowDiscountDollars } from "@shared/payNow";
+import { PAY_AT_CLOSE_PACKAGES_FOOTNOTE } from "@shared/titusEstimate";
 import NewServiceAlert from "@/components/NewServiceAlert";
 import type { SocialRateStep } from "@shared/thankfulEvent";
 import { taxDollars, type PricingRates } from "@shared/pricingSettings";
@@ -264,9 +266,12 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
     feeRate: 0,
     chargeCardProcessing: false,
   });
-  const [paymentChoice, setPaymentChoice] = useState<"card" | "pay_at_close">(
-    searchParams.get("payment") === "pay-at-close" ? "pay_at_close" : "card",
-  );
+  const [paymentChoice, setPaymentChoice] = useState<"pay_now" | "pay_later" | "pay_at_close">(() => {
+    const payment = searchParams.get("payment");
+    if (payment === "pay-at-close") return "pay_at_close";
+    if (payment === "pay-now") return "pay_now";
+    return "pay_later";
+  });
   const offer = useMemo(() => bookingOffer(catalog), [catalog]);
   const services = offer.services;
   const addOns = offer.addOns;
@@ -742,7 +747,11 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
         total,
         promoCode: appliedPromo?.code || null,
         promoDiscount: appliedPromo?.discount || 0,
-        paymentMethod: paymentChoice === "pay_at_close" && payAtCloseOffer.offered ? "pay_at_close" : undefined,
+        paymentMethod: paymentChoice === "pay_at_close" && (payAtCloseOffer.offered || devPayAtClosePreview)
+          ? "pay_at_close"
+          : paymentChoice === "pay_now"
+            ? "pay_now"
+            : "pay_later",
       }),
       readClientNotificationsLive(),
     ]);
@@ -776,16 +785,25 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
   const serviceBase = Math.max(0, sumLineItemPrices(buildSubmittedLineItems({ ...priceInput, promo: null })));
   const showPayAtClose = payAtCloseOffer.offered || devPayAtClosePreview;
   const payAtCloseSelected = showPayAtClose && paymentChoice === "pay_at_close";
+  const payNowSelected = paymentChoice === "pay_now";
+  const netBeforePayNow = Math.max(0, serviceBase - (appliedPromo?.discount || 0));
+  const payNowDiscount = payNowSelected ? payNowDiscountDollars(netBeforePayNow) : 0;
+  const estimatePromoDiscount = (appliedPromo?.discount || 0) + payNowDiscount;
   const chargeProcessing = payAtCloseSelected
     ? payAtCloseOffer.chargeCardProcessing && processingOn && pricing.processingActive
     : processingOn && pricing.processingActive;
   const estimate = estimateBookingCharge(
-    priceInput,
+    {
+      ...priceInput,
+      promo: estimatePromoDiscount > 0
+        ? { code: appliedPromo?.code || "PAYNOW", discount: estimatePromoDiscount }
+        : null,
+    },
     showTravelLine ? travelFeeDollars(travel) : 0,
     chargeProcessing,
     {
       processingPercent: pricing.processingPercent,
-      tax: taxDollars(Math.max(0, serviceBase - (appliedPromo?.discount || 0)), pricing),
+      tax: taxDollars(Math.max(0, serviceBase - estimatePromoDiscount), pricing),
     },
   );
   const customerPayAtClose = payAtCloseCustomerOffer(payAtCloseOffer);
@@ -904,6 +922,12 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
           <div className="pt-2 mt-2 border-t border-dashed border-teal-100 flex items-baseline justify-between gap-3 text-[11px]">
              <span className="min-w-0 text-teal-600 font-bold flex items-center gap-1.5"><Sparkles className="w-3 h-3" /> PROMO: {appliedPromo.code}</span>
              <MoneyAmount className="font-black text-teal-600">-${appliedPromo.discount}</MoneyAmount>
+          </div>
+        )}
+        {payNowDiscount > 0 && (
+          <div data-testid="pay-now-discount" className="flex items-baseline justify-between gap-3 text-[11px]">
+            <span className="min-w-0 font-bold text-teal-600">{PAY_NOW_OPTION_LABEL}</span>
+            <MoneyAmount className="font-black text-teal-600">-${payNowDiscount.toFixed(2)}</MoneyAmount>
           </div>
         )}
       </div>
@@ -1686,7 +1710,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Complete your request</p>
             </div>
 
-            <div className="space-y-8 max-w-lg mx-auto">
+            <div data-testid="payment-step" className="space-y-8 max-w-lg mx-auto">
                <div data-testid="order-summary-before-submit" className="rounded-2xl border border-gray-100 bg-gray-50 p-5 space-y-3">
                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Order summary</p>
                  {submittedLines.map((item, index) => {
@@ -1706,6 +1730,12 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
                      </div>
                    );
                  })}
+                 {payNowDiscount > 0 && (
+                   <div data-testid="pay-now-discount" className="flex items-baseline justify-between gap-3 text-sm">
+                     <span className="min-w-0 font-bold text-teal-600">{PAY_NOW_OPTION_LABEL}</span>
+                     <MoneyAmount className="font-black text-teal-600">-${payNowDiscount.toFixed(2)}</MoneyAmount>
+                   </div>
+                 )}
                  <TravelFeeLine travel={travel} />
                  {chargeProcessing && hasBookingSelection(bookingPriceInput()) && (
                    <ProcessingEstimateLine amount={estimate.processing} percent={pricing.processingPercent} />
@@ -1777,23 +1807,36 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
                  </div>
                ) : null}
 
-               {showPayAtClose && (
-                 <fieldset data-testid="pay-at-close-option" className="space-y-3 rounded-[1.5rem] border border-gray-100 bg-white p-4">
+               <fieldset data-testid="payment-options" className="space-y-3 rounded-[1.5rem] border border-gray-100 bg-white p-4">
                    <legend className="px-1 text-[10px] font-black uppercase tracking-widest text-gray-400">How do you want to pay?</legend>
                    <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-gray-100 p-3">
                      <input
                        type="radio"
                        name="payment-choice"
                        className="mt-1"
-                       checked={paymentChoice !== "pay_at_close"}
-                       onChange={() => setPaymentChoice("card")}
+                       checked={paymentChoice === "pay_now"}
+                       onChange={() => setPaymentChoice("pay_now")}
                      />
                      <span>
-                       <span className="block text-sm font-black text-black">Pay by card after the shoot</span>
+                       <span className="block text-sm font-black text-black">{PAY_NOW_OPTION_LABEL}</span>
+                       <span className="block text-xs leading-relaxed text-gray-500">Save $5 today. A secure Square card checkout opens when you submit. Card processing applies when it is turned on.</span>
+                     </span>
+                   </label>
+                   <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-gray-100 p-3">
+                     <input
+                       type="radio"
+                       name="payment-choice"
+                       className="mt-1"
+                       checked={paymentChoice === "pay_later"}
+                       onChange={() => setPaymentChoice("pay_later")}
+                     />
+                     <span>
+                       <span className="block text-sm font-black text-black">Pay Later</span>
                        <span className="block text-xs leading-relaxed text-gray-500">Nothing is charged today. After your shoot we send your invoice with a secure Square card link. Card processing applies when it is turned on.</span>
                      </span>
                    </label>
-                   <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-[#0d9488]/30 bg-[#f0fdfa] p-3">
+                   {showPayAtClose && (
+                   <label data-testid="pay-at-close-option" className="flex cursor-pointer items-start gap-3 rounded-2xl border border-[#0d9488]/30 bg-[#f0fdfa] p-3">
                      <input
                        type="radio"
                        name="payment-choice"
@@ -1804,10 +1847,11 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
                      <span>
                        <span className="block text-sm font-black text-black">Pay at Close</span>
                        <span className="block text-xs leading-relaxed text-gray-600">Spoil yourself and use our discounts. Titus pays Iconic now, and you settle when the home closes. Titus shows its fee. One invoice, either way.</span>
+                       <span className="mt-1 block text-xs leading-relaxed text-gray-600">{PAY_AT_CLOSE_PACKAGES_FOOTNOTE}</span>
                      </span>
                    </label>
+                   )}
                  </fieldset>
-               )}
 
                <SmsConsentField
                  checked={formData.smsConsent}

@@ -148,11 +148,24 @@ describe("/book estimator processing line", () => {
     expect(text.indexOf(PROCESSING_ESTIMATE_LABEL)).toBeLessThan(text.indexOf("Total estimate"));
     expect(text).toContain("$806.98");
 
-    const pay = container?.querySelector('[data-testid="pay-at-close-option"]');
+    const pay = container?.querySelector('[data-testid="payment-options"]');
     const payText = pay?.textContent || "";
-    expect(payText).toContain("Pay by card after the shoot");
+    expect(payText).toContain("Pay Now (save $5)");
+    expect(payText).toContain("Pay Later");
+    expect(payText).toContain("Pay at Close");
     expect(payText).toContain("Nothing is charged today. After your shoot we send your invoice with a secure Square card link. Card processing applies when it is turned on.");
+    expect(payText).toContain("$0 due until closing with financing arranged by Titus.");
     expect(payText).not.toContain("Square checkout on this same invoice.");
+
+    const payNow = Array.from(pay?.querySelectorAll("label") || []).find((label) =>
+      label.textContent?.includes("Pay Now (save $5)"),
+    );
+    await act(async () => {
+      payNow?.querySelector("input")?.click();
+    });
+    const summaryAfter = container?.querySelector('[data-testid="order-summary-before-submit"]');
+    expect(summaryAfter?.textContent).toContain("Pay Now (save $5)");
+    expect(summaryAfter?.textContent).toContain("-$5.00");
   });
 
   it("keeps the processing percent dynamic and does not say the card is charged at booking", () => {
@@ -160,7 +173,10 @@ describe("/book estimator processing line", () => {
     expect(source).toContain("processingFeeLabel(percent)");
     expect(source).toContain("percent={pricing.processingPercent}");
     expect(source).toContain(", charged on the invoice");
-    expect(source).toContain("Pay by card after the shoot");
+    expect(source).toContain(">Pay Later</span>");
+    expect(source).toContain("Nothing is charged today. After your shoot we send your invoice with a secure Square card link. Card processing applies when it is turned on.");
+    expect(source).toContain("PAY_NOW_OPTION_LABEL");
+    expect(source).toContain("PAY_AT_CLOSE_PACKAGES_FOOTNOTE");
     expect(source).not.toContain(">Pay by card</span>");
     expect(source).not.toContain("Square checkout on this same invoice.");
   });
