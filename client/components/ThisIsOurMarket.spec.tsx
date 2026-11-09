@@ -28,6 +28,10 @@ describe("This Is OUR Market services blaze", () => {
     expect(blaze).toContain('data-site-field="video"');
     expect(html.indexOf(UNDERLAY)).toBeLessThan(html.indexOf(VIDEO));
     expect(html).toContain("aspect-[3/4]");
+    expect(html).toContain("w-[min(100%,420px)]");
+    expect(html).not.toContain("w-[min(100%,240px)]");
+    expect(underlay).toContain("opacity-30");
+    expect(underlay).not.toContain("inset-0");
     expect(html).toContain("This Is");
     expect(html).toContain("OUR");
     expect(html).not.toContain("lifestyle-kennedy");

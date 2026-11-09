@@ -41,7 +41,7 @@ export default function MediaCarousel() {
         },
       ];
 
-  const stillPairs = AI_BEFORE_AFTER.map((pair) => ({
+  const stillPairs = AI_BEFORE_AFTER.filter((pair) => pair.id !== "pasture-lifestyle" && pair.id !== "living-declutter").map((pair) => ({
     id: pair.id,
     before: { type: "image" as const, url: pair.before.src, alt: pair.before.alt },
     after: { type: "image" as const, url: pair.after.src, alt: pair.after.alt },
