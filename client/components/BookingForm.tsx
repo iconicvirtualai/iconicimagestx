@@ -1054,7 +1054,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
                                     </div>
                                   )}
                                   {cat === "business" && socialOffLabel ? (
-                                    <span className="absolute right-3 top-2 z-10 rounded-full bg-[#FFD700] px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-black shadow">
+                                    <span className="absolute right-3 top-2 z-10 whitespace-nowrap rounded-full bg-[#FFD700] px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-black shadow">
                                       {socialOffLabel} off
                                     </span>
                                   ) : null}
@@ -1062,8 +1062,8 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
                                     <h4 className="font-black text-black uppercase text-[11px] leading-tight">{s.name}</h4>
                                     <p className="text-[10px] text-gray-500 leading-relaxed line-clamp-2">{s.description}</p>
                                   </div>
-                                  <div className="mt-3 flex items-end justify-between">
-                                     <div className="text-sm font-black text-black">
+                                  <div className="mt-3 flex items-end justify-between gap-2">
+                                     <div className="shrink-0 whitespace-nowrap text-sm font-black tabular-nums text-black">
                                        {s.price > 0 ? `$${s.price}` : ""}
                                      </div>
                                      {formData.selectedService === s.id && (
@@ -1104,7 +1104,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
                         >
                           <div className="space-y-1 pr-6">
                             <h4 className="font-black text-black uppercase text-sm">{b.name}</h4>
-                            <span className="text-sm font-black text-black block">${b.price}</span>
+                            <span className="block whitespace-nowrap text-sm font-black tabular-nums text-black">${b.price}</span>
                           </div>
                           {formData.selectedBasics.includes(b.id) && (
                             <div className="absolute top-4 right-4 w-5 h-5 rounded-full bg-black flex items-center justify-center">
@@ -1143,7 +1143,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
                             <div className="space-y-1.5 pr-6">
                               <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">{b.kicker}</p>
                               <h4 className="text-2xl font-black leading-none text-black">{b.cardTitle || b.name}</h4>
-                              <span className="text-xl font-black text-black block">${b.price}</span>
+                              <span className="block whitespace-nowrap text-xl font-black tabular-nums text-black">${b.price}</span>
                               {b.appointmentLimit && (
                                 <p className="text-[10px] font-medium leading-snug text-gray-400">{b.appointmentLimit}</p>
                               )}
@@ -1245,9 +1245,9 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
                       }`}
                     >
                       <div>
-                        <div className="flex justify-between items-start mb-1">
-                          <span className="text-[11px] font-black uppercase text-black">{style.name}</span>
-                          {style.price > 0 && <span className="text-[10px] font-black text-teal-500">+${style.price}</span>}
+                        <div className="mb-1 pr-5">
+                          <span className="block text-[11px] font-black uppercase leading-tight text-black [overflow-wrap:normal] [word-break:normal]">{style.name}</span>
+                          {style.price > 0 && <span className="mt-1 inline-block whitespace-nowrap text-[10px] font-black tabular-nums text-teal-500">+${style.price}</span>}
                         </div>
                         <p className="text-[9px] text-gray-500 leading-tight">{style.description}</p>
                       </div>
@@ -1284,7 +1284,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
                         >
                           <div className="flex flex-col">
                              <span className="text-[10px] font-black uppercase text-black">{item.name}</span>
-                             <span className="text-[9px] font-bold" style={{ color: settings.global.primaryColor }}>+${item.price}</span>
+                             <span className="whitespace-nowrap text-[9px] font-bold tabular-nums" style={{ color: settings.global.primaryColor }}>+${item.price}</span>
                           </div>
                           {formData.selectedAddOns.includes(item.id) && (
                             <div className="w-3.5 h-3.5 rounded-full bg-black flex items-center justify-center">
@@ -2094,7 +2094,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
                   }}
                   className="bg-black hover:bg-gray-800 text-white font-black py-8 text-sm rounded-2xl transition-all shadow-xl group"
                 >
-                   UPGRADE TO ICONIC FINISH (+${iconicFinishPrice})
+                   UPGRADE TO ICONIC FINISH (<span className="whitespace-nowrap">+${iconicFinishPrice}</span>)
                    <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
                 </Button>
                 <button
@@ -2136,7 +2136,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
              <div className="bg-gray-50 rounded-2xl p-6 flex items-center justify-between border border-gray-100">
                 <div className="space-y-1">
                    <h4 className="text-xs font-black uppercase text-black tracking-widest">Staging Credits</h4>
-                   <p className="text-[10px] text-gray-400 font-bold">${virtualStagingUnitPrice} Per Image</p>
+                   <p className="whitespace-nowrap text-[10px] font-bold text-gray-400">${virtualStagingUnitPrice} Per Image</p>
                 </div>
                 <div className="flex items-center gap-4">
                    <button
