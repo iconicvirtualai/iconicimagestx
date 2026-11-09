@@ -5,6 +5,7 @@
  */
 
 import { clientNotifyLive } from "./clientNotify.ts";
+import { squareBuyerAddress, squareBuyerPhone } from "./squareCheckout.ts";
 
 export const HUB_SOCIAL_PLATFORMS = [
   { id: "facebook", label: "Facebook" },
@@ -614,10 +615,10 @@ export function squareBuyerPrefill(invoice: Record<string, unknown>): Record<str
   const data: Record<string, unknown> = {};
   const email = hubEmail(invoice.billingEmail) || hubEmail(invoice.clientEmail);
   if (email) data.buyer_email = email;
-  const phone = hubPhone(invoice.billingPhone) || hubPhone(invoice.clientPhone);
+  const phone = squareBuyerPhone(hubPhone(invoice.billingPhone) || hubPhone(invoice.clientPhone));
   if (phone) data.buyer_phone_number = phone;
-  const address = text(invoice.billToAddress, 240);
-  if (address) data.buyer_address = { address_line_1: address, country: "US" };
+  const address = squareBuyerAddress(text(invoice.billToAddress, 240));
+  if (address) data.buyer_address = address;
   return data;
 }
 

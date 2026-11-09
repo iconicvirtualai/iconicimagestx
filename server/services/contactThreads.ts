@@ -7,6 +7,11 @@ const COLLECTION = "contactThreads";
 const MAX_THREAD_MESSAGES = 200;
 const TOKEN_BYTES = 32;
 
+/** Follow-up visitor messages alert staff at most once per this interval. */
+export const STAFF_THREAD_ALERT_INTERVAL_MS = 10 * 60 * 1000;
+
+export type StaffAlertStatus = "sent" | "failed" | "throttled";
+
 export interface ContactThreadRecord {
   id: string;
   accessToken: string;
@@ -16,6 +21,11 @@ export interface ContactThreadRecord {
   createdAt: string;
   updatedAt: string;
   messages: ContactThreadMessage[];
+  /** Set when a staff alert is claimed. Follow-ups inside the interval do not send. */
+  lastStaffAlertAt?: string;
+  /** Distinguishes the winner when two claims race in the same millisecond. */
+  staffAlertClaimId?: string;
+  staffAlertStatus?: StaffAlertStatus;
 }
 
 interface ContactThreadStore {
@@ -104,28 +114,39 @@ function asRecord(data: unknown): ContactThreadRecord | null {
     createdAt: typeof raw.createdAt === "string" ? raw.createdAt : new Date(0).toISOString(),
     updatedAt: typeof raw.updatedAt === "string" ? raw.updatedAt : new Date(0).toISOString(),
     messages,
+    ...(typeof raw.lastStaffAlertAt === "string" && raw.lastStaffAlertAt ? { lastStaffAlertAt: raw.lastStaffAlertAt } : {}),
+    ...(typeof raw.staffAlertClaimId === "string" && raw.staffAlertClaimId ? { staffAlertClaimId: raw.staffAlertClaimId } : {}),
+    ...(raw.staffAlertStatus === "sent" || raw.staffAlertStatus === "failed" || raw.staffAlertStatus === "throttled"
+      ? { staffAlertStatus: raw.staffAlertStatus }
+      : {}),
   };
 }
 
 function createMemoryStore(): ContactThreadStore {
   const rows = new Map<string, ContactThreadRecord>();
+  const read = (id: string) => {
+    const row = rows.get(id);
+    return row ? asRecord(row) : null;
+  };
   return {
     async get(id) {
-      return rows.get(id) ?? null;
+      return read(id);
     },
     async insert(thread) {
       rows.set(thread.id, thread);
     },
     async update(id, change) {
-      const current = rows.get(id);
+      const current = read(id);
       if (!current) return null;
       const next = change(current);
       if (!next) return null;
       rows.set(id, next);
-      return next;
+      return asRecord(next);
     },
     async listRecent(limit) {
       return [...rows.values()]
+        .map((row) => asRecord(row))
+        .filter((row): row is ContactThreadRecord => Boolean(row))
         .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0))
         .slice(0, limit);
     },
@@ -208,9 +229,63 @@ function withClientMessage(current: ContactThreadRecord, input: LiveChatMessage,
   };
 }
 
+function staffAlertIsDue(thread: ContactThreadRecord, nowMs: number): boolean {
+  const lastMs = thread.lastStaffAlertAt ? Date.parse(thread.lastStaffAlertAt) : Number.NaN;
+  if (!Number.isFinite(lastMs)) return true;
+  return nowMs - lastMs >= STAFF_THREAD_ALERT_INTERVAL_MS;
+}
+
+/**
+ * True when this visitor message should alert staff.
+ * A missing thread is "missing". A thread inside the interval is "throttled"
+ * and that status is stored without moving lastStaffAlertAt.
+ */
+export async function staffThreadAlertDue(
+  id: string,
+  now = new Date(),
+): Promise<"due" | "throttled" | "missing"> {
+  const thread = await activeStore().get(id);
+  if (!thread) return "missing";
+  if (staffAlertIsDue(thread, now.getTime())) return "due";
+  await recordStaffAlertStatus(id, "throttled");
+  return "throttled";
+}
+
+/**
+ * Claim the next staff alert for this thread.
+ * The claim is inside the store update, which is a Firestore transaction.
+ * Returns false when another writer already claimed this interval.
+ */
+export async function claimStaffThreadAlert(id: string, now = new Date()): Promise<boolean> {
+  const nowIso = now.toISOString();
+  const nowMs = now.getTime();
+  const claimId = randomBytes(8).toString("hex");
+  const updated = await activeStore().update(id, (current) => {
+    if (!staffAlertIsDue(current, nowMs)) return current;
+    return { ...current, lastStaffAlertAt: nowIso, staffAlertClaimId: claimId };
+  });
+  return updated?.staffAlertClaimId === claimId;
+}
+
+export async function recordStaffAlertStatus(id: string, status: StaffAlertStatus): Promise<void> {
+  await activeStore().update(id, (current) => ({ ...current, staffAlertStatus: status }));
+}
+
+export async function readContactThreadAlert(id: string): Promise<{
+  lastStaffAlertAt?: string;
+  staffAlertStatus?: StaffAlertStatus;
+} | null> {
+  const thread = await activeStore().get(id);
+  if (!thread) return null;
+  return {
+    ...(thread.lastStaffAlertAt ? { lastStaffAlertAt: thread.lastStaffAlertAt } : {}),
+    ...(thread.staffAlertStatus ? { staffAlertStatus: thread.staffAlertStatus } : {}),
+  };
+}
+
 /**
  * Save a visitor message on a portal thread.
- * Does not email or text the visitor or the office.
+ * Does not email or text anyone. The route alerts staff separately.
  */
 export async function startClientThread(input: LiveChatMessage): Promise<ClientThreadResult> {
   const createdAt = new Date().toISOString();

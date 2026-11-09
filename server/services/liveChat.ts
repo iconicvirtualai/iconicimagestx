@@ -87,10 +87,40 @@ function escapeHtml(value: string): string {
 }
 
 /** Plain-text staff SMS. Short on purpose; the email carries the full message. */
-export function liveChatSmsBody(input: LiveChatMessage): string {
+export function liveChatSmsBody(input: LiveChatMessage, adminUrl?: string): string {
   const reply = [input.email, input.phone].filter(Boolean).join(" | ") || "no reply path";
   const text = input.message.replace(/\s+/g, " ").trim().slice(0, 280);
-  return `Iconic live chat\n${oneLine(input.name).slice(0, 80)}\n${reply}\n${text}`.slice(0, 640);
+  const head = `Iconic live chat\n${oneLine(input.name).slice(0, 80)}\n${reply}\n${text}`;
+  if (!adminUrl) return head.slice(0, 640);
+  const link = oneLine(adminUrl);
+  const room = Math.max(0, 640 - link.length - 1);
+  return `${head.slice(0, room)}\n${link}`.slice(0, 640);
+}
+
+export interface LiveChatDeliveryOptions {
+  /** Reply-To header only. Never a To, Cc, or Bcc recipient. */
+  replyTo?: string;
+  /** Absolute staff URL for this chat. Included in the email and SMS. */
+  adminUrl?: string;
+  /** Max characters of the visitor message copied into the staff email. */
+  messageLimit?: number;
+}
+
+function clipStaffMessage(message: string, limit: number | undefined): string {
+  if (!limit || message.length <= limit) return message;
+  return `${message.slice(0, limit)}...`;
+}
+
+function withAdminLink(message: string, adminUrl: string | undefined): string {
+  if (!adminUrl) return message;
+  return `${message}\n\nOpen the chat: ${adminUrl}`;
+}
+
+function staffReplyTo(replyTo: string | undefined, staffTo: string): string | undefined {
+  const candidate = replyTo?.trim();
+  if (!candidate || !EMAIL_RE.test(candidate)) return undefined;
+  if (candidate.toLowerCase() === staffTo.trim().toLowerCase()) return undefined;
+  return candidate;
 }
 
 export interface LiveChatDelivery {
@@ -119,15 +149,25 @@ function isMissingTransport(err: unknown): boolean {
  * Emails the office and texts Google Voice.
  * Either channel reaching the office counts as delivered.
  * Throws only when both fail. Does not email or text the visitor.
+ * `replyTo` is a header only. The visitor is never a recipient.
  */
-export async function deliverLiveChat(input: LiveChatMessage): Promise<LiveChatDelivery> {
+export async function deliverLiveChat(
+  input: LiveChatMessage,
+  options: LiveChatDeliveryOptions = {},
+): Promise<LiveChatDelivery> {
   const to = liveChatStaffEmail();
+  if (input.email && to.trim().toLowerCase() === input.email.trim().toLowerCase()) {
+    throw new LiveChatDeliveryError("Refusing to email the visitor.", "failed");
+  }
+  const replyTo = staffReplyTo(options.replyTo, to);
+  const message = withAdminLink(clipStaffMessage(input.message, options.messageLimit), options.adminUrl);
   let emailDelivered = false;
   let emailError: unknown;
 
   try {
     const emailResult = await sendEmail({
       to,
+      ...(replyTo ? { replyTo } : {}),
       template: STAFF_INBOUND_EMAIL_TEMPLATE,
       audience: "staff",
       subject: `Live chat from ${oneLine(input.name).slice(0, 80)}`,
@@ -135,7 +175,8 @@ export async function deliverLiveChat(input: LiveChatMessage): Promise<LiveChatD
         senderName: escapeHtml(input.name),
         senderEmail: escapeHtml(input.email || "Not provided"),
         senderPhone: escapeHtml(input.phone || "Not provided"),
-        message: escapeHtml(input.message),
+        message: escapeHtml(message),
+        ...(options.adminUrl ? { adminUrl: escapeHtml(options.adminUrl) } : {}),
       },
     });
     emailDelivered = emailResult.sent;
@@ -153,7 +194,7 @@ export async function deliverLiveChat(input: LiveChatMessage): Promise<LiveChatD
     const sms = await sendSMS({
       to: STAFF_INBOUND_SMS_TO,
       kind: STAFF_INBOUND_SMS_KIND,
-      body: liveChatSmsBody(input),
+      body: liveChatSmsBody(input, options.adminUrl),
     });
     smsDelivered = !sms.suppressed && Boolean(sms.sid);
     if (!smsDelivered) {

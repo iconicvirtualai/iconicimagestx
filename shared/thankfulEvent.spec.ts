@@ -15,6 +15,8 @@ import {
   socialRatePreviewAllowed,
   socialRateSchedule,
   socialRateView,
+  THANKFUL_RSVP_EVENT_CLOSED,
+  thankfulEventDatePassed,
   thankfulRsvpOpen,
 } from "./thankfulEvent";
 
@@ -32,6 +34,9 @@ describe("thankful event on Nov 7", () => {
     expect(thankfulRsvpOpen(new Date("2026-11-01T04:59:00.000Z"))).toBe(true);
     expect(thankfulRsvpOpen(new Date("2026-11-01T04:59:00.001Z"))).toBe(false);
     expect(thankfulRsvpOpen(new Date("2026-10-17T21:16:00.000Z"))).toBe(true);
+    expect(thankfulEventDatePassed(new Date("2026-11-08T05:59:59.000Z"))).toBe(false);
+    expect(thankfulEventDatePassed(new Date("2026-11-08T06:00:00.000Z"))).toBe(true);
+    expect(THANKFUL_RSVP_EVENT_CLOSED).toBe("RSVPs are closed — thank you to everyone who joined us!");
   });
 
   it("uses the stair-step table, including a half percent, through the end of Nov 7 CT", () => {
@@ -96,6 +101,11 @@ describe("thankful event on Nov 7", () => {
     expect(thankful).toContain("Sat, Nov 7, 2026");
     expect(thankful).toContain("Sat, Oct 31");
     expect(thankful).toContain(THANKFUL_RSVP_CLOSE_UTC);
+    expect(thankful).toContain('id="rsvp"');
+    expect(thankful).toContain('id="vote"');
+    expect(thankful).toContain("RSVPs are closed — thank you to everyone who joined us!");
+    expect(thankful).not.toContain('id="rsvpform"');
+    expect(thankful).not.toContain("Send my RSVP");
     expect(thankful).not.toContain("Nov 14");
     expect(thankful).not.toContain("Nov 6");
     expect(thankful).not.toContain("2026-11-14");

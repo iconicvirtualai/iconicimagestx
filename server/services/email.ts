@@ -61,8 +61,8 @@ interface SendEmailOptions {
   replyTo?: string;
   template: string;
   /**
-   * "staff" is required for the live_chat office alert and the new-order
-   * office alert. Omit for client mail.
+   * "staff" is required for the live_chat office alert, the new-order
+   * office alert, and the contact-form office alert. Omit for client mail.
    * Visitor addresses must not be paired with audience "staff".
    */
   audience?: "client" | "staff";
@@ -81,6 +81,7 @@ type EmailDeliveryOverride = (message: {
   to: string;
   cc?: string;
   bcc?: string;
+  replyTo?: string;
   subject: string;
   html: string;
   text?: string;
@@ -116,7 +117,7 @@ export async function sendEmail(options: SendEmailOptions): Promise<{ sent: bool
   }
 
   // booking_received (order-received confirmation) always sends.
-  // live_chat and office_new_order send only with audience "staff".
+  // live_chat, office_new_order, and contact_form send only with audience "staff".
   // Other client mail stays off unless CLIENT_NOTIFY_LIVE is exactly "true"
   // and the zone is not RED. NOTIFY_TEST_ALLOWLIST can still deliver those
   // gated messages, and only to exact addresses on that list, including in RED.
@@ -165,7 +166,7 @@ export async function sendEmail(options: SendEmailOptions): Promise<{ sent: bool
   }
   const delivery: EmailDelivery = emailAllowed(template, process.env, audience) ? "sent" : "allowlist";
   if (emailDeliveryOverride) {
-    await emailDeliveryOverride({ to, cc, bcc, subject, html: htmlBody, text: textBody });
+    await emailDeliveryOverride({ to, cc, bcc, replyTo, subject, html: htmlBody, text: textBody });
     console.log(`[Email] Sent '${template}' to ${to}`);
     return { sent: true, delivery };
   }
@@ -297,6 +298,7 @@ function getFallbackTemplate(
       <div style="background:#f8fafc;padding:15px;border-left:4px solid #0d9488;color:#333;line-height:1.6;">
         ${(vars.message || "").replace(/\n/g, "<br>")}
       </div>
+      ${vars.adminUrl ? `<p style="margin-top:24px;"><a href="${vars.adminUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">Open this chat</a></p>` : ""}
     `),
   };
   void BUSINESS_CONTACT.line;

@@ -47,14 +47,14 @@ Square invoice sync uses `delivery_method: SHARE_MANUALLY`, so Square does not e
 | `office_new_order` | Email | New booking, `notifyOfficeOfOrder`. Audience `staff`. | `ADMIN_EMAIL` and `COORDINATOR_EMAIL`, never the client address | Ungated for this template when audience is `staff`. | **SENDS** | Admin link is `publicSiteUrl()/admin/order-request/:id`. |
 | `live_chat` | Email | Visitor chat, `server/services/liveChat.ts`. Audience `staff`. | Office inbox | Ungated for this template when audience is `staff`. Refused if audience is not staff. | **SENDS** | No client link. |
 | `staff_inbound` | SMS | Same live chat. | Office Google Voice `+12813560965` only | Ungated, and any other destination is refused. | **SENDS** to that number | No URL. |
-| `contact_form` | Email | Contact form, to the office. | `CONTACT_FORM_EMAIL` or `photos@iconicimagestx.com` | Treated as client mail because audience is not `staff`. | Allowlist-only. The office address is suppressed unless it is on the allowlist. | No site link. |
+| `contact_form` | Email | Contact form, to the office. Audience `staff`. | `CONTACT_FORM_EMAIL` or `photos@iconicimagestx.com`. Reply-To is the visitor. The visitor is not a To, Cc, or Bcc recipient. | Ungated for this template when audience is `staff`. Refused if audience is not staff. The client auto-reply `contact_confirmation` stays gated. | **SENDS** to the office inbox. | No site link. |
 | `newBookingAlert` | SMS | Booking handler, only if `ADMIN_PHONE` is set. | Admin phone | No SMS kind, so the client gate applies. | **Suppressed** | No URL. |
 | `ownerNotification` | Email, Gmail | `onOrderCreated` | `orders@iconicimagestx.com` | Same direct flag as `clientConfirmation`. No allowlist. | **Suppressed** | Seeded template has no URL. |
 
 ## Ungated, or still on `APP_URL` / Wix
 
 - **Intentional, keep live** with the flag unset: `booking_received` and the booking-confirmation SMS. The owner's lead confirmed both should keep reaching real clients.
-- **SENDS today with the flag unset, and is not that carve-out:** Firebase Forgot password, `office_new_order`, live-chat staff email, live-chat staff SMS, and a Square seller receipt if that dashboard toggle is on.
+- **SENDS today with the flag unset, and is not that carve-out:** Firebase Forgot password, `office_new_order`, contact-form staff email (`contact_form`), live-chat staff email, live-chat staff SMS, and a Square seller receipt if that dashboard toggle is on.
 - **Email and SMS links now on `publicSiteUrl()`:** `office_new_order` admin link, `booking_received`'s `dashboardUrl` variable, and GMass unsubscribe links when `MARKETING_PUBLIC_URL` is empty.
 - **Still built from `APP_URL`, and left alone because they are not a link inside an email or SMS body:**
   - `server/routes/sms.ts` Twilio webhook URL (`/api/sms/webhook`). That string is the callback Twilio signs. It is not text in the message.
