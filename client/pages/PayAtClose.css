@@ -529,20 +529,31 @@
 @media (min-width: 800px) {
   .pac-page .gallery { grid-template-columns: repeat(4, 1fr); }
 }
-.pac-page .gallery figure { border-radius: 1.1rem; overflow: hidden; aspect-ratio: 4/5; position: relative; margin: 0; }
-.pac-page .gallery img { width: 100%; height: 100%; object-fit: cover; }
-.pac-page .gallery figcaption {
+.pac-page .gallery figure { border-radius: 1.1rem; overflow: hidden; aspect-ratio: 4/5; position: relative; margin: 0; background: transparent; }
+.pac-page .gallery img {
   position: absolute;
   left: 0;
-  right: 0;
-  bottom: 0;
-  padding: 1.5rem 0.9rem 0.8rem;
-  background: linear-gradient(transparent, rgba(0, 0, 0, 0.75));
+  top: 0;
+  width: 100%;
+  height: 114%;
+  object-fit: cover;
+  object-position: center top;
+}
+.pac-page .gallery figcaption {
+  position: absolute;
+  left: 0.7rem;
+  right: auto;
+  bottom: 0.7rem;
+  max-width: calc(100% - 1.4rem);
+  padding: 0.35rem 0.7rem;
+  background: rgba(10, 10, 10, 0.55);
+  backdrop-filter: blur(8px);
+  border-radius: 999px;
   color: #fff;
   font-size: 0.62rem;
   font-weight: 800;
-  letter-spacing: 0.03em;
-  line-height: 1.25;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
   text-transform: uppercase;
 }
 
@@ -659,10 +670,12 @@
   background: #111;
 }
 .pac-page .estate-feature img {
+  position: absolute;
+  inset: 0;
   width: 100%;
-  aspect-ratio: 16/9;
+  height: 100%;
   object-fit: cover;
-  display: block;
+  object-position: center;
 }
 .pac-page .estate-reel {
   width: 100%;
@@ -675,15 +688,18 @@
 .pac-page .estate-feature figcaption,
 .pac-page .estate-reel-card figcaption {
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  padding: 1.5rem 0.9rem 0.8rem;
-  background: linear-gradient(transparent, rgba(0, 0, 0, 0.75));
+  left: 0.75rem;
+  right: auto;
+  bottom: 0.75rem;
+  max-width: calc(100% - 1.5rem);
+  padding: 0.35rem 0.75rem;
+  background: rgba(10, 10, 10, 0.55);
+  backdrop-filter: blur(8px);
+  border-radius: 999px;
   color: #fff;
   font-size: 0.62rem;
   font-weight: 800;
-  letter-spacing: 0.03em;
-  line-height: 1.25;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
   text-transform: uppercase;
 }

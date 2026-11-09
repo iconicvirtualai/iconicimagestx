@@ -45,7 +45,7 @@ const bookingsRoute = readFileSync(new URL("../server/routes/bookings.ts", impor
 const fixedSelection: BookingPriceInput = {
   selectedService: "listing-showcase",
   selectedBasics: ["photos-35"],
-  selectedAddOns: ["aerial-drone", "same-day", "agent-intro"],
+  selectedAddOns: ["aerial-drone", "same-day", "agent-intro-video"],
   premiumUpgrade: true,
   virtualStagingCredits: 2,
   specializedPhotography: "social",
@@ -60,16 +60,16 @@ describe("booking total contract", () => {
     const submitted = sumLineItemPrices(lineItems);
     const label = orderTotalLabel(submitted);
 
-    expect(sidebar).toBe(1118);
+    expect(sidebar).toBe(1102);
     expect(submitted).toBe(sidebar);
-    expect(label).toBe("$1118.00");
+    expect(label).toBe("$1102.00");
     expect(orderTotalLabel(sidebar)).toBe(label);
     expect(lineItems.map((item) => [item.name, item.price])).toEqual([
       ["The Showcase", 549],
       ["35 Photos", 150],
       ["Aerial Drone Stills", 99],
       ["Same-Day Delivery", 50],
-      ["Agent Intro/Outro", 75],
+      ["Agent intro/outro", 59],
       ["Iconic Finish (Premium Upgrade)", 75],
       ["Virtual Staging (2 credits)", 70],
       ["Social Media Optimized Photography", 85],
@@ -107,7 +107,7 @@ describe("booking total contract", () => {
       tier: "campaign",
     })));
     expect(sumLineItemPrices(normalized)).toBe(sumLineItemPrices(items));
-    expect(orderTotalLabel(sumLineItemPrices(normalized))).toBe("$1118.00");
+    expect(orderTotalLabel(sumLineItemPrices(normalized))).toBe("$1102.00");
     expect(normalized[0]).toMatchObject({
       description: "Staff note",
       category: "photography",

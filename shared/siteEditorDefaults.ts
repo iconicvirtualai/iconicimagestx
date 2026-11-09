@@ -77,7 +77,6 @@ const PAGES: ContentPage[] = [
     block("nav", "Navigation", [], [
       linkItem("about", "About", "/about"),
       linkItem("pricing", "Pricing", "/pricing"),
-      linkItem("studio", "Studio 105", "/studio-105"),
       linkItem("portfolio", "Portfolio", "/portfolio"),
       linkItem("insights", "Insights", "/insights"),
       linkItem("stock", "Stock Footage", "/stock-footage"),

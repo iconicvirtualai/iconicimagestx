@@ -85,6 +85,46 @@ export const services: Service[] = [
       "Post-Sale Marketing Package (Scheduled)"
     ]
   },
+  {
+    id: "hollywood",
+    name: "Hollywood",
+    category: "listings",
+    price: 199,
+    description: "A sharp, streamlined listing launch.",
+    features: ["30 daytime listing photos", "Branded listing website", "Grass replacement included"],
+  },
+  {
+    id: "hall-of-fame",
+    name: "Hall of Fame",
+    category: "listings",
+    price: 299,
+    description: "More coverage for homes that need to stand out.",
+    features: ["35 listing photos", "5 aerial photos", "Branded listing website", "Grass replacement included"],
+  },
+  {
+    id: "red-carpet",
+    name: "Red Carpet",
+    category: "listings",
+    price: 599,
+    description: "More story, more motion, more attention.",
+    features: ["45 listing photos", "5 aerials", "Social reel", "Amenity coverage", "Branded listing website", "Grass replacement included"],
+  },
+  {
+    id: "luxe-video",
+    name: "Luxe Video",
+    category: "listings",
+    price: 785,
+    description: "Standout-home coverage with a listing video.",
+    features: ["50 listing photos", "5 aerials", "Listing video", "Premium editing package", "Grass replacement included"],
+  },
+  {
+    id: "luxe-3d",
+    name: "Luxe 3D Tour",
+    category: "listings",
+    price: 785,
+    description: "Standout-home coverage with a 3D tour.",
+    features: ["50 listing photos", "5 aerials", "3D tour", "Premium editing package", "Grass replacement included"],
+  },
 
   // Branding
   {

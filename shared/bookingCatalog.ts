@@ -48,9 +48,9 @@ export function isApprenticeshipPackage(id: string): boolean {
   return id.startsWith("apprentice-");
 }
 
-/** Photo-count packages are one choice: standard photos-only or apprenticeship. */
+/** Photo-count packages are one choice: standard photos-only, aerial only, or apprenticeship. */
 export function isExclusivePhotoPackage(id: string): boolean {
-  return id.startsWith("photos-") || isApprenticeshipPackage(id);
+  return id.startsWith("photos-") || id === "aerial-only" || isApprenticeshipPackage(id);
 }
 
 export function basicLineName(item: CatalogItem): string {
@@ -58,6 +58,30 @@ export function basicLineName(item: CatalogItem): string {
 }
 
 export const basicsList: CatalogItem[] = [
+  {
+    id: "photos-18",
+    name: "Photos Only — 18 photos",
+    cardTitle: "18 Photos",
+    price: 139,
+    description: "Just the basics. Next-day delivery.",
+    features: ["18 photos", "Next-day delivery"],
+  },
+  {
+    id: "photos-25-only",
+    name: "Photos Only — 25 photos",
+    cardTitle: "25 Photos",
+    price: 169,
+    description: "Just the basics. Next-day delivery.",
+    features: ["25 photos", "Next-day delivery"],
+  },
+  {
+    id: "photos-40",
+    name: "Photos Only — 40 photos",
+    cardTitle: "40 Photos",
+    price: 199,
+    description: "Just the basics. Next-day delivery.",
+    features: ["40 photos", "Next-day delivery"],
+  },
   {
     id: "photos-20",
     name: "20 Photos",
@@ -102,6 +126,13 @@ export const basicsList: CatalogItem[] = [
       "Next Day Turn Around",
       "Reflection/Mirror Removal",
     ],
+  },
+  {
+    id: "aerial-only",
+    name: "Aerial Only",
+    price: 99,
+    description: "Aerial photos without a photo package.",
+    features: ["5 aerial photos"],
   },
   {
     id: "apprentice-25",
@@ -209,17 +240,31 @@ export const addOns: Array<{ category: string; items: CatalogItem[] }> = [
         description: "Capture the shared spaces and community features that add value.",
         features: ["Pool & Clubhouse Shots", "Parks & Shared Spaces", "Community Context"],
       },
+      {
+        id: "essentials-aerial",
+        name: "Essentials Aerial Upgrade",
+        price: 89,
+        description: "Aerial upgrade for The Essentials.",
+        features: ["Aerial photos"],
+      },
+      {
+        id: "grass-replacement",
+        name: "Grass replacement",
+        price: 25,
+        description: "Grass replacement for the appointment.",
+        features: ["Grass replacement"],
+      },
     ],
   },
   {
     category: "The Brand",
     items: [
       {
-        id: "agent-intro",
-        name: "Agent Intro/Outro",
-        price: 75,
-        description: "Put a face to the brand with a professional on-camera introduction.",
-        features: ["On-Camera Greeting", "Professional Audio Setup", "Call-to-Action Closing"],
+        id: "agent-intro-video",
+        name: "Agent intro/outro",
+        price: 59,
+        description: "On-camera agent intro or outro, priced per video.",
+        features: ["Agent intro/outro"],
       },
     ],
   },
@@ -301,102 +346,17 @@ const UPGRADES: CatalogItem[] = [
 ];
 
 /**
- * Packages the public booking pages sell that are not cards on /book.
- * Hollywood, Hall of Fame, Red Carpet, and the photo-count classics live
- * on the temporary order page. Aerial Only is the aerial-only choice.
- * Seed only — do not write these into production from this module.
+ * Priced lines the order form can charge that are not their own card.
+ * Iconic Polish is the same $75 finish as the premium toggle (iconic-finish).
+ * The toggle is the control on /book, so this id stays chargeable without a second button.
  */
 export const publicBookingPackages: CatalogItem[] = [
-  {
-    id: "hollywood",
-    name: "Hollywood",
-    price: 199,
-    description: "A sharp, streamlined listing launch.",
-    features: ["30 daytime listing photos", "Branded listing website", "Grass replacement included"],
-  },
-  {
-    id: "hall-of-fame",
-    name: "Hall of Fame",
-    price: 299,
-    description: "More coverage for homes that need to stand out.",
-    features: ["35 listing photos", "5 aerial photos", "Branded listing website", "Grass replacement included"],
-  },
-  {
-    id: "red-carpet",
-    name: "Red Carpet",
-    price: 599,
-    description: "More story, more motion, more attention.",
-    features: ["45 listing photos", "5 aerials", "Social reel", "Amenity coverage", "Branded listing website", "Grass replacement included"],
-  },
-  {
-    id: "luxe-video",
-    name: "Luxe Video",
-    price: 785,
-    description: "Standout-home coverage with a listing video.",
-    features: ["50 listing photos", "5 aerials", "Listing video", "Premium editing package", "Grass replacement included"],
-  },
-  {
-    id: "luxe-3d",
-    name: "Luxe 3D Tour",
-    price: 785,
-    description: "Standout-home coverage with a 3D tour.",
-    features: ["50 listing photos", "5 aerials", "3D tour", "Premium editing package", "Grass replacement included"],
-  },
-  {
-    id: "photos-18",
-    name: "Photos Only — 18 photos",
-    price: 139,
-    description: "Photography only. Next-day delivery.",
-    features: ["18 photos", "Next-day delivery"],
-  },
-  {
-    id: "photos-25-only",
-    name: "Photos Only — 25 photos",
-    price: 169,
-    description: "Photography only. Next-day delivery.",
-    features: ["25 photos", "Next-day delivery"],
-  },
-  {
-    id: "photos-40",
-    name: "Photos Only — 40 photos",
-    price: 199,
-    description: "Photography only. Next-day delivery.",
-    features: ["40 photos", "Next-day delivery"],
-  },
-  {
-    id: "aerial-only",
-    name: "Aerial Only",
-    price: 99,
-    description: "Aerial photos without a photo package.",
-    features: ["5 aerial photos"],
-  },
-  {
-    id: "essentials-aerial",
-    name: "Essentials Aerial Upgrade",
-    price: 89,
-    description: "Aerial upgrade for The Essentials.",
-    features: ["Aerial photos"],
-  },
-  {
-    id: "grass-replacement",
-    name: "Grass replacement",
-    price: 25,
-    description: "Grass replacement for the appointment.",
-    features: ["Grass replacement"],
-  },
   {
     id: "iconic-polish",
     name: "Iconic Polish",
     price: 75,
     description: "Premium digital finish.",
     features: ["Premium digital finish"],
-  },
-  {
-    id: "agent-intro-video",
-    name: "Agent intro/outro",
-    price: 59,
-    description: "On-camera agent intro or outro, priced per video on the public booking page.",
-    features: ["Agent intro/outro"],
   },
 ];
 
