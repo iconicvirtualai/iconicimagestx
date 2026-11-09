@@ -38,7 +38,6 @@ const APP_SHELL_SOURCES = [
   "/services/virtual-staging/select",
   "/services/virtual-staging/ai-tool",
   "/services/virtual-staging/pro-order",
-  "/services/virtual-staging/checkout",
   "/dev/invoice-template",
 ];
 

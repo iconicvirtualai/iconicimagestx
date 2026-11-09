@@ -59,7 +59,6 @@ import StockFootage from "./pages/StockFootage";
 import VirtualStagingSelection from "./pages/VirtualStagingSelection";
 import VirtualStagingAITool from "./pages/VirtualStagingAITool";
 import VirtualStagingProOrder from "./pages/VirtualStagingProOrder";
-import VirtualStagingCheckout from "./pages/VirtualStagingCheckout";
 import Go from "./pages/Go";
 import ListingCardPreview from "./pages/ListingCardPreview";
 import AdminOrderTiles from "./pages/AdminOrderTiles";
@@ -211,7 +210,7 @@ const App = () => (
             <Route path="/services/virtual-staging/select" element={<VirtualStagingSelection />} />
             <Route path="/services/virtual-staging/ai-tool" element={<VirtualStagingAITool />} />
             <Route path="/services/virtual-staging/pro-order" element={<VirtualStagingProOrder />} />
-            <Route path="/services/virtual-staging/checkout" element={<VirtualStagingCheckout />} />
+            <Route path="/services/virtual-staging/checkout" element={<Navigate to="/services/virtual-staging" replace />} />
 
             {/* ─── Login Routes ─────────────────────────────────────────── */}
             <Route path="/login" element={<Login />} />

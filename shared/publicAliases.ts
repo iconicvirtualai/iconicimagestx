@@ -31,6 +31,12 @@ export const PUBLIC_ALIASES: readonly PublicAlias[] = [
     statusCode: 301,
     note: "No /services page. The services menu is /pricing. /services/virtual-staging stays its own page.",
   },
+  {
+    path: "/services/virtual-staging/checkout",
+    destination: "/services/virtual-staging",
+    statusCode: 301,
+    note: "The staging checkout took no payment. Professional staging is requested on the pro order page.",
+  },
 ];
 
 export function publicAliasRedirects(): { source: string; destination: string; statusCode: 301 | 302 }[] {

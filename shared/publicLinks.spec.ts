@@ -52,7 +52,6 @@ const SURFACE = [
   "client/pages/Terms.tsx",
   "client/pages/VirtualStaging.tsx",
   "client/pages/VirtualStagingSelection.tsx",
-  "client/pages/VirtualStagingCheckout.tsx",
   "client/pages/VirtualStagingProOrder.tsx",
   "public/404.html",
   "public/thankful.html",
