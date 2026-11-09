@@ -5,7 +5,10 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
+import { readFileSync } from "node:fs";
 import { BOOKING_PROCESSING_LABEL } from "@shared/invoiceProcessing";
+
+const PROCESSING_ESTIMATE_LABEL = `${BOOKING_PROCESSING_LABEL}, charged on the invoice`;
 
 vi.mock("framer-motion", async () => {
   const React = await import("react");
@@ -80,14 +83,14 @@ describe("/book estimator processing line", () => {
 
     const estimator = container?.querySelector('[data-testid="booking-estimator"]');
     const text = estimator?.textContent || "";
-    expect(text).toContain(BOOKING_PROCESSING_LABEL);
+    expect(text).toContain(PROCESSING_ESTIMATE_LABEL);
     expect(text).toContain("$85");
     expect(text).toContain("$2.38");
     expect(text).toContain("$87.38");
-    expect(text.indexOf(BOOKING_PROCESSING_LABEL)).toBeLessThan(text.indexOf("Total Estimate"));
+    expect(text.indexOf(PROCESSING_ESTIMATE_LABEL)).toBeLessThan(text.indexOf("Total Estimate"));
     expect(text.indexOf("$2.38")).toBeLessThan(text.indexOf("$87.38"));
     const line = container?.querySelector('[data-testid="booking-processing-line"]');
-    expect(line?.textContent).toContain(BOOKING_PROCESSING_LABEL);
+    expect(line?.textContent).toContain(PROCESSING_ESTIMATE_LABEL);
     expect(line?.textContent).toContain("$2.38");
   });
 
@@ -97,7 +100,7 @@ describe("/book estimator processing line", () => {
     root = createRoot(container);
     await act(async () => {
       root?.render(
-        <MemoryRouter initialEntries={["/book?package=luxe-video&example=1"]}>
+        <MemoryRouter initialEntries={["/book?package=luxe-video&example=1&pacPreview=1"]}>
           <BookingForm />
         </MemoryRouter>,
       );
@@ -139,11 +142,27 @@ describe("/book estimator processing line", () => {
     const processing = summary?.querySelector('[data-testid="booking-processing-line"]');
     expect(packageLine?.textContent).toContain("Luxe Video");
     expect(packageLine?.textContent).toContain("$785.00");
-    expect(processing?.textContent).toContain(BOOKING_PROCESSING_LABEL);
+    expect(processing?.textContent).toContain(PROCESSING_ESTIMATE_LABEL);
     expect(processing?.textContent).toContain("$21.98");
-    expect(text.indexOf("Luxe Video")).toBeLessThan(text.indexOf(BOOKING_PROCESSING_LABEL));
-    expect(text.indexOf(BOOKING_PROCESSING_LABEL)).toBeLessThan(text.indexOf("Total estimate"));
+    expect(text.indexOf("Luxe Video")).toBeLessThan(text.indexOf(PROCESSING_ESTIMATE_LABEL));
+    expect(text.indexOf(PROCESSING_ESTIMATE_LABEL)).toBeLessThan(text.indexOf("Total estimate"));
     expect(text).toContain("$806.98");
+
+    const pay = container?.querySelector('[data-testid="pay-at-close-option"]');
+    const payText = pay?.textContent || "";
+    expect(payText).toContain("Pay by card after the shoot");
+    expect(payText).toContain("Nothing is charged today. After your shoot we send your invoice with a secure Square card link. Card processing applies when it is turned on.");
+    expect(payText).not.toContain("Square checkout on this same invoice.");
+  });
+
+  it("keeps the processing percent dynamic and does not say the card is charged at booking", () => {
+    const source = readFileSync("client/components/BookingForm.tsx", "utf8");
+    expect(source).toContain("processingFeeLabel(percent)");
+    expect(source).toContain("percent={pricing.processingPercent}");
+    expect(source).toContain(", charged on the invoice");
+    expect(source).toContain("Pay by card after the shoot");
+    expect(source).not.toContain(">Pay by card</span>");
+    expect(source).not.toContain("Square checkout on this same invoice.");
   });
 
   it("shows 30 Images in the Showcase details popup and keeps the $549 price", async () => {

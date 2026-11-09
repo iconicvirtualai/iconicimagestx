@@ -11366,20 +11366,28 @@ router$B.post("/", async (req, res) => {
         return "failed";
       });
       if (phone) {
-        smsStatus = await sendSMS({
-          to: phone,
-          kind: "booking_confirmation",
-          body: SMS_TEMPLATES.bookingConfirmation(
-            firstName,
-            bookingDateLabel(scheduledDate, "TBD — we'll confirm shortly"),
-            displayAddress,
-            money$3(total)
-          )
-        }).then((result) => "suppressed" in result && result.suppressed ? "failed" : "sent").catch((err) => {
-          console.error("[Bookings] Confirmation SMS failed:", err);
-          const message = err instanceof Error ? err.message : String(err);
-          return /TWILIO_|not configured|not set/i.test(message) ? "not_configured" : "failed";
-        });
+        const clientSmsAllowed = clientNotifyLive() || isNotifyTestAllowlisted(normalizedEmail);
+        if (!clientSmsAllowed) {
+          smsStatus = "gated";
+          console.info(
+            `[Bookings] Client confirmation SMS skipped for request ${docRef.id}. ${clientNotifyBlockReason()}. No message sent.`
+          );
+        } else {
+          smsStatus = await sendSMS({
+            to: phone,
+            kind: "booking_confirmation",
+            body: SMS_TEMPLATES.bookingConfirmation(
+              firstName,
+              bookingDateLabel(scheduledDate, "TBD — we'll confirm shortly"),
+              displayAddress,
+              money$3(total)
+            )
+          }).then((result) => "suppressed" in result && result.suppressed ? "failed" : "sent").catch((err) => {
+            console.error("[Bookings] Confirmation SMS failed:", err);
+            const message = err instanceof Error ? err.message : String(err);
+            return /TWILIO_|not configured|not set/i.test(message) ? "not_configured" : "failed";
+          });
+        }
       }
     }
     if (process.env.ADMIN_PHONE) {

@@ -13,6 +13,7 @@ describe("bookingFollowUp", () => {
       clientNotificationsLive: true,
       notifications: { appointmentEmail: "sent", sms: "sent", passwordSetup: "sent" },
     });
+    expect(note).toContain("We saved your appointment request. Nothing was charged today. Your invoice comes after the shoot.");
     expect(note).toContain("A confirmation email is on its way.");
     expect(note).toContain("text confirmation");
     expect(note).toContain("separate email");
@@ -27,6 +28,7 @@ describe("bookingFollowUp", () => {
       orderNumber: "ORD - L - 00534",
       notifications: { appointmentEmail: "sent", sms: "sent", passwordSetup: "gated" },
     });
+    expect(note).toContain("We saved your appointment request. Nothing was charged today. Your invoice comes after the shoot.");
     expect(note).not.toMatch(/confirmation email/i);
     expect(note).toContain("Save your order number. We'll reach out to confirm your shoot time.");
     expect(note).toContain("text confirmation was sent");

@@ -116,7 +116,7 @@ describe("live order confirmation emails", () => {
     expect(bookings).not.toContain('template: "invoice"');
   });
 
-  it("sends booking confirms before the password-setup gate", () => {
+  it("sends booking_received without the client-notify gate, then gates the client SMS", () => {
     const receivedAt = bookings.indexOf('template: "booking_received"');
     const smsAt = bookings.indexOf('kind: "booking_confirmation"');
     const gateAt = bookings.indexOf("if (!passwordSetupAllowed)");
@@ -125,7 +125,13 @@ describe("live order confirmation emails", () => {
     expect(smsAt).toBeGreaterThan(receivedAt);
     expect(gateAt).toBeGreaterThan(smsAt);
     expect(passwordAt).toBeGreaterThan(gateAt);
-    expect(bookings.slice(receivedAt, smsAt)).not.toContain("clientNotifyLive(");
+    const emailCall = bookings.slice(receivedAt, bookings.indexOf("}).then((result) => (result.sent", receivedAt));
+    expect(emailCall).not.toContain("clientNotifyLive(");
+    expect(emailCall).not.toContain("isNotifyTestAllowlisted(");
+    const smsGate = bookings.slice(bookings.lastIndexOf("if (phone)", smsAt), smsAt);
+    expect(smsGate).toContain("clientNotifyLive()");
+    expect(smsGate).toContain("isNotifyTestAllowlisted(normalizedEmail)");
+    expect(smsGate).toContain("No message sent.");
     const notificationsAt = bookings.indexOf("const notifications = {");
     const saved = bookings.slice(notificationsAt, bookings.indexOf("await docRef.update({", notificationsAt));
     expect(saved).not.toContain("passwordSetupLink");

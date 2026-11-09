@@ -32,7 +32,7 @@ import {
   sumLineItemPrices,
   type BookingPriceInput,
 } from "@shared/bookingPricing";
-import { BOOKING_PROCESSING_LABEL, estimateBookingCharge } from "@shared/invoiceProcessing";
+import { estimateBookingCharge, processingFeeLabel } from "@shared/invoiceProcessing";
 import SocialCountdownBanner from "@/components/SocialCountdownBanner";
 import { payAtCloseCustomerOffer, payAtCloseFeeDollars, type PayAtClosePublicOffer } from "@shared/payAtClose";
 import NewServiceAlert from "@/components/NewServiceAlert";
@@ -152,10 +152,10 @@ function publicDetailFeature(item: { id?: string; name?: string } | null | undef
   return feature.replace(/\b50(\s+images)\b/gi, "30$1");
 }
 
-function ProcessingEstimateLine({ amount }: { amount: number }) {
+function ProcessingEstimateLine({ amount, percent }: { amount: number; percent: number }) {
   return (
     <div data-testid="booking-processing-line" className="mb-3 flex items-baseline justify-between gap-3 text-[11px]">
-      <span className="min-w-0 font-bold text-gray-500">{BOOKING_PROCESSING_LABEL}</span>
+      <span className="min-w-0 font-bold text-gray-500">{processingFeeLabel(percent)}, charged on the invoice</span>
       <MoneyAmount className="font-black text-black">${amount.toFixed(2)}</MoneyAmount>
     </div>
   );
@@ -933,7 +933,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
           </div>
         )}
         {chargeProcessing && hasBookingSelection(bookingPriceInput()) && (
-          <ProcessingEstimateLine amount={estimate.processing} />
+          <ProcessingEstimateLine amount={estimate.processing} percent={pricing.processingPercent} />
         )}
         {payAtCloseFee > 0 && (
           <div className="mb-2 flex justify-between text-xs font-bold text-neutral-700">
@@ -1708,7 +1708,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
                  })}
                  <TravelFeeLine travel={travel} />
                  {chargeProcessing && hasBookingSelection(bookingPriceInput()) && (
-                   <ProcessingEstimateLine amount={estimate.processing} />
+                   <ProcessingEstimateLine amount={estimate.processing} percent={pricing.processingPercent} />
                  )}
                  {payAtCloseFee > 0 && (
                    <div className="flex justify-between text-xs font-bold text-neutral-700">
@@ -1789,8 +1789,8 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
                        onChange={() => setPaymentChoice("card")}
                      />
                      <span>
-                       <span className="block text-sm font-black text-black">Pay by card</span>
-                       <span className="block text-xs leading-relaxed text-gray-500">Square checkout on this same invoice. The card processing fee stays on when that fee is turned on.</span>
+                       <span className="block text-sm font-black text-black">Pay by card after the shoot</span>
+                       <span className="block text-xs leading-relaxed text-gray-500">Nothing is charged today. After your shoot we send your invoice with a secure Square card link. Card processing applies when it is turned on.</span>
                      </span>
                    </label>
                    <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-[#0d9488]/30 bg-[#f0fdfa] p-3">

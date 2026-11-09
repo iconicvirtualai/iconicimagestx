@@ -26,6 +26,7 @@ describe("booking confirmation screen", () => {
     expect(text).toContain("YOU'RE IN");
     expect(text).toContain("Order number");
     expect(text).toContain("ORD - L - 00534");
+    expect(text).toContain("We saved your appointment request. Nothing was charged today. Your invoice comes after the shoot.");
     expect(text).toContain("Save your order number. We'll reach out to confirm your shoot time.");
     expect(text).not.toMatch(/confirmation email/i);
     expect(text).not.toContain(INTERNAL_NOTE);
@@ -49,6 +50,7 @@ describe("booking confirmation screen", () => {
       />,
     );
     expect(html).toContain("ORD - B - 22017");
+    expect(html).toContain("We saved your appointment request. Nothing was charged today. Your invoice comes after the shoot.");
     expect(html).toContain("A confirmation email is on its way.");
     expect(html).toContain("A separate email has the link to set your portal password.");
     expect(html).not.toContain("password-setup");

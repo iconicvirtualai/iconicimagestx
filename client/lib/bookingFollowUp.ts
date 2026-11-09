@@ -55,7 +55,7 @@ const PORTAL_PATH = "Sign in at the client portal (/portal), or use Forgot passw
 
 export function bookingFollowUp(result: BookingSubmitResult) {
   const live = result.clientNotificationsLive === true;
-  const notes = ["We saved your appointment request."];
+  const notes = ["We saved your appointment request. Nothing was charged today. Your invoice comes after the shoot."];
   const emailStatus = result.notifications?.appointmentEmail;
   if (live && emailStatus === "sent") notes.push("A confirmation email is on its way.");
   else if (live) notes.push(`If the confirmation email does not arrive in a few minutes, call ${BUSINESS_CONTACT.phoneDisplay}.`);

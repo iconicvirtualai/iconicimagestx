@@ -759,23 +759,34 @@ router.post("/", async (req, res) => {
         return "failed" as const;
       });
 
-      // Order-received SMS to the client. Same carve-out as booking_received:
-      // not blocked by RED or a missing CLIENT_NOTIFY_LIVE.
+      // Client confirmation text uses the same CLIENT_NOTIFY_LIVE / RED check as
+      // other client mail and the admin text. An exact NOTIFY_TEST_ALLOWLIST
+      // address can still receive it. booking_received email is not part of this
+      // gate. smsAllowed still lets kind booking_confirmation through, so the
+      // route has to skip the Twilio call itself.
       if (phone) {
-        smsStatus = await sendSMS({
-          to: phone,
-          kind: "booking_confirmation",
-          body: SMS_TEMPLATES.bookingConfirmation(
-            firstName,
-            bookingDateLabel(scheduledDate, "TBD — we'll confirm shortly"),
-            displayAddress,
-            money(total)
-          ),
-        }).then((result) => ("suppressed" in result && result.suppressed ? "failed" as const : "sent" as const)).catch((err) => {
-          console.error("[Bookings] Confirmation SMS failed:", err);
-          const message = err instanceof Error ? err.message : String(err);
-          return /TWILIO_|not configured|not set/i.test(message) ? "not_configured" as const : "failed" as const;
-        });
+        const clientSmsAllowed = clientNotifyLive() || isNotifyTestAllowlisted(normalizedEmail);
+        if (!clientSmsAllowed) {
+          smsStatus = "gated";
+          console.info(
+            `[Bookings] Client confirmation SMS skipped for request ${docRef.id}. ${clientNotifyBlockReason()}. No message sent.`,
+          );
+        } else {
+          smsStatus = await sendSMS({
+            to: phone,
+            kind: "booking_confirmation",
+            body: SMS_TEMPLATES.bookingConfirmation(
+              firstName,
+              bookingDateLabel(scheduledDate, "TBD — we'll confirm shortly"),
+              displayAddress,
+              money(total)
+            ),
+          }).then((result) => ("suppressed" in result && result.suppressed ? "failed" as const : "sent" as const)).catch((err) => {
+            console.error("[Bookings] Confirmation SMS failed:", err);
+            const message = err instanceof Error ? err.message : String(err);
+            return /TWILIO_|not configured|not set/i.test(message) ? "not_configured" as const : "failed" as const;
+          });
+        }
       }
     }
 
