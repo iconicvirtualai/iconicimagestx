@@ -44,6 +44,7 @@ import {
 } from "../services/apprenticeshipHolds";
 import { releaseExpiredHeadshotHolds } from "../services/headshotHolds";
 import { nextOrderNumber } from "../services/orderNumbers";
+import { publicClientUrl } from "../../shared/publicSiteUrl";
 
 const router = Router();
 
@@ -54,10 +55,6 @@ const limiter = createRateLimiter({
 
 export function resetApprenticeshipRateLimit() {
   limiter.reset();
-}
-
-function appUrl() {
-  return process.env.APP_URL || "https://iconicimagestx.com";
 }
 
 const db = () => admin.firestore();
@@ -425,7 +422,7 @@ router.post("/order", async (req, res) => {
           scheduledDate: slot?.date || null,
           scheduledTime: slot?.time || value.preferredTime || null,
         },
-        adminUrl: `${appUrl()}/admin/orders`,
+        adminUrl: publicClientUrl("/admin/orders"),
       });
     } catch (error) {
       console.error("[Apprenticeship] Office notify failed:", error);

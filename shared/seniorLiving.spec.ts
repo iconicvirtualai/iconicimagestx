@@ -84,7 +84,10 @@ describe("senior living deposit math", () => {
     expect(quoted.ok).toBe(true);
     if (!quoted.ok) return;
     expect(quoted.quote.travel.travelQuoted).toBe(false);
+    expect(quoted.quote.travel.travelZone).toBe(1);
+    expect(quoted.quote.travel.travelFeeCents).toBe(0);
     expect(quoted.quote.travelLine.price).toBe(0);
+    expect(quoted.quote.travelLine.name).toContain("Zone 1");
     expect(quoted.quote.serviceSubtotal).toBe(250);
     expect(quoted.quote.processing).toBe(7);
     expect(quoted.quote.total).toBe(257);
@@ -162,6 +165,68 @@ describe("senior living request validation", () => {
     if (!parsed.ok) return;
     expect(parsed.value.services).toEqual(["tour-3d", "rooms"]);
     expect(parsed.value.email).toBe("ada@community.example");
+  });
+
+  it("accepts a Woodlands Zone 1 trip at $0 and still rejects an address with no price", () => {
+    const priced = parseSeniorLivingOrder({
+      tour: true,
+      roomCount: 0,
+      facilitySqft: 0,
+      community: "A Woodlands-area senior living community",
+      address: "9595 Six Pines Dr, The Woodlands, TX 77380",
+      name: "Ada Lovelace",
+      title: "Director",
+      phone: "281-555-0199",
+      email: "ada@community.example",
+      onsiteContact: "Front desk",
+      notes: "Front desk can let you in.",
+      scheduledDate: "2099-01-15",
+      scheduledTime: "9:00 AM",
+      hosting: "monthly-hosting",
+    });
+    expect(priced.ok).toBe(true);
+    if (!priced.ok) return;
+    expect(priced.quote.travel.travelZone).toBe(1);
+    expect(priced.quote.travel.travelFeeCents).toBe(0);
+    expect(priced.quote.travelLine.price).toBe(0);
+
+    const forcedZero = parseSeniorLivingOrder({
+      tour: true,
+      roomCount: 0,
+      facilitySqft: 0,
+      community: "A Woodlands-area senior living community",
+      address: "100 Oak St, Spring, TX 77380",
+      name: "Ada Lovelace",
+      title: "Director",
+      phone: "281-555-0199",
+      email: "ada@community.example",
+      onsiteContact: "Front desk",
+      notes: "",
+      scheduledDate: "2099-01-15",
+      scheduledTime: "9:00 AM",
+      hosting: "monthly-hosting",
+    });
+    expect(forcedZero.ok).toBe(true);
+
+    expect(parseSeniorLivingOrder({
+      tour: true,
+      roomCount: 0,
+      facilitySqft: 0,
+      community: "A Woodlands-area senior living community",
+      address: "123 Main St, Conroe, TX",
+      name: "Ada Lovelace",
+      title: "Director",
+      phone: "281-555-0199",
+      email: "ada@community.example",
+      onsiteContact: "Front desk",
+      notes: "",
+      scheduledDate: "2099-01-15",
+      scheduledTime: "9:00 AM",
+      hosting: "monthly-hosting",
+    })).toMatchObject({
+      ok: false,
+      error: "We could not price travel for that address. Call us and we will quote the trip.",
+    });
   });
 
   it("rejects a missing service, a bad email, and a short phone", () => {

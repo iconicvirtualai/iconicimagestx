@@ -134,9 +134,23 @@ export function assessTravel(value: unknown, zones: readonly TravelZone[] = TRAV
   return unresolved();
 }
 
+/**
+ * A zone and a numeric fee are a price. Zone 1 is $0, which is not the same
+ * as "no price". A quoted trip leaves the zone and the fee null.
+ * `travelQuoted` does not veto a fee that was already determined.
+ */
+export function travelPriceKnown(travel: TravelAssessment): boolean {
+  return typeof travel.travelZone === "number"
+    && Number.isFinite(travel.travelZone)
+    && travel.travelZone > 0
+    && typeof travel.travelFeeCents === "number"
+    && Number.isFinite(travel.travelFeeCents)
+    && travel.travelFeeCents >= 0;
+}
+
 export function travelFeeDollars(travel: TravelAssessment): number {
-  if (travel.travelQuoted || travel.travelFeeCents == null) return 0;
-  return travel.travelFeeCents / 100;
+  if (!travelPriceKnown(travel)) return 0;
+  return travel.travelFeeCents == null ? 0 : travel.travelFeeCents / 100;
 }
 
 export function travelCustomerLine(travel: TravelAssessment): TravelCustomerLine {

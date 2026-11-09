@@ -9,6 +9,7 @@ import { addressText } from "./addressText.ts";
 import { formatChicagoDate } from "./clientHome.ts";
 import { packagesForStaffEditor, type StaffCatalogPackage } from "./bookingCatalog.ts";
 import { orderChargeSummary, orderServiceLines, cleanPackageName, type OrderServiceLine } from "./orderPackageLines.ts";
+import { adjustmentKind } from "./invoiceFace.ts";
 import { isTravelFeeLine, travelTextForRecord } from "./travelZones.ts";
 
 export const NOT_PROVIDED = "Not provided";
@@ -63,8 +64,10 @@ export function officeNewOrderEmail(
   options?: { adminUrl?: string; catalog?: StaffCatalogPackage[] },
 ): OfficeOrderEmail {
   const catalog = options?.catalog ?? packagesForStaffEditor([]);
-  const lines = orderServiceLines(saved).filter((line) => !isTravelFeeLine(line));
+  const rawLines = orderServiceLines(saved);
+  const lines = rawLines.filter((line) => !isTravelFeeLine(line) && !isProcessingChargeLine(line));
   const charges = orderChargeSummary(saved, lines);
+  const processingAmount = officeProcessingAmount(saved, rawLines);
   const packageLine = lines.find((line) => !isAddOn(line, catalog)) || lines[0];
   const addOns = packageLine ? lines.filter((line) => line !== packageLine) : lines;
   const features = packageFeatures(packageLine, catalog);
@@ -80,6 +83,7 @@ export function officeNewOrderEmail(
   const requestedDate = firstDate(saved, ["scheduledDate", "requestedDate", "appointmentDate", "requestedDates"]);
   const clientName = clientNameOf(saved);
   const notes = notesOf(saved);
+  const subtotal = subtotalBeforeProcessing(saved, lines, processingAmount);
 
   const fields: Array<[string, string]> = [
     ["Order number", orderNumber],
@@ -106,7 +110,8 @@ export function officeNewOrderEmail(
     ["Turnaround", deliverables.turnaround],
     ["Add-ons", addOnText(addOns)],
     ["Travel", travelTextForRecord(saved, { miles: true }) ?? NOT_PROVIDED],
-    ["Subtotal", moneyField(saved, "subtotal", lines.length ? charges.subtotal : null)],
+    ["Subtotal", subtotal],
+    ...(processingAmount == null ? [] : [["Processing", formatMoney(processingAmount)] as [string, string]]),
     ["Tax", moneyField(saved, "tax", lines.length ? charges.tax : null)],
     ["Total", moneyField(saved, "total", lines.length ? charges.total : null)],
     ["Payment", paymentOf(saved, lines.length ? charges.total : null)],
@@ -195,10 +200,79 @@ function digits(value: string): string {
 }
 
 function notesOf(saved: Record<string, unknown>): string {
-  const parts = ["vibeNote", "notes", "specialInstructions", "internalNotes"]
-    .map((key) => text(saved[key]))
-    .filter(Boolean);
-  return parts.length ? parts.join("\n") : NOT_PROVIDED;
+  const seen = new Set<string>();
+  const lines: string[] = [];
+  for (const key of ["vibeNote", "notes", "specialInstructions", "internalNotes"]) {
+    const chunk = text(saved[key]);
+    if (!chunk) continue;
+    for (const line of chunk.split(/\n+/)) {
+      const trimmed = line.trim();
+      if (!trimmed || seen.has(trimmed)) continue;
+      seen.add(trimmed);
+      lines.push(trimmed);
+    }
+  }
+  return lines.length ? lines.join("\n") : NOT_PROVIDED;
+}
+
+function isProcessingChargeLine(item: { id?: string; name?: string }): boolean {
+  if (adjustmentKind(item) === "processing") return true;
+  const id = String(item.id || "");
+  if (id === "processing" || id === "adjustment-processing") return true;
+  return /^processing fee\b/i.test(String(item.name || "").trim());
+}
+
+/** Stored fee, or the processing line. Null when this order has no fee. */
+function officeProcessingAmount(
+  saved: Record<string, unknown>,
+  lines: OrderServiceLine[],
+): number | null {
+  const pricing = nested(saved.pricing);
+  const explicit = moneyOrNull(saved.processing) ?? moneyOrNull(pricing.processing);
+  if (explicit != null) return roundCents(explicit);
+  const feeLines = lines.filter((line) => isProcessingChargeLine(line));
+  if (feeLines.length === 0) return null;
+  return roundCents(feeLines.reduce((sum, line) => sum + line.price, 0));
+}
+
+/**
+ * Subtotal before the processing fee. A stored subtotal that matches the
+ * total already folded the fee in, so the fee comes back out in cents.
+ */
+function subtotalBeforeProcessing(
+  saved: Record<string, unknown>,
+  serviceLines: OrderServiceLine[],
+  processingAmount: number | null,
+): string {
+  const pricing = nested(saved.pricing);
+  const stored = moneyOrNull(saved.subtotal) ?? moneyOrNull(pricing.subtotal);
+  const total = moneyOrNull(saved.total) ?? moneyOrNull(pricing.total);
+  const tax = moneyOrNull(saved.tax) ?? moneyOrNull(pricing.tax) ?? 0;
+  const fromLines = serviceLines.length
+    ? roundCents(serviceLines.reduce((sum, line) => sum + line.price, 0))
+    : null;
+  if (
+    processingAmount != null
+    && processingAmount > 0
+    && total != null
+    && stored != null
+    && roundCents(stored) === roundCents(total)
+  ) {
+    return formatMoney(centsApart(total, processingAmount, tax));
+  }
+  if (fromLines != null && fromLines > 0) return formatMoney(fromLines);
+  if (stored != null) return formatMoney(roundCents(stored));
+  if (total != null) return formatMoney(centsApart(total, processingAmount ?? 0, tax));
+  return NOT_PROVIDED;
+}
+
+function centsApart(total: number, processing: number, tax: number): number {
+  const cents = Math.round(total * 100) - Math.round(processing * 100) - Math.round(tax * 100);
+  return cents / 100;
+}
+
+function roundCents(value: number): number {
+  return Math.round(value * 100) / 100;
 }
 
 function lockboxOf(saved: Record<string, unknown>): string {

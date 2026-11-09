@@ -122,6 +122,49 @@ describe("office new order email", () => {
     expect(email.text).toContain("Booked via: Site");
   });
 
+  it("prints a senior living note once and shows the processing fee after the subtotal", () => {
+    const note = "Front desk can let you in.";
+    const email = officeNewOrderEmail({
+      id: "sl1",
+      orderNumber: "ORD-L-10001",
+      clientName: "Ada Lovelace",
+      email: "ada@community.example",
+      phone: "281-555-0199",
+      address: "9595 Six Pines Dr, The Woodlands, TX 77380",
+      selectedService: "Senior Living",
+      lineItems: [
+        { id: "tour-3d", name: "3D tour", price: 250, qty: 1 },
+        { id: "travel-fee", name: "Travel fee — Zone 1", price: 0, qty: 1 },
+        { id: "processing", name: "Processing fee (2.8%)", price: 7, qty: 1 },
+      ],
+      subtotal: 257,
+      total: 257,
+      processing: 7,
+      tax: 0,
+      travelZone: 1,
+      travelMiles: 1.2,
+      travelFeeCents: 0,
+      travelQuoted: false,
+      notes: note,
+      vibeNote: `Community: Example\n${note}`,
+      scheduledDate: "2099-01-15",
+      source: "senior-living",
+      leadSource: "Senior living page",
+    }, {
+      adminUrl: "https://iconicimagestx.vercel.app/admin/orders",
+    });
+    expect(email.text.match(/Front desk can let you in\./g)).toHaveLength(1);
+    expect(email.html.match(/Front desk can let you in\./g)).toHaveLength(1);
+    expect(email.text).toContain("Subtotal: $250.00");
+    expect(email.text).toContain("Processing: $7.00");
+    expect(email.text).toContain("Total: $257.00");
+    expect(email.text.indexOf("Subtotal:")).toBeLessThan(email.text.indexOf("Processing:"));
+    expect(email.text.indexOf("Processing:")).toBeLessThan(email.text.indexOf("Total:"));
+    expect(email.text).toContain("Travel: FREE (Zone 1)");
+    expect(email.text).not.toContain("Add-ons: Processing fee");
+    expect(email.text).toContain("Admin link: https://iconicimagestx.vercel.app/admin/orders");
+  });
+
   it("prints the stored travel quote and miles on their own line", () => {
     const zoned = officeNewOrderEmail({
       ...saved,
