@@ -31,11 +31,23 @@ export const STUDIO105_APP_SOURCES = [
 export const STUDIO105_SEO_DESCRIPTION =
   "Studio Noir and Studio Blanc at Studio 105 in Spring, Texas. Request a room and a time. We confirm availability and the rate.";
 
+/** Saved on the booking as leadSource. The API uses this to skip client mail. */
+export const STUDIO105_LEAD_SOURCE = "Studio 105";
+
 export const STUDIO_ROOM_IDS = ["studio-noir", "studio-blanc"] as const;
 export type StudioRoomId = (typeof STUDIO_ROOM_IDS)[number];
 
 export function isStudioRoomId(value: string): value is StudioRoomId {
   return (STUDIO_ROOM_IDS as readonly string[]).includes(value);
+}
+
+/**
+ * Studio 105 room requests must not send booking_received.
+ * That template is excluded from the client-notice pause, so the lead source
+ * is the skip. Other booking forms do not set this source.
+ */
+export function isStudio105Request(leadSource: unknown): boolean {
+  return typeof leadSource === "string" && leadSource.trim() === STUDIO105_LEAD_SOURCE;
 }
 
 /** Same uncataloged studio line the order form already accepts. The room is in the name. */
@@ -73,7 +85,7 @@ export function studioRoomRequestBody(input: {
     scheduledDate: input.preferredDate,
     scheduledTime: input.preferredTime,
     vibeNote: note,
-    leadSource: "Studio 105",
+    leadSource: STUDIO105_LEAD_SOURCE,
     accessMethod: "Studio 105",
     propertyStatus: "Not specified",
     furnishingStatus: "Not specified",

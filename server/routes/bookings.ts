@@ -78,6 +78,7 @@ import {
 } from "../../shared/realestate75";
 import { createHolidayCalendarEvent, deleteHolidayCalendarEvent } from "../services/holidayCalendar";
 import { backfillHolidayCalendarEvents } from "../services/holidayCalendarBackfill";
+import { isStudio105Request } from "../../shared/studio105";
 import { isPreferredWindowBooking, resolveBookingAssignment } from "../../shared/bookingAvailability";
 import { suggestedAppointmentsAreEnabled } from "../services/suggestedAppointmentsFlag";
 import { BUSINESS_CONTACT } from "../../shared/businessContact";
@@ -651,6 +652,10 @@ router.post("/", async (req, res) => {
     let smsStatus: "sent" | "failed" | "skipped" | "not_configured" | "gated" = phone ? "failed" : "skipped";
     const shownTime = requestedTimeLabel || (typeof scheduledTime === "string" ? scheduledTime : "");
     const isThankfulRsvp = leadSource === HOLIDAY_RSVP_LEAD;
+    // booking_received is not covered by the client-notice pause. Studio 105
+    // requests skip that client email and the matching client text. Staff
+    // still get the office new-request notice below.
+    const studio105Request = isStudio105Request(leadSource);
     const holidayMailKind = holidayCheckoutKind(leadSource, total);
     const holidayHtml = holidayMailKind === "none" || isThankfulRsvp ? "" : holidayOrderReceivedHtml({
       clientName,
@@ -714,6 +719,12 @@ router.post("/", async (req, res) => {
         // No booking_confirmation SMS for Thankful RSVPs — the email is the appointment confirm.
         smsStatus = phone ? "gated" : "skipped";
       }
+    } else if (studio105Request) {
+      clientEmailStatus = "gated";
+      smsStatus = phone ? "gated" : "skipped";
+      console.info(
+        `[Bookings] Studio 105 request ${docRef.id} was saved. booking_received was not sent.`,
+      );
     } else {
       // Order-received confirmation to the client. booking_received is excluded from the
       // RED blast kill and sends even when CLIENT_NOTIFY_LIVE is unset.

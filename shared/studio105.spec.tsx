@@ -5,7 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 import { BUSINESS_CONTACT } from "./businessContact";
 import { resolveSubmittedBooking, unpricedCatalogBookingError } from "./bookingPricing";
 import { metaPlan } from "./siteSeo";
-import { studioRoomRequestBody } from "./studio105";
+import { isStudio105Request, studioRoomRequestBody } from "./studio105";
 import Studio105 from "../client/pages/Studio105";
 import Header from "../client/components/Header";
 
@@ -28,6 +28,9 @@ describe("Studio 105 microsite", () => {
     expect(resolved.lineItems.map((item) => item.price)).toEqual([0]);
     expect(JSON.stringify(body)).not.toMatch(/paymentMethod|pay_at_close|CLIENT_NOTIFY|BOOKING_NOTIFY/);
     expect(body.address).toBe(BUSINESS_CONTACT.address);
+    expect(isStudio105Request(body.leadSource)).toBe(true);
+    expect(isStudio105Request("Iconic temporary booking page")).toBe(false);
+    expect(isStudio105Request(undefined)).toBe(false);
   });
 
   it("renders its own shell, rooms, and request form", () => {

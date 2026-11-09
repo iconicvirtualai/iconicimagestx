@@ -249,6 +249,46 @@ async function postBooking() {
 }
 
 describe("public booking calendar hold", () => {
+  it("saves a Studio 105 request without a client email when notice flags are unset", async () => {
+    expect(process.env.CLIENT_NOTIFY_LIVE).toBeUndefined();
+    expect(process.env.BOOKING_NOTIFY_LIVE).toBeUndefined();
+    expect(process.env.THANKFUL_RSVP_CONFIRM_LIVE).toBeUndefined();
+    availability.mockResolvedValue({
+      live: false,
+      slots: [],
+      suggestions: [],
+      durationMinutes: 90,
+      bufferMinutes: 30,
+      driveMode: "buffer",
+    });
+
+    const response = await fetch(`${baseUrl}/api/bookings`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        firstName: "Ada",
+        lastName: "Lovelace",
+        email: "ada@example.com",
+        phone: "281-555-0199",
+        address: "26410 Oakridge Dr. Ste 105 - 108, Spring, TX 77380",
+        leadSource: "Studio 105",
+        selectedService: "Studio booking / pre-sale — Studio Noir",
+        lineItems: [{ name: "Studio booking / pre-sale — Studio Noir", price: 0 }],
+        total: 0,
+        scheduledDate: "2026-12-02",
+        scheduledTime: "10:00 AM",
+        accessMethod: "Studio 105",
+      }),
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(201);
+    expect(body.success).toBe(true);
+    expect(sent.filter((message) => message.to.includes("ada@example.com"))).toEqual([]);
+    expect(sent.some((message) => message.to.includes("office@iconicimagestx.com"))).toBe(true);
+    expect(sent.some((message) => /booking received|your iconic order/i.test(message.subject))).toBe(false);
+  });
+
   it("saves the order when the calendar insert throws and stores no secrets or headers", async () => {
     expect(process.env.CLIENT_NOTIFY_LIVE).not.toBe("true");
     const message = `Calendar insert failed ${"x".repeat(400)}`;

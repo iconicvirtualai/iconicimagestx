@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { createOrder } from "@/lib/createOrder";
 import { trackConversion } from "@/lib/tracking";
 import { BUSINESS_CONTACT } from "@shared/businessContact";
-import { isStudioRoomId, studioRoomRequestName, type StudioRoomId } from "@shared/studio105";
+import { isStudioRoomId, STUDIO105_LEAD_SOURCE, studioRoomRequestName, type StudioRoomId } from "@shared/studio105";
 
 const ROOMS: Array<{ id: StudioRoomId; name: string }> = [
   { id: "studio-noir", name: "Studio Noir" },
@@ -61,7 +61,7 @@ export default function Studio105BookForm() {
           notes.trim(),
           "Request only. Confirm availability and the rate. Do not charge a card.",
         ].filter(Boolean).join("\n"),
-        leadSource: "Studio 105",
+        leadSource: STUDIO105_LEAD_SOURCE,
         accessInfo: "Studio 105",
         propertyStatus: "Not specified",
         furnishingStatus: "Not specified",
