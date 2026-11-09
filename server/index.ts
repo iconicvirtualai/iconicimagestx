@@ -53,6 +53,7 @@ import { handleGetPublicPortalListing } from "./routes/portalListing";
 import presentationsRouter, { handlePresentationShell } from "./routes/presentations";
 import { handleGetListingSite, handleListingSiteInquiry, handleListingSiteShell } from "./routes/listingSite";
 import photoEditRequestsRouter from "./routes/photoEditRequests";
+import photosInboxRouter from "./routes/photosInbox";
 import { mountOwners } from "./routes/owners";
 import siteContentRouter from "./routes/siteContent";
 import insightsRouter, { handleInsightShell } from "./routes/insights";
@@ -299,6 +300,7 @@ export function createServer() {
   app.use("/api", presentationsRouter);
   app.use("/api/listings", listingsRouter);
   app.use("/api", photoEditRequestsRouter);
+  app.use("/api/task-board", photosInboxRouter);
   app.use("/api/campaigns", campaignsRouter);
   app.use("/api/marketing", marketingRouter);
   app.use("/api/marketing", marketingCampaignsRouter);

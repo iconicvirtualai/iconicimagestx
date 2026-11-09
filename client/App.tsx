@@ -6,7 +6,9 @@ import AdminAicon from "@/pages/AdminAicon";
 import AdminAutomation from "@/pages/AdminAutomation";
 import AdminSchedule from "@/pages/AdminSchedule";
 import AdminOrders from "@/pages/AdminOrders";
-import AdminHolidayRsvps from "@/pages/AdminHolidayRsvps";
+import AdminTaskBoard from "@/pages/AdminTaskBoard";
+import AdminContent from "@/pages/AdminContent";
+import AdminEvents, { HolidayRsvpsRedirect } from "@/pages/AdminEvents";
 import OwnersSuite from "@/pages/OwnersSuite";
 
 import "./global.css";
@@ -283,7 +285,11 @@ const App = () => (
             <Route path="/admin/automation" element={<ProtectedRoute requiredRole="admin"><AdminAutomation /></ProtectedRoute>} />
             <Route path="/admin/schedule" element={<ProtectedRoute requiredRole="coordinator"><AdminSchedule /></ProtectedRoute>} />
             <Route path="/admin/orders" element={<ProtectedRoute requiredRole="coordinator"><AdminOrders /></ProtectedRoute>} />
-            <Route path="/admin/holiday-rsvps" element={<ProtectedRoute requiredRole="coordinator"><AdminHolidayRsvps /></ProtectedRoute>} />
+            <Route path="/admin/tasks" element={<ProtectedRoute requiredRole="admin"><AdminTaskBoard /></ProtectedRoute>} />
+            <Route path="/admin/content" element={<ProtectedRoute requiredRole="admin"><AdminContent /></ProtectedRoute>} />
+            <Route path="/admin/events" element={<ProtectedRoute requiredRole="coordinator"><AdminEvents /></ProtectedRoute>} />
+            <Route path="/admin/events/:eventId" element={<ProtectedRoute requiredRole="coordinator"><AdminEvents /></ProtectedRoute>} />
+            <Route path="/admin/holiday-rsvps" element={<HolidayRsvpsRedirect />} />
             <Route path="/admin/owners" element={<OwnersSuite />} />
             <Route path="/owners" element={<OwnersSuite />} />
 

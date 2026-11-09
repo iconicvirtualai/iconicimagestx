@@ -9,6 +9,14 @@ import { HOLIDAY_RSVP_LEAD } from "@shared/holidayCheckout";
 import { holidayRsvpBoard, type HolidayBackfillReport, type HolidayRsvpRow } from "@shared/holidayCalendar";
 
 export default function AdminHolidayRsvps() {
+  return (
+    <AdminLayout title="Holiday RSVPs">
+      <HolidayRsvpPanel />
+    </AdminLayout>
+  );
+}
+
+export function HolidayRsvpPanel() {
   const { user } = useAuth();
   const [rows, setRows] = React.useState<HolidayRsvpRow[]>([]);
   const [totalHeadcount, setTotalHeadcount] = React.useState(0);
@@ -48,16 +56,15 @@ export default function AdminHolidayRsvps() {
   }, []);
 
   return (
-    <AdminLayout title="Holiday RSVPs">
-      <div className="pb-10">
-        <p className="mb-4 max-w-2xl text-sm font-bold text-gray-500">
-          Thankful client holiday event RSVPs for Sat, Nov 7. Photo times are on the photos calendar.
-        </p>
+    <div className="pb-10">
+      <p className="mb-4 max-w-2xl text-sm font-bold text-gray-500">
+        Thankful client holiday event RSVPs for Sat, Nov 7. Photo times are on the photos calendar.
+      </p>
         {loading ? (
           <div className="flex items-center justify-center py-24"><div className="w-6 h-6 border-2 border-[#0d9488] border-t-transparent rounded-full animate-spin" /></div>
         ) : (
           <>
-            {error ? <p role="alert" className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-800">{error}</p> : null}
+            {error ? <p role="alert" className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-800">{error}</p> : (
             <HolidayRsvpTable
               rows={rows}
               totalHeadcount={totalHeadcount}
@@ -66,9 +73,9 @@ export default function AdminHolidayRsvps() {
               report={report}
               reportError={reportError}
             />
+            )}
           </>
         )}
-      </div>
-    </AdminLayout>
+    </div>
   );
 }

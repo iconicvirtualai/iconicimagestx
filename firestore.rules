@@ -415,6 +415,35 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // ─── Task board ──────────────────────────────────────────────────────────
+    // Admin checklist: manual tasks plus saved order, assignee, stage,
+    // priority, due date, and dismissals. Clients cannot read this.
+    // Publish this file in the Firebase console. Vercel does not deploy rules.
+    // Nothing in this collection sends email or texts.
+    match /taskBoardItems/{itemId} {
+      allow read: if isCoordinator();
+      allow create: if isAdmin() || (
+        isCoordinator() &&
+        request.resource.data.eventId is string &&
+        request.resource.data.eventId.size() > 0
+      );
+      allow update: if isAdmin() || (
+        isCoordinator() &&
+        resource.data.eventId is string &&
+        resource.data.eventId.size() > 0 &&
+        request.resource.data.eventId == resource.data.eventId
+      );
+      allow delete: if isAdmin();
+    }
+
+    // Office events. Thankful stays in the app. Coordinators plan the rest.
+    // Publish this file in the Firebase console. Vercel does not deploy rules.
+    match /officeEvents/{eventId} {
+      allow read: if isCoordinator();
+      allow create, update: if isCoordinator();
+      allow delete: if isAdmin();
+    }
+
     // ─── Catch-all: deny everything else ─────────────────────────────────────
     match /{document=**} {
       allow read, write: if false;

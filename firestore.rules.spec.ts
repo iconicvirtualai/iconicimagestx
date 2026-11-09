@@ -17,6 +17,22 @@ describe("client hub firestore rules", () => {
   });
 });
 
+describe("task board firestore rules", () => {
+  const rules = readFileSync("firestore.rules", "utf8");
+
+  it("lets coordinators read the checklist and write only event tasks", () => {
+    const board = rules.indexOf("match /taskBoardItems/{itemId}");
+    const events = rules.indexOf("match /officeEvents/{eventId}");
+    const catchAll = rules.indexOf("match /{document=**}");
+    expect(board).toBeGreaterThan(-1);
+    expect(events).toBeGreaterThan(board);
+    expect(events).toBeLessThan(catchAll);
+    expect(rules).toMatch(/match \/taskBoardItems\/\{itemId\}[\s\S]*allow read: if isCoordinator\(\)/);
+    expect(rules).toMatch(/match \/officeEvents\/\{eventId\}[\s\S]*allow read: if isCoordinator\(\)/);
+    expect(rules).toMatch(/request\.resource\.data\.eventId/);
+  });
+});
+
 describe("communications firestore rules", () => {
   const rules = readFileSync("firestore.rules", "utf8");
 
