@@ -98,7 +98,11 @@ export function framesFromListingImages(images: unknown): StudioFrame[] {
 export const AI_EDIT_SAMPLE_NOTE =
   "Sample layout only. Queue AI Edit calls OpenAI when this listing is loaded from the studio.";
 
-/** Output sizes the Images edit API documents for gpt-image-1. */
+/**
+ * Standard Images edit sizes gpt-image-2.5-sunburst still accepts.
+ * 1024x1024, 1536x1024, and 1024x1536 are multiples of 16, inside a 1:3–3:1
+ * aspect ratio, and between 655,360 and 8,294,400 pixels.
+ */
 export type ListingEditSize = "1024x1024" | "1536x1024" | "1024x1536";
 
 export const RAW_IMPORT_LABEL = "RAW — import for AI queue";

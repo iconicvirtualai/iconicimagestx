@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { AI_EDIT_MISSING_KEY_NOTE, realEstateEditPrompt } from "../../shared/iconicStudio";
 import { orderExteriorTwilightPrompt } from "../../shared/orderEditPlan";
 import { GRASS_REPLACE_PROMPT } from "../../shared/studioScratch";
-import { OPENAI_IMAGE_EDITS_URL } from "./openaiImageEdit";
+import { OPENAI_IMAGE_EDIT_MODEL, OPENAI_IMAGE_EDITS_URL } from "./openaiImageEdit";
 import { editScratchPhoto, grassReferenceStatus } from "./studioScratch";
 
 const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xd9, ...Buffer.alloc(40, 1)]);
@@ -16,7 +16,7 @@ describe("scratch photo edit", () => {
       expect(url).toBe(OPENAI_IMAGE_EDITS_URL);
       const form = init.body as FormData;
       expect(form.get("prompt")).toBe(realEstateEditPrompt("Clear the window glare"));
-      expect(form.get("model")).toBe("gpt-image-1");
+      expect(form.get("model")).toBe(OPENAI_IMAGE_EDIT_MODEL);
       expect(form.get("image")).toBeInstanceOf(Blob);
       return new Response(JSON.stringify({ data: [{ b64_json: jpeg.toString("base64") }] }), { status: 200 });
     });

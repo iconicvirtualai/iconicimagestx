@@ -1,18 +1,48 @@
 /**
  * Iconic Studio image edits via OpenAI's Images API.
- * POST https://api.openai.com/v1/images/edits with gpt-image-1.
- * A finished order JPEG is inspected with the same API key via chat completions.
+ * POST https://api.openai.com/v1/images/edits with gpt-image-2.5-sunburst.
+ * gpt-image-1 was shut down on 2026-10-23. Override the edit model with
+ * OPENAI_IMAGE_EDIT_MODEL. A finished order JPEG is inspected with the same
+ * API key via chat completions (default gpt-4o-mini, override
+ * OPENAI_INSPECTION_MODEL). gpt-4o-mini shuts down on 2027-01-14.
+ *
+ * Edit body for gpt-image-2.5-sunburst: n=1, quality=medium, output_format=jpeg,
+ * output_compression=85, and a standard size (1024x1024, 1536x1024, or
+ * 1024x1536). Those sizes stay valid: edges are multiples of 16, the aspect
+ * ratio is inside 1:3–3:1, and the pixel count is inside 655,360–8,294,400.
+ * input_fidelity is omitted. The edits reference tells callers to omit it for
+ * gpt-image-2, and the image prompting guide says to omit it on image edits.
+ * GPT Image 2 and later already keep input images at high fidelity.
+ *
  * The API key stays on the server. This does not train a model or use Assistants.
  */
 
 import { AI_EDIT_TIMEOUT_NOTE, listingPhotoEditSize, type ListingEditSize } from "../../shared/iconicStudio";
 
 export const OPENAI_IMAGE_EDITS_URL = "https://api.openai.com/v1/images/edits";
-export const OPENAI_IMAGE_EDIT_MODEL = "gpt-image-1";
 export const OPENAI_IMAGE_EDIT_TIMEOUT_MS = 45_000;
 export const OPENAI_CHAT_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions";
-export const OPENAI_INSPECTION_MODEL = "gpt-4o-mini";
 export const OPENAI_INSPECTION_TIMEOUT_MS = 20_000;
+
+const DEFAULT_OPENAI_IMAGE_EDIT_MODEL = "gpt-image-2.5-sunburst";
+const DEFAULT_OPENAI_INSPECTION_MODEL = "gpt-4o-mini";
+
+function modelFromEnv(value: string | undefined, fallback: string): string {
+  const trimmed = typeof value === "string" ? value.trim() : "";
+  return trimmed || fallback;
+}
+
+/** Trimmed OPENAI_IMAGE_EDIT_MODEL, or gpt-image-2.5-sunburst when unset. */
+export const OPENAI_IMAGE_EDIT_MODEL = modelFromEnv(
+  process.env.OPENAI_IMAGE_EDIT_MODEL,
+  DEFAULT_OPENAI_IMAGE_EDIT_MODEL,
+);
+
+/** Trimmed OPENAI_INSPECTION_MODEL, or gpt-4o-mini when unset. */
+export const OPENAI_INSPECTION_MODEL = modelFromEnv(
+  process.env.OPENAI_INSPECTION_MODEL,
+  DEFAULT_OPENAI_INSPECTION_MODEL,
+);
 
 /** Issues a finished listing JPEG may be flagged for. Nothing else. */
 export const DELIVERY_INSPECTION_NOTES = [
@@ -175,7 +205,6 @@ export async function editListingPhotoWithOpenAI(input: {
   form.append("quality", "medium");
   form.append("output_format", "jpeg");
   form.append("output_compression", "85");
-  form.append("input_fidelity", "high");
 
   const fetchImpl = input.fetchImpl || fetch;
   const timeoutMs = input.timeoutMs ?? OPENAI_IMAGE_EDIT_TIMEOUT_MS;
