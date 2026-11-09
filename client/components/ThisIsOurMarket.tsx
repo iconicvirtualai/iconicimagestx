@@ -51,9 +51,9 @@ export default function ThisIsOurMarket() {
       <div className="absolute top-0 right-0 w-[40%] h-[100%] bg-teal-500/5 -skew-x-12 transform origin-top-right -z-10 blur-3xl opacity-30"></div>
 
       <div className="container mx-auto px-4 relative z-10">
-        <div className="flex flex-col lg:flex-row items-center gap-12 max-w-6xl mx-auto">
+        <div className="mx-auto flex w-full max-w-6xl flex-col items-center gap-12 lg:flex-row">
           {/* Left: Text Content */}
-          <div className="w-full lg:w-[46%] text-left">
+          <div className="w-full text-left lg:w-[46%] lg:shrink-0">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
@@ -94,53 +94,51 @@ export default function ThisIsOurMarket() {
             </motion.div>
           </div>
 
-          {/* Right: a smaller, faded underlay sits off-center; the services card is the focal point */}
-          <div ref={columnRef} className="relative isolate min-h-[36rem] w-full overflow-hidden rounded-[1.75rem] lg:min-h-[40rem] lg:w-[54%] lg:self-stretch">
-            <video
-              src={underlaySrc}
-              data-site-page="home"
-              data-site-block="market"
-              data-site-field="underlay"
-              data-site-kind="video"
-              className="pointer-events-none absolute -right-[8%] top-[6%] h-[58%] w-[68%] rounded-[1.6rem] object-cover opacity-30 sm:top-[10%] sm:h-[62%] sm:w-[72%]"
-              autoPlay
-              muted
-              loop
-              playsInline
-              preload="metadata"
-              aria-hidden="true"
-              onLoadedMetadata={(event) => armMarketVideo(event.currentTarget)}
-              onPlay={(event) => armMarketVideo(event.currentTarget)}
-            />
-            <div className="relative z-10 flex h-full min-h-[36rem] items-end justify-start p-3 sm:p-6 lg:min-h-[40rem] lg:items-center">
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                whileInView={{ opacity: 1, scale: 1 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.8 }}
-                className="w-[min(100%,420px)] translate-x-1 translate-y-3 rounded-[1.85rem] border-[7px] border-[#111] bg-black shadow-2xl sm:translate-y-6"
-              >
-                <div className="relative aspect-[3/4] overflow-hidden rounded-[1.15rem]">
-                  <video
-                    src={videoSrc}
-                    poster={poster}
-                    data-site-page="home"
-                    data-site-block="market"
-                    data-site-field="video"
-                    data-site-kind="video"
-                    className="absolute inset-0 h-full w-full object-cover"
-                    autoPlay
-                    muted
-                    loop
-                    playsInline
-                    preload="metadata"
-                    aria-label="Iconic services"
-                    onLoadedMetadata={(event) => armMarketVideo(event.currentTarget)}
-                    onPlay={(event) => armMarketVideo(event.currentTarget)}
-                  />
-                </div>
-              </motion.div>
+          {/* Right: back card up and to the right; front portrait overlaps its lower-left */}
+          <div ref={columnRef} className="relative mx-auto aspect-[312/413] w-full min-w-0 max-w-[26rem] lg:mx-0 lg:w-auto lg:max-w-[34rem] lg:flex-1">
+            <div className="absolute left-[38%] top-0 h-[71%] w-[62%] overflow-hidden rounded-[1.35rem] border-[3px] border-[#75bed4]">
+              <video
+                src={underlaySrc}
+                data-site-page="home"
+                data-site-block="market"
+                data-site-field="underlay"
+                data-site-kind="video"
+                className="pointer-events-none h-full w-full object-cover"
+                autoPlay
+                muted
+                loop
+                playsInline
+                preload="metadata"
+                aria-hidden="true"
+                onLoadedMetadata={(event) => armMarketVideo(event.currentTarget)}
+                onPlay={(event) => armMarketVideo(event.currentTarget)}
+              />
             </div>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.8 }}
+              className="absolute left-0 top-[25%] z-10 h-[75%] w-[74%] overflow-hidden rounded-2xl border-[5px] border-[#111] bg-[#111] shadow-[0_10px_24px_rgba(0,0,0,0.32)]"
+            >
+              <video
+                src={videoSrc}
+                poster={poster}
+                data-site-page="home"
+                data-site-block="market"
+                data-site-field="video"
+                data-site-kind="video"
+                className="h-full w-full object-cover"
+                autoPlay
+                muted
+                loop
+                playsInline
+                preload="metadata"
+                aria-label="Iconic services"
+                onLoadedMetadata={(event) => armMarketVideo(event.currentTarget)}
+                onPlay={(event) => armMarketVideo(event.currentTarget)}
+              />
+            </motion.div>
           </div>
         </div>
       </div>
