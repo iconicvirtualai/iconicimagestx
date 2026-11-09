@@ -55,6 +55,25 @@ describe("booking_received stays on under RED", () => {
     expect(emailAllowed("office_new_order", { CLIENT_COMMS_ZONE: "RED" }, "client")).toBe(false);
   });
 
+  it("lets contact_form through for staff when flags are unset or RED, and keeps the client auto-reply gated", () => {
+    const qa = { NOTIFY_TEST_ALLOWLIST: "ops+deliveryqa@iconicimagestx.com" };
+    expect(emailAllowed("contact_form", {}, "staff")).toBe(true);
+    expect(emailAllowed("contact_form", { CLIENT_COMMS_ZONE: "RED" }, "staff")).toBe(true);
+    expect(emailAllowed("contact_form", { CLIENT_NOTIFY_LIVE: "true", CLIENT_COMMS_ZONE: "RED" }, "staff")).toBe(true);
+    expect(emailAllowed("contact_form", qa, "staff")).toBe(true);
+    expect(emailAllowed("contact_form", {})).toBe(false);
+    expect(emailAllowed("contact_form", { CLIENT_COMMS_ZONE: "RED" })).toBe(false);
+    expect(emailAllowed("contact_form", { CLIENT_NOTIFY_LIVE: "true", CLIENT_COMMS_ZONE: "RED" }, "client")).toBe(false);
+    expect(emailAllowed("contact_form", qa)).toBe(false);
+    expect(emailAllowed("contact_confirmation", {})).toBe(false);
+    expect(emailAllowed("contact_confirmation", { CLIENT_COMMS_ZONE: "RED" })).toBe(false);
+    expect(emailAllowed("contact_confirmation", qa)).toBe(false);
+    expect(emailAllowed("contact_confirmation", { ...qa, CLIENT_NOTIFY_LIVE: "true", CLIENT_COMMS_ZONE: "RED" })).toBe(false);
+    expect(emailAllowed("contact_confirmation", { CLIENT_NOTIFY_LIVE: "true" })).toBe(true);
+    expect(emailAllowed("marketing", qa)).toBe(false);
+    expect(emailAllowed("booking_received", qa)).toBe(true);
+  });
+
   it("sends the client bookingConfirmation SMS with no flags set and while the zone is RED", () => {
     expect(smsAllowed("booking_confirmation", {})).toBe(true);
     expect(smsAllowed("booking_confirmation", { CLIENT_COMMS_ZONE: "RED" })).toBe(true);
