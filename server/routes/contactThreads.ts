@@ -2,6 +2,7 @@ import { Router } from "express";
 import { clientIp } from "../lib/clientIp";
 import { createRateLimiter } from "../lib/rateLimit";
 import { requireCoordinator, type AuthenticatedRequest } from "../middleware/auth";
+import { alertStaffOfVisitorThread } from "../services/contactThreadAlert";
 import { LIVE_CHAT_MAX_PER_WINDOW, LIVE_CHAT_WINDOW_MS, parseLiveChatBody } from "../services/liveChat";
 import { BUSINESS_CONTACT } from "../../shared/businessContact";
 import {
@@ -34,7 +35,12 @@ function threadToken(req: { header(name: string): string | undefined }): string 
 /**
  * Portal contact thread.
  * The site widget and the staff communications page share these messages.
- * This router does not email, text, or send marketing.
+ * A new visitor thread alerts staff once. A later visitor message alerts
+ * staff at most once every 10 minutes, and an office-wide cap limits how
+ * many of those alerts can reach the office line. Staff replies do not alert.
+ * Alerts go only to the office email and Google Voice. A failed alert is
+ * logged and does not fail the visitor's post. This router does not email,
+ * text, or send marketing to the visitor.
  */
 
 router.get("/staff/threads", requireCoordinator, async (_req, res) => {
@@ -115,10 +121,12 @@ router.post("/threads", async (req, res) => {
       }
       const continued = await continueClientThread(threadId, accessToken, parsed.value);
       if (!continued) return res.status(404).json({ error: "Conversation not found." });
+      await alertStaffOfVisitorThread(continued.thread.id, parsed.value);
       return res.json(continued);
     }
 
     const created = await startClientThread(parsed.value);
+    await alertStaffOfVisitorThread(created.thread.id, parsed.value);
     return res.status(201).json(created);
   } catch (error) {
     console.error("[ContactThread] Client message failed.", error);

@@ -298,6 +298,7 @@ function getFallbackTemplate(
       <div style="background:#f8fafc;padding:15px;border-left:4px solid #0d9488;color:#333;line-height:1.6;">
         ${(vars.message || "").replace(/\n/g, "<br>")}
       </div>
+      ${vars.adminUrl ? `<p style="margin-top:24px;"><a href="${vars.adminUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">Open this chat</a></p>` : ""}
     `),
   };
   void BUSINESS_CONTACT.line;

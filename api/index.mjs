@@ -2533,6 +2533,7 @@ function getFallbackTemplate(type, vars) {
       <div style="background:#f8fafc;padding:15px;border-left:4px solid #0d9488;color:#333;line-height:1.6;">
         ${(vars.message || "").replace(/\n/g, "<br>")}
       </div>
+      ${vars.adminUrl ? `<p style="margin-top:24px;"><a href="${vars.adminUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">Open this chat</a></p>` : ""}
     `)
   };
   return templates[type] || base(`<p>You have a new notification from Iconic Images.</p>`);
@@ -30201,13 +30202,34 @@ function oneLine(value) {
 function escapeHtml$4(value) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
-function liveChatSmsBody(input) {
+function liveChatSmsBody(input, adminUrl) {
   const reply = [input.email, input.phone].filter(Boolean).join(" | ") || "no reply path";
   const text2 = input.message.replace(/\s+/g, " ").trim().slice(0, 280);
-  return `Iconic live chat
+  const head = `Iconic live chat
 ${oneLine(input.name).slice(0, 80)}
 ${reply}
-${text2}`.slice(0, 640);
+${text2}`;
+  if (!adminUrl) return head.slice(0, 640);
+  const link = oneLine(adminUrl);
+  const room = Math.max(0, 640 - link.length - 1);
+  return `${head.slice(0, room)}
+${link}`.slice(0, 640);
+}
+function clipStaffMessage(message, limit) {
+  if (!limit || message.length <= limit) return message;
+  return `${message.slice(0, limit)}...`;
+}
+function withAdminLink(message, adminUrl) {
+  if (!adminUrl) return message;
+  return `${message}
+
+Open the chat: ${adminUrl}`;
+}
+function staffReplyTo(replyTo, staffTo) {
+  const candidate = replyTo?.trim();
+  if (!candidate || !EMAIL_RE.test(candidate)) return void 0;
+  if (candidate.toLowerCase() === staffTo.trim().toLowerCase()) return void 0;
+  return candidate;
 }
 class LiveChatDeliveryError extends Error {
   code;
@@ -30223,13 +30245,19 @@ function isMissingTransport(err) {
   const message = err instanceof Error ? err.message : "";
   return /Twilio credentials not configured|TWILIO_PHONE_NUMBER not set|SMTP is not configured/i.test(message);
 }
-async function deliverLiveChat(input) {
+async function deliverLiveChat(input, options = {}) {
   const to = liveChatStaffEmail();
+  if (input.email && to.trim().toLowerCase() === input.email.trim().toLowerCase()) {
+    throw new LiveChatDeliveryError("Refusing to email the visitor.", "failed");
+  }
+  const replyTo = staffReplyTo(options.replyTo, to);
+  const message = withAdminLink(clipStaffMessage(input.message, options.messageLimit), options.adminUrl);
   let emailDelivered = false;
   let emailError;
   try {
     const emailResult = await sendEmail({
       to,
+      ...replyTo ? { replyTo } : {},
       template: STAFF_INBOUND_EMAIL_TEMPLATE,
       audience: "staff",
       subject: `Live chat from ${oneLine(input.name).slice(0, 80)}`,
@@ -30237,7 +30265,8 @@ async function deliverLiveChat(input) {
         senderName: escapeHtml$4(input.name),
         senderEmail: escapeHtml$4(input.email || "Not provided"),
         senderPhone: escapeHtml$4(input.phone || "Not provided"),
-        message: escapeHtml$4(input.message)
+        message: escapeHtml$4(message),
+        ...options.adminUrl ? { adminUrl: escapeHtml$4(options.adminUrl) } : {}
       }
     });
     emailDelivered = emailResult.sent;
@@ -30254,7 +30283,7 @@ async function deliverLiveChat(input) {
     const sms = await sendSMS({
       to: STAFF_INBOUND_SMS_TO,
       kind: STAFF_INBOUND_SMS_KIND,
-      body: liveChatSmsBody(input)
+      body: liveChatSmsBody(input, options.adminUrl)
     });
     smsDelivered = !sms.suppressed && Boolean(sms.sid);
     if (!smsDelivered) {
@@ -30314,6 +30343,7 @@ router$a.post("/live-chat", async (req, res) => {
 const COLLECTION = "contactThreads";
 const MAX_THREAD_MESSAGES = 200;
 const TOKEN_BYTES = 32;
+const STAFF_THREAD_ALERT_INTERVAL_MS = 10 * 60 * 1e3;
 function newId() {
   return randomBytes$1(16).toString("hex");
 }
@@ -30370,28 +30400,35 @@ function asRecord$1(data) {
     ...typeof raw.phone === "string" && raw.phone ? { phone: raw.phone } : {},
     createdAt: typeof raw.createdAt === "string" ? raw.createdAt : (/* @__PURE__ */ new Date(0)).toISOString(),
     updatedAt: typeof raw.updatedAt === "string" ? raw.updatedAt : (/* @__PURE__ */ new Date(0)).toISOString(),
-    messages
+    messages,
+    ...typeof raw.lastStaffAlertAt === "string" && raw.lastStaffAlertAt ? { lastStaffAlertAt: raw.lastStaffAlertAt } : {},
+    ...typeof raw.staffAlertClaimId === "string" && raw.staffAlertClaimId ? { staffAlertClaimId: raw.staffAlertClaimId } : {},
+    ...raw.staffAlertStatus === "sent" || raw.staffAlertStatus === "failed" || raw.staffAlertStatus === "throttled" ? { staffAlertStatus: raw.staffAlertStatus } : {}
   };
 }
 function createMemoryStore() {
   const rows = /* @__PURE__ */ new Map();
+  const read = (id) => {
+    const row = rows.get(id);
+    return row ? asRecord$1(row) : null;
+  };
   return {
     async get(id) {
-      return rows.get(id) ?? null;
+      return read(id);
     },
     async insert(thread) {
       rows.set(thread.id, thread);
     },
     async update(id, change) {
-      const current = rows.get(id);
+      const current = read(id);
       if (!current) return null;
       const next = change(current);
       if (!next) return null;
       rows.set(id, next);
-      return next;
+      return asRecord$1(next);
     },
     async listRecent(limit) {
-      return [...rows.values()].sort((a, b) => a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0).slice(0, limit);
+      return [...rows.values()].map((row) => asRecord$1(row)).filter((row) => Boolean(row)).sort((a, b) => a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0).slice(0, limit);
     },
     clear() {
       rows.clear();
@@ -30459,6 +30496,31 @@ function withClientMessage(current, input, createdAt) {
     messages: trimMessages([...current.messages, clientMessage(input, createdAt)])
   };
 }
+function staffAlertIsDue(thread, nowMs) {
+  const lastMs = thread.lastStaffAlertAt ? Date.parse(thread.lastStaffAlertAt) : Number.NaN;
+  if (!Number.isFinite(lastMs)) return true;
+  return nowMs - lastMs >= STAFF_THREAD_ALERT_INTERVAL_MS;
+}
+async function staffThreadAlertDue(id, now = /* @__PURE__ */ new Date()) {
+  const thread = await activeStore().get(id);
+  if (!thread) return "missing";
+  if (staffAlertIsDue(thread, now.getTime())) return "due";
+  await recordStaffAlertStatus(id, "throttled");
+  return "throttled";
+}
+async function claimStaffThreadAlert(id, now = /* @__PURE__ */ new Date()) {
+  const nowIso = now.toISOString();
+  const nowMs = now.getTime();
+  const claimId = randomBytes$1(8).toString("hex");
+  const updated = await activeStore().update(id, (current) => {
+    if (!staffAlertIsDue(current, nowMs)) return current;
+    return { ...current, lastStaffAlertAt: nowIso, staffAlertClaimId: claimId };
+  });
+  return updated?.staffAlertClaimId === claimId;
+}
+async function recordStaffAlertStatus(id, status2) {
+  await activeStore().update(id, (current) => ({ ...current, staffAlertStatus: status2 }));
+}
 async function startClientThread(input) {
   const createdAt = (/* @__PURE__ */ new Date()).toISOString();
   const accessToken = newToken();
@@ -30508,6 +30570,49 @@ async function appendStaffReply(id, text2, senderName = "Iconic Images") {
     messages: trimMessages([...current.messages, message])
   }));
   return updated ? toContactThreadView(updated) : null;
+}
+const STAFF_ALERT_MESSAGE_LIMIT = 500;
+const GLOBAL_ALERT_KEY = "contact-thread-staff";
+let alertNow = () => /* @__PURE__ */ new Date();
+const globalAlertLimiter = createRateLimiter({
+  windowMs: LIVE_CHAT_WINDOW_MS,
+  max: LIVE_CHAT_MAX_PER_WINDOW,
+  now: () => alertNow().getTime()
+});
+function contactThreadAdminUrl(threadId) {
+  return publicClientUrl(`/admin/messages?tab=contact&thread=${encodeURIComponent(threadId)}`);
+}
+async function alertStaffOfVisitorThread(threadId, input) {
+  const now = alertNow();
+  try {
+    const due = await staffThreadAlertDue(threadId, now);
+    if (due !== "due") return;
+    if (!globalAlertLimiter.check(GLOBAL_ALERT_KEY).allowed) {
+      await recordStaffAlertStatus(threadId, "throttled");
+      console.warn("[ContactThread] Staff alert skipped. Office alert cap reached.");
+      return;
+    }
+    const claimed = await claimStaffThreadAlert(threadId, now);
+    if (!claimed) return;
+    try {
+      const delivery = await deliverLiveChat(input, {
+        replyTo: input.email,
+        adminUrl: contactThreadAdminUrl(threadId),
+        messageLimit: STAFF_ALERT_MESSAGE_LIMIT
+      });
+      const status2 = delivery.emailDelivered || delivery.smsDelivered ? "sent" : "failed";
+      await recordStaffAlertStatus(threadId, status2);
+    } catch (error) {
+      console.error("[ContactThread] Staff alert failed.", error);
+      try {
+        await recordStaffAlertStatus(threadId, "failed");
+      } catch (recordError) {
+        console.error("[ContactThread] Staff alert status was not saved.", recordError);
+      }
+    }
+  } catch (error) {
+    console.error("[ContactThread] Staff alert failed.", error);
+  }
 }
 const router$9 = Router();
 const THREAD_ID_RE = /^[a-f0-9]{32}$/;
@@ -30592,9 +30697,11 @@ router$9.post("/threads", async (req, res) => {
       }
       const continued = await continueClientThread(threadId, accessToken, parsed.value);
       if (!continued) return res.status(404).json({ error: "Conversation not found." });
+      await alertStaffOfVisitorThread(continued.thread.id, parsed.value);
       return res.json(continued);
     }
     const created = await startClientThread(parsed.value);
+    await alertStaffOfVisitorThread(created.thread.id, parsed.value);
     return res.status(201).json(created);
   } catch (error) {
     console.error("[ContactThread] Client message failed.", error);

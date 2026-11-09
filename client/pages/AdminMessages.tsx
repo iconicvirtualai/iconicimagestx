@@ -140,7 +140,9 @@ function timeAgo(ts: { seconds: number } | null) {
 
 function initialCommunicationsTab(pathname: string, search: string): Tab {
   const params = new URLSearchParams(search);
-  if (pathname.startsWith("/admin/botroom") || params.get("tab") === "botroom") return "botroom";
+  const requested = params.get("tab");
+  if (pathname.startsWith("/admin/botroom") || requested === "botroom") return "botroom";
+  if (requested === "contact") return "contact";
   return "sweep";
 }
 
@@ -192,7 +194,7 @@ export default function AdminMessages() {
 
   useEffect(() => {
     const next = initialCommunicationsTab(location.pathname, location.search);
-    if (next === "botroom") setTab("botroom");
+    if (next === "botroom" || next === "contact") setTab(next);
   }, [location.pathname, location.search]);
 
   // ─── Real-time messages ───────────────────────────────────────────────────
