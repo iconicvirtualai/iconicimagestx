@@ -8033,6 +8033,163 @@ async function mirrorPayAtCloseOnSquareOrder(invoice, input, deps) {
     console.error("[Pay at Close] Square external tender failed:", err instanceof Error ? err.message : "request failed");
   }
 }
+const SQUARE_DEPOSIT_CHECKOUT_FAILURE = `We could not start the deposit checkout. Please call ${BUSINESS_CONTACT.phoneDisplay}.`;
+const SQUARE_CHECKOUT_FAILURE = `We could not start Square checkout. Please call ${BUSINESS_CONTACT.phoneDisplay}.`;
+const US_STATE_CODES = /* @__PURE__ */ new Set([
+  "AL",
+  "AK",
+  "AZ",
+  "AR",
+  "CA",
+  "CO",
+  "CT",
+  "DC",
+  "DE",
+  "FL",
+  "GA",
+  "HI",
+  "IA",
+  "ID",
+  "IL",
+  "IN",
+  "KS",
+  "KY",
+  "LA",
+  "MA",
+  "MD",
+  "ME",
+  "MI",
+  "MN",
+  "MO",
+  "MS",
+  "MT",
+  "NC",
+  "ND",
+  "NE",
+  "NH",
+  "NJ",
+  "NM",
+  "NV",
+  "NY",
+  "OH",
+  "OK",
+  "OR",
+  "PA",
+  "RI",
+  "SC",
+  "SD",
+  "TN",
+  "TX",
+  "UT",
+  "VA",
+  "VT",
+  "WA",
+  "WI",
+  "WV",
+  "WY"
+]);
+const ADDRESS_TEXT = /^[\p{L}\p{N} .,#&/'()-]+$/u;
+const FULL_US_ADDRESS = /^(?<street>.+),\s*(?<city>[A-Za-z][A-Za-z .'-]*[A-Za-z]),\s*(?<state>[A-Za-z]{2})\s*,?\s*(?<zip>\d{5}(?:-\d{4})?)$/;
+function squareBuyerPhone(value) {
+  if (typeof value !== "string") return "";
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  const digits2 = trimmed.replace(/\D/g, "");
+  let normalized = "";
+  if (digits2.length === 10) normalized = `+1${digits2}`;
+  else if (digits2.length === 11 && digits2.startsWith("1"))
+    normalized = `+${digits2}`;
+  else if (trimmed.startsWith("+") && digits2.length >= 9 && digits2.length <= 16)
+    normalized = `+${digits2}`;
+  if (!/^\+[1-9]\d{8,15}$/.test(normalized) || normalized.length > 17)
+    return "";
+  return normalized;
+}
+function cleanAddressText(value, max) {
+  const text2 = value.replace(/\s+/g, " ").trim();
+  if (!text2 || text2.length > max) return "";
+  if (!/[\p{L}\p{N}]/u.test(text2)) return "";
+  if (!ADDRESS_TEXT.test(text2)) return "";
+  return text2;
+}
+function looksLikeCityStateZip(value) {
+  return /\b[A-Za-z]{2}\s*,?\s*\d{5}(?:-\d{4})?\b/.test(value);
+}
+function squareBuyerAddress(value) {
+  if (typeof value !== "string") return null;
+  const raw = value.replace(/\s+/g, " ").trim().slice(0, 240);
+  if (!raw) return null;
+  const match = raw.match(FULL_US_ADDRESS);
+  if (match?.groups) {
+    const street = cleanAddressText(match.groups.street, 500);
+    const city = cleanAddressText(match.groups.city, 80);
+    const state = match.groups.state.toUpperCase();
+    const zip = match.groups.zip;
+    if (!street || !city || !US_STATE_CODES.has(state) || !/^\d{5}(?:-\d{4})?$/.test(zip))
+      return null;
+    return {
+      address_line_1: street,
+      locality: city,
+      administrative_district_level_1: state,
+      postal_code: zip,
+      country: "US"
+    };
+  }
+  if (looksLikeCityStateZip(raw) || raw.includes(",")) return null;
+  const line = cleanAddressText(raw, 500);
+  if (!line) return null;
+  return { address_line_1: line, country: "US" };
+}
+function fnv1a32(input) {
+  let hash = 2166136261;
+  for (let i = 0; i < input.length; i += 1) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
+}
+function squarePaymentLinkIdempotencyKey(input) {
+  const invoiceId = String(input.invoiceId || "").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 80);
+  const purpose = input.purpose === "deposit" ? "deposit" : "checkout";
+  const amountCents = Number.isFinite(input.amountCents) ? Math.round(input.amountCents) : 0;
+  const attempt = input.attempt > 0 ? 1 : 0;
+  const hash = fnv1a32(`${purpose}|${invoiceId}|${amountCents}|${attempt}`);
+  const prefix = purpose === "deposit" ? "dep" : "pay";
+  return `${prefix}-${invoiceId}-${amountCents}-a${attempt}-${hash}`.slice(
+    0,
+    192
+  );
+}
+function scrubSquareLogText(value) {
+  return value.replace(/bearer\s+\S+/gi, "Bearer [redacted]").replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[email]").replace(/\+?\d[\d\s().-]{6,}\d/g, "[phone]");
+}
+function readSquareErrors(body) {
+  if (!body || typeof body !== "object") return [];
+  const errors = body.errors;
+  if (!Array.isArray(errors)) return [];
+  return errors.slice(0, 8).map((error) => {
+    const row = error && typeof error === "object" ? error : {};
+    const detail = typeof row.detail === "string" ? scrubSquareLogText(row.detail).slice(0, 300) : "";
+    return {
+      category: typeof row.category === "string" ? row.category : "",
+      code: typeof row.code === "string" ? row.code : "",
+      field: typeof row.field === "string" ? row.field : "",
+      detail
+    };
+  });
+}
+const PREFILL_CODES = /* @__PURE__ */ new Set([
+  "INVALID_PHONE_NUMBER",
+  "INVALID_EMAIL_ADDRESS"
+]);
+function squarePrefillRejected(body) {
+  const errors = readSquareErrors(body);
+  if (errors.length === 0) return false;
+  return errors.every((error) => {
+    if (error.field.startsWith("pre_populated_data")) return true;
+    return PREFILL_CODES.has(error.code);
+  });
+}
 const HUB_SOCIAL_PLATFORMS = [
   { id: "facebook", label: "Facebook" },
   { id: "instagram", label: "Instagram" },
@@ -8416,10 +8573,10 @@ function squareBuyerPrefill(invoice) {
   const data = {};
   const email = hubEmail(invoice.billingEmail) || hubEmail(invoice.clientEmail);
   if (email) data.buyer_email = email;
-  const phone = hubPhone(invoice.billingPhone) || hubPhone(invoice.clientPhone);
+  const phone = squareBuyerPhone(hubPhone(invoice.billingPhone) || hubPhone(invoice.clientPhone));
   if (phone) data.buyer_phone_number = phone;
-  const address = text$k(invoice.billToAddress, 240);
-  if (address) data.buyer_address = { address_line_1: address, country: "US" };
+  const address = squareBuyerAddress(text$k(invoice.billToAddress, 240));
+  if (address) data.buyer_address = address;
   return data;
 }
 function accountBalanceCents(invoices, storedCents = 0) {
@@ -18059,6 +18216,90 @@ function finite(value) {
 function text$a(value) {
   return typeof value === "string" ? value.trim() : "";
 }
+function prefillOrNull(prefill) {
+  return prefill && Object.keys(prefill).length > 0 ? prefill : null;
+}
+async function createSquareQuickPayLink(input) {
+  const env = input.env ?? process.env;
+  const fetchImpl = input.fetchImpl ?? fetch;
+  if (!Number.isSafeInteger(input.amountCents) || input.amountCents <= 0) {
+    return { ok: false, message: input.failureMessage, errors: [] };
+  }
+  const populated = prefillOrNull(input.prefill);
+  const attempts = populated ? [populated, null] : [null];
+  let lastErrors = [];
+  for (let attempt = 0; attempt < attempts.length; attempt += 1) {
+    const prefill = attempts[attempt];
+    const body = {
+      idempotency_key: squarePaymentLinkIdempotencyKey({
+        invoiceId: input.invoiceId,
+        purpose: input.purpose,
+        amountCents: input.amountCents,
+        attempt
+      }),
+      quick_pay: {
+        name: input.name.slice(0, 255),
+        price_money: {
+          amount: input.amountCents,
+          currency: "USD"
+        },
+        location_id: env.SQUARE_LOCATION_ID
+      },
+      checkout_options: {
+        redirect_url: input.redirectUrl
+      },
+      payment_note: input.paymentNote
+    };
+    if (prefill) body.pre_populated_data = prefill;
+    const response = await fetchImpl(
+      `${squareApiBaseUrl(env.SQUARE_ENVIRONMENT)}/v2/online-checkout/payment-links`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Square-Version": env.SQUARE_VERSION || "2026-08-20",
+          Authorization: `Bearer ${env.SQUARE_ACCESS_TOKEN}`
+        },
+        body: JSON.stringify(body)
+      }
+    );
+    const result = await response.json().catch(() => ({}));
+    if (response.ok) {
+      const link = result && typeof result === "object" ? result.payment_link : void 0;
+      const checkoutUrl = typeof link?.url === "string" ? link.url : "";
+      if (!checkoutUrl.startsWith("https://")) {
+        console.error(`[Payments] ${input.logLabel}`, {
+          attempt,
+          status: response.status,
+          errors: [
+            {
+              category: "",
+              code: "NO_CHECKOUT_URL",
+              field: "payment_link.url",
+              detail: "Square did not return an https checkout url."
+            }
+          ]
+        });
+        return { ok: false, message: input.failureMessage, errors: [] };
+      }
+      return {
+        ok: true,
+        checkoutUrl,
+        linkId: typeof link?.id === "string" ? link.id : null,
+        orderId: typeof link?.order_id === "string" ? link.order_id : null
+      };
+    }
+    lastErrors = readSquareErrors(result);
+    console.error(`[Payments] ${input.logLabel}`, {
+      attempt,
+      status: response.status,
+      errors: lastErrors
+    });
+    const retryWithoutPrefill = attempt === 0 && prefill !== null && squarePrefillRejected(result);
+    if (!retryWithoutPrefill) break;
+  }
+  return { ok: false, message: input.failureMessage, errors: lastErrors };
+}
 function payTokenMatches(stored, presented, equal = timingSafeEqual) {
   const left = Buffer.from(typeof stored === "string" ? stored : "");
   const right = Buffer.from(typeof presented === "string" ? presented : "");
@@ -18383,9 +18624,6 @@ function stripeReady() {
 }
 function squareReady() {
   return Boolean(process.env.SQUARE_ACCESS_TOKEN && process.env.SQUARE_LOCATION_ID);
-}
-function squareBaseUrl() {
-  return squareApiBaseUrl(process.env.SQUARE_ENVIRONMENT);
 }
 function invoiceProvider(invoice) {
   const explicit = String(invoice.paymentProvider || invoice.processor || "").toLowerCase();
@@ -19369,51 +19607,33 @@ router$w.post("/invoice/:id/checkout", async (req, res) => {
         return res.json({ checkoutUrl: publishedUrl, provider: "square" });
       }
       if (!squareReady()) return res.status(503).json({ error: "Square payments are not configured yet." });
-      const response = await fetch(`${squareBaseUrl()}/v2/online-checkout/payment-links`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Square-Version": process.env.SQUARE_VERSION || "2026-08-20",
-          Authorization: `Bearer ${process.env.SQUARE_ACCESS_TOKEN}`
-        },
-        body: JSON.stringify({
-          idempotency_key: `${invoiceDoc.id}-${Date.now()}`,
-          quick_pay: {
-            name: `Iconic Images Invoice ${invoice.invoiceNumber || invoiceDoc.id}`,
-            price_money: {
-              amount: Math.round(amountDue * 100),
-              currency: "USD"
-            },
-            location_id: process.env.SQUARE_LOCATION_ID
-          },
-          checkout_options: {
-            redirect_url: clientInvoiceUrl({
-              id: invoiceDoc.id,
-              payToken,
-              status: invoice.status
-            }, void 0, { paid: "1" }) || invoiceUrl
-          },
-          pre_populated_data: squareBuyerPrefill(invoice),
-          payment_note: squarePaymentNote(invoiceDoc.id, invoice.invoiceNumber)
-        })
+      const created = await createSquareQuickPayLink({
+        invoiceId: invoiceDoc.id,
+        purpose: "checkout",
+        amountCents: Math.round(amountDue * 100),
+        name: `Iconic Images Invoice ${invoice.invoiceNumber || invoiceDoc.id}`,
+        redirectUrl: clientInvoiceUrl({
+          id: invoiceDoc.id,
+          payToken,
+          status: invoice.status
+        }, void 0, { paid: "1" }) || invoiceUrl,
+        prefill: squareBuyerPrefill(invoice),
+        paymentNote: squarePaymentNote(invoiceDoc.id, invoice.invoiceNumber),
+        logLabel: "Square checkout error",
+        failureMessage: SQUARE_CHECKOUT_FAILURE
       });
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        console.error("[Payments] Square checkout error:", result);
-        return res.status(500).json({ error: "Failed to start Square checkout." });
-      }
-      const link = result.payment_link;
+      if (created.ok === false) return res.status(500).json({ error: created.message });
       await invoiceDoc.ref.update({
         status: "sent",
         paymentProvider: "square",
         paymentMethod: "square",
-        paymentUrl: link?.url || invoiceUrl,
-        squarePaymentLinkId: link?.id || null,
-        squareOrderId: link?.order_id || null,
+        paymentUrl: created.checkoutUrl || invoiceUrl,
+        squarePaymentLinkId: created.linkId,
+        squareOrderId: created.orderId,
         sentAt: invoice.sentAt || admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
-      return res.json({ checkoutUrl: link?.url, provider: "square" });
+      return res.json({ checkoutUrl: created.checkoutUrl, provider: "square" });
     }
     if (!stripeReady()) {
       return res.status(503).json({ error: "Studio Noir Stripe payments are not configured yet." });
@@ -19528,48 +19748,30 @@ router$w.post("/invoice/:id/deposit-checkout", async (req, res) => {
     if (!squareReady()) return res.status(503).json({ error: "Square payments are not configured yet." });
     await payTokenForLink(invoiceDoc);
     const orderNumber2 = String(invoice.orderNumber || order.orderNumber || "");
-    const response = await fetch(`${squareBaseUrl()}/v2/online-checkout/payment-links`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Square-Version": process.env.SQUARE_VERSION || "2026-08-20",
-        Authorization: `Bearer ${process.env.SQUARE_ACCESS_TOKEN}`
-      },
-      body: JSON.stringify({
-        idempotency_key: `${invoiceDoc.id}-deposit`,
-        quick_pay: {
-          name: orderSource === APPRENTICESHIP_ORDER_SOURCE || orderSource === HEADSHOTS_ORDER_SOURCE ? `Iconic Images booking fee ${orderNumber2 || invoice.invoiceNumber || invoiceDoc.id}` : `Iconic Images deposit ${invoice.invoiceNumber || invoiceDoc.id}`,
-          price_money: {
-            amount: Math.round(depositAmount * 100),
-            currency: "USD"
-          },
-          location_id: process.env.SQUARE_LOCATION_ID
-        },
-        checkout_options: {
-          redirect_url: `${appUrl$2()}${orderSource === HEADSHOTS_ORDER_SOURCE ? headshotBookingReturnPath(orderNumber2) : orderSource === APPRENTICESHIP_ORDER_SOURCE ? apprenticeshipBookingReturnPath(orderNumber2, invoice.depositReturn) : seniorLivingDepositReturnPath(orderNumber2)}`
-        },
-        pre_populated_data: squareBuyerPrefill(invoice),
-        payment_note: squarePaymentNote(invoiceDoc.id, invoice.invoiceNumber)
-      })
+    const amountCents = Math.round(depositAmount * 100);
+    const created = await createSquareQuickPayLink({
+      invoiceId: invoiceDoc.id,
+      purpose: "deposit",
+      amountCents,
+      name: orderSource === APPRENTICESHIP_ORDER_SOURCE || orderSource === HEADSHOTS_ORDER_SOURCE ? `Iconic Images booking fee ${orderNumber2 || invoice.invoiceNumber || invoiceDoc.id}` : `Iconic Images deposit ${invoice.invoiceNumber || invoiceDoc.id}`,
+      redirectUrl: `${appUrl$2()}${orderSource === HEADSHOTS_ORDER_SOURCE ? headshotBookingReturnPath(orderNumber2) : orderSource === APPRENTICESHIP_ORDER_SOURCE ? apprenticeshipBookingReturnPath(orderNumber2, invoice.depositReturn) : seniorLivingDepositReturnPath(orderNumber2)}`,
+      prefill: squareBuyerPrefill(invoice),
+      paymentNote: squarePaymentNote(invoiceDoc.id, invoice.invoiceNumber),
+      logLabel: "Square deposit checkout error",
+      failureMessage: SQUARE_DEPOSIT_CHECKOUT_FAILURE
     });
-    const result = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      console.error("[Payments] Square deposit checkout error:", result);
-      return res.status(500).json({ error: "Failed to start the deposit checkout." });
-    }
-    const link = result.payment_link;
-    const checkoutUrl = typeof link?.url === "string" ? link.url : "";
+    if (created.ok === false) return res.status(500).json({ error: created.message });
     await invoiceDoc.ref.update({
-      squareDepositPaymentLinkId: link?.id || null,
-      squareDepositOrderId: link?.order_id || null,
-      ...checkoutUrl ? { squareDepositCheckoutUrl: checkoutUrl } : {},
+      squareDepositPaymentLinkId: created.linkId,
+      squareDepositOrderId: created.orderId,
+      ...created.checkoutUrl ? { squareDepositCheckoutUrl: created.checkoutUrl } : {},
       paymentProvider: "square",
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
-    return res.json({ checkoutUrl, provider: "square" });
+    return res.json({ checkoutUrl: created.checkoutUrl, provider: "square" });
   } catch (err) {
     console.error("[Payments] Deposit checkout error:", err);
-    return res.status(500).json({ error: "Failed to start the deposit checkout." });
+    return res.status(500).json({ error: SQUARE_DEPOSIT_CHECKOUT_FAILURE });
   }
 });
 router$w.post("/webhook", async (req, res) => {
