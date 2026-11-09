@@ -703,3 +703,24 @@
   line-height: 1.2;
   text-transform: uppercase;
 }
+
+/* Phone: labels, badges, kickers, captions, and fine print were under 12px. Desktop sizes stay. */
+@media (max-width: 767px) {
+  .pac-page .urgency,
+  .pac-page .pill,
+  .pac-page .hero-stat span,
+  .pac-page .section-kicker,
+  .pac-page .value-item span,
+  .pac-page .pkg-badge,
+  .pac-page .confirm-tag,
+  .pac-page .field-label,
+  .pac-page .hint,
+  .pac-page .pc-meta,
+  .pac-page .gallery figcaption,
+  .pac-page .estate-feature figcaption,
+  .pac-page .estate-reel-card figcaption,
+  .pac-page .so-copy,
+  .pac-page .footnote {
+    font-size: 12px;
+  }
+}

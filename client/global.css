@@ -197,7 +197,12 @@ body:has(.iframe-safe-page.bg-\[\#f4f7f8\]) {
 @media (max-width: 767px) {
   body:has([data-site-page="portfolio"]) :is(.text-\[8px\], .text-\[9px\], .text-\[10px\], .text-\[11px\]),
   body:has([data-site-page="pricing"]) :is(.text-\[8px\], .text-\[9px\], .text-\[10px\], .text-\[11px\]),
-  body:has([data-site-page="agents"]) :is(.text-\[8px\], .text-\[9px\], .text-\[10px\], .text-\[11px\]) {
+  body:has([data-site-page="agents"]) :is(.text-\[8px\], .text-\[9px\], .text-\[10px\], .text-\[11px\]),
+  body:has([data-site-page="home"]) :is(.text-\[8px\], .text-\[9px\], .text-\[10px\], .text-\[11px\], .text-\[0\.65rem\]),
+  body:has([data-testid="booking-step"]) :is(.text-\[8px\], .text-\[9px\], .text-\[10px\], .text-\[11px\], .text-\[0\.65rem\]),
+  body:has([data-testid="studio105-shell"]) :is(.text-\[8px\], .text-\[9px\], .text-\[10px\], .text-\[11px\]),
+  body:has([data-testid="virtual-staging-pro-rate"]) :is(.text-\[8px\], .text-\[9px\], .text-\[10px\], .text-\[11px\]),
+  body:has([data-testid="virtual-staging-pro-confirmation"]) :is(.text-\[8px\], .text-\[9px\], .text-\[10px\], .text-\[11px\]) {
     font-size: 12px;
   }
 }
