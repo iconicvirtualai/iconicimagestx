@@ -154,10 +154,11 @@ function publicDetailFeature(item: { id?: string; name?: string } | null | undef
   return feature.replace(/\b50(\s+images)\b/gi, "30$1");
 }
 
-function ProcessingEstimateLine({ amount, percent }: { amount: number; percent: number }) {
+function ProcessingEstimateLine({ amount, percent, chargedOnInvoice }: { amount: number; percent: number; chargedOnInvoice: boolean }) {
+  const label = chargedOnInvoice ? `${processingFeeLabel(percent)}, charged on the invoice` : processingFeeLabel(percent);
   return (
     <div data-testid="booking-processing-line" className="mb-3 flex items-baseline justify-between gap-3 text-[11px]">
-      <span className="min-w-0 font-bold text-gray-500">{processingFeeLabel(percent)}, charged on the invoice</span>
+      <span className="min-w-0 font-bold text-gray-500">{label}</span>
       <MoneyAmount className="font-black text-black">${amount.toFixed(2)}</MoneyAmount>
     </div>
   );
@@ -944,7 +945,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
           </div>
         )}
         {chargeProcessing && hasBookingSelection(bookingPriceInput()) && (
-          <ProcessingEstimateLine amount={estimate.processing} percent={pricing.processingPercent} />
+          <ProcessingEstimateLine amount={estimate.processing} percent={pricing.processingPercent} chargedOnInvoice={!payNowSelected} />
         )}
         {payNowDiscount > 0 && (
           <div data-testid="pay-now-discount" className="mb-2 flex items-baseline justify-between gap-3 text-[11px]">
@@ -1725,7 +1726,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
                  })}
                  <TravelFeeLine travel={travel} />
                  {chargeProcessing && hasBookingSelection(bookingPriceInput()) && (
-                   <ProcessingEstimateLine amount={estimate.processing} percent={pricing.processingPercent} />
+                   <ProcessingEstimateLine amount={estimate.processing} percent={pricing.processingPercent} chargedOnInvoice={!payNowSelected} />
                  )}
                  {payNowDiscount > 0 && (
                    <div data-testid="pay-now-discount" className="flex items-baseline justify-between gap-3 text-sm">

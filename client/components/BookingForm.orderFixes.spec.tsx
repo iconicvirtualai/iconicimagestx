@@ -171,12 +171,34 @@ describe("/book estimator processing line", () => {
     expect(after).toContain("$801.98");
     expect(after.indexOf("Processing")).toBeLessThan(after.indexOf("Pay Now savings"));
     expect(after.indexOf("Pay Now savings")).toBeLessThan(after.indexOf("Total estimate"));
+    const payNowProcessing = summaryAfter?.querySelector('[data-testid="booking-processing-line"]');
+    expect(payNowProcessing?.textContent).toContain("Processing (2.8%)");
+    expect(payNowProcessing?.textContent).not.toContain("charged on the invoice");
+
+    const payLater = Array.from(pay?.querySelectorAll("label") || []).find((label) =>
+      label.textContent?.includes("Pay Later"),
+    );
+    await act(async () => {
+      payLater?.querySelector("input")?.click();
+    });
+    const laterSummary = container?.querySelector('[data-testid="order-summary-before-submit"]');
+    const laterProcessing = laterSummary?.querySelector('[data-testid="booking-processing-line"]');
+    expect(laterProcessing?.textContent).toContain(PROCESSING_ESTIMATE_LABEL);
+    expect(laterSummary?.textContent).not.toContain("Pay Now savings");
+
+    const payAtClose = pay?.querySelector('[data-testid="pay-at-close-option"]');
+    await act(async () => {
+      payAtClose?.querySelector("input")?.click();
+    });
+    const closeProcessing = container?.querySelector('[data-testid="order-summary-before-submit"] [data-testid="booking-processing-line"]');
+    expect(closeProcessing).toBeNull();
   });
 
   it("keeps the processing percent dynamic and does not say the card is charged at booking", () => {
     const source = readFileSync("client/components/BookingForm.tsx", "utf8");
     expect(source).toContain("processingFeeLabel(percent)");
     expect(source).toContain("percent={pricing.processingPercent}");
+    expect(source).toContain("chargedOnInvoice={!payNowSelected}");
     expect(source).toContain(", charged on the invoice");
     expect(source).toContain(">Pay Later</span>");
     expect(source).toContain("Nothing is charged today. After your shoot we send your invoice with a secure Square card link. Card processing applies when it is turned on.");
