@@ -265,7 +265,7 @@ function BillingRoute({ example }: { example: boolean }) {
     example ? {
       billing: exampleBilling(),
       invoices: [exampleInvoice()],
-      payments: [{ id: "example-payment", invoiceNumber: "INV-EXAMPLE-1001", status: "partial", amount: 121.5, issuedOn: "Oct 2, 2026" }],
+      payments: [{ id: "example-payment", invoiceNumber: "#001", status: "partial", amount: 121.5, issuedOn: "Oct 2, 2026" }],
     } : null,
   );
   const [error, setError] = useState("");

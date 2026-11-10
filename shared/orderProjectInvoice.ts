@@ -5,6 +5,7 @@
 
 import { buildBookingInvoiceDraft, type BookingInvoiceDraftInput } from "./bookingInvoice.ts";
 import { isDerivedInvoiceId } from "./invoicePay.ts";
+import { formatOrderNumber, orderCodeTail } from "./orderNumber.ts";
 
 export function nonEmptyId(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -234,6 +235,68 @@ export function brandedInvoiceNumber(source: InvoiceNumberSource, now = new Date
 /** Portal Order History and the listing Orders tab. */
 export function orderHistoryInvoiceNumber(source: InvoiceNumberSource, now = new Date()): string {
   return shownInvoiceNumber(source, now);
+}
+
+function sequentialOrderLabel(value: unknown): string | null {
+  if (typeof value === "number" && Number.isInteger(value) && value >= 1) return formatOrderNumber(value);
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  const hashed = trimmed.match(/^#(\d+)$/);
+  const digits = hashed ? hashed[1] : (/^\d+$/.test(trimmed) ? trimmed : "");
+  if (!digits) return null;
+  const n = Number(digits);
+  if (!Number.isInteger(n) || n < 1) return null;
+  return formatOrderNumber(n);
+}
+
+/** Order # the admin Orders page shows for this order. */
+export function portalOrderNumberLabel(record: Record<string, unknown> | null | undefined): string {
+  if (!record) return "";
+  const sequential = sequentialOrderLabel(record.orderNumber);
+  if (sequential) return sequential;
+  const explicit = [record.orderCode, record.displayId]
+    .map((value) => typeof value === "string" ? value.trim() : "")
+    .find((value) => value && !/^INV-/i.test(value) && !/EXAMPLE/i.test(value));
+  if (explicit) return explicit.toUpperCase();
+  const raw = typeof record.orderNumber === "string" ? record.orderNumber.trim() : "";
+  if (raw && !/^INV-/i.test(raw) && !/EXAMPLE/i.test(raw)) return raw.toUpperCase();
+  const id = typeof record.id === "string" ? record.id.trim() : "";
+  if (!id) return "";
+  const business = record.projectType === "business";
+  return `ORD - ${business ? "B" : "L"} - ${orderCodeTail(id)}`;
+}
+
+/**
+ * Portal invoice label. The linked order's admin order number wins.
+ * Stored INV- numbers and id-derived invoice numbers are not shown once an
+ * order is attached. Nothing is written back to Firestore.
+ */
+export function portalDisplayedInvoiceNumber(
+  invoice: Record<string, unknown>,
+  order?: Record<string, unknown> | null,
+  now = new Date(),
+): string {
+  if (order && (typeof order.id === "string" && order.id.trim() || order.orderNumber != null || order.orderCode || order.displayId)) {
+    const label = portalOrderNumberLabel(order);
+    if (label) return label;
+  }
+  const linkedId = (typeof invoice.orderRequestId === "string" ? invoice.orderRequestId.trim() : "")
+    || (typeof invoice.orderId === "string" ? invoice.orderId.trim() : "");
+  if (invoice.orderNumber != null || invoice.orderCode || invoice.displayId || linkedId) {
+    const label = portalOrderNumberLabel({
+      id: linkedId,
+      orderNumber: invoice.orderNumber,
+      orderCode: invoice.orderCode,
+      displayId: invoice.displayId,
+      projectType: invoice.projectType,
+    });
+    if (label) return label;
+  }
+  return orderHistoryInvoiceNumber({
+    invoiceNumber: invoice.invoiceNumber,
+    id: invoice.id,
+    createdAt: invoice.createdAt,
+  }, now);
 }
 
 /** AR and billing lists (revenue detail, client account invoices). */

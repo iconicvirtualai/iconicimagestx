@@ -157,7 +157,7 @@ router.get("/me/home", requireAuth, async (req: AuthenticatedRequest, res) => {
     }
 
     const galleries: Record<string, unknown>[] = [];
-    const invoices: ReturnType<typeof buildClientInvoice>[] = [];
+    const invoiceDocs: Array<{ id: string; data: Record<string, unknown> }> = [];
     const projects: ReturnType<typeof buildClientListing>[] = [];
     const appointmentDocs: FirebaseFirestore.QueryDocumentSnapshot[] = [];
     let listingsTruncated = false;
@@ -175,7 +175,7 @@ router.get("/me/home", requireAuth, async (req: AuthenticatedRequest, res) => {
     const pushInvoice = (entry: FirebaseFirestore.QueryDocumentSnapshot) => {
       if (seenInvoice.has(entry.id)) return;
       seenInvoice.add(entry.id);
-      invoices.push(buildClientInvoice(entry.id, asRecord(jsonSafe(entry.data()))));
+      invoiceDocs.push({ id: entry.id, data: asRecord(jsonSafe(entry.data())) });
     };
     const pushListing = (entry: FirebaseFirestore.QueryDocumentSnapshot) => {
       if (seenProject.has(entry.id)) return;
@@ -216,6 +216,7 @@ router.get("/me/home", requireAuth, async (req: AuthenticatedRequest, res) => {
     }
 
     const orders: Record<string, unknown>[] = [];
+    const ordersById = new Map<string, Record<string, unknown>>();
     const seenOrder = new Set<string>();
     const pushOrder = (entry: FirebaseFirestore.QueryDocumentSnapshot) => {
       if (seenOrder.has(entry.id)) return;
@@ -225,12 +226,15 @@ router.get("/me/home", requireAuth, async (req: AuthenticatedRequest, res) => {
         { ids: identity.ids, email: identity.email },
       )) return;
       seenOrder.add(entry.id);
+      const stored = asRecord(jsonSafe(data));
+      ordersById.set(entry.id, { ...stored, id: entry.id });
       const listingId = typeof data.listingId === "string" ? data.listingId : "";
       orders.push({
         id: entry.id,
         address: addressText(data.address || data.shootLocation) || "Order",
         status: data.status || "new",
         href: listingId ? `/studio/${listingId}` : "",
+        orderNumber: stored.orderNumber ?? null,
       });
     };
     try {
@@ -285,6 +289,12 @@ router.get("/me/home", requireAuth, async (req: AuthenticatedRequest, res) => {
     });
     const listings = sortNewestFirst(projects);
     const appointments = mergeListingShoots(storedAppointments, listings);
+    const invoices = invoiceDocs.map((entry) => {
+      const requestId = typeof entry.data.orderRequestId === "string" ? entry.data.orderRequestId : "";
+      const orderId = typeof entry.data.orderId === "string" ? entry.data.orderId : "";
+      const order = (requestId && ordersById.get(requestId)) || (orderId && ordersById.get(orderId)) || null;
+      return buildClientInvoice(entry.id, entry.data, new Date(), order);
+    });
     const invoiceRows = sortNewestFirst(invoices);
 
     return res.json({

@@ -17,6 +17,9 @@ import {
   sanitizeWebsiteSettings,
   visitorPortalListingDetail,
 } from "./portalListingDetail";
+import { portalOrderNumberLabel } from "./orderProjectInvoice";
+
+const ORDER_LABEL = portalOrderNumberLabel({ id: "req1" });
 
 const listingId = "listing1234";
 
@@ -223,7 +226,7 @@ describe("portal listing detail", () => {
     expect(detail.photos.some((photo) => photo.id === "angle")).toBe(true);
     expect(detail.floorplans.map((plan) => plan.name)).toEqual(["level1.jpg"]);
     expect(detail.marketing.map((card) => card.status)).toEqual(["not_connected", "not_connected", "not_connected"]);
-    expect(detail.invoices[0]).toMatchObject({ invoiceNumber: "INV-2026-100", status: "draft", total: 450 });
+    expect(detail.invoices[0]).toMatchObject({ invoiceNumber: ORDER_LABEL, status: "draft", total: 450 });
     expect(JSON.stringify(detail.invoices)).not.toContain("/invoice/");
   });
 
@@ -232,7 +235,7 @@ describe("portal listing detail", () => {
     expect(summaries[0]).toBe("Booking request received");
     expect(summaries).toContain("Booking confirmed");
     expect(summaries).toContain("Photo uploaded: kitchen.jpg");
-    expect(summaries).toContain("Invoice INV-2026-100 is draft");
+    expect(summaries).toContain(`Invoice ${ORDER_LABEL} is draft`);
     expect(summaries.join(" ")).not.toMatch(/lockbox/i);
     expect(summaries.indexOf("Booking request received")).toBeLessThan(summaries.indexOf("Photo uploaded: kitchen.jpg"));
   });
@@ -325,12 +328,12 @@ describe("portal listing detail", () => {
     expect(body).not.toMatch(/INV-2026-100/);
     expect(body).not.toMatch(/"invoiceNumber"|"amountDue"|"total"/);
     expect(detail.invoices[0]).toMatchObject({
-      invoiceNumber: "INV-2026-100",
+      invoiceNumber: ORDER_LABEL,
       status: "draft",
       total: 450,
       amountDue: 450,
     });
-    expect(detail.activity.map((event) => event.summary)).toContain("Invoice INV-2026-100 is draft");
+    expect(detail.activity.map((event) => event.summary)).toContain(`Invoice ${ORDER_LABEL} is draft`);
   });
 
   it("saves owner fact edits over the booking values and leaves the map pin where it was", () => {

@@ -8,7 +8,7 @@ import { brandedInvoicePdf, brandedInvoicePdfFilename, type BrandedInvoicePdfInp
 import { iconicBusinessFooterLines } from "./iconicBusiness.ts";
 import { invoiceFaceFromStored } from "./invoiceFace.ts";
 import { invoicePayLinkFor } from "./invoicePayLink.ts";
-import { orderHistoryInvoiceNumber } from "./orderProjectInvoice.ts";
+import { portalDisplayedInvoiceNumber } from "./orderProjectInvoice.ts";
 import { addressText } from "./addressText.ts";
 import {
   formatShootDateLabel,
@@ -299,15 +299,16 @@ export function buildClientListing(id: string, data: Record<string, unknown>): C
   };
 }
 
-export function buildClientInvoice(id: string, data: Record<string, unknown>, now = new Date()): ClientInvoiceStatement {
+export function buildClientInvoice(
+  id: string,
+  data: Record<string, unknown>,
+  now = new Date(),
+  order?: Record<string, unknown> | null,
+): ClientInvoiceStatement {
   const createdAt = isoStamp(data.createdAt);
   return {
     id,
-    invoiceNumber: orderHistoryInvoiceNumber({
-      invoiceNumber: data.invoiceNumber,
-      id,
-      createdAt: data.createdAt,
-    }, now),
+    invoiceNumber: portalDisplayedInvoiceNumber({ ...data, id }, order, now),
     status: typeof data.status === "string" && data.status.trim() ? data.status.trim() : "",
     clientName: text(data.clientName),
     address: addressText(data.billToAddress || data.address || data.propertyAddress),

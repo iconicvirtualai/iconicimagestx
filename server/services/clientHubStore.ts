@@ -612,7 +612,13 @@ export async function getBilling(actor: HubActor, requestedOwner = "") {
   const stored = await readDoc("billing", ownerClientId);
   const billing = billingFrom(stored);
   const invoiceRows = await queryEqual("invoices", "clientId", ownerClientId);
-  const invoices = invoiceRows.map((row) => buildClientInvoice(row.id, row.data));
+  const invoices = await Promise.all(invoiceRows.map(async (row) => {
+    const requestId = typeof row.data.orderRequestId === "string" ? row.data.orderRequestId : "";
+    const orderId = typeof row.data.orderId === "string" ? row.data.orderId : "";
+    const orderKey = requestId || orderId;
+    const stored = orderKey ? await readDoc("orders", orderKey) : null;
+    return buildClientInvoice(row.id, row.data, new Date(), stored ? { ...stored, id: orderKey } : null);
+  }));
   billing.balanceCents = accountBalanceCents(invoices, billing.balanceCents);
   const payments = invoices
     .filter((invoice) => (invoice.amountPaid || 0) > 0)

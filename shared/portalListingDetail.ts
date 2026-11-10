@@ -9,7 +9,7 @@
 import { addressText } from "./addressText.ts";
 import { listingKitFieldShown } from "./galleryUpload.ts";
 import { arrangementActive, isHiddenFromClientGallery, isHiddenFromListingSites, readMediaArrangement } from "./mediaArrangement.ts";
-import { orderHistoryInvoiceNumber } from "./orderProjectInvoice.ts";
+import { portalDisplayedInvoiceNumber } from "./orderProjectInvoice.ts";
 import type { ListingCardLook } from "./packageSkins.ts";
 import { readPhotoEditRequests, type PhotoEditRequest } from "./photoEditRequest";
 
@@ -414,7 +414,7 @@ export function buildPortalListingDetail(sources: PortalListingSources): PortalL
   const socialAssets = collectClientUploads(listing, "social", savedOrder);
   const clientFiles = collectClientUploads(listing, "file", savedOrder);
   const website = readWebsite(listing.portalWebsite);
-  const invoices = readInvoices(sources.invoices || []);
+  const invoices = readInvoices(sources.invoices || [], sources);
   const activity = buildActivity(sources, photos, videos, floorplans, tours, invoices);
   const status = text(listing.status) || text(sources.order?.status) || text(sources.orderRequest?.status) || "open";
 
@@ -1237,7 +1237,17 @@ function safeHttpUrl(value: unknown): string {
   }
 }
 
-function readInvoices(invoices: Array<Record<string, unknown>>): PortalInvoiceSummary[] {
+function orderForInvoice(invoice: Record<string, unknown>, sources: PortalListingSources): Record<string, unknown> | null {
+  const requestId = text(invoice.orderRequestId);
+  const orderId = text(invoice.orderId);
+  const request = sources.orderRequest || null;
+  const order = sources.order || null;
+  if (request && (!requestId || text(request.id) === requestId)) return request;
+  if (order && (!orderId || text(order.id) === orderId)) return order;
+  return null;
+}
+
+function readInvoices(invoices: Array<Record<string, unknown>>, sources: PortalListingSources): PortalInvoiceSummary[] {
   const seen = new Set<string>();
   const summaries: PortalInvoiceSummary[] = [];
   for (const invoice of invoices) {
@@ -1247,11 +1257,7 @@ function readInvoices(invoices: Array<Record<string, unknown>>): PortalInvoiceSu
     const total = money(invoice.total);
     summaries.push({
       id,
-      invoiceNumber: orderHistoryInvoiceNumber({
-        invoiceNumber: invoice.invoiceNumber,
-        id,
-        createdAt: invoice.createdAt,
-      }),
+      invoiceNumber: portalDisplayedInvoiceNumber(invoice, orderForInvoice(invoice, sources)),
       status: text(invoice.status) || "draft",
       total,
       amountDue: invoice.amountDue == null ? total : money(invoice.amountDue),
@@ -1343,11 +1349,7 @@ function buildActivity(
 
   for (const invoice of sources.invoices || []) {
     const id = text(invoice.id);
-    const number = orderHistoryInvoiceNumber({
-      invoiceNumber: invoice.invoiceNumber,
-      id,
-      createdAt: invoice.createdAt,
-    });
+    const number = portalDisplayedInvoiceNumber(invoice, orderForInvoice(invoice, sources));
     const status = text(invoice.status) || "draft";
     const summary = status === "paid"
       ? `Payment recorded on ${number}`

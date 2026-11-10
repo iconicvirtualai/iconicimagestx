@@ -1032,7 +1032,7 @@ const EXAMPLE_WEBSITE_DETAIL = buildPortalListingDetail({
     yearBuilt: "2012",
     neighborhood: "Example Grove",
   },
-  invoices: [{ id: "example-invoice", invoiceNumber: "INV-EXAMPLE-1001", status: "partial", total: 250, amountDue: 128.5, amountPaid: 121.5 }],
+  invoices: [{ id: "example-invoice", invoiceNumber: "#001", orderNumber: "#001", status: "partial", total: 250, amountDue: 128.5, amountPaid: 121.5 }],
 });
 EXAMPLE_WEBSITE_DETAIL.photos = SAMPLE_GALLERY.map(([url, name], index) => ({
   id: `example-photo-${index}`,

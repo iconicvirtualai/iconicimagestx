@@ -12,6 +12,7 @@ import {
   invoiceEmailNumber,
   invoicePageInvoiceNumber,
   orderHistoryInvoiceNumber,
+  portalOrderNumberLabel,
   presentInvoiceNumber,
   receiptEmailNumber,
 } from "./orderProjectInvoice";
@@ -47,10 +48,10 @@ describe("invoice number surfaces", () => {
       billingListInvoiceNumber(fixture, when),
       invoiceEmailNumber(fixture, when),
       receiptEmailNumber(fixture, when),
-      buildClientInvoice(invoiceId, fixture, when).invoiceNumber,
       professionalInvoiceNumber(fixture.invoiceNumber, invoiceId, when),
     ];
     expect(numbers).toEqual(Array(numbers.length).fill(expected));
+    expect(buildClientInvoice(invoiceId, fixture, when).invoiceNumber).toBe(portalOrderNumberLabel({ id: fixture.orderRequestId }));
     expect(clientBillingInvoiceNumber(order, [fixture], when)).not.toBe("INV-M6DPEA");
 
     const pdf = new TextDecoder().decode(brandedInvoicePdf({
@@ -68,8 +69,8 @@ describe("invoice number surfaces", () => {
       listing: { id: "listing1" },
       invoices: [fixture],
     });
-    expect(portal.invoices[0].invoiceNumber).toBe(expected);
-    expect(portal.activity.map((event) => event.summary)).toContain(`Invoice ${expected} is draft`);
+    expect(portal.invoices[0].invoiceNumber).toBe(portalOrderNumberLabel({ id: fixture.orderRequestId }));
+    expect(portal.activity.map((event) => event.summary)).toContain(`Invoice ${portalOrderNumberLabel({ id: fixture.orderRequestId })} is draft`);
   });
 
   it("uses the same fallback only when no stored number exists", () => {
@@ -118,9 +119,9 @@ describe("invoice number surfaces", () => {
       billingListInvoiceNumber(qa, when),
       invoiceEmailNumber(qa, when),
       receiptEmailNumber(qa, when),
-      buildClientInvoice(qaId, qa, when).invoiceNumber,
     ];
     expect(numbers).toEqual(Array(numbers.length).fill(expected));
+    expect(buildClientInvoice(qaId, qa, when).invoiceNumber).toBe(portalOrderNumberLabel({ id: qa.orderRequestId }));
     expect(numbers).not.toContain("INV-2026-NVOICE");
 
     const pdf = new TextDecoder().decode(brandedInvoicePdf({
@@ -139,7 +140,7 @@ describe("invoice number surfaces", () => {
       listing: { id: "listing1" },
       invoices: [qa],
     });
-    expect(portal.invoices[0].invoiceNumber).toBe(expected);
+    expect(portal.invoices[0].invoiceNumber).toBe(portalOrderNumberLabel({ id: qa.orderRequestId }));
 
     const issued = new Date(issuedAt);
     const fallback = presentInvoiceNumber("INV-2026-0NaN", qaId, issued);
@@ -167,8 +168,8 @@ describe("invoice number surfaces", () => {
     expect(read("../client/pages/AdminInvoiceEditor.tsx")).toContain("invoicePageInvoiceNumber");
     expect(read("../shared/brandedInvoicePdf.ts")).toContain("brandedInvoiceNumber");
     expect(read("../client/lib/downloadBrandedInvoice.ts")).toContain("brandedInvoiceNumber");
-    expect(read("../shared/clientHome.ts")).toContain("orderHistoryInvoiceNumber");
-    expect(read("../shared/portalListingDetail.ts")).toContain("orderHistoryInvoiceNumber");
+    expect(read("../shared/clientHome.ts")).toContain("portalDisplayedInvoiceNumber");
+    expect(read("../shared/portalListingDetail.ts")).toContain("portalDisplayedInvoiceNumber");
     expect(read("../client/pages/AdminRevenue.tsx")).toContain("billingListInvoiceNumber");
     expect(read("../client/pages/AdminRevenue.tsx")).not.toContain("substring(0, 6)");
     expect(read("../client/pages/AdminClientAccount.tsx")).toContain("billingListInvoiceNumber");

@@ -114,7 +114,7 @@ export interface SampleCardFace {
 const SAMPLE_FACES: Record<string, SampleCardFace> = {
   "example-listing": {
     meta: "1 photo · Oct 4, 2026",
-    bits: ["Invoice INV-EXAMPLE-1001 · Partial", "Downloads locked until the balance is paid"],
+    bits: ["Order #001 · Partial", "Downloads locked until the balance is paid"],
     stage: "Delivery",
     stageValue: "Ready",
     width: "100%",
@@ -261,7 +261,7 @@ export function exampleThreads(): UnifiedThread[] {
 export function exampleInvoice(): ClientInvoiceStatement {
   return {
     id: "example-invoice",
-    invoiceNumber: "INV-EXAMPLE-1001",
+    invoiceNumber: "#001",
     status: "partial",
     clientName: "Example Agent",
     address: "100 Example Street, Suite 200, Spring, TX 77373",

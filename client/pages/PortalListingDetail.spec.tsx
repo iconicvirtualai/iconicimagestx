@@ -3,6 +3,7 @@ import { renderToString } from "react-dom/server";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import PortalListingDetail, { PortalListingDetailView } from "./PortalListingDetail";
 import { buildPortalListingDetail, defaultPortalWebsite, portalFactsDraftFromDetail } from "@shared/portalListingDetail";
+import { portalOrderNumberLabel } from "@shared/orderProjectInvoice";
 
 vi.mock("@/contexts/AuthContext", () => ({
   useAuth: () => ({
@@ -264,7 +265,7 @@ describe("portal listing detail page", () => {
   it("scaffolds marketing, invoices, and activity without a pay action", () => {
     expect(render("marketing")).toContain("Design tools are not connected yet.");
     const orders = render("orders");
-    expect(orders).toContain("INV-2026-100");
+    expect(orders).toContain(portalOrderNumberLabel({ id: "req1" }));
     expect(orders).toContain("draft");
     expect(orders).toContain("Total");
     expect(orders).toContain("$100.00");
