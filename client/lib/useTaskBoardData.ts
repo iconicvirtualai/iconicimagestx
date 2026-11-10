@@ -3,23 +3,23 @@
  * Writes taskBoardItems only. Does not email or text anyone.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   collection,
-  deleteDoc,
   doc,
   limit,
   onSnapshot,
   orderBy,
   query,
   serverTimestamp,
-  setDoc,
+  writeBatch,
   type DocumentData,
 } from "firebase/firestore";
+import type { User } from "firebase/auth";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
-import { db } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import type { ContactThreadView } from "@shared/contactThread";
 import {
   PHOTOS_INBOX_PREREQUISITES,
@@ -28,17 +28,20 @@ import {
 } from "@shared/inboundEmail";
 import { sampleEventPlanTasks } from "@shared/officeEvents";
 import {
+  TASK_BOARD_BATCH_LIMIT,
   TASK_BOARD_COLLECTION,
   buildTaskBoard,
   chicagoToday,
+  chunkItems,
+  describeTaskBoardSaveError,
   readTaskAssignees,
   readTaskBoardOverlay,
   sampleTaskBoard,
   taskBoardDocId,
-  taskRemovalWrite,
-  taskToOverlay,
+  taskBoardWriteData,
   type TaskAssignee,
   type TaskBoardOverlay,
+  type TaskBoardRemoval,
   type TaskBoardTask,
 } from "@shared/taskBoard";
 
@@ -67,7 +70,9 @@ export function useTaskBoardData() {
   const [overlays, setOverlays] = useState<TaskBoardOverlay[]>([]);
   const [sourceErrors, setSourceErrors] = useState<string[]>([]);
   const [loading, setLoading] = useState(!sample);
-  const [draft, setDraft] = useState<TaskBoardTask[] | null>(() => (sample ? readSampleDraft() : null));
+  const [draft, setDraft] = useState<TaskBoardTask[] | null>(() => (sample ? readSampleDraft()?.tasks ?? null : null));
+  const [clearedDraft, setClearedDraft] = useState<TaskBoardTask[] | null>(() => (sample ? readSampleDraft()?.cleared ?? null : null));
+  const saveGeneration = useRef(0);
 
   const live = useMemo(() => buildTaskBoard({
     orderRequests,
@@ -85,10 +90,12 @@ export function useTaskBoardData() {
 
   const model = sample ? sampleModel : live;
   const tasks = draft ?? model.tasks;
+  const cleared = clearedDraft ?? model.cleared;
 
   useEffect(() => {
     if (sample) return;
     setDraft(null);
+    setClearedDraft(null);
   }, [model, sample]);
 
   useEffect(() => {
@@ -187,13 +194,33 @@ export function useTaskBoardData() {
     };
   }, [sample, user]);
 
-  const commit = (next: TaskBoardTask[], removed: TaskBoardTask | null = null) => {
+  const commit = (next: TaskBoardTask[], removed: TaskBoardRemoval[] = []) => {
+    const nextIds = new Set(next.map((task) => task.id));
+    const deletedIds = new Set(removed.filter((item) => item.mode === "delete").map((item) => item.task.id));
+    const clearedById = new Map<string, TaskBoardTask>();
+    for (const task of cleared) {
+      if (nextIds.has(task.id) || deletedIds.has(task.id)) continue;
+      clearedById.set(task.id, task);
+    }
+    for (const item of removed) {
+      if (item.mode !== "clear" || nextIds.has(item.task.id)) continue;
+      clearedById.set(item.task.id, { ...item.task, dismissed: true });
+    }
+    const clearedAfter = [...clearedById.values()];
     setDraft(next);
+    setClearedDraft(clearedAfter);
     if (sample) {
-      writeSampleDraft(next);
+      writeSampleDraft(next, clearedAfter);
       return;
     }
-    void persist(tasks, next, removed);
+    const generation = ++saveGeneration.current;
+    const previous = tasks;
+    void persist(user, previous, next, removed).then((ok) => {
+      if (!ok && saveGeneration.current === generation) {
+        setDraft(null);
+        setClearedDraft(null);
+      }
+    });
   };
 
   return {
@@ -203,6 +230,7 @@ export function useTaskBoardData() {
     user,
     loading,
     tasks,
+    cleared,
     staff: sample ? sampleModel.staff : staff,
     emailNotice: sample ? photosInboxNotice(false) : model.emailNotice,
     inboxPrerequisites: sample || emailConnected ? [] : inboxPrerequisites,
@@ -211,52 +239,97 @@ export function useTaskBoardData() {
   };
 }
 
-function readSampleDraft(): TaskBoardTask[] | null {
+function readSampleDraft(): { tasks: TaskBoardTask[]; cleared: TaskBoardTask[] } | null {
   try {
     const raw = sessionStorage.getItem(SAMPLE_DRAFT_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as TaskBoardTask[];
-    return Array.isArray(parsed) ? parsed : null;
+    const parsed = JSON.parse(raw) as TaskBoardTask[] | { tasks?: TaskBoardTask[]; cleared?: TaskBoardTask[] };
+    if (Array.isArray(parsed)) return { tasks: parsed, cleared: [] };
+    if (parsed && Array.isArray(parsed.tasks)) {
+      return { tasks: parsed.tasks, cleared: Array.isArray(parsed.cleared) ? parsed.cleared : [] };
+    }
+    return null;
   } catch {
     return null;
   }
 }
 
-function writeSampleDraft(tasks: TaskBoardTask[]) {
+function writeSampleDraft(tasks: TaskBoardTask[], cleared: TaskBoardTask[]) {
   try {
-    sessionStorage.setItem(SAMPLE_DRAFT_KEY, JSON.stringify(tasks));
+    sessionStorage.setItem(SAMPLE_DRAFT_KEY, JSON.stringify({ tasks, cleared }));
   } catch {
     /* The sample still updates in this view. */
   }
 }
 
-async function persist(previous: TaskBoardTask[], next: TaskBoardTask[], removed: TaskBoardTask | null) {
+type BoardWrite =
+  | { kind: "delete"; id: string }
+  | { kind: "set"; id: string; data: Record<string, unknown> };
+
+async function persist(user: User | null, previous: TaskBoardTask[], next: TaskBoardTask[], removed: TaskBoardRemoval[]): Promise<boolean> {
   const previousJson = new Map(previous.map((task) => [task.id, JSON.stringify(task)]));
   const changed = next.filter((task) => previousJson.get(task.id) !== JSON.stringify(task));
+  const writes: BoardWrite[] = [];
+  for (const item of removed) {
+    const id = taskBoardDocId(item.task.id);
+    if (item.mode === "delete" && item.task.manual) {
+      writes.push({ kind: "delete", id });
+      continue;
+    }
+    writes.push({
+      kind: "set",
+      id,
+      data: {
+        ...taskBoardWriteData({ ...item.task, dismissed: true }),
+        dismissed: true,
+        updatedAt: serverTimestamp(),
+      },
+    });
+  }
+  for (const task of changed) {
+    writes.push({
+      kind: "set",
+      id: taskBoardDocId(task.id),
+      data: {
+        ...taskBoardWriteData(task),
+        ...(previousJson.has(task.id) ? {} : { createdAt: serverTimestamp() }),
+        updatedAt: serverTimestamp(),
+      },
+    });
+  }
+  if (writes.length === 0) return true;
   try {
-    if (removed) {
-      const write = taskRemovalWrite(removed);
-      const ref = doc(db, write.collection, write.id);
-      if (write.deleteDoc) await deleteDoc(ref);
-      else {
-        await setDoc(ref, {
-          ...taskToOverlay({ ...removed, dismissed: true }),
-          dismissed: true,
-          updatedAt: serverTimestamp(),
-        }, { merge: true });
+    await assertStaffToken(user);
+    const batches = chunkItems(writes, TASK_BOARD_BATCH_LIMIT);
+    for (let index = 0; index < batches.length; index += 1) {
+      const batch = writeBatch(db);
+      for (const write of batches[index]) {
+        const ref = doc(db, TASK_BOARD_COLLECTION, write.id);
+        if (write.kind === "delete") batch.delete(ref);
+        else batch.set(ref, write.data, { merge: true });
+      }
+      try {
+        await batch.commit();
+      } catch (error) {
+        const described = describeTaskBoardSaveError(error);
+        console.error(`[TaskBoard] Save failed (${described.code}) on batch ${index + 1} of ${batches.length}.`, error);
+        toast.error(`Could not save the task board. ${described.summary}`);
+        return false;
       }
     }
-    await Promise.all(changed.map(async (task) => {
-      const ref = doc(db, TASK_BOARD_COLLECTION, taskBoardDocId(task.id));
-      const created = previousJson.has(task.id) ? {} : { createdAt: serverTimestamp() };
-      await setDoc(ref, {
-        ...taskToOverlay(task),
-        ...created,
-        updatedAt: serverTimestamp(),
-      }, { merge: true });
-    }));
+    return true;
   } catch (error) {
-    console.error("[TaskBoard] Save failed.", error);
-    toast.error("Could not save the task board.");
+    const described = describeTaskBoardSaveError(error);
+    console.error(`[TaskBoard] Save failed (${described.code}).`, error);
+    toast.error(`Could not save the task board. ${described.summary}`);
+    return false;
   }
+}
+
+async function assertStaffToken(user: User | null): Promise<void> {
+  if (!user || !auth.currentUser || auth.currentUser.uid !== user.uid) {
+    throw Object.assign(new Error("missing staff auth token"), { code: "unauthenticated" });
+  }
+  const token = await auth.currentUser.getIdToken();
+  if (!token) throw Object.assign(new Error("missing staff auth token"), { code: "unauthenticated" });
 }

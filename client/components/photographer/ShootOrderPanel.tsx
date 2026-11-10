@@ -27,6 +27,14 @@ import { photographerUploadFolder } from "@shared/photographerPortal";
  * publish the gallery sequence. Office staff see it on Shoots. Photographers
  * see it on the job the upload bookmark opens.
  */
+function sampleGalleryShots(listingId: string): WorkingShot[] {
+  if (listingId !== "sampleUpload001") return [];
+  return [
+    { key: "sample-front", name: "front.jpg", url: "/media/photos/luxury-exterior.jpg", culled: false, shotAt: 1 },
+    { key: "sample-kitchen", name: "kitchen.jpg", url: "/media/photos/luxury-interior.jpg", culled: false, shotAt: 2 },
+  ];
+}
+
 export function ShootOrderPanel({
   listingId,
   fallbackAddress,
@@ -68,13 +76,16 @@ export function ShootOrderPanel({
     fetchListing(listingId)
       .then((listing) => {
         const fromServer = shotsFromListingImages(listing.images);
+        const base = fromServer.length ? fromServer : sampleGalleryShots(listingId);
         const stored = readStoredPhotoOrder(listingId);
-        const locals = shotsRef.current.filter((shot) => !shot.path && !fromServer.some((item) => item.key === shot.key));
-        apply(mergeStoredOrder([...fromServer, ...locals], stored));
+        const locals = shotsRef.current.filter((shot) => !shot.path && !base.some((item) => item.key === shot.key));
+        apply(mergeStoredOrder([...base, ...locals], stored));
       })
       .catch(() => {
         const stored = readStoredPhotoOrder(listingId);
-        if (stored.length) apply(mergeStoredOrder(shotsRef.current, stored));
+        const sample = sampleGalleryShots(listingId);
+        if (sample.length) apply(mergeStoredOrder(sample, stored));
+        else if (stored.length) apply(mergeStoredOrder(shotsRef.current, stored));
       });
     return () => {
       cancelled = true;

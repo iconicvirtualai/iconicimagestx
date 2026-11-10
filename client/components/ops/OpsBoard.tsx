@@ -73,15 +73,26 @@ export function OpsBoard({
           One shoot, one place. Follow it from the schedule through upload and editing, review, and delivery.
           Pending, Undelivered, and Delivered still follow the gallery. Mark Delivered uses the same hold as sending the gallery.
         </p>
-        {showPreview && (
-          <Link
-            to={OPS_PREVIEW_PATH}
-            data-testid="view-as-photographer"
-            className="inline-flex shrink-0 items-center rounded-xl bg-black px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white hover:bg-zinc-800"
-          >
-            View as photographer
-          </Link>
-        )}
+        <div className="flex shrink-0 flex-wrap gap-2">
+          {!demo && (
+            <Link
+              to="/admin/ops?sample=1&stage=uploads&job=sampleUpload001"
+              data-testid="ops-view-sample"
+              className="inline-flex items-center rounded-xl bg-[#0d9488] px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white hover:bg-[#0f766e]"
+            >
+              View sample gallery
+            </Link>
+          )}
+          {showPreview && (
+            <Link
+              to={OPS_PREVIEW_PATH}
+              data-testid="view-as-photographer"
+              className="inline-flex items-center rounded-xl bg-black px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white hover:bg-zinc-800"
+            >
+              View as photographer
+            </Link>
+          )}
+        </div>
       </div>
 
       {demo && (

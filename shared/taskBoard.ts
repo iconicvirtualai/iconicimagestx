@@ -234,8 +234,21 @@ export interface TaskBoardInput {
 
 export interface TaskBoardModel {
   tasks: TaskBoardTask[];
+  /** Hidden with a dismissal. Orders and deliveries are still in their own collections. */
+  cleared: TaskBoardTask[];
   emailNotice: string;
   emailConnected: boolean;
+}
+
+/** Firestore writeBatch allows 500 operations. Stay under that. */
+export const TASK_BOARD_BATCH_LIMIT = 400;
+
+export type TaskBoardRemovalMode = "delete" | "clear";
+
+export interface TaskBoardRemoval {
+  task: TaskBoardTask;
+  /** delete removes a manual task document. clear hides any task and can be restored. */
+  mode: TaskBoardRemovalMode;
 }
 
 export interface TaskBoardStat {
@@ -340,6 +353,87 @@ export function taskRemovalWrite(task: TaskBoardTask): {
   };
 }
 
+/** Hide from the board. The task document stays so Show cleared can restore it. */
+export function taskClearWrite(task: TaskBoardTask): {
+  collection: typeof TASK_BOARD_COLLECTION;
+  id: string;
+  deleteDoc: false;
+} {
+  return {
+    collection: TASK_BOARD_COLLECTION,
+    id: taskBoardDocId(task.id),
+    deleteDoc: false,
+  };
+}
+
+export function chunkItems<T>(items: T[], size = TASK_BOARD_BATCH_LIMIT): T[][] {
+  const limit = Math.max(1, Math.floor(size));
+  const chunks: T[][] = [];
+  for (let index = 0; index < items.length; index += limit) chunks.push(items.slice(index, index + limit));
+  return chunks;
+}
+
+/** Plain Firestore data. Undefined and non-finite numbers are rejected by the client SDK. */
+export function taskBoardWriteData(task: TaskBoardTask): Record<string, unknown> {
+  const activity = (Array.isArray(task.activity) ? task.activity : []).slice(-20).flatMap((entry) => {
+    if (!entry || typeof entry.at !== "string" || typeof entry.text !== "string") return [];
+    const at = entry.at.trim();
+    const textValue = entry.text.trim();
+    if (!at || !textValue) return [];
+    return [{ at, text: textValue, ...(entry.sample === true ? { sample: true } : {}) }];
+  });
+  return omitUndefinedDeep(taskToOverlay({
+    ...task,
+    dueOn: task.dueOn || null,
+    sort: typeof task.sort === "number" && Number.isFinite(task.sort) ? task.sort : null,
+    resumeStage: task.resumeStage || null,
+    contentKind: task.contentKind || null,
+    contentStage: task.contentStage || null,
+    publishOn: task.publishOn || null,
+    insightId: task.insightId || null,
+    eventId: task.eventId || null,
+    activity,
+  }));
+}
+
+export function describeTaskBoardSaveError(error: unknown): { code: string; summary: string } {
+  const code = readErrorCode(error);
+  const detail = error instanceof Error ? error.message : "Unknown save error";
+  if (code === "permission-denied" || /insufficient permissions|permission denied/i.test(detail)) {
+    return { code: "permission-denied", summary: "permission-denied: Firestore denied the write." };
+  }
+  if (code === "unauthenticated" || /missing staff auth token|no staff firebase/i.test(detail)) {
+    return { code: "unauthenticated", summary: "unauthenticated: missing staff auth token." };
+  }
+  if (
+    code === "invalid-argument"
+    || /unsupported field value|invalid data|invalid document|exceeds the maximum|must be a string/i.test(detail)
+  ) {
+    return { code: "invalid-argument", summary: `validation: ${clip(detail, 220)}` };
+  }
+  if (code) return { code, summary: `${code}: ${clip(detail, 180)}` };
+  return { code: "unknown", summary: clip(detail, 180) };
+}
+
+export function withoutTasks(tasks: TaskBoardTask[], ids: string[]): { tasks: TaskBoardTask[]; removed: TaskBoardTask[] } {
+  const idSet = new Set(ids);
+  const removed = tasks.filter((task) => idSet.has(task.id) && !task.dismissed).map((task) => ({ ...task, dismissed: true }));
+  const removedIds = new Set(removed.map((task) => task.id));
+  return {
+    tasks: tasks.filter((task) => !removedIds.has(task.id)),
+    removed,
+  };
+}
+
+export function withRestored(tasks: TaskBoardTask[], cleared: TaskBoardTask[], ids: string[]): TaskBoardTask[] {
+  const idSet = new Set(ids);
+  const have = new Set(tasks.map((task) => task.id));
+  const back = cleared
+    .filter((task) => idSet.has(task.id) && !have.has(task.id))
+    .map((task) => ({ ...task, dismissed: false }));
+  return [...tasks, ...back];
+}
+
 export function taskBoardStats(tasks: TaskBoardTask[], today: string): TaskBoardStats {
   const openTasks = tasks.filter((task) => task.status !== "done");
   const production = openTasks.filter((task) => columnStage(task) === "production");
@@ -414,9 +508,10 @@ export function buildTaskBoard(input: TaskBoardInput): TaskBoardModel {
   const emails = input.emails || [];
   const candidates = deriveCandidates(input, staff);
   const overlays = input.overlays || [];
-  const tasks = mergeCandidates(candidates, overlays);
+  const merged = mergeCandidates(candidates, overlays);
   return {
-    tasks,
+    tasks: merged.tasks,
+    cleared: merged.cleared,
     emailConnected: input.emailConnected === true,
     emailNotice: photosInboxNotice(input.emailConnected === true),
   };
@@ -966,6 +1061,7 @@ export function sampleTaskBoard(today: string): TaskBoardModel & { staff: TaskAs
   tasks.sort(compareManual);
   return {
     tasks,
+    cleared: [],
     staff,
     emailConnected: false,
     emailNotice: built.emailNotice,
@@ -1065,27 +1161,38 @@ function deriveCandidates(input: TaskBoardInput, staff: TaskAssignee[]): TaskBoa
   return [...byPipeline.values()];
 }
 
-function mergeCandidates(candidates: TaskBoardTask[], overlays: TaskBoardOverlay[]): TaskBoardTask[] {
+function mergeCandidates(candidates: TaskBoardTask[], overlays: TaskBoardOverlay[]): { tasks: TaskBoardTask[]; cleared: TaskBoardTask[] } {
   const byPipeline = new Map(candidates.map((task) => [task.pipelineKey, task]));
   const seen = new Set<string>();
   const merged: TaskBoardTask[] = [];
+  const cleared: TaskBoardTask[] = [];
 
   for (const overlay of overlays) {
     if (overlay.manual) {
-      if (overlay.dismissed) continue;
+      if (overlay.dismissed) {
+        cleared.push(clearedTask(taskFromOverlay(overlay)));
+        continue;
+      }
       seen.add(overlay.pipelineKey);
       merged.push(taskFromOverlay(overlay));
       continue;
     }
     const candidate = byPipeline.get(overlay.pipelineKey);
     if (!candidate) {
-      if (overlay.dismissed || overlay.status !== "done") continue;
+      if (overlay.dismissed) {
+        cleared.push(clearedTask(taskFromOverlay(overlay)));
+        continue;
+      }
+      if (overlay.status !== "done") continue;
       seen.add(overlay.pipelineKey);
       merged.push(taskFromOverlay(overlay));
       continue;
     }
     seen.add(overlay.pipelineKey);
-    if (overlay.dismissed && overlay.fingerprint === candidate.fingerprint) continue;
+    if (overlay.dismissed && overlay.fingerprint === candidate.fingerprint) {
+      cleared.push(clearedTask(mergeOverlay(candidate, overlay)));
+      continue;
+    }
     merged.push(mergeOverlay(candidate, overlay));
   }
 
@@ -1093,7 +1200,11 @@ function mergeCandidates(candidates: TaskBoardTask[], overlays: TaskBoardOverlay
     if (seen.has(candidate.pipelineKey)) continue;
     merged.push(candidate);
   }
-  return merged;
+  return { tasks: merged, cleared };
+}
+
+function clearedTask(task: TaskBoardTask): TaskBoardTask {
+  return { ...task, dismissed: true };
 }
 
 function mergeOverlay(candidate: TaskBoardTask, overlay: TaskBoardOverlay): TaskBoardTask {
@@ -1742,6 +1853,30 @@ function nullableText(value: unknown): string | null {
 function dateOnly(value: unknown): string | null {
   const clean = text(value);
   return /^\d{4}-\d{2}-\d{2}$/.test(clean) ? clean : null;
+}
+
+function omitUndefinedDeep(value: unknown): Record<string, unknown> {
+  const output: Record<string, unknown> = {};
+  if (!value || typeof value !== "object" || Array.isArray(value)) return output;
+  for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+    if (item === undefined) continue;
+    output[key] = omitUndefinedValue(item);
+  }
+  return output;
+}
+
+function omitUndefinedValue(value: unknown): unknown {
+  if (typeof value === "number" && !Number.isFinite(value)) return null;
+  if (Array.isArray(value)) return value.map((item) => omitUndefinedValue(item));
+  if (!value || typeof value !== "object") return value;
+  return omitUndefinedDeep(value);
+}
+
+function readErrorCode(error: unknown): string {
+  if (!error || typeof error !== "object" || !("code" in error)) return "";
+  const code = (error as { code?: unknown }).code;
+  if (typeof code !== "string") return "";
+  return code.replace(/^firestore\//, "");
 }
 
 function isOrigin(value: unknown): value is TaskOrigin {

@@ -53,6 +53,8 @@ let db: ReturnType<typeof getFirestore>;
 try {
   db = initializeFirestore(app, {
     experimentalForceLongPolling: true,
+    // Match the Admin SDK. Undefined fields are omitted instead of failing the write.
+    ignoreUndefinedProperties: true,
   });
 } catch {
   db = getFirestore(app);
