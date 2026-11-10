@@ -9,7 +9,6 @@ import twilio from "twilio";
 import { google } from "googleapis";
 import crypto, { randomBytes, createHmac as createHmac$1, timingSafeEqual as timingSafeEqual$1, randomUUID } from "crypto";
 import crypto$1, { timingSafeEqual, createHmac, randomUUID as randomUUID$1, randomBytes as randomBytes$1, createHash } from "node:crypto";
-import sharp from "sharp";
 import Stripe from "stripe";
 import * as XLSX from "xlsx";
 import fs$1 from "node:fs";
@@ -16948,6 +16947,9 @@ async function inspectFinishedListingJpeg(input) {
   }
   return parseDeliveryInspection(body) || deliveryInspection("flag", [INSPECTION_FAILED_NOTE]);
 }
+function loadSharp() {
+  return import("sharp").then((mod) => mod.default);
+}
 const ANALYSIS_LONG_EDGE = 512;
 const MIN_LAWN_FRACTION = 0.02;
 const MAX_LAWN_FRACTION = 0.78;
@@ -16971,6 +16973,7 @@ async function compositeGrass(input) {
   }
   const usedModel = Boolean(input.apiKey || input.inpaint);
   const painted = await fillMaskedLawn(photo, mask, input);
+  const sharp = await loadSharp();
   const jpeg = await sharp(Buffer.from(painted.raw), {
     raw: { width: photo.width, height: photo.height, channels: 3 }
   }).jpeg({ quality: 95, chromaSubsampling: "4:4:4", mozjpeg: true }).toBuffer();
@@ -16996,6 +16999,7 @@ async function lawnMaskPng(photo) {
 }
 async function decodeRgb(bytes) {
   try {
+    const sharp = await loadSharp();
     const { data, info } = await sharp(bytes, { failOn: "none", limitInputPixels: 8e7 }).rotate().removeAlpha().toColorspace("srgb").raw().toBuffer({ resolveWithObject: true });
     if (!info.width || !info.height || info.channels < 3) return null;
     return { data: new Uint8Array(data), width: info.width, height: info.height };
@@ -17008,6 +17012,7 @@ async function downscale(photo) {
   if (scale >= 1) return photo;
   const width = Math.max(32, Math.round(photo.width * scale));
   const height = Math.max(32, Math.round(photo.height * scale));
+  const sharp = await loadSharp();
   const { data, info } = await sharp(Buffer.from(photo.data), {
     raw: { width: photo.width, height: photo.height, channels: 3 }
   }).resize(width, height, { fit: "fill" }).raw().toBuffer({ resolveWithObject: true });
@@ -17026,6 +17031,7 @@ async function maskFromSegmentation(photo) {
 }
 async function maskFromOverride(mask, width, height) {
   try {
+    const sharp = await loadSharp();
     const { data, info } = await sharp(mask, { failOn: "none", limitInputPixels: 4e7 }).rotate().resize(width, height, { fit: "fill" }).removeAlpha().raw().toBuffer({ resolveWithObject: true });
     const alpha = new Uint8Array(width * height);
     const channels = info.channels || 3;
@@ -17041,6 +17047,7 @@ async function maskFromOverride(mask, width, height) {
 }
 async function upsampleMask(binary, sw, sh, width, height) {
   const blurred = boxBlur(binary, sw, sh, 1);
+  const sharp = await loadSharp();
   const resized = await grayFrom(
     sharp(Buffer.from(blurred), { raw: { width: sw, height: sh, channels: 1 } }).resize(width, height, { fit: "fill", kernel: "lanczos3" }),
     width,
@@ -17058,6 +17065,7 @@ async function grayFrom(pipeline, width, height) {
   return out;
 }
 async function softenMask(alpha, width, height, sigma = 0) {
+  const sharp = await loadSharp();
   let pipeline = sharp(Buffer.from(alpha), { raw: { width, height, channels: 1 } });
   if (sigma > 0) pipeline = pipeline.blur(sigma);
   const out = await grayFrom(pipeline, width, height);
@@ -17065,6 +17073,7 @@ async function softenMask(alpha, width, height, sigma = 0) {
   return out;
 }
 async function encodeMask(alpha, width, height) {
+  const sharp = await loadSharp();
   return sharp(Buffer.from(alpha), { raw: { width, height, channels: 1 } }).png().toBuffer();
 }
 async function fillMaskedLawn(photo, alpha, input) {
@@ -17073,6 +17082,7 @@ async function fillMaskedLawn(photo, alpha, input) {
 }
 async function inpaintFill(photo, alpha, input) {
   const target = grassInpaintSize(photo.width, photo.height);
+  const sharp = await loadSharp();
   const image = await sharp(Buffer.from(photo.data), {
     raw: { width: photo.width, height: photo.height, channels: 3 }
   }).resize(target.width, target.height, { fit: "fill" }).png().toBuffer();
@@ -17091,6 +17101,7 @@ async function inpaintFill(photo, alpha, input) {
   return { data: new Uint8Array(data), width: info.width, height: info.height };
 }
 async function editMaskPng(alpha, srcW, srcH, dstW, dstH) {
+  const sharp = await loadSharp();
   const resized = await sharp(Buffer.from(alpha), { raw: { width: srcW, height: srcH, channels: 1 } }).resize(dstW, dstH, { fit: "fill" }).raw().toBuffer();
   const rgba = Buffer.alloc(dstW * dstH * 4);
   const channels = Math.max(1, Math.round(resized.length / (dstW * dstH)));
@@ -17143,6 +17154,7 @@ async function patchFill(photo, alpha, reference) {
   return { data, width, height };
 }
 async function referencePatches(reference) {
+  const sharp = await loadSharp();
   const base = sharp(reference, { failOn: "none" }).rotate().resize({ width: 900, withoutEnlargement: true });
   const patches = [];
   for (const angle of [0, 90, 180, 270]) {
@@ -36203,8 +36215,8 @@ function bucketName() {
   return process.env.FIREBASE_STORAGE_BUCKET || process.env.VITE_FIREBASE_STORAGE_BUCKET || "";
 }
 async function optimizeImage(bytes) {
-  const sharp2 = (await import("sharp")).default;
-  const body = await sharp2(bytes, { failOn: "none" }).rotate().resize({ width: 2e3, withoutEnlargement: true }).webp({ quality: 82 }).toBuffer();
+  const sharp = (await import("sharp")).default;
+  const body = await sharp(bytes, { failOn: "none" }).rotate().resize({ width: 2e3, withoutEnlargement: true }).webp({ quality: 82 }).toBuffer();
   return { body, type: "image/webp", ext: "webp" };
 }
 async function saveObject(pageId, ext, body, type) {

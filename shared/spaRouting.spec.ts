@@ -30,7 +30,8 @@ describe("vercel function split", () => {
   it("ships sharp with the main API and keeps display images on their own function", () => {
     const index = readFileSync(new URL("../api/index.mjs", import.meta.url), "utf8");
     const media = readFileSync(new URL("../api/media-display.mjs", import.meta.url), "utf8");
-    expect(index).toMatch(/from ["']sharp["']|import\(["']sharp["']\)/);
+    expect(index).toMatch(/import\(["']sharp["']\)/);
+    expect(index).not.toMatch(/^import\s+sharp\s+from\s+["']sharp["']/m);
     expect(index).not.toContain("handleMediaDisplay");
     expect(index).not.toContain("@img/sharp");
     expect(media).toMatch(/from ["']sharp["']/);
@@ -46,14 +47,15 @@ describe("vercel function split", () => {
     const display = vercel.functions["api/media-display.mjs"];
     expect(typeof main.includeFiles).toBe("string");
     expect(typeof display.includeFiles).toBe("string");
-    expect(main.includeFiles).toContain("**/sharp/**");
-    expect(main.includeFiles).toContain("sharp-linux-x64");
-    expect(main.includeFiles).toContain("sharp-libvips-linux-x64");
     expect(main.includeFiles).toContain("public/studio/grass-reference.jpg");
+    expect(main.includeFiles).toContain(display.includeFiles);
+    expect(display.includeFiles).toBe(
+      "node_modules/.pnpm/@img+sharp-libvips-linux-x64@*/node_modules/@img/sharp-libvips-linux-x64/**",
+    );
     expect(main.excludeFiles).toContain("linuxmusl");
     expect(main.excludeFiles).not.toContain("node_modules/sharp/**");
-    expect(display.includeFiles).toContain("sharp-libvips-linux-x64");
     expect(display.excludeFiles).toContain("public/media");
+    expect(display.excludeFiles).toContain("sharp-linuxmusl-x64");
     for (const config of Object.values(vercel.functions)) {
       for (const value of Object.values(config)) {
         if (typeof value === "string") expect(value.length).toBeLessThanOrEqual(256);

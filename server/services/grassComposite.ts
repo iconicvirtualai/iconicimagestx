@@ -11,7 +11,6 @@
  * shadows stay. The raw model frame is never returned.
  */
 
-import sharp from "sharp";
 import {
   GRASS_APPLIED_NOTE,
   GRASS_INPAINT_PROMPT,
@@ -19,6 +18,12 @@ import {
   GRASS_UNCHANGED_NOTE,
 } from "../../shared/grassEdit";
 import { grassInpaintSize, inpaintMaskedPhoto } from "./openaiImageEdit";
+
+type Sharp = typeof import("sharp").default;
+
+function loadSharp(): Promise<Sharp> {
+  return import("sharp").then((mod) => mod.default);
+}
 
 const ANALYSIS_LONG_EDGE = 512;
 const MIN_LAWN_FRACTION = 0.02;
@@ -79,6 +84,7 @@ export async function compositeGrass(input: GrassCompositeInput): Promise<GrassC
 
   const usedModel = Boolean(input.apiKey || input.inpaint);
   const painted = await fillMaskedLawn(photo, mask, input);
+  const sharp = await loadSharp();
   const jpeg = await sharp(Buffer.from(painted.raw), {
     raw: { width: photo.width, height: photo.height, channels: 3 },
   })
@@ -112,6 +118,7 @@ export async function lawnMaskPng(photo: Buffer): Promise<{ png: Buffer | null; 
 
 async function decodeRgb(bytes: Buffer): Promise<Rgb | null> {
   try {
+    const sharp = await loadSharp();
     const { data, info } = await sharp(bytes, { failOn: "none", limitInputPixels: 80_000_000 })
       .rotate()
       .removeAlpha()
@@ -130,6 +137,7 @@ async function downscale(photo: Rgb): Promise<Rgb> {
   if (scale >= 1) return photo;
   const width = Math.max(32, Math.round(photo.width * scale));
   const height = Math.max(32, Math.round(photo.height * scale));
+  const sharp = await loadSharp();
   const { data, info } = await sharp(Buffer.from(photo.data), {
     raw: { width: photo.width, height: photo.height, channels: 3 },
   })
@@ -154,6 +162,7 @@ async function maskFromSegmentation(photo: Rgb): Promise<Uint8Array | null> {
 
 async function maskFromOverride(mask: Buffer, width: number, height: number): Promise<Uint8Array | null> {
   try {
+    const sharp = await loadSharp();
     const { data, info } = await sharp(mask, { failOn: "none", limitInputPixels: 40_000_000 })
       .rotate()
       .resize(width, height, { fit: "fill" })
@@ -175,6 +184,7 @@ async function maskFromOverride(mask: Buffer, width: number, height: number): Pr
 
 async function upsampleMask(binary: Uint8Array, sw: number, sh: number, width: number, height: number): Promise<Uint8Array> {
   const blurred = boxBlur(binary, sw, sh, 1);
+  const sharp = await loadSharp();
   const resized = await grayFrom(
     sharp(Buffer.from(blurred), { raw: { width: sw, height: sh, channels: 1 } })
       .resize(width, height, { fit: "fill", kernel: "lanczos3" }),
@@ -186,7 +196,7 @@ async function upsampleMask(binary: Uint8Array, sw: number, sh: number, width: n
   return softenMask(resized, width, height, sigma);
 }
 
-async function grayFrom(pipeline: ReturnType<typeof sharp>, width: number, height: number): Promise<Uint8Array> {
+async function grayFrom(pipeline: ReturnType<Sharp>, width: number, height: number): Promise<Uint8Array> {
   const { data, info } = await pipeline.raw().toBuffer({ resolveWithObject: true });
   const out = new Uint8Array(width * height);
   const channels = Math.max(1, info.channels || 1);
@@ -195,6 +205,7 @@ async function grayFrom(pipeline: ReturnType<typeof sharp>, width: number, heigh
 }
 
 async function softenMask(alpha: Uint8Array, width: number, height: number, sigma = 0): Promise<Uint8Array> {
+  const sharp = await loadSharp();
   let pipeline = sharp(Buffer.from(alpha), { raw: { width, height, channels: 1 } });
   if (sigma > 0) pipeline = pipeline.blur(sigma);
   const out = await grayFrom(pipeline, width, height);
@@ -203,6 +214,7 @@ async function softenMask(alpha: Uint8Array, width: number, height: number, sigm
 }
 
 async function encodeMask(alpha: Uint8Array, width: number, height: number): Promise<Buffer> {
+  const sharp = await loadSharp();
   return sharp(Buffer.from(alpha), { raw: { width, height, channels: 1 } })
     .png()
     .toBuffer();
@@ -221,6 +233,7 @@ async function fillMaskedLawn(
 
 async function inpaintFill(photo: Rgb, alpha: Uint8Array, input: GrassCompositeInput): Promise<Rgb> {
   const target = grassInpaintSize(photo.width, photo.height);
+  const sharp = await loadSharp();
   const image = await sharp(Buffer.from(photo.data), {
     raw: { width: photo.width, height: photo.height, channels: 3 },
   }).resize(target.width, target.height, { fit: "fill" }).png().toBuffer();
@@ -248,6 +261,7 @@ async function inpaintFill(photo: Rgb, alpha: Uint8Array, input: GrassCompositeI
 
 /** Alpha 0 is the lawn the model may change. Everything else is opaque. */
 async function editMaskPng(alpha: Uint8Array, srcW: number, srcH: number, dstW: number, dstH: number): Promise<Buffer> {
+  const sharp = await loadSharp();
   const resized = await sharp(Buffer.from(alpha), { raw: { width: srcW, height: srcH, channels: 1 } })
     .resize(dstW, dstH, { fit: "fill" })
     .raw()
@@ -309,6 +323,7 @@ async function patchFill(photo: Rgb, alpha: Uint8Array, reference: Buffer): Prom
 }
 
 async function referencePatches(reference: Buffer): Promise<Rgb[]> {
+  const sharp = await loadSharp();
   const base = sharp(reference, { failOn: "none" }).rotate().resize({ width: 900, withoutEnlargement: true });
   const patches: Rgb[] = [];
   for (const angle of [0, 90, 180, 270]) {
