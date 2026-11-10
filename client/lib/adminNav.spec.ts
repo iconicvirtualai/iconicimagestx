@@ -51,6 +51,10 @@ describe("studio nav", () => {
     expect(hrefs).not.toContain("/admin/current-pricing");
     expect(hrefs).toContain("/admin/pricing");
     expect(hrefs).toContain("/admin/events");
+    expect(hrefs).toContain("/admin/files");
+    const files = navGroups.flatMap((group) => group.items).find((item) => item.href === "/admin/files");
+    expect(files?.label).toBe("Files");
+    expect(files?.roles).toEqual(["admin", "coordinator", "photographer", "editor"]);
     expect(hrefs).not.toContain("/admin/holiday-rsvps");
     expect(mostSpecificNavHref("/admin/events/thankful-2026", hrefs)).toBe("/admin/events");
   });

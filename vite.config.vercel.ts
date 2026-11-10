@@ -60,6 +60,8 @@ export default defineConfig({
         "zod",
         "serverless-http",
         "sharp",
+        "@aws-sdk/client-s3",
+        "@aws-sdk/s3-request-presigner",
       ],
       output: {
         format: "es",

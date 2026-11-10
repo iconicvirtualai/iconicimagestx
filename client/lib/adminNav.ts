@@ -17,6 +17,7 @@ import {
   Palette,
   Settings,
   ShoppingBag,
+  FolderClosed,
   UserCircle,
   Users,
 } from "lucide-react";
@@ -55,6 +56,7 @@ export const navGroups: { label: string; items: AdminNavItem[] }[] = [
       { label: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard, roles: COORD_UP },
       { label: "Studio", href: "/admin/studio", icon: Camera, roles: ALL_STAFF },
       { label: "Orders", href: "/admin/orders", icon: ShoppingBag, roles: COORD_UP },
+      { label: "Files", href: "/admin/files", icon: FolderClosed, roles: ALL_STAFF },
       { label: "Task board", href: "/admin/tasks", icon: ClipboardList, roles: ADMIN_ONLY },
       { label: "Content", href: "/admin/content", icon: Newspaper, roles: ADMIN_ONLY },
       { label: "Events", href: "/admin/events", icon: CalendarDays, roles: COORD_UP },

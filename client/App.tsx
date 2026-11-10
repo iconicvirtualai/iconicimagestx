@@ -6,6 +6,7 @@ import AdminAicon from "@/pages/AdminAicon";
 import AdminAutomation from "@/pages/AdminAutomation";
 import AdminSchedule from "@/pages/AdminSchedule";
 import AdminOrders from "@/pages/AdminOrders";
+import AdminFiles from "@/pages/AdminFiles";
 import AdminTaskBoard from "@/pages/AdminTaskBoard";
 import AdminContent from "@/pages/AdminContent";
 import AdminEvents, { HolidayRsvpsRedirect } from "@/pages/AdminEvents";
@@ -293,6 +294,7 @@ const App = () => (
             <Route path="/admin/automation" element={<ProtectedRoute requiredRole="admin"><AdminAutomation /></ProtectedRoute>} />
             <Route path="/admin/schedule" element={<ProtectedRoute requiredRole="coordinator"><AdminSchedule /></ProtectedRoute>} />
             <Route path="/admin/orders" element={<ProtectedRoute requiredRole="coordinator"><AdminOrders /></ProtectedRoute>} />
+            <Route path="/admin/files" element={<ProtectedRoute requiredRole="staff"><AdminFiles /></ProtectedRoute>} />
             <Route path="/admin/tasks" element={<ProtectedRoute requiredRole="admin"><AdminTaskBoard /></ProtectedRoute>} />
             <Route path="/admin/content" element={<ProtectedRoute requiredRole="admin"><AdminContent /></ProtectedRoute>} />
             <Route path="/admin/events" element={<ProtectedRoute requiredRole="coordinator"><AdminEvents /></ProtectedRoute>} />

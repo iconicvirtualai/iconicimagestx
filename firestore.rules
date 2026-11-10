@@ -452,6 +452,114 @@ service cloud.firestore {
       allow read, write: if isCoordinator() && request.auth.uid == uid;
     }
 
+    // Media library metadata for Backblaze. Staff only. Clients stay out.
+    // Publish this file in the Firebase console. Vercel does not deploy rules.
+    // Download and upload URLs are signed by /api/files, which checks the
+    // top-level folder access again. fileUploads is server-only.
+    function mediaPathOk(path) {
+      return path is string
+        && path.size() > 0
+        && path.size() < 800
+        && !path.matches('.*\\.\\..*')
+        && !path.matches('^/.*')
+        && !path.matches('.*\\\\.*')
+        && !path.matches('^\\.trash.*');
+    }
+
+    function mediaObjectKeyOk(key) {
+      return mediaPathOk(key)
+        || (key is string
+          && key.size() < 1200
+          && !key.matches('.*\\.\\..*')
+          && key.matches('^\\.trash/.+'));
+    }
+
+    function mediaRoot(path) {
+      return path.split('/')[0];
+    }
+
+    function mediaRestricted(path) {
+      return exists(/databases/$(database)/documents/fileFolderAccess/$(mediaRoot(path)))
+        && get(/databases/$(database)/documents/fileFolderAccess/$(mediaRoot(path))).data.access == 'owners_coordinators';
+    }
+
+    function canUseMediaPath(path) {
+      return isCoordinator() || !mediaRestricted(path);
+    }
+
+    function isValidMediaFile(data) {
+      return data.keys().hasAll(['path', 'name', 'folder', 'b2Key', 'contentType', 'size', 'trashed', 'searchTokens', 'createdAt', 'uploadedBy'])
+        && mediaPathOk(data.path)
+        && mediaObjectKeyOk(data.b2Key)
+        && data.name is string
+        && data.name.size() > 0
+        && data.name.size() < 181
+        && data.folder is string
+        && data.contentType is string
+        && data.contentType.size() < 121
+        && data.size is number
+        && data.size >= 0
+        && data.trashed is bool
+        && data.searchTokens is list
+        && data.searchTokens.size() < 100
+        && data.createdAt is number
+        && data.uploadedBy is string
+        && (!('tags' in data) || (data.tags is list && data.tags.size() < 30))
+        && (!('notes' in data) || (data.notes is string && data.notes.size() < 2001))
+        && (!('deletedAt' in data) || data.deletedAt == null || data.deletedAt is number);
+    }
+
+    function isValidMediaFolder(data) {
+      return data.keys().hasAll(['path', 'name', 'parent', 'trashed', 'createdAt'])
+        && mediaPathOk(data.path)
+        && data.name is string
+        && data.name.size() > 0
+        && data.name.size() < 181
+        && data.parent is string
+        && data.trashed is bool
+        && data.createdAt is number;
+    }
+
+    function isValidFolderAccess(data) {
+      return data.keys().hasOnly(['access', 'updatedAt'])
+        && data.access in ['all_staff', 'owners_coordinators']
+        && data.updatedAt is number;
+    }
+
+    match /files/{fileId} {
+      allow read: if isStaff() && canUseMediaPath(resource.data.path);
+      allow create: if isStaff()
+        && isValidMediaFile(request.resource.data)
+        && canUseMediaPath(request.resource.data.path);
+      allow update: if isStaff()
+        && isValidMediaFile(request.resource.data)
+        && canUseMediaPath(resource.data.path)
+        && canUseMediaPath(request.resource.data.path);
+      allow delete: if isStaff() && canUseMediaPath(resource.data.path);
+    }
+
+    match /folders/{folderId} {
+      allow read: if isStaff() && canUseMediaPath(resource.data.path);
+      allow create: if isStaff()
+        && isValidMediaFolder(request.resource.data)
+        && canUseMediaPath(request.resource.data.path);
+      allow update: if isStaff()
+        && isValidMediaFolder(request.resource.data)
+        && canUseMediaPath(resource.data.path)
+        && canUseMediaPath(request.resource.data.path);
+      allow delete: if isStaff() && canUseMediaPath(resource.data.path);
+    }
+
+    match /fileFolderAccess/{root} {
+      allow read: if isStaff();
+      allow create, update: if isCoordinator() && isValidFolderAccess(request.resource.data);
+      allow delete: if false;
+    }
+
+    match /fileUploads/{uploadId} {
+      allow read, write: if false;
+    }
+
     // ─── Catch-all: deny everything else ─────────────────────────────────────
     match /{document=**} {
       allow read, write: if false;

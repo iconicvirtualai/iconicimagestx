@@ -59,6 +59,7 @@ import siteContentRouter from "./routes/siteContent";
 import insightsRouter, { handleInsightShell } from "./routes/insights";
 import testDataCleanupRouter from "./routes/testDataCleanup";
 import holyGrailRouter from "./routes/holyGrail";
+import filesRouter from "./routes/files";
 import { originForHost, robotsTxt, sitemapXml } from "../shared/siteSeo.ts";
 import { amenityMediaRequestAllowed } from "../shared/amenityStock.ts";
 import stockFootageRouter from "./routes/stockFootage";
@@ -323,6 +324,7 @@ export function createServer() {
   app.use("/api/apprenticeship", apprenticeshipRouter);
   app.use("/api/admin/test-data", testDataCleanupRouter);
   app.use("/api/holy-grail", holyGrailRouter);
+  app.use("/api/files", filesRouter);
 
   // ─── Error handler ─────────────────────────────────────────────────
   app.use(
