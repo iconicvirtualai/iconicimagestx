@@ -12,6 +12,7 @@ import { visibleToPortalClient } from "../../shared/listingWrite";
 import {
   addressText,
   buildClientAppointment,
+  mergeListingShoots,
   buildClientInvoice,
   buildClientListing,
   sortNewestFirst,
@@ -277,12 +278,13 @@ router.get("/me/home", requireAuth, async (req: AuthenticatedRequest, res) => {
       .map((entry) => entry.data().orderRequestId)
       .filter((id): id is string => typeof id === "string" && id.trim().length > 0);
     const orderRequests = await orderRequestsById(requestIds);
-    const appointments = appointmentDocs.map((entry) => {
+    const storedAppointments = appointmentDocs.map((entry) => {
       const data = asRecord(jsonSafe(entry.data()));
       const orderRequestId = typeof data.orderRequestId === "string" ? data.orderRequestId : "";
       return buildClientAppointment(entry.id, data, orderRequests.get(orderRequestId) || null);
     });
     const listings = sortNewestFirst(projects);
+    const appointments = mergeListingShoots(storedAppointments, listings);
     const invoiceRows = sortNewestFirst(invoices);
 
     return res.json({

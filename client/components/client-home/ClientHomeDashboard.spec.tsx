@@ -104,14 +104,13 @@ describe("client home dashboard", () => {
     expect(html).toContain("Listings");
     expect(html).toContain("Place Order");
     expect(html).toContain('href="/portal/order"');
-    expect(html).toContain("lg:hidden");
-    expect(html).toContain("hidden lg:block");
+    expect(html).toContain("phone-menu");
+    expect(html).toContain("rail-nav");
     expect(html).toContain('href="/portal/settings/profile"');
     expect(html).toContain('href="/portal/settings/team"');
     expect(html).toContain('href="/portal/settings/clients"');
     expect(html).toContain('href="/portal/settings/billing"');
-    expect(html).toContain("minmax(min(100%,280px),360px)");
-    expect(html).toContain("items-start");
+    expect(html).toContain("lcard");
     expect(html).not.toContain("2xl:grid-cols-4");
     expect(html).not.toContain("xl:grid-cols-2");
     expect(html).toContain("Schedule");
@@ -193,7 +192,9 @@ describe("client home dashboard", () => {
   it("shows an empty listings state instead of sample properties", () => {
     const html = view();
     expect(html).toContain("No listings are tied to this account yet");
-    expect(html).not.toContain("https://");
+    expect(html).not.toContain("100 Example Street");
+    expect(html).not.toContain("Windsong");
+    expect(html).not.toContain("files.example");
   });
 
   it("expands an invoice into a download and does not ask for payment", () => {

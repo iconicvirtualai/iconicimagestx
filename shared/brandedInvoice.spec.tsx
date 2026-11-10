@@ -163,7 +163,7 @@ describe("branded invoice pdf", () => {
       face,
     }));
     expect(pdf).toContain("PROCESSING");
-    expect(pdf).toContain("$ 0");
+    expect(pdf).toContain("$0.00");
     expect(pdf).toContain("$ 549");
     expect(pdf).not.toContain("$564.37");
     expect(pdf).not.toContain("INCLUDED");

@@ -118,7 +118,7 @@ export function ProfileSettings({
         <Field label="Email"><input className={fieldClass} type="email" value={draft.email} onChange={(event) => setDraft({ ...draft, email: event.target.value })} /></Field>
         <Field label="Brokerage"><input className={fieldClass} value={draft.brokerage} onChange={(event) => setDraft({ ...draft, brokerage: event.target.value })} /></Field>
         <Field label="Website"><input className={fieldClass} value={draft.website} onChange={(event) => setDraft({ ...draft, website: event.target.value })} inputMode="url" placeholder="https://" /></Field>
-        <ImageField label="Headshot" url={draft.headshotUrl} onFile={(file) => void onFile("headshot", file)} />
+        <ImageField label="Headshot" url={draft.headshotUrl} monogram={`${draft.firstName[0] || ""}${draft.lastName[0] || ""}`.toUpperCase()} onFile={(file) => void onFile("headshot", file)} />
         <ImageField label="Company logo" url={draft.companyLogoUrl} onFile={(file) => void onFile("companyLogo", file)} />
         <ImageField label="Brokerage logo" url={draft.brokerageLogoUrl} onFile={(file) => void onFile("brokerageLogo", file)} />
       </div>
@@ -178,11 +178,11 @@ export function ProfileSettings({
   }
 }
 
-function ImageField({ label, url, onFile }: { label: string; url: string; onFile: (file: File | undefined) => void }) {
+function ImageField({ label, url, onFile, monogram = "" }: { label: string; url: string; onFile: (file: File | undefined) => void; monogram?: string }) {
   return (
     <Field label={label}>
       <div className="flex items-center gap-3 min-w-0">
-        {url ? <img src={url} alt="" className="h-14 w-14 shrink-0 rounded-xl object-cover bg-gray-100" /> : <div className="h-14 w-14 shrink-0 rounded-xl bg-gray-100" />}
+        {url ? <img src={url} alt="" className="h-14 w-14 shrink-0 rounded-full object-cover bg-gray-100" /> : <div className="av" style={{ width: 56, height: 56 }}>{monogram || " "}</div>}
         <label className="inline-flex min-h-11 min-w-0 items-center rounded-xl border border-gray-200 px-3 text-[10px] font-black uppercase tracking-widest">
           Upload
           <input type="file" accept="image/jpeg,image/png,image/webp" aria-label={label} className="sr-only" onChange={(event) => onFile(event.target.files?.[0])} />
@@ -259,7 +259,11 @@ export function TeamSettings({
                 <p className="font-black">{member.name}</p>
                 <p className="text-sm text-gray-500">{member.email}{member.phone ? ` · ${member.phone}` : ""}</p>
                 <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mt-2">{member.permissions.join(" · ")}</p>
-                <p className="text-xs text-gray-500 mt-1">{member.inviteEmail === "paused" ? "Invite email is paused." : member.inviteEmail === "sent" ? "Invite email sent." : "No invite email yet."}</p>
+                <p className="notice">{member.inviteEmail === "paused"
+                  ? example
+                    ? "Invite email is paused on this sample account. You can still queue Send invite; the email goes out when invites are on."
+                    : "Invite email is paused. You can still queue Send invite; the email goes out when invites are on."
+                  : member.inviteEmail === "sent" ? "Invite email sent." : "No invite email yet."}</p>
               </div>
               {member.logoUrl ? <img src={member.logoUrl} alt="" className="h-12 w-12 rounded-xl object-cover" /> : null}
             </div>
@@ -487,7 +491,6 @@ export function BillingSettings({
 }) {
   const [draft, setDraft] = useState(billing);
   const [message, setMessage] = useState("");
-  const [sourceId, setSourceId] = useState("");
   useEffect(() => setDraft(billing), [billing]);
   const dollars = (cents: number) => usd(cents / 100);
 
@@ -519,9 +522,10 @@ export function BillingSettings({
         <p className="text-sm text-gray-500 sm:col-span-2">Invoices and checkout use {billingAddressLine(draft) || "the billing address you save here"}.</p>
         <button type="submit" className="min-h-12 rounded-2xl bg-black text-white px-5 text-xs font-black uppercase tracking-widest w-fit">Save billing</button>
       </form>
-      <section className="bg-white rounded-2xl border border-gray-100 p-4 space-y-3">
-        <h3 className="text-xs font-black uppercase tracking-widest text-[#0d9488]">Credit or debit card</h3>
-        <p className="text-sm text-gray-600">Square keeps the card. Iconic stores the brand and last four digits, not the card number.</p>
+      <section className="panel card-on-file">
+        <h3>Card on file</h3>
+        <p>{cardLabel(billing.card) || "No card on file"}</p>
+        <p>Square keeps the card. Iconic stores only the brand and last four digits, never the full number.</p>
         {billing.square?.applicationId ? (
           <SquareCard
             applicationId={billing.square.applicationId}
@@ -530,21 +534,9 @@ export function BillingSettings({
             onToken={(token) => void onCard(token).then(() => setMessage("Card saved with Square.")).catch((err: Error) => setMessage(err.message))}
           />
         ) : (
-          <div className="space-y-2">
-            <p className="text-sm text-gray-500">Set SQUARE_APPLICATION_ID to show the Square card form. Do not type a card number here.</p>
-            {example ? null : (
-              <form
-                className="flex flex-col sm:flex-row gap-2"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void onCard(sourceId).then(() => setMessage("Card saved with Square.")).catch((err: Error) => setMessage(err.message));
-                }}
-              >
-                <input className={fieldClass} aria-label="Square card nonce" value={sourceId} onChange={(event) => setSourceId(event.target.value)} placeholder="Square card nonce" />
-                <button type="submit" className="min-h-11 rounded-xl bg-black text-white px-4 text-[10px] font-black uppercase tracking-widest">Save Square nonce</button>
-              </form>
-            )}
-          </div>
+          <button type="button" className="btn btn-ink btn-md" onClick={() => setMessage(example ? "Sample preview — Square checkout is not opened." : "Update card opens Square checkout. Iconic never asks for the full number on this page.")}>
+            Update card
+          </button>
         )}
       </section>
       <section>

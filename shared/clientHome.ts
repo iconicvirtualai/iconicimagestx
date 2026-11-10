@@ -114,6 +114,8 @@ export interface ClientInvoiceStatement {
   amountDue: number | null;
   /** Tokenized /invoice/{id}?t= path. Absent when the invoice has no pay token. */
   payPath?: string | null;
+  /** Empty means the invoice preview and PDF say there are no notes. */
+  notes?: string | null;
 }
 
 export interface ClientAppointment {
@@ -336,8 +338,8 @@ export function buildClientAppointment(
   data: Record<string, unknown>,
   orderRequest?: Record<string, unknown> | null,
 ): ClientAppointment {
-  const scheduledDate = firstDate(data.scheduledDate, data.appointmentDate);
-  const scheduledTime = firstTime(data.scheduledTime, data.appointmentTime, data.apptTime);
+  const scheduledDate = firstDate(data.scheduledDate, data.appointmentDate, data.shootDate, data.apptDate);
+  const scheduledTime = firstTime(data.scheduledTime, data.appointmentTime, data.apptTime, data.shootTime);
   let requestedDate = firstDate(data.requestedDate, data.originalScheduledDate, data.originalDate, orderRequest?.requestedDate, orderRequest?.originalScheduledDate);
   let requestedTime = firstTime(data.requestedTime, data.originalScheduledTime, data.originalTime, orderRequest?.requestedTime, orderRequest?.originalScheduledTime);
 
@@ -462,8 +464,44 @@ export function clientInvoicePdfInput(statement: ClientInvoiceStatement): Brande
     billToAddress: statement.address,
     status: humanStatus(statement.status),
     face,
+    notes: statement.notes?.trim() || "No notes on this invoice.",
     footerLines: iconicBusinessFooterLines(),
   };
+}
+
+/**
+ * A listing shoot date is an appointment when the account has no separate
+ * appointment row for that day and place. This does not invent a time.
+ */
+export function mergeListingShoots(appointments: ClientAppointment[], listings: ClientListingCard[]): ClientAppointment[] {
+  const next = [...appointments];
+  for (const listing of listings) {
+    if (!listing.appointmentDate) continue;
+    const address = listing.address || listing.street || "Appointment";
+    const duplicate = next.some((item) => item.date === listing.appointmentDate && samePlace(item.address, address));
+    if (duplicate) continue;
+    const delivered = /deliver|paid|complete|archived/.test(statusKey(listing.status));
+    next.push({
+      id: `listing-${listing.id}`,
+      address,
+      status: delivered ? "completed" : "confirmed",
+      date: listing.appointmentDate,
+      time: "",
+      requestedDate: listing.appointmentDate,
+      requestedTime: "",
+      approved: true,
+      createdAt: listing.createdAt,
+    });
+  }
+  return next;
+}
+
+function samePlace(left: string, right: string): boolean {
+  const norm = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const a = norm(left);
+  const b = norm(right);
+  if (!a || !b) return false;
+  return a === b || a.startsWith(b) || b.startsWith(a);
 }
 
 export function invoicePdfFilename(invoiceNumber: string): string {

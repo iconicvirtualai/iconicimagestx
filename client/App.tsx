@@ -114,6 +114,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ChangePassword from "./pages/ChangePassword";
 import ClientPortal from "./pages/ClientPortal";
 import PortalListingDetail from "./pages/PortalListingDetail";
+import PortalStyleShots from "./pages/PortalStyleShots";
 import PortalSettings from "./pages/PortalSettings";
 import PortalOrder from "./pages/PortalOrder";
 
@@ -237,6 +238,7 @@ const App = () => (
             <Route path="/portal/settings" element={<ClientPortalSurface><PortalQueryRedirect to="/portal/settings/profile" /></ClientPortalSurface>} />
             <Route path="/portal/settings/:section" element={<ClientPortalSurface><PortalSettings /></ClientPortalSurface>} />
             <Route path="/portal/listings/:listingId" element={<ClientPortalSurface><PortalListingDetail /></ClientPortalSurface>} />
+            <Route path="/dev/listing-style-shots" element={<PortalStyleShots />} />
             <Route path="/admin/login" element={<AdminLogin />} />
 
             {/* ─── Admin / Staff ────────────────────────────────────────── */}

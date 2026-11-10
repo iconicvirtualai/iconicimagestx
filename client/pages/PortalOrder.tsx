@@ -4,16 +4,15 @@ import { useAuth } from "@/contexts/AuthContext";
 import { clientPortalAction, staffHomePath } from "@shared/staffAccess";
 import { CHANGE_PASSWORD_PATH } from "@shared/passwordAccount";
 import { billingPrefill, type BillingProfile, type ClientHubProfile } from "@shared/clientHubSettings";
-import Footer from "@/components/Footer";
 import BookingForm, { type PortalOrderPrefill } from "@/components/BookingForm";
 import { PortalShell } from "@/components/client-hub/PortalShell";
 import { useExampleMode } from "@/pages/PortalSettings";
-import { exampleBilling, exampleProfile } from "@/lib/exampleHub";
+import { exampleBilling, samplePortalProfile } from "@/lib/exampleHub";
 
 export default function PortalOrder() {
   const example = useExampleMode();
   const { user, userType, staffProfile, clientProfile, loading, mustChangePassword, signOutUser } = useAuth();
-  const [prefill, setPrefill] = useState<PortalOrderPrefill | null>(example ? billingPrefill(exampleProfile(), exampleBilling()) : null);
+  const [prefill, setPrefill] = useState<PortalOrderPrefill | null>(example ? billingPrefill(samplePortalProfile(), exampleBilling()) : null);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -48,15 +47,18 @@ export default function PortalOrder() {
     if (gate.type !== "show-home" || !user) return <Navigate to="/portal" replace />;
   }
 
-  const firstName = example ? "Example" : clientProfile?.firstName || prefill?.firstName || "there";
+  const sample = example ? samplePortalProfile() : null;
+  const firstName = sample?.firstName || clientProfile?.firstName || prefill?.firstName || "there";
+  const accountName = sample ? `${sample.firstName} ${sample.lastName}` : [clientProfile?.firstName, clientProfile?.lastName].filter(Boolean).join(" ") || firstName;
 
   return (
-    <div className="iframe-safe-page bg-[#f6f7f8] flex flex-col">
+    <div className="iframe-safe-page">
       <PortalShell
         firstName={firstName}
+        accountName={accountName}
         example={example}
         active="order"
-        onSignOut={example ? undefined : () => void signOutUser().then(() => { window.location.assign("/portal"); })}
+        onSignOut={() => void signOutUser().then(() => { window.location.assign(example ? "/portal?example=1" : "/portal"); })}
       >
         <div className="bg-white rounded-2xl border border-gray-100">
           <div className="px-4 pt-6 sm:px-6">
@@ -74,7 +76,6 @@ export default function PortalOrder() {
           {prefill ? <BookingForm prefill={prefill} source="portal" /> : <Pending />}
         </div>
       </PortalShell>
-      <Footer />
     </div>
   );
 }
