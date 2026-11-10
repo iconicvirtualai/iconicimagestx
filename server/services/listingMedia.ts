@@ -20,6 +20,7 @@ import {
   isListingStoragePath,
   safeStorageFileName,
 } from "../../shared/listingAccess";
+import { galleryUploadExtra } from "../../shared/galleryUpload";
 import { jsonSafe } from "../lib/firestoreJson";
 
 const db = () => admin.firestore();
@@ -136,17 +137,22 @@ export async function registerListingPhoto(options: {
     const value = Number(item?.sortOrder);
     return Number.isFinite(value) ? Math.max(max, value) : max;
   }, 0);
+  const delivery = galleryUploadExtra(options.extra);
+  const displayName = typeof delivery.displayName === "string" ? delivery.displayName : "";
+  delete delivery.displayName;
   const image = {
     id: storagePath,
     url,
-    name: safeStorageFileName(fileName),
+    name: displayName || safeStorageFileName(fileName),
     path: storagePath,
     contentType: contentTypeForUpload(fileName, options.contentType),
     uploadedAt: new Date().toISOString(),
     uploadedBy,
     sortOrder: maxOrder + 1,
     culled: false,
+    hiddenFromGallery: false,
     ...studioImageExtra(options.extra),
+    ...delivery,
   };
   const already = images.find((item: { path?: string }) => item?.path === storagePath);
   if (!already) {

@@ -150,10 +150,13 @@ export function ClientStudioView({
     }
   };
 
-  const images: any[] = project.images || [];
-  const videos: any[] = project.videos || [];
-  const floorPlans: any[] = project.floorPlans || [];
-  const tours: any[] = project.tourUrl ? [{ url: project.tourUrl }] : [];
+  const shown = (item: { hiddenFromGallery?: boolean; culled?: boolean } | null | undefined) => (
+    item?.hiddenFromGallery !== true && item?.culled !== true
+  );
+  const images: any[] = (project.images || []).filter(shown);
+  const videos: any[] = (project.videos || []).filter(shown);
+  const floorPlans: any[] = (project.floorPlans || []).filter(shown);
+  const tours: any[] = project.tourUrl && project.tourHidden !== true ? [{ url: project.tourUrl }] : [];
   const downloadsUnlocked = typeof project.downloadsUnlocked === "boolean"
     ? project.downloadsUnlocked
     : clientGalleryDownloadsUnlocked({
@@ -513,6 +516,7 @@ function OwnerStudioFileDownloads({ files }: { files: unknown }) {
   const downloads = files.flatMap((file) => {
     if (!file || typeof file !== "object") return [];
     const record = file as Record<string, unknown>;
+    if (record.hiddenFromGallery === true || record.culled === true) return [];
     const url = studioHttpUrl(record.url);
     if (!url) return [];
     const name = typeof record.name === "string" && record.name.trim() ? record.name.trim() : "Download";

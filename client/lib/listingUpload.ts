@@ -64,8 +64,9 @@ export async function uploadListingFile(options: {
   file: File;
   folder?: "photos" | "raw";
   onProgress?: (pct: number) => void;
+  extra?: Record<string, unknown>;
 }) {
-  const { listingId, file, folder = "photos", onProgress } = options;
+  const { listingId, file, folder = "photos", onProgress, extra } = options;
   const contentType = contentTypeForUpload(file.name, file.type);
   const headers = await authorizedJsonHeaders();
 
@@ -74,7 +75,7 @@ export async function uploadListingFile(options: {
     const res = await fetch(`/api/listings/${listingId}/photos`, {
       method: "POST",
       headers,
-      body: JSON.stringify({ fileName: file.name, contentType, folder, dataBase64 }),
+      body: JSON.stringify({ fileName: file.name, contentType, folder, dataBase64, ...(extra ? { extra } : {}) }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || "Upload failed.");
@@ -99,6 +100,7 @@ export async function uploadListingFile(options: {
         contentType: ticket.contentType || contentType,
         folder,
         storagePath: ticket.storagePath,
+        ...(extra ? { extra } : {}),
       }),
     });
     const saved = await saveRes.json().catch(() => ({}));

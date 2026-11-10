@@ -7,7 +7,8 @@
  */
 
 import { addressText } from "./addressText.ts";
-import { arrangementActive, isHiddenFromListingSites, readMediaArrangement } from "./mediaArrangement.ts";
+import { listingKitFieldShown } from "./galleryUpload.ts";
+import { arrangementActive, isHiddenFromClientGallery, isHiddenFromListingSites, readMediaArrangement } from "./mediaArrangement.ts";
 import { orderHistoryInvoiceNumber } from "./orderProjectInvoice.ts";
 import type { ListingCardLook } from "./packageSkins.ts";
 import { readPhotoEditRequests, type PhotoEditRequest } from "./photoEditRequest";
@@ -45,6 +46,8 @@ export interface PortalFact {
   label: string;
   value: string;
   empty: boolean;
+  /** Staff turned Show on gallery off. Visitors do not receive the fact. */
+  galleryHidden?: boolean;
 }
 
 /** Address lines and property facts an owner can save from the Data tab. */
@@ -307,6 +310,7 @@ export function visitorPortalListingDetail(detail: PortalListingDetail): PortalL
     videos: detail.videos.filter((item) => !item.hidden),
     tours: detail.tours.filter((item) => !item.hidden),
     floorplans: detail.floorplans.filter((item) => !item.hidden),
+    facts: detail.facts.filter((fact) => fact.galleryHidden !== true).map(({ galleryHidden: _hidden, ...fact }) => fact),
     socialAssets: [],
     clientFiles: [],
     invoices: [],
@@ -421,7 +425,14 @@ export function buildPortalListingDetail(sources: PortalListingSources): PortalL
     address,
     facts: FACT_DEFS.map((fact) => {
       const value = factText(readFact(records, fact.keys));
-      return { id: fact.id, label: fact.label, value: value || EMPTY, empty: !value };
+      const galleryHidden = !listingKitFieldShown(listing.listingKit, fact.id);
+      return {
+        id: fact.id,
+        label: fact.label,
+        value: value || EMPTY,
+        empty: !value,
+        ...(galleryHidden ? { galleryHidden: true } : {}),
+      };
     }),
     photos,
     videos,
@@ -996,7 +1007,7 @@ export function mapEmbedUrl(lat: number, lng: number): string {
 }
 
 function collectPhotos(listing: Record<string, unknown>, galleries: Array<Record<string, unknown>>, store: PortalMediaStore, savedOrder = false): PortalMediaItem[] {
-  return finishMedia("photo", [...rowsFrom(listing.images), ...galleryRows(galleries)], store.photos, (row) => isPhoto(row), savedOrder);
+  return finishMedia("photo", [...rowsFrom(listing.images), ...galleryRows(galleries)], store.photos, (row) => isPhoto(row), savedOrder, listing);
 }
 
 function collectVideos(listing: Record<string, unknown>, galleries: Array<Record<string, unknown>>, store: PortalMediaStore, savedOrder = false): PortalMediaItem[] {
@@ -1006,22 +1017,29 @@ function collectVideos(listing: Record<string, unknown>, galleries: Array<Record
     store.videos,
     (row) => isVideo(row),
     savedOrder,
+    listing,
   );
 }
 
 function collectClientUploads(listing: Record<string, unknown>, kind: "social" | "file", savedOrder = false): PortalMediaItem[] {
-  return finishMedia(kind === "social" ? "photo" : "floorplan", clientUploadRows(listing, kind), {}, () => true, savedOrder)
+  const tagged = rowsFrom(listing.images).filter((row) => text(row.assetType).toLowerCase() === kind || text(row.type).toLowerCase() === kind);
+  const socialBucket = kind === "social" ? rowsFrom(listing.socialAssets) : [];
+  return finishMedia(kind === "social" ? "photo" : "floorplan", [...clientUploadRows(listing, kind), ...tagged, ...socialBucket], {}, () => true, savedOrder, listing)
     .map((item) => ({ ...item, kind: kind === "social" ? "photo" as const : "floorplan" as const }));
 }
 
 function collectFloorplans(listing: Record<string, unknown>, galleries: Array<Record<string, unknown>>, store: PortalMediaStore, savedOrder = false): PortalMediaItem[] {
   const rows = [
     ...rowsFrom(listing.floorplans).filter(isRasterFloorplan),
+    ...rowsFrom(listing.images).filter((row) => (
+      (text(row.assetType).toLowerCase() === "floorplan" || text(row.type).toLowerCase() === "floorplan")
+      && isRasterFloorplan(row)
+    )),
     ...rowsFrom(listing.designAssets).filter(isFloorplan),
     ...rowsFrom(listing.cubiCasaImports).filter(isFloorplan),
     ...galleryRows(galleries).filter(isFloorplan),
   ];
-  return finishMedia("floorplan", rows, store.floorplans, () => true, savedOrder);
+  return finishMedia("floorplan", rows, store.floorplans, () => true, savedOrder, listing);
 }
 
 function collectTours(listing: Record<string, unknown>, galleries: Array<Record<string, unknown>>, store: PortalMediaStore, savedOrder = false): PortalTourItem[] {
@@ -1053,7 +1071,7 @@ function collectTours(listing: Record<string, unknown>, galleries: Array<Record<
       name: text(row.name) || text(row.title) || provider || "Virtual tour",
       url,
       contentType: text(row.contentType),
-      hidden: prefs?.hidden === true || row.hiddenFromPresentation === true,
+      hidden: prefs?.hidden === true || row.hiddenFromPresentation === true || isHiddenFromClientGallery(listing, row),
       order: savedOrder ? (storedOrder ?? index + 100000) : (prefs?.order ?? index),
       groupId: "",
       uploadedAt: portalTimestamp(row.uploadedAt || row.createdAt),
@@ -1075,6 +1093,7 @@ function finishMedia(
   prefs: Record<string, PortalMediaPrefs>,
   include: (row: Record<string, unknown>) => boolean,
   savedOrder = false,
+  listing: Record<string, unknown> = {},
 ): PortalMediaItem[] {
   const seen = new Set<string>();
   const items: PortalMediaItem[] = [];
@@ -1098,7 +1117,7 @@ function finishMedia(
       name: text(row.name) || text(row.fileName) || text(row.title) || `${kind} ${items.length + 1}`,
       url,
       contentType: text(row.contentType).toLowerCase(),
-      hidden: pref?.hidden === true || row.hiddenFromPresentation === true || row.portalHidden === true,
+      hidden: pref?.hidden === true || row.hiddenFromPresentation === true || row.portalHidden === true || isHiddenFromClientGallery(listing, row),
       order: savedOrder ? (storedOrder ?? index + 100000) : (pref?.order ?? index),
       groupId: kind === "photo" ? (savedOrder ? sectionId : groupIdText(pref?.groupId)) : "",
       uploadedAt: portalTimestamp(row.uploadedAt || row.createdAt),
@@ -1175,6 +1194,7 @@ function isVideo(row: Record<string, unknown>): boolean {
 function isPhoto(row: Record<string, unknown>): boolean {
   const declared = text(row.type).toLowerCase();
   const asset = text(row.assetType).toLowerCase();
+  if (asset === "social" || asset === "file" || declared === "social" || declared === "file" || declared === "document") return false;
   if (isVideo(row) || declared === "floorplan" || asset === "floorplan" || isRaw(row)) return false;
   const type = text(row.type).toLowerCase();
   if (type === "tour" || type === "matterport" || type === "video" || type === "reel" || type === "file" || type === "document") return false;

@@ -6,6 +6,7 @@
 
 import { addressText } from "./addressText.ts";
 import { deliveryFileName, keptShots } from "./gallerySequence.ts";
+import { isHiddenFromClientGallery, readMediaArrangement } from "./mediaArrangement.ts";
 import { frameFromListingImage } from "./iconicStudio";
 import { studioDownloadsUnlocked } from "./lockImpact.ts";
 import { ownerDisplayPath, signOwnerDisplayToken } from "./ownerDisplayGrant";
@@ -222,32 +223,68 @@ function publicImages(listing: GalleryLinkDoc): StudioMedia[] {
     const url = httpUrl(frame?.url);
     if (!frame || frame.raw || !url) return;
     if (isPrivateMedia(frame.path, frame.name, url)) return;
+    if (isHiddenFromClientGallery(listing, item)) return;
+    const content = typeof item.contentType === "string" ? item.contentType.toLowerCase() : "";
+    const asset = typeof item.assetType === "string" ? item.assetType.toLowerCase() : "";
+    const kind = typeof item.type === "string" ? item.type.toLowerCase() : "";
+    if (content.startsWith("video/") || asset === "social" || asset === "floorplan" || asset === "file" || kind === "video" || kind === "floorplan" || kind === "file" || kind === "social") return;
     const downloadName = deliveryFileName(item, index);
     images.push({ url, name: downloadName, downloadName });
   });
+  const coverId = readMediaArrangement(listing.mediaArrangement).coverId;
+  if (coverId && Array.isArray(listing.images)) {
+    const cover = (listing.images as Array<Record<string, unknown>>).find((row) => (
+      text(row.id) === coverId || text(row.path) === coverId || text(row.url) === coverId
+    ));
+    const coverUrl = cover ? httpUrl(cover.url) : "";
+    const index = coverUrl ? images.findIndex((image) => image.url === coverUrl) : -1;
+    if (index > 0) {
+      const [hit] = images.splice(index, 1);
+      images.unshift(hit);
+    }
+  }
   return images.slice(0, 200);
 }
 
 function publicVideos(listing: GalleryLinkDoc): StudioMedia[] {
-  if (!Array.isArray(listing.videos)) return [];
+  const groups = [listing.videos, listing.images];
   const videos: StudioMedia[] = [];
-  keptShots(listing.videos as Array<Record<string, unknown>>).forEach((item, index) => {
-    const row = rowOf(item);
-    if (!row) return;
-    const url = httpUrl(row.url);
-    const original = mediaName(row, "Video");
-    const name = deliveryFileName(row, index);
-    const path = text(row.path) || text(row.storagePath);
-    if (!url || isPrivateMedia(path, original, url) || isPrivateMedia(path, name, url)) return;
-    videos.push({ url, name, downloadName: name });
-  });
+  for (const group of groups) {
+    if (!Array.isArray(group)) continue;
+    keptShots(group as Array<Record<string, unknown>>).forEach((item, index) => {
+      const row = rowOf(item);
+      if (!row) return;
+      const content = text(row.contentType).toLowerCase();
+      const nameHint = `${mediaName(row, "")} ${text(row.url)}`;
+      const video = content.startsWith("video/") || /\.(mp4|mov|m4v|webm)(\?|#|$)/i.test(nameHint) || text(row.assetType) === "video" || text(row.type) === "video";
+      if (!video) return;
+      const url = httpUrl(row.url);
+      const original = mediaName(row, "Video");
+      const name = deliveryFileName(row, index);
+      const path = text(row.path) || text(row.storagePath);
+      if (!url || isPrivateMedia(path, original, url) || isPrivateMedia(path, name, url)) return;
+      if (isHiddenFromClientGallery(listing, row)) return;
+      if (videos.some((clip) => clip.url === url)) return;
+      videos.push({ url, name, downloadName: name });
+    });
+  }
   return videos.slice(0, 40);
 }
 
 function publicTour(listing: GalleryLinkDoc): string {
   for (const key of ["tourUrl", "matterportUrl", "virtualTourUrl", "virtualTour", "threeDTourUrl", "tourLink"]) {
     const url = httpUrl(listing[key]);
-    if (url && !isPrivateMedia("", key, url)) return url;
+    if (!url || isPrivateMedia("", key, url)) continue;
+    if (isHiddenFromClientGallery(listing, { id: key, url })) continue;
+    return url;
+  }
+  if (Array.isArray(listing.tours)) {
+    for (const item of listing.tours) {
+      const row = rowOf(item);
+      if (!row || isHiddenFromClientGallery(listing, row)) continue;
+      const url = httpUrl(row.url) || httpUrl(row.embedUrl);
+      if (url && !isPrivateMedia("", mediaName(row, "tour"), url)) return url;
+    }
   }
   return "";
 }
@@ -262,18 +299,24 @@ function agentNameOf(listing: GalleryLinkDoc): string {
 }
 
 function publicFloorPlans(listing: GalleryLinkDoc): StudioMedia[] {
-  const groups = [listing.floorplans, listing.floorPlans];
+  const groups = [listing.floorplans, listing.floorPlans, listing.images];
   const plans: StudioMedia[] = [];
   for (const group of groups) {
     if (!Array.isArray(group)) continue;
     keptShots(group as Array<Record<string, unknown>>).forEach((item, index) => {
       const row = rowOf(item);
       if (!row) return;
+      const asset = text(row.assetType).toLowerCase();
+      const type = text(row.type).toLowerCase();
+      const fromImages = group === listing.images;
+      if (fromImages && asset !== "floorplan" && type !== "floorplan") return;
       const url = httpUrl(row.url) || httpUrl(row.shareUrl);
       const original = mediaName(row, "Floor plan");
       const name = deliveryFileName(row, index);
       const path = text(row.path) || text(row.storagePath);
       if (!url || isPrivateMedia(path, original, url) || isPrivateMedia(path, name, url)) return;
+      if (isHiddenFromClientGallery(listing, row)) return;
+      if (plans.some((plan) => plan.url === url)) return;
       plans.push({ url, name, downloadName: name });
     });
   }
@@ -302,7 +345,7 @@ function ownerFiles(listing: GalleryLinkDoc): StudioMedia[] {
     if (!Array.isArray(group)) continue;
     group.forEach((item, index) => {
       const row = rowOf(item);
-      if (!row) return;
+      if (!row || isHiddenFromClientGallery(listing, row)) return;
       const name = mediaName(row, `File ${index + 1}`);
       const path = text(row.path) || text(row.storagePath);
       const display = httpUrl(row.url);
@@ -659,7 +702,7 @@ function embedTour(listing: GalleryLinkDoc, needles: string[]): string {
     if (!Array.isArray(group)) continue;
     for (const item of group) {
       const row = rowOf(item);
-      if (!row) continue;
+      if (!row || isHiddenFromClientGallery(listing, row)) continue;
       for (const key of ["embedUrl", "url", "shareUrl"] as const) {
         const url = shareableUrl(row[key]);
         if (!url || isOriginalFileUrl(url) || containsOriginal(url, needles)) continue;

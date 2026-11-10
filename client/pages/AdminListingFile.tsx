@@ -31,7 +31,8 @@ import { projectStatusLabel, projectSurfaceStatus, type ProjectSurface } from "@
 import { PresentationShareButton, PresentationSharePanel } from "@/components/PresentationSharePanel";
 import { PhotoEditRequestStaff } from "@/components/PhotoEditRequestStaff";
 import { StaffMediaBoard } from "@/components/listing/StaffMediaBoard";
-import { saveListingMediaArrangement } from "@/lib/listingUpload";
+import { GalleryUploadBoard } from "@/components/gallery-delivery/GalleryUploadBoard";
+import { saveListingMediaArrangement, uploadListingFile } from "@/lib/listingUpload";
 import { collectArrangementMedia, readMediaArrangement } from "@shared/mediaArrangement";
 
 // ─── Status systems ───────────────────────────────────────────────────────────
@@ -55,7 +56,7 @@ const PAYMENT_BADGE: Record<string, string> = {
 };
 
 // ─── Tab configs ──────────────────────────────────────────────────────────────
-const RE_TABS = ["Media", "Video", "Social Media", "3D Content", "Files", "Listing Info", "Audit Log"];
+const RE_TABS = ["Photos", "Videos / Reels", "Social Media", "3D Tours", "Floorplans", "Listing Kit", "Audit Log"];
 const BIZ_TABS = ["Photos", "Videography", "Branding", "Social Content", "Files", "Project Info", "Audit Log"];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -586,6 +587,68 @@ export default function AdminListingFile({
       {/* Main + sidebar */}
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-6">
         <div className="min-w-0">
+          {isRE && (
+            <>
+              <GalleryUploadBoard
+                project={project}
+                userId={user?.uid || "staff"}
+                activeTab={activeTab}
+                onTab={setActiveTab}
+                saving={updating}
+                onSaveArrangement={async (next) => {
+                  if (!id) return;
+                  const saved = await saveListingMediaArrangement(id, next);
+                  toast.success(saved.note || "Gallery order saved.");
+                }}
+                onPatch={patch}
+                onUpload={async (file, extra, onProgress) => {
+                  if (!id) return;
+                  const result = await uploadListingFile({
+                    listingId: id,
+                    file,
+                    extra,
+                    onProgress: (pct) => onProgress(pct / 100),
+                  });
+                  const image = (result as { image?: { id?: string } }).image;
+                  return { id: image?.id || "" };
+                }}
+                audit={(project.auditLog || []).length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-16 text-center">
+                    <History className="w-12 h-12 text-gray-200 mb-4" />
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">No activity recorded yet</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {[...(project.auditLog || [])].reverse().map((entry: { action?: string; by?: string; at?: string; details?: string }, i: number) => (
+                      <div key={i} className="flex gap-4 p-4 bg-gray-50 rounded-xl">
+                        <div className="w-2 h-2 rounded-full bg-[#0d9488] mt-1.5 flex-shrink-0" />
+                        <div>
+                          <p className="text-xs font-bold text-black">{entry.action}</p>
+                          <p className="text-[10px] text-gray-400">{entry.by} · {entry.at}</p>
+                          {entry.details && <p className="text-[10px] text-gray-500 mt-0.5">{entry.details}</p>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              />
+              {activeTab === 0 && id && (
+                <div className="mt-6 space-y-4">
+                  <PresentationShareButton
+                    listingId={id}
+                    getToken={getPresentationToken}
+                    className="inline-flex items-center gap-2 rounded-xl bg-black px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white"
+                  />
+                  <PhotoEditRequestStaff
+                    listingId={id}
+                    requests={project.photoEditRequests}
+                    getToken={async () => (user ? user.getIdToken() : undefined)}
+                  />
+                </div>
+              )}
+            </>
+          )}
+          {!isRE && <>
           {/* Tab bar */}
           <div className="flex gap-1 bg-gray-100 p-1 rounded-2xl mb-6 overflow-x-auto">
             {tabs.map((t, i) => (
@@ -869,6 +932,7 @@ export default function AdminListingFile({
               </div>
             )}
           </div>
+          </>}
         </div>
 
         {/* RIGHT SIDEBAR */}
