@@ -57,6 +57,16 @@ export default function AdminOrders() {
   const [deskPrefs, setDeskPrefs] = React.useState<OrderDeskPrefs>(DEFAULT_ORDER_DESK_PREFS);
 
   React.useEffect(() => {
+    const visual = import.meta.env.DEV && new URLSearchParams(window.location.search).get("visual") === "1";
+    if (visual) {
+      void import("./ordersDeskVisualSeed").then(({ visualDeskOrders, visualDeskStaff }) => {
+        setOrders(visualDeskOrders());
+        setStaff(visualDeskStaff());
+        setLoading(false);
+      });
+      const interval = setInterval(() => setNow(Date.now()), 60000);
+      return () => clearInterval(interval);
+    }
     const unsub = onSnapshot(collection(db, "orderRequests"), snap => {
       setOrders(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       setLoading(false);
@@ -292,7 +302,7 @@ export default function AdminOrders() {
   };
 
   return (
-    <AdminLayout title="Orders">
+    <AdminLayout plain mainClassName="bg-[#f4f6f5]">
       {loading ? (
         <div className="flex items-center justify-center py-24"><div className="w-6 h-6 border-2 border-[#0d9488] border-t-transparent rounded-full animate-spin" /></div>
       ) : (

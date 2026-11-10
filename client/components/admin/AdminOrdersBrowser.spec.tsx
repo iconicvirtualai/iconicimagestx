@@ -136,7 +136,7 @@ describe("orders desk sections", () => {
     expect(maple?.textContent).toContain("Paid");
     expect(maple?.textContent).toContain("Gallery");
     expect(maple?.textContent).toContain("Editing");
-    expect(maple?.querySelectorAll("i.rounded-full").length).toBe(1);
+    expect(maple?.querySelectorAll("i.ndot").length).toBe(1);
     expect(maple?.innerHTML).not.toMatch(/bg-red-|bg-green-|bg-blue-|rounded-full px-/);
     expect(maple?.textContent).toContain(adminOrderTotalLabel(orders.find((order) => order.id === "fixture-maple")!));
     const link = maple?.querySelector("a[data-order-link='fixture-maple']") as HTMLAnchorElement | null;
