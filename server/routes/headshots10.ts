@@ -10,6 +10,8 @@
 
 import { Router } from "express";
 import admin from "firebase-admin";
+import { orderRequestSignal } from "../../shared/adminUnread";
+import { bumpAdminUnreadChannel } from "../services/adminUnread";
 import { APPRENTICESHIP_AWAITING_DEPOSIT_STATUS } from "../../shared/apprenticeship";
 import { placedRevenueFields } from "../../shared/revenueCount";
 import { BUSINESS_CONTACT } from "../../shared/businessContact";
@@ -272,6 +274,7 @@ router.post("/order", async (req, res) => {
       submittedAt: now,
       updatedAt: now,
     });
+    await bumpAdminUnreadChannel(orderRequestSignal(HEADSHOTS_LEAD_SOURCE));
 
     const orderRef = await db().collection("orders").add({
       orderRequestId: requestRef.id,

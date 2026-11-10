@@ -452,6 +452,28 @@ service cloud.firestore {
       allow read, write: if isCoordinator() && request.auth.uid == uid;
     }
 
+    // Staff menu badges. `channels` is the shared arrival counter (chat, inbox,
+    // sms, bot room, orders, holiday RSVPs). `tasks` counts assignments per
+    // staff uid. `staffUnread/{uid}` is that person's seen cursor, so one
+    // person opening a tab does not clear anyone else's badge.
+    // Clients cannot read these. Nothing here sends email or texts.
+    // Publish this file in the Firebase console. Vercel does not deploy rules.
+    match /adminUnreadCounters/{docId} {
+      allow read: if isCoordinator();
+      allow create, update: if isCoordinator() && docId in ['channels', 'tasks'];
+      allow delete: if false;
+    }
+
+    match /staffUnread/{uid} {
+      allow read: if isCoordinator() && request.auth.uid == uid;
+      allow create, update: if isCoordinator()
+        && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['seen', 'updatedAt'])
+        && request.resource.data.seen is map
+        && request.resource.data.seen.keys().hasOnly(['chat', 'inbox', 'sms', 'botroom', 'orders', 'events', 'tasks']);
+      allow delete: if false;
+    }
+
     // ─── Catch-all: deny everything else ─────────────────────────────────────
     match /{document=**} {
       allow read, write: if false;

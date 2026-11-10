@@ -10,13 +10,11 @@ import { onSnapshot, collection, query, orderBy, limit, where, getDocs } from "f
 import { db } from "@/lib/firebase";
 import AdminLayout from "@/components/AdminLayout";
 import {
-  Bot,
   CheckCircle2,
   CircleDashed,
   ExternalLink,
   Inbox,
   Mail,
-  MessageCircle,
   MessageSquare,
   Phone,
   Send,
@@ -26,7 +24,6 @@ import {
   Smartphone,
   Megaphone,
   RefreshCw,
-  Sparkles,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import BotRoomPanel from "@/components/communications/BotRoomPanel";
@@ -35,6 +32,9 @@ import ContactLiveChat from "@/components/ContactLiveChat";
 import { useAuth } from "@/contexts/AuthContext";
 import { UnifiedThreads } from "@/components/communications/UnifiedThreads";
 import { AssistantPanes } from "@/components/communications/AssistantPanes";
+import { CommunicationsTabBar, type CommunicationsTabId } from "@/components/communications/CommunicationsTabBar";
+import { useAdminUnread } from "@/components/admin/AdminUnreadProvider";
+import { communicationTabUnreadKey } from "@shared/adminUnread";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -78,7 +78,7 @@ interface MailchimpList {
   unsubscribeCount: number;
 }
 
-type Tab = "sweep" | "contact" | "inbox" | "sms" | "compose" | "campaigns" | "assistants" | "botroom";
+type Tab = CommunicationsTabId;
 
 const sweepChannels = [
   {
@@ -149,6 +149,7 @@ function initialCommunicationsTab(pathname: string, search: string): Tab {
 export default function AdminMessages() {
   const { toast } = useToast();
   const { user, isAdmin } = useAuth();
+  const unread = useAdminUnread();
   const location = useLocation();
   const [tab, setTab] = useState<Tab>(() => initialCommunicationsTab(location.pathname, location.search));
   const [threads, setThreads] = useState<OrderThread[]>([]);
@@ -196,6 +197,11 @@ export default function AdminMessages() {
     const next = initialCommunicationsTab(location.pathname, location.search);
     if (next === "botroom" || next === "contact") setTab(next);
   }, [location.pathname, location.search]);
+
+  useEffect(() => {
+    const key = communicationTabUnreadKey(tab);
+    if (key) void unread.markSeen(key);
+  }, [tab, unread.markSeen]);
 
   // ─── Real-time messages ───────────────────────────────────────────────────
 
@@ -427,31 +433,7 @@ export default function AdminMessages() {
         {/* ─── Left sidebar: tabs + thread list ─────────────────────────── */}
         <div className={`flex w-full min-w-0 flex-col border-b border-gray-700 bg-gray-900 ${tab === "botroom" ? "" : "lg:w-80 lg:shrink-0 lg:border-b-0 lg:border-r"}`}>
           {/* Tabs */}
-          <div className="flex flex-wrap border-b border-gray-700">
-            {[
-              { id: "sweep" as Tab, icon: Bot, label: "Sweep" },
-              { id: "contact" as Tab, icon: MessageCircle, label: "Chat" },
-              { id: "inbox" as Tab, icon: MessageSquare, label: "Inbox" },
-              { id: "sms" as Tab, icon: Smartphone, label: "SMS" },
-              { id: "compose" as Tab, icon: Send, label: "Compose" },
-              { id: "campaigns" as Tab, icon: Megaphone, label: "Campaigns" },
-              { id: "assistants" as Tab, icon: Sparkles, label: "Assistants" },
-              ...(isAdmin ? [{ id: "botroom" as Tab, icon: Bot, label: "Bot Room" }] : []),
-            ].map(({ id, icon: Icon, label }) => (
-              <button
-                key={id}
-                onClick={() => setTab(id)}
-                className={`flex min-w-[4.5rem] flex-1 flex-col items-center gap-1 px-1 py-3 text-[10px] transition-colors ${
-                  tab === id
-                    ? "text-teal-400 border-b-2 border-teal-400"
-                    : "text-gray-400 hover:text-gray-200"
-                }`}
-              >
-                <Icon className="w-4 h-4" />
-                {label}
-              </button>
-            ))}
-          </div>
+          <CommunicationsTabBar tab={tab} isAdmin={isAdmin} counts={unread.counts} onSelect={setTab} />
 
           {tab === "inbox" && (
             <p className="hidden p-4 text-sm leading-relaxed text-gray-400 lg:block">

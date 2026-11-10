@@ -1,5 +1,6 @@
 import * as React from "react";
 import AdminLayout from "@/components/AdminLayout";
+import { useAdminUnread } from "@/components/admin/AdminUnreadProvider";
 import { HolidayRsvpTable } from "@/components/admin/HolidayRsvpTable";
 import { useAuth } from "@/contexts/AuthContext";
 import { requestHolidayCalendarBackfill } from "@/lib/holidayCalendarBackfill";
@@ -18,6 +19,7 @@ export default function AdminHolidayRsvps() {
 
 export function HolidayRsvpPanel() {
   const { user } = useAuth();
+  const unread = useAdminUnread();
   const [rows, setRows] = React.useState<HolidayRsvpRow[]>([]);
   const [totalHeadcount, setTotalHeadcount] = React.useState(0);
   const [loading, setLoading] = React.useState(true);
@@ -39,6 +41,10 @@ export function HolidayRsvpPanel() {
       setAdding(false);
     }
   };
+
+  React.useEffect(() => {
+    void unread.markSeen("events");
+  }, [unread.markSeen]);
 
   React.useEffect(() => {
     const list = query(collection(db, "orderRequests"), where("leadSource", "==", HOLIDAY_RSVP_LEAD));

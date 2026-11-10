@@ -30,6 +30,7 @@ import {
 import { AdminOrdersBrowser } from "@/components/admin/AdminOrdersBrowser";
 import { useAuth } from "@/contexts/AuthContext";
 import { cancelOrderRequest } from "@/lib/cancelOrderRequest";
+import { useAdminUnread } from "@/components/admin/AdminUnreadProvider";
 
 function safe(v: any): string {
   if (v === null || v === undefined) return "—";
@@ -44,6 +45,7 @@ const getTotal = (o: any) => Number(o.total) || Number(o.amount) || Number(o.pri
 
 export default function AdminOrders() {
   const { user } = useAuth();
+  const unread = useAdminUnread();
   const [orders, setOrders] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [now, setNow] = React.useState(Date.now());
@@ -55,6 +57,10 @@ export default function AdminOrders() {
   const [bulkProjectType, setBulkProjectType] = React.useState<"real_estate" | "business">("real_estate");
   const [editRequests, setEditRequests] = React.useState<Record<string, unknown>[]>([]);
   const [deskPrefs, setDeskPrefs] = React.useState<OrderDeskPrefs>(DEFAULT_ORDER_DESK_PREFS);
+
+  React.useEffect(() => {
+    void unread.markSeen("orders");
+  }, [unread.markSeen]);
 
   React.useEffect(() => {
     const visual = import.meta.env.DEV && new URLSearchParams(window.location.search).get("visual") === "1";

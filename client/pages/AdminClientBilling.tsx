@@ -12,6 +12,7 @@ import { Search, DollarSign, Send, Eye, Plus, FileText, ChevronDown, Download } 
 import { MoneyAmount } from "@/components/MoneyAmount";
 import { Button } from "@/components/ui/button";
 import { db } from "@/lib/firebase";
+import { bumpStaffChannel } from "@/lib/adminUnreadStore";
 import { collection, onSnapshot, addDoc, serverTimestamp, updateDoc, doc } from "firebase/firestore";
 import { toast } from "sonner";
 import OperationsStatsGrid from "@/components/OperationsStatsGrid";
@@ -165,6 +166,7 @@ export default function AdminClientBilling() {
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
+      void bumpStaffChannel("orders");
       toast.success("Invoice created!");
       setShowCreate(false);
       servicePatchRef.current = null;

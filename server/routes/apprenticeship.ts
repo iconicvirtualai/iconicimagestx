@@ -6,6 +6,8 @@
 
 import { Router } from "express";
 import admin from "firebase-admin";
+import { orderRequestSignal } from "../../shared/adminUnread";
+import { bumpAdminUnreadChannel } from "../services/adminUnread";
 import {
   APPRENTICESHIP_AWAITING_DEPOSIT_STATUS,
   APPRENTICESHIP_BALANCE_LINE,
@@ -309,6 +311,7 @@ router.post("/order", async (req, res) => {
       submittedAt: now,
       updatedAt: now,
     });
+    await bumpAdminUnreadChannel(orderRequestSignal(leadSource));
 
     const orderRef = await db().collection("orders").add({
       orderRequestId: requestRef.id,

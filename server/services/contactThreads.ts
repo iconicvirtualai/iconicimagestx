@@ -1,5 +1,6 @@
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import admin from "firebase-admin";
+import { bumpAdminUnreadChannel } from "./adminUnread.ts";
 import type { ContactThreadMessage, ContactThreadView } from "../../shared/contactThread";
 import type { LiveChatMessage } from "./liveChat";
 
@@ -301,6 +302,7 @@ export async function startClientThread(input: LiveChatMessage): Promise<ClientT
     messages: [clientMessage(input, createdAt)],
   };
   await activeStore().insert(thread);
+  await bumpAdminUnreadChannel("chat");
   return { thread: toContactThreadView(thread), accessToken };
 }
 
@@ -315,6 +317,7 @@ export async function continueClientThread(
     return withClientMessage(current, input, createdAt);
   });
   if (!updated) return null;
+  await bumpAdminUnreadChannel("chat");
   return { thread: toContactThreadView(updated), accessToken: updated.accessToken };
 }
 

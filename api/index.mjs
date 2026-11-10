@@ -6557,6 +6557,40 @@ function holidayOrderReceivedHtml(input) {
     </div>
   </div>`;
 }
+const ADMIN_UNREAD_COUNTERS_COLLECTION = "adminUnreadCounters";
+const ADMIN_UNREAD_CHANNELS_DOC = "channels";
+function orderRequestSignal(leadSource) {
+  return leadSource === HOLIDAY_RSVP_LEAD ? "events" : "orders";
+}
+function signalForCommunication(entry2) {
+  if (entry2.direction !== "inbound") return null;
+  if (entry2.senderType === "staff") return null;
+  if (entry2.channel === "sms") return "sms";
+  if (entry2.channel === "in-app" || entry2.channel === "contact" || entry2.channel === "email" || !entry2.channel) {
+    return "inbox";
+  }
+  return null;
+}
+function liveDb() {
+  if (!admin.apps.length) return null;
+  return admin.firestore();
+}
+function counterValue(by) {
+  const increment = admin.firestore.FieldValue?.increment;
+  if (typeof increment === "function") return increment(by);
+  return by;
+}
+async function bumpAdminUnreadChannel(key, by = 1, db2 = liveDb()) {
+  if (!db2 || !Number.isInteger(by) || by <= 0) return;
+  try {
+    await db2.collection(ADMIN_UNREAD_COUNTERS_COLLECTION).doc(ADMIN_UNREAD_CHANNELS_DOC).set(
+      { [key]: counterValue(by) },
+      { merge: true }
+    );
+  } catch (error) {
+    console.warn("[adminUnread] Channel counter update failed.", error);
+  }
+}
 const DELIVERY_QA_CLIENT_EMAIL = "ops+deliveryqa@iconicimagestx.com";
 const DELIVERY_QA_CLIENT_ID = "playtest-delivery-qa-client";
 const DELIVERY_QA_GALLERY_ID = "playtest-delivery-qa-gallery";
@@ -11272,6 +11306,7 @@ router$B.post("/", async (req, res) => {
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     };
     const docRef = await db$x().collection("orderRequests").add(orderRequest);
+    await bumpAdminUnreadChannel(orderRequestSignal(orderRequest.leadSource));
     let orderNumber2 = docRef.id;
     let packageName = "";
     try {
@@ -13253,6 +13288,7 @@ router$A.post("/order", async (req, res) => {
       submittedAt: now,
       updatedAt: now
     });
+    await bumpAdminUnreadChannel(orderRequestSignal(HEADSHOTS_LEAD_SOURCE));
     const orderRef = await db$v().collection("orders").add({
       orderRequestId: requestRef.id,
       clientName: clientName2,
@@ -21021,6 +21057,7 @@ router$v.post("/:orderId", requireAuth, async (req, res) => {
       createdAt: admin.firestore.FieldValue.serverTimestamp()
     };
     const docRef = await db$j().collection("messages").add(message);
+    if (senderType === "client") await bumpAdminUnreadChannel("inbox");
     await db$j().collection("agentLogs").add({
       agent: "nora",
       action: "New message",
@@ -28527,6 +28564,7 @@ async function postBotRoomMessage(input) {
   };
   const ref = botRoomDb().collection(BOT_ROOM_MESSAGES).doc();
   await ref.set(payload);
+  if (identity.sender !== BOT_ROOM_HUMAN_SENDER) await bumpAdminUnreadChannel("botroom");
   return toMessage(ref.id, payload);
 }
 async function loadWindow() {
@@ -29795,6 +29833,7 @@ router$f.post("/webhook", express_raw_or_json, async (req, res) => {
         createdAt: admin.firestore.FieldValue.serverTimestamp()
       });
     }
+    if (senderType !== "staff") await bumpAdminUnreadChannel("sms");
     return res.status(200).send("");
   } catch (err) {
     console.error("[SMS Webhook] Error:", err);
@@ -30073,6 +30112,7 @@ router$d.post("/order", async (req, res) => {
       submittedAt: now,
       updatedAt: now
     });
+    await bumpAdminUnreadChannel(orderRequestSignal("Senior living page"));
     const orderRef = await db$4().collection("orders").add({
       orderRequestId: requestRef.id,
       clientName: value.name,
@@ -30527,6 +30567,7 @@ router$c.post("/order", async (req, res) => {
       submittedAt: now,
       updatedAt: now
     });
+    await bumpAdminUnreadChannel(orderRequestSignal(leadSource));
     const orderRef = await db$3().collection("orders").add({
       orderRequestId: requestRef.id,
       clientName: clientName2,
@@ -31052,6 +31093,7 @@ async function startClientThread(input) {
     messages: [clientMessage(input, createdAt)]
   };
   await activeStore().insert(thread);
+  await bumpAdminUnreadChannel("chat");
   return { thread: toContactThreadView(thread), accessToken };
 }
 async function continueClientThread(id, accessToken, input) {
@@ -31061,6 +31103,7 @@ async function continueClientThread(id, accessToken, input) {
     return withClientMessage(current, input, createdAt);
   });
   if (!updated) return null;
+  await bumpAdminUnreadChannel("chat");
   return { thread: toContactThreadView(updated), accessToken: updated.accessToken };
 }
 async function readClientThread(id, accessToken) {
@@ -31632,6 +31675,8 @@ async function logCommunicationMessage(entry2) {
     createdAt: admin.firestore.FieldValue.serverTimestamp()
   };
   const ref = await firestore.collection("messages").add(stored);
+  const signal = signalForCommunication(entry2);
+  if (signal) await bumpAdminUnreadChannel(signal);
   if (entry2.channel === "sms") {
     await firestore.collection("smsLogs").add({
       direction: entry2.direction,

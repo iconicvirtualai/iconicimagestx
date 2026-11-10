@@ -28,6 +28,8 @@ import { chargedServiceLines, normalizeBookingLineItems, orderTotalLabel, resolv
 import { applyServerTravel, isTravelFeeLine, travelInvoiceLine, travelSummaryText, type TravelAssessment } from "../../shared/travelZones";
 import { planOrderPackageRepair } from "../../shared/orderPackageRepair";
 import { notifyOfficeOfOrder } from "../services/officeOrderNotify";
+import { bumpAdminUnreadChannel } from "../services/adminUnread";
+import { orderRequestSignal } from "../../shared/adminUnread";
 import { HOLIDAY_RSVP_LEAD, HOLIDAY_SEASON_LEAD, HOLIDAY_SOCIAL_SAVES_LEAD, holidayCheckoutKind, holidayOrderReceivedHtml } from "../../shared/holidayCheckout";
 import { THANKFUL_RSVP_CLOSED, THANKFUL_RSVP_EVENT_CLOSED, quoteThankfulSocialSave, socialRatePreviewAllowed, socialRateView, thankfulEventDatePassed, thankfulRsvpOpen } from "../../shared/thankfulEvent";
 import {
@@ -495,6 +497,7 @@ router.post("/", async (req, res) => {
     };
 
     const docRef = await db().collection("orderRequests").add(orderRequest);
+    await bumpAdminUnreadChannel(orderRequestSignal(orderRequest.leadSource));
 
     // Same short code /admin/orders prints. Stamp it before the office email
     // so the template receives the order number and package name.
