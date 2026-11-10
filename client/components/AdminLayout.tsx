@@ -11,6 +11,8 @@ interface AdminLayoutProps {
   title?: string;
   /** Hides the main-column scrollbar. The column still scrolls. */
   mainClassName?: string;
+  /** Page draws its own title on the gray canvas. The sticky uppercase bar stays off. */
+  plain?: boolean;
 }
 
 const ROLE_BADGE: Record<string, { label: string; color: string }> = {
@@ -20,7 +22,7 @@ const ROLE_BADGE: Record<string, { label: string; color: string }> = {
   editor:       { label: "Editor",       color: "bg-orange-500/20 text-orange-400" },
 };
 
-export default function AdminLayout({ children, title, mainClassName }: AdminLayoutProps) {
+export default function AdminLayout({ children, title, mainClassName, plain = false }: AdminLayoutProps) {
   const { user, staffProfile, loading, isStaff, signOutUser } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -159,9 +161,14 @@ export default function AdminLayout({ children, title, mainClassName }: AdminLay
 
       {/* Main Content */}
       <main className={`${navOpen ? "hidden" : "block"} relative ml-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden lg:ml-60 lg:block ${mainClassName || ""}`}>
-        <AdminDecor />
+        {!plain && <AdminDecor />}
         <div className="relative z-[1] min-h-full w-full">
-          {title && (
+          {plain && (
+            <button type="button" className="m-3 rounded-lg border border-slate-200 bg-white p-2 lg:hidden" aria-label="Open menu" onClick={() => setNavOpen(true)}>
+              <Menu className="h-4 w-4" />
+            </button>
+          )}
+          {!plain && title && (
             <div className="relative border-b border-slate-200 bg-white sticky top-0 z-10 overflow-hidden">
               <img
                 src="/media/decor/arc.svg"
@@ -185,7 +192,7 @@ export default function AdminLayout({ children, title, mainClassName }: AdminLay
               </div>
             </div>
           )}
-          <div className="w-full min-w-0 px-3 py-4 sm:px-6 sm:py-6">
+          <div className={plain ? "min-h-full w-full min-w-0" : "w-full min-w-0 px-3 py-4 sm:px-6 sm:py-6"}>
             {children}
           </div>
         </div>
