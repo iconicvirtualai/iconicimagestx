@@ -28,6 +28,10 @@ describe("insight posts", () => {
     expect(insightHeadTags({ ...publicPost, coverUrl: "/media/photos/drone-hero.jpg" }, "https://iconicimagestx.vercel.app")).toContain(
       "https://iconicimagestx.vercel.app/media/photos/drone-hero.jpg",
     );
+    const wwwTags = insightHeadTags({ ...publicPost, coverUrl: "/media/photos/drone-hero.jpg" });
+    expect(wwwTags).toContain("https://www.iconicimagestx.com/media/photos/drone-hero.jpg");
+    expect(wwwTags).toContain(`rel="canonical" href="https://www.iconicimagestx.com/insights/${publicPost.slug}"`);
+    expect(wwwTags).toContain(`property="og:url" content="https://www.iconicimagestx.com/insights/${publicPost.slug}"`);
   });
 
   it("rejects a reserved slug and a publish with no title", () => {
