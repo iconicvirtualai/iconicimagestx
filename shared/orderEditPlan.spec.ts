@@ -34,6 +34,7 @@ describe("order edit plan", () => {
     expect(plan.deliverables.find((item) => item.id === "aerials")?.label).toBe("5 aerial stills");
     expect(plan.galleryRelease).toBe(ORDER_GALLERY_RELEASE);
     expect(plan.iconicPolish).toBe(false);
+    expect(plan.grassReplacement).toBe(false);
     expect(plan.photoPrompt).not.toMatch(/Iconic Polish/);
     expect(plan.notes.join(" ")).toMatch(/does not send/i);
   });
@@ -69,7 +70,12 @@ describe("order edit plan", () => {
     expect(flagged.photoPrompt).toMatch(/dirt and debris/i);
     expect(flagged.photoPrompt).toMatch(/powerlines/i);
     expect(flagged.photoPrompt).toMatch(/curb appeal/i);
+    expect(flagged.photoPrompt).toMatch(/foliage/i);
+    expect(flagged.photoPrompt).toMatch(/landscaping unchanged/i);
+    expect(flagged.photoPrompt).not.toMatch(/\badd grass\b/i);
     expect(flagged.photoPrompt).toMatch(/do not add people/i);
+    expect(flagged.grassReplacement).toBe(true);
+    expect(flagged.twilight).toHaveLength(0);
 
     const ordered = planOrderEdits({
       lineItems: [{ id: "iconic-finish", name: "Iconic Finish (Premium Upgrade)" }],
@@ -91,6 +97,22 @@ describe("order edit plan", () => {
     expect(drafts.some((draft) => draft.sourcePath.includes("frame.CR2"))).toBe(false);
     expect(drafts.filter((draft) => draft.type === "photo")).toHaveLength(3);
     expect(orderEditDocId("job123456", "twilight-front")).toBe("order_job123456_twilight-front");
+  });
+
+  it("runs the lawn composite for the $25 grass add-on without putting grass in the model prompt", () => {
+    const plan = planOrderEdits({
+      lineItems: [
+        { id: "grass-replacement", name: "Grass replacement" },
+        { name: "25 Photos" },
+      ],
+    });
+    expect(plan.grassReplacement).toBe(true);
+    expect(plan.iconicPolish).toBe(false);
+    expect(plan.photoPrompt).not.toMatch(/\badd grass\b/i);
+    const polishedTwilight = planOrderEdits({ services: ["1 Iconic Twilight Render"], iconicPolish: true });
+    expect(polishedTwilight.grassReplacement).toBe(true);
+    expect(polishedTwilight.twilight[0].prompt).not.toMatch(/\badd grass\b/i);
+    expect(polishedTwilight.twilight[0].prompt).toMatch(/foliage/i);
   });
 
   it("exposes the exterior twilight line the scratch pad reuses", () => {

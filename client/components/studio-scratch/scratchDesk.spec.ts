@@ -2,12 +2,15 @@ import { describe, expect, it } from "vitest";
 import { editInstructionSteps, preferenceSteps, stagingApi, stagingGuidance, studioSteps, type StagingRequest } from "./scratchDesk";
 
 describe("scratch desk pathways", () => {
-  it("sends full iconic polish and special instructions on one edit", () => {
+  it("sends full iconic polish, then the lawn composite, without asking the model to invent grass", () => {
     const steps = preferenceSteps("full-iconic", "Prioritize twilight window views.");
-    expect(steps).toHaveLength(1);
-    expect(steps[0].action).toBe("edit");
+    expect(steps.map((step) => step.action)).toEqual(["edit", "grass"]);
     expect(steps[0].prompt).toMatch(/dirt and debris/i);
+    expect(steps[0].prompt).toMatch(/foliage/i);
     expect(steps[0].prompt).toMatch(/Prioritize twilight window views/);
+    expect(steps[0].prompt).not.toMatch(/\badd grass\b/i);
+    expect(preferenceSteps("polish", "").map((step) => step.action)).toEqual(["edit", "grass"]);
+    expect(preferenceSteps("grass", "Warm the porch light.").map((step) => step.action)).toEqual(["edit", "grass"]);
   });
 
   it("runs twilight, then the note as a revision", () => {

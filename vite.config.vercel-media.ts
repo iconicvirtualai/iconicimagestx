@@ -3,7 +3,8 @@ import path from "path";
 
 /**
  * Display-image function. sharp stays external so the native binary is traced
- * only into api/media-display.mjs, never into api/index.mjs.
+ * with the function. api/index.mjs uses the same external and the same
+ * libvips include.
  */
 export default defineConfig({
   publicDir: false,

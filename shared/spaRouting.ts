@@ -47,7 +47,8 @@ const APP_SHELL_SOURCES = [
 const PRIVATE_EXACT_SOURCES = new Set(["/invoice/:invoiceId"]);
 
 const RESERVED: Rewrite[] = [
-  // Ahead of /api/(.*) so sharp stays in api/media-display.mjs, not api/index.mjs.
+  // Ahead of /api/(.*) so display images stay on api/media-display.mjs.
+  // Lawn compositing also uses sharp inside api/index.mjs.
   // The original path still arrives at that function. p/ and o/ are listed
   // first so a later rule cannot send them to the main API.
   { source: "/api/media/display/p/(.*)", destination: "/api/media-display" },

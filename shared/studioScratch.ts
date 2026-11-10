@@ -17,12 +17,36 @@ export const SCRATCH_PROMPT_MAX = 2000;
 export const SCRATCH_PROMPT_HEADER = "x-scratch-prompt";
 export const SCRATCH_NAME_HEADER = "x-scratch-filename";
 export const SCRATCH_ACTION_HEADER = "x-scratch-action";
+export const SCRATCH_LAWN_MASK_HEADER = "x-scratch-lawn-mask";
+export const SCRATCH_NOTE_HEADER = "x-scratch-note";
 
 export const SCRATCH_ACTIONS = ["edit", "revise", "twilight", "grass"] as const;
 export type ScratchAction = (typeof SCRATCH_ACTIONS)[number];
 
 export const GRASS_REPLACE_PROMPT =
-  "Replace the lawn in the first image with healthy, even grass that matches the second image, the grass reference. Keep the house, hardscape, trees, sky, lighting, and camera angle. Change only the lawn.";
+  "Replace only the lawn with Cadi's grass reference. Keep every non-lawn pixel on the original photo.";
+
+/** Optional staff mask in front of the JPEG: uint32be length, PNG bytes, then the JPEG. */
+export function frameScratchBody(jpeg: Uint8Array, mask?: Uint8Array): Uint8Array {
+  if (!mask?.byteLength) return jpeg;
+  const out = new Uint8Array(4 + mask.byteLength + jpeg.byteLength);
+  new DataView(out.buffer).setUint32(0, mask.byteLength, false);
+  out.set(mask, 4);
+  out.set(jpeg, 4 + mask.byteLength);
+  return out;
+}
+
+export function splitScratchBody(body: Uint8Array, masked: boolean): { jpeg: Uint8Array; mask?: Uint8Array } {
+  if (!masked) return { jpeg: body };
+  if (body.byteLength < 8) throw new Error("The lawn mask could not be read.");
+  const len = new DataView(body.buffer, body.byteOffset, body.byteLength).getUint32(0, false);
+  if (len < 32 || len > 2_000_000 || 4 + len >= body.byteLength) {
+    throw new Error("The lawn mask could not be read.");
+  }
+  const mask = body.subarray(4, 4 + len);
+  if (mask[0] !== 0x89 || mask[1] !== 0x50) throw new Error("The lawn mask must be a PNG.");
+  return { jpeg: body.subarray(4 + len), mask };
+}
 
 export const GRASS_REFERENCE_MISSING_NOTE =
   "Grass reference is missing. Add Cadi's lawn JPEG at public/studio/grass-reference.jpg (or set STUDIO_GRASS_REFERENCE_PATH).";
