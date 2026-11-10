@@ -1,14 +1,16 @@
 /**
  * Admin task board.
  * Reads orders, deliveries, edits, questions, and photos@ when that inbox is connected.
- * Writes taskBoardItems only. Does not email or text anyone.
+ * Writes taskBoardItems, and the assignee unread counter when someone else is assigned.
+ * Does not email or text anyone.
  */
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import AdminLayout from "@/components/AdminLayout";
 import { TaskBoardView } from "@/components/taskBoard/TaskBoardView";
+import { useAdminUnread } from "@/components/admin/AdminUnreadProvider";
 import { useTaskBoardData } from "@/lib/useTaskBoardData";
 import {
   createManualTask,
@@ -27,6 +29,10 @@ import {
 
 export default function AdminTaskBoard() {
   const data = useTaskBoardData();
+  const unread = useAdminUnread();
+  const onSeenAssignments = useCallback(() => {
+    if (!data.sample) void unread.markSeen("tasks");
+  }, [data.sample, unread.markSeen]);
   const [params, setParams] = useSearchParams();
   const view = params.get("view") === "board" ? "board" : "list";
   const [selectedId, setSelectedId] = useState<string | null>(params.get("task"));
@@ -86,6 +92,8 @@ export default function AdminTaskBoard() {
             today={data.today}
             meId={data.meId}
             sample={data.sample}
+            assignmentUnread={data.sample ? 0 : unread.counts.tasks}
+            onSeenAssignments={onSeenAssignments}
             emailNotice={data.emailNotice}
             sourceErrors={data.sourceErrors}
             cleared={data.cleared}

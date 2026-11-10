@@ -19,12 +19,16 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Routes, Route, useLocation } from "react-router-dom";
 import { PublicSiteTracking } from "./lib/tracking";
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { AuthProvider } from "./contexts/AuthContext";
 import { SiteContentProvider } from "./content/siteContent";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { LocalBusinessJsonLd } from "./components/LocalBusinessJsonLd";
 import SiteMeta from "./components/SiteMeta";
+
+const AdminUnreadFixture = import.meta.env.DEV
+  ? lazy(() => import("./pages/AdminUnreadFixture"))
+  : null;
 
 // Public pages
 import Index from "./pages/Index";
@@ -264,6 +268,9 @@ const App = () => (
             <Route path="/admin/invoice-presets" element={<ProtectedRoute requiredRole="coordinator"><AdminInvoicePresets /></ProtectedRoute>} />
             <Route path="/admin/messages" element={<ProtectedRoute requiredRole="coordinator"><AdminMessages /></ProtectedRoute>} />
             <Route path="/admin/communications" element={<ProtectedRoute requiredRole="coordinator"><AdminMessages /></ProtectedRoute>} />
+            {AdminUnreadFixture ? (
+              <Route path="/admin/unread-badge-fixture" element={<Suspense fallback={null}><AdminUnreadFixture /></Suspense>} />
+            ) : null}
             <Route path="/admin/botroom" element={<ProtectedRoute requiredRole="admin"><AdminMessages /></ProtectedRoute>} />
             <Route path="/admin/botroom/connect" element={<ProtectedRoute requiredRole="admin"><AdminBotRoomConnect /></ProtectedRoute>} />
             <Route path="/admin/communications/email" element={<ProtectedRoute requiredRole="admin"><EmailHome /></ProtectedRoute>} />

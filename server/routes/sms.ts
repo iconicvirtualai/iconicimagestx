@@ -26,6 +26,7 @@ import { recordAddressText } from "../../shared/addressText";
 import { bookingDateLabel } from "../../shared/clientHome";
 import { clientNotifyBlockReason, clientNotifyLive } from "../../shared/clientNotify";
 import { refuseQaStaffPhone } from "../services/qaStaffAssign";
+import { bumpAdminUnreadChannel } from "../services/adminUnread";
 
 const router = Router();
 const db = () => admin.firestore();
@@ -342,6 +343,8 @@ router.post("/webhook", express_raw_or_json, async (req: Request, res: Response)
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
     }
+
+    if (senderType !== "staff") await bumpAdminUnreadChannel("sms");
 
     // Twilio Conversations expects empty 200
     return res.status(200).send("");

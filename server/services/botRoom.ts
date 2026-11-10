@@ -29,6 +29,7 @@ import {
   type BotRoomReader,
 } from "../../shared/botRoom";
 import { isHostedDeployment, liveServerEnv } from "../../shared/tempAdmin";
+import { bumpAdminUnreadChannel } from "./adminUnread";
 import { createMemoryFirestore } from "../lib/memoryFirestore";
 import { createRateLimiter, type RateLimitResult } from "../lib/rateLimit";
 
@@ -370,6 +371,7 @@ export async function postBotRoomMessage(input: PostBotRoomInput): Promise<BotRo
 
   const ref = botRoomDb().collection(BOT_ROOM_MESSAGES).doc();
   await ref.set(payload);
+  if (identity.sender !== BOT_ROOM_HUMAN_SENDER) await bumpAdminUnreadChannel("botroom");
   return toMessage(ref.id, payload);
 }
 

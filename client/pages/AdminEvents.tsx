@@ -4,6 +4,8 @@
  */
 
 import { useState } from "react";
+import { useAdminUnread } from "@/components/admin/AdminUnreadProvider";
+import { UnreadBadge } from "@/components/admin/UnreadBadge";
 import { Link, Navigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import AdminLayout from "@/components/AdminLayout";
@@ -28,6 +30,7 @@ import { withToggled } from "@shared/taskBoard";
 export default function AdminEvents() {
   const { eventId } = useParams();
   const data = useTaskBoardData();
+  const unread = useAdminUnread();
   const office = useOfficeEvents(data.sample, data.today);
   const [params] = useSearchParams();
   const sampleQuery = params.get("sample") === "1" ? "?sample=1" : "";
@@ -72,6 +75,7 @@ export default function AdminEvents() {
           events={office.events}
           today={data.today}
           sampleQuery={sampleQuery}
+          rsvpUnread={unread.counts.events}
           error={office.error}
           onCreate={async (input) => {
             const created = await office.create(input);
@@ -97,12 +101,14 @@ function EventList({
   events,
   today,
   sampleQuery,
+  rsvpUnread,
   error,
   onCreate,
 }: {
   events: OfficeEvent[];
   today: string;
   sampleQuery: string;
+  rsvpUnread: number;
   error: string;
   onCreate: (input: {
     name: string;
@@ -125,13 +131,13 @@ function EventList({
         </button>
       </div>
       {open ? <NewEventForm today={today} onCreate={onCreate} onDone={() => setOpen(false)} /> : null}
-      <EventGroup title="Upcoming" events={upcoming} sampleQuery={sampleQuery} empty="No upcoming events yet." />
-      <EventGroup title="Past" events={past} sampleQuery={sampleQuery} empty="No past events." />
+      <EventGroup title="Upcoming" events={upcoming} sampleQuery={sampleQuery} rsvpUnread={rsvpUnread} empty="No upcoming events yet." />
+      <EventGroup title="Past" events={past} sampleQuery={sampleQuery} rsvpUnread={rsvpUnread} empty="No past events." />
     </div>
   );
 }
 
-function EventGroup({ title, events, sampleQuery, empty }: { title: string; events: OfficeEvent[]; sampleQuery: string; empty: string }) {
+function EventGroup({ title, events, sampleQuery, rsvpUnread, empty }: { title: string; events: OfficeEvent[]; sampleQuery: string; rsvpUnread: number; empty: string }) {
   return (
     <section className="mb-6">
       <h2 className="mb-2 text-[10px] font-black uppercase tracking-widest text-slate-400">{title}</h2>
@@ -143,7 +149,12 @@ function EventGroup({ title, events, sampleQuery, empty }: { title: string; even
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm font-semibold text-slate-900">{event.name}</span>
                 {event.sample ? <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-amber-800">Sample</span> : null}
-                {event.builtin ? <span className="rounded-full bg-teal-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-teal-800">Holiday RSVPs</span> : null}
+                {event.builtin ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="rounded-full bg-teal-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-teal-800">Holiday RSVPs</span>
+                    <UnreadBadge count={rsvpUnread} testId="events-rsvp-unread" />
+                  </span>
+                ) : null}
               </div>
               <p className="mt-1 text-xs text-slate-500">
                 {EVENT_TYPE_LABEL[event.type]} · {EVENT_STATUS_LABEL[event.status]} · {event.date}{event.time ? ` · ${event.time}` : ""}

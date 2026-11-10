@@ -5,6 +5,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { staffHomePath } from "@shared/staffAccess";
 import { LogOut, Menu, X } from "lucide-react";
 import { mostSpecificNavHref, navGroups } from "@/lib/adminNav";
+import { AdminSidebarNav } from "@/components/admin/AdminSidebarNav";
+import { AdminUnreadProvider, useAdminUnread } from "@/components/admin/AdminUnreadProvider";
+import { UnreadBadge } from "@/components/admin/UnreadBadge";
 
 interface AdminLayoutProps {
   children: ReactNode;
@@ -25,8 +28,7 @@ const ROLE_BADGE: Record<string, { label: string; color: string }> = {
 export default function AdminLayout({ children, title, mainClassName, plain = false }: AdminLayoutProps) {
   const { user, staffProfile, loading, isStaff, signOutUser } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
-  const [navOpen, setNavOpen] = useState(false);
+  const role = staffProfile?.role || "";
 
   if (loading) {
     return (
@@ -45,13 +47,38 @@ export default function AdminLayout({ children, title, mainClassName, plain = fa
     return null;
   }
 
-  const role = staffProfile?.role || "";
-  const badge = ROLE_BADGE[role] ?? { label: role, color: "bg-gray-500/20 text-gray-400" };
+  return (
+    <AdminUnreadProvider uid={user?.uid || null} role={role}>
+      <AdminShell
+        title={title}
+        mainClassName={mainClassName}
+        plain={plain}
+        role={role}
+        onLogout={async () => {
+          await signOutUser();
+          navigate("/admin/login");
+        }}
+      >
+        {children}
+      </AdminShell>
+    </AdminUnreadProvider>
+  );
+}
 
-  const handleLogout = async () => {
-    await signOutUser();
-    navigate("/admin/login");
-  };
+function AdminShell({
+  children,
+  title,
+  mainClassName,
+  plain,
+  role,
+  onLogout,
+}: AdminLayoutProps & { role: string; onLogout: () => void }) {
+  const { user, staffProfile } = useAuth();
+  const location = useLocation();
+  const [navOpen, setNavOpen] = useState(false);
+  const unread = useAdminUnread();
+
+  const badge = ROLE_BADGE[role] ?? { label: role, color: "bg-gray-500/20 text-gray-400" };
 
   // Filter nav items by current user's role
   const visibleGroups = navGroups
@@ -96,37 +123,13 @@ export default function AdminLayout({ children, title, mainClassName, plain = fa
           </button>
         </div>
 
-        {/* Navigation */}
-        <nav className="scrollbar-hide relative flex-1 px-3 py-5 space-y-5 overflow-y-auto">
-          {visibleGroups.map((group) => (
-            <div key={group.label}>
-              <p className="text-[9px] font-black text-gray-600 uppercase tracking-[0.15em] px-3 mb-2">
-                {group.label}
-              </p>
-              <div className="space-y-0.5">
-                {group.items.map((item) => {
-                  const Icon = item.icon;
-                  const active = item.href === activeHref;
-                  return (
-                    <Link
-                      key={item.label}
-                      to={item.href}
-                      onClick={() => setNavOpen(false)}
-                      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest transition-all ${
-                        active
-                          ? "bg-[#0d9488]/10 text-[#0d9488] border-l-2 border-[#0d9488] pl-[10px]"
-                          : "text-gray-400 hover:text-white hover:bg-white/5"
-                      }`}
-                    >
-                      <Icon className="w-4 h-4 flex-shrink-0" />
-                      <span>{item.label}</span>
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-        </nav>
+        <AdminSidebarNav
+          groups={visibleGroups}
+          activeHref={activeHref}
+          role={role}
+          counts={unread.counts}
+          onNavigate={() => setNavOpen(false)}
+        />
 
         {/* User section */}
         <div className="relative border-t border-gray-800 p-4 space-y-3">
@@ -150,7 +153,7 @@ export default function AdminLayout({ children, title, mainClassName, plain = fa
             Change password
           </Link>
           <button
-            onClick={handleLogout}
+            onClick={onLogout}
             className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 rounded-lg font-bold text-[10px] uppercase tracking-widest transition-colors"
           >
             <LogOut className="w-3.5 h-3.5" />
@@ -164,9 +167,7 @@ export default function AdminLayout({ children, title, mainClassName, plain = fa
         {!plain && <AdminDecor />}
         <div className="relative z-[1] min-h-full w-full">
           {plain && (
-            <button type="button" className="m-3 rounded-lg border border-slate-200 bg-white p-2 lg:hidden" aria-label="Open menu" onClick={() => setNavOpen(true)}>
-              <Menu className="h-4 w-4" />
-            </button>
+            <MenuButton count={unread.total} onClick={() => setNavOpen(true)} className="m-3" />
           )}
           {!plain && title && (
             <div className="relative border-b border-slate-200 bg-white sticky top-0 z-10 overflow-hidden">
@@ -179,9 +180,7 @@ export default function AdminLayout({ children, title, mainClassName, plain = fa
               <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-teal-500/70 to-transparent" />
               <div className="flex w-full min-w-0 items-center justify-between gap-3 px-4 py-4 sm:px-6 sm:py-5">
                 <div className="flex min-w-0 items-center gap-3">
-                  <button type="button" className="shrink-0 rounded-lg border border-slate-200 p-2 lg:hidden" aria-label="Open menu" onClick={() => setNavOpen(true)}>
-                    <Menu className="h-4 w-4" />
-                  </button>
+                  <MenuButton count={unread.total} onClick={() => setNavOpen(true)} className="shrink-0" />
                   <h1 className="min-w-0 truncate text-xl font-black text-black uppercase tracking-tight">
                     {title}
                   </h1>
@@ -198,6 +197,15 @@ export default function AdminLayout({ children, title, mainClassName, plain = fa
         </div>
       </main>
     </div>
+  );
+}
+
+function MenuButton({ count, onClick, className }: { count: number; onClick: () => void; className?: string }) {
+  return (
+    <button type="button" className={`relative rounded-lg border border-slate-200 bg-white p-2 lg:hidden ${className || ""}`} aria-label="Open menu" onClick={onClick}>
+      <Menu className="h-4 w-4" />
+      <UnreadBadge count={count} testId="admin-menu-unread" className="absolute -right-1 -top-1" />
+    </button>
   );
 }
 

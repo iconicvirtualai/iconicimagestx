@@ -1,5 +1,7 @@
 import { randomBytes } from "node:crypto";
 import admin from "firebase-admin";
+import { signalForCommunication } from "../../shared/adminUnread.ts";
+import { bumpAdminUnreadChannel } from "./adminUnread.ts";
 
 export interface CommunicationLogEntry {
   id?: string;
@@ -70,6 +72,8 @@ export async function logCommunicationMessage(entry: CommunicationLogEntry): Pro
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
   };
   const ref = await firestore.collection("messages").add(stored);
+  const signal = signalForCommunication(entry);
+  if (signal) await bumpAdminUnreadChannel(signal);
   if (entry.channel === "sms") {
     await firestore.collection("smsLogs").add({
       direction: entry.direction,

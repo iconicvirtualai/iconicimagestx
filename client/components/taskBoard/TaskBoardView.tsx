@@ -1,7 +1,8 @@
-import { useRef, useState, type FormEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { Link } from "react-router-dom";
 import { GripVertical, Plus, Search, Trash2, X } from "lucide-react";
 import { DragGhost, dragDropClass, type DragGhostModel } from "@/components/drag/DragGhost";
+import { UnreadBadge } from "@/components/admin/UnreadBadge";
 import {
   TASK_PRIORITIES,
   TASK_PRIORITY_LABEL,
@@ -54,6 +55,8 @@ export function TaskBoardView({
   onCreate,
   onClear,
   onRestore,
+  assignmentUnread = 0,
+  onSeenAssignments,
 }: {
   tasks: TaskBoardTask[];
   staff: TaskAssignee[];
@@ -77,6 +80,8 @@ export function TaskBoardView({
   onCreate: (input: { title: string; assignee: TaskAssignee | null; priority: TaskPriority; dueOn: string | null; stage: TaskStage }) => void;
   onClear: (ids: string[]) => void;
   onRestore: (ids: string[]) => void;
+  assignmentUnread?: number;
+  onSeenAssignments?: () => void;
 }) {
   const [filter, setFilter] = useState<TaskFilter>("all");
   const [query, setQuery] = useState("");
@@ -105,6 +110,10 @@ export function TaskBoardView({
       || tasks[0]
       || null;
   const saved = manualOrderSaved(tasks);
+
+  useEffect(() => {
+    if (filter === "mine") onSeenAssignments?.();
+  }, [filter, onSeenAssignments]);
 
   const choose = (id: string) => {
     if (suppressClick.current) {
@@ -270,9 +279,10 @@ export function TaskBoardView({
                   key={item.id}
                   type="button"
                   onClick={() => setFilter(item.id)}
-                  className={`rounded-full px-3 py-1 text-[11px] font-semibold ${filter === item.id ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600"}`}
+                  className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-[11px] font-semibold ${filter === item.id ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600"}`}
                 >
                   {item.label} {counts[item.id]}
+                  {item.id === "mine" ? <UnreadBadge count={assignmentUnread} testId="tasks-mine-unread" /> : null}
                 </button>
               ))}
               <button

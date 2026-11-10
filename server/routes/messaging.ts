@@ -8,6 +8,7 @@ import { Router } from "express";
 import admin from "firebase-admin";
 import { requireAuth, requireStaff, type AuthenticatedRequest } from "../middleware/auth";
 import { sendEmail } from "../services/email";
+import { bumpAdminUnreadChannel } from "../services/adminUnread";
 
 const router = Router();
 const db = () => admin.firestore();
@@ -153,6 +154,7 @@ router.post("/:orderId", requireAuth, async (req: AuthenticatedRequest, res) => 
     };
 
     const docRef = await db().collection("messages").add(message);
+    if (senderType === "client") await bumpAdminUnreadChannel("inbox");
 
     // Log for AI agent monitoring
     await db().collection("agentLogs").add({

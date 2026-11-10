@@ -1,6 +1,7 @@
 /**
  * One task list for the checklist and the content workspace.
- * Writes taskBoardItems only. Does not email or text anyone.
+ * Writes taskBoardItems, and the assignee unread counter when someone else is assigned.
+ * Does not email or text anyone.
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -20,6 +21,8 @@ import type { User } from "firebase/auth";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { auth, db } from "@/lib/firebase";
+import { bumpTaskAssignments } from "@/lib/adminUnreadStore";
+import { newlyAssignedStaffIds } from "@shared/adminUnread";
 import type { ContactThreadView } from "@shared/contactThread";
 import {
   PHOTOS_INBOX_PREREQUISITES,
@@ -317,6 +320,8 @@ async function persist(user: User | null, previous: TaskBoardTask[], next: TaskB
         return false;
       }
     }
+    const assigned = newlyAssignedStaffIds(previous, next, user?.uid || null);
+    if (assigned.length > 0) void bumpTaskAssignments(assigned);
     return true;
   } catch (error) {
     const described = describeTaskBoardSaveError(error);

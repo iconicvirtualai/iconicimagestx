@@ -33,6 +33,7 @@ import {
 } from "firebase/firestore";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { bumpStaffChannel } from "@/lib/adminUnreadStore";
 import { adminRevenueAcceptance } from "@shared/revenueCount";
 import { resolvePortalClientId } from "@/lib/listingClient";
 import { OrderServicesFields } from "@/components/OrderServicesFields";
@@ -221,6 +222,7 @@ export default function AdminDashboard() {
         submittedAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
+      void bumpStaffChannel("orders");
       toast.success(clientId ? "Order created and linked to that client." : "Order created. No client account uses that email yet.");
       setShowNewOrder(false);
       setForm(BLANK);
