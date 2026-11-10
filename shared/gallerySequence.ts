@@ -1,8 +1,8 @@
 /**
  * Photographer delivery order.
  * Kept shots get an explicit sortOrder and a download name
- * like 001_123-main-st.jpg. Culled shots stay on the listing
- * and stay out of the gallery, the zip, and the client grid.
+ * like 001_123-main-st.jpg. Culled shots and shots hidden from the client
+ * gallery stay on the listing and stay out of the gallery, the zip, and the client grid.
  */
 
 export interface SequenceShot {
@@ -13,6 +13,7 @@ export interface SequenceShot {
   fileName?: unknown;
   title?: unknown;
   culled?: unknown;
+  hiddenFromGallery?: unknown;
   sortOrder?: unknown;
   deliveryName?: unknown;
   shotAt?: unknown;
@@ -73,7 +74,7 @@ export function isCulledShot(shot: SequenceShot): boolean {
 export function keptShots<T extends SequenceShot>(items: T[]): T[] {
   const rows = items
     .map((item, index) => ({ item, index }))
-    .filter(({ item }) => !isCulledShot(item));
+    .filter(({ item }) => !isCulledShot(item) && item.hiddenFromGallery !== true);
   const any = rows.some(({ item }) => finiteOrder(item.sortOrder) != null);
   if (!any) return rows.map(({ item }) => item);
   return rows

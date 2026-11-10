@@ -211,6 +211,7 @@ router.post("/:id/photos", requirePhotographer, async (req: AuthenticatedRequest
         contentType: saved.contentType,
         uploadedBy: req.user!.uid,
         existingUrl: saved.url,
+        extra: req.body?.extra,
       });
       await noteRawUpload(listingId, registered.image, req.user!.uid);
       const autoQueue = await noteOrderEditQueue(listingId, req.user!.uid);
@@ -228,6 +229,7 @@ router.post("/:id/photos", requirePhotographer, async (req: AuthenticatedRequest
       fileName,
       contentType: req.body?.contentType,
       uploadedBy: req.user!.uid,
+      extra: req.body?.extra,
     });
     await noteRawUpload(listingId, registered.image, req.user!.uid);
     const autoQueue = await noteOrderEditQueue(listingId, req.user!.uid);

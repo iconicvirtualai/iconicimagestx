@@ -6,6 +6,8 @@
  * deliveryName, so that drag never showed up after a reload. Saving an
  * arrangement stamps those fields, section by section. A section marked
  * hideFromListingSites stays in the client gallery and in downloads.
+ * hideFromClientGallery on a section, or hiddenFromGallery on a file,
+ * keeps the file in this admin board and removes it from the client gallery.
  */
 
 import { addressSlug } from "./gallerySequence.ts";
@@ -21,6 +23,15 @@ export interface ArrangementMedia {
   culled: boolean;
   bucket: string;
   index: number;
+  assetType?: string;
+  brandLabel?: string;
+  aspectLabel?: string;
+  platform?: string;
+  caption?: string;
+  width?: number;
+  height?: number;
+  webUrl?: string;
+  hiddenFromGallery?: boolean;
 }
 
 export interface MediaSection {
@@ -28,23 +39,29 @@ export interface MediaSection {
   name: string;
   order: number;
   hideFromListingSites: boolean;
+  /** Dimmed in admin. Left out of the client gallery, downloads, and zip. */
+  hideFromClientGallery: boolean;
 }
 
 export interface MediaPlacement {
   id: string;
   sectionId: string;
   order: number;
+  hiddenFromGallery: boolean;
 }
 
 export interface MediaArrangement {
   sections: MediaSection[];
   placements: MediaPlacement[];
+  /** Photo shown as the gallery cover. Empty means the first photo. */
+  coverId?: string;
 }
 
 export interface SequencedArrangementItem extends ArrangementMedia {
   sectionId: string;
   sortOrder: number;
   deliveryName: string;
+  hiddenFromGallery: boolean;
 }
 
 export type ArrangementWrite =
@@ -117,6 +134,14 @@ function pushRow(
   const id = rowId(row, `${kind}-${index}`);
   if (!id || seen.has(id)) return;
   seen.add(id);
+  const width = typeof row.width === "number" && Number.isFinite(row.width) ? row.width : undefined;
+  const height = typeof row.height === "number" && Number.isFinite(row.height) ? row.height : undefined;
+  const assetType = text(row.assetType) || text(row.type);
+  const brandLabel = text(row.brandLabel, 20);
+  const aspectLabel = text(row.aspectLabel, 24);
+  const platform = text(row.platform, 40);
+  const caption = text(row.caption, 500);
+  const webUrl = httpUrl(row.webUrl) || httpUrl(row.previewUrl) || httpUrl(row.displayUrl) || httpUrl(row.thumbnailUrl);
   out.push({
     id,
     kind,
@@ -126,6 +151,15 @@ function pushRow(
     culled: row.culled === true,
     bucket,
     index,
+    ...(assetType ? { assetType } : {}),
+    ...(brandLabel ? { brandLabel } : {}),
+    ...(aspectLabel ? { aspectLabel } : {}),
+    ...(platform ? { platform } : {}),
+    ...(caption ? { caption } : {}),
+    ...(width != null ? { width } : {}),
+    ...(height != null ? { height } : {}),
+    ...(webUrl ? { webUrl } : {}),
+    ...(row.hiddenFromGallery === true ? { hiddenFromGallery: true } : {}),
   });
 }
 
@@ -142,7 +176,15 @@ export function collectArrangementMedia(listing: Record<string, unknown> | null 
   const seenTourUrls = new Set<string>();
 
   rowsOf(source.images).forEach((row, index) => {
-    pushRow(out, seen, row, isVideoRow(row) ? "video" : "photo", "images", index, `Photo ${index + 1}`);
+    const asset = text(row.assetType).toLowerCase() || text(row.type).toLowerCase();
+    const kind: ArrangementKind = asset === "floorplan"
+      ? "floorplan"
+      : asset === "file" || asset === "document"
+        ? "file"
+        : asset === "video" || isVideoRow(row)
+          ? "video"
+          : "photo";
+    pushRow(out, seen, row, kind, asset === "social" ? "socialAssets" : "images", index, `Photo ${index + 1}`);
   });
   rowsOf(source.videos).forEach((row, index) => {
     pushRow(out, seen, row, "video", "videos", index, `Video ${index + 1}`);
@@ -168,6 +210,9 @@ export function collectArrangementMedia(listing: Record<string, unknown> | null 
   });
   rowsOf(source.files).forEach((row, index) => {
     pushRow(out, seen, row, "file", "files", index, `File ${index + 1}`);
+  });
+  rowsOf(source.socialAssets).forEach((row, index) => {
+    pushRow(out, seen, { ...row, assetType: text(row.assetType) || "social" }, "photo", "socialAssets", index, `Social ${index + 1}`);
   });
   rowsOf(source.clientPortalUploads).forEach((row, index) => {
     const kind = text(row.kind);
@@ -198,6 +243,7 @@ export function readMediaArrangement(value: unknown): MediaArrangement {
         name,
         order: typeof section.order === "number" && Number.isFinite(section.order) ? section.order : sections.length,
         hideFromListingSites: section.hideFromListingSites === true,
+        hideFromClientGallery: section.hideFromClientGallery === true,
       });
       if (sections.length >= SECTION_LIMIT) break;
     }
@@ -223,6 +269,7 @@ export function readMediaArrangement(value: unknown): MediaArrangement {
         id,
         sectionId: known.has(sectionId) ? sectionId : "",
         order: typeof placement.order === "number" && Number.isFinite(placement.order) ? placement.order : draft.length,
+        hiddenFromGallery: placement.hiddenFromGallery === true,
         index: draft.length,
       });
       if (draft.length >= PLACEMENT_LIMIT) break;
@@ -231,10 +278,16 @@ export function readMediaArrangement(value: unknown): MediaArrangement {
     for (const placement of draft) {
       const order = counters.get(placement.sectionId) || 0;
       counters.set(placement.sectionId, order + 1);
-      placements.push({ id: placement.id, sectionId: placement.sectionId, order });
+      placements.push({
+        id: placement.id,
+        sectionId: placement.sectionId,
+        order,
+        hiddenFromGallery: placement.hiddenFromGallery === true,
+      });
     }
   }
-  return { sections, placements };
+  const coverId = text(row.coverId, 180);
+  return coverId ? { sections, placements, coverId } : { sections, placements };
 }
 
 export function arrangementActive(arrangement: MediaArrangement): boolean {
@@ -266,17 +319,23 @@ export function createSection(
   const id = explicitId ? text(explicitId, 32) : newSectionId(current.sections.map((section) => section.id));
   if (!sectionIdOk(id)) return { ok: false, error: "That section id is not valid." };
   if (current.sections.some((section) => section.id === id)) return { ok: false, error: "That section already exists." };
-  const sections = [...current.sections, { id, name: label, order: current.sections.length, hideFromListingSites: false }];
+  const sections = [...current.sections, {
+    id,
+    name: label,
+    order: current.sections.length,
+    hideFromListingSites: false,
+    hideFromClientGallery: false,
+  }];
   const chosen = new Set(ids);
   const placements = current.placements.map((placement) => (
     chosen.has(placement.id) ? { ...placement, sectionId: id } : placement
   ));
   for (const mediaId of ids) {
     if (!placements.some((placement) => placement.id === mediaId)) {
-      placements.push({ id: mediaId, sectionId: id, order: 0 });
+      placements.push({ id: mediaId, sectionId: id, order: 0, hiddenFromGallery: false });
     }
   }
-  return { ok: true, arrangement: readMediaArrangement({ sections, placements }) };
+  return { ok: true, arrangement: readMediaArrangement({ sections, placements, coverId: current.coverId }) };
 }
 
 export function renameSection(arrangement: MediaArrangement, id: string, name: string): ArrangementWrite {
@@ -297,7 +356,7 @@ export function deleteSection(arrangement: MediaArrangement, id: string): Arrang
   const placements = current.placements.map((placement) => (
     placement.sectionId === id ? { ...placement, sectionId: "" } : placement
   ));
-  return { ok: true, arrangement: readMediaArrangement({ sections, placements }) };
+  return { ok: true, arrangement: readMediaArrangement({ sections, placements, coverId: current.coverId }) };
 }
 
 export function reorderSections(arrangement: MediaArrangement, ids: string[]): MediaArrangement {
@@ -307,6 +366,42 @@ export function reorderSections(arrangement: MediaArrangement, ids: string[]): M
     .sort((a, b) => (rank.get(a.id) ?? 99) - (rank.get(b.id) ?? 99) || a.order - b.order)
     .map((section, order) => ({ ...section, order }));
   return { ...current, sections };
+}
+
+export function setSectionClientHidden(arrangement: MediaArrangement, id: string, hideFromClientGallery: boolean): ArrangementWrite {
+  const current = readMediaArrangement(arrangement);
+  if (!current.sections.some((section) => section.id === id)) {
+    return { ok: false, error: "That section is not on this listing." };
+  }
+  return {
+    ok: true,
+    arrangement: {
+      ...current,
+      sections: current.sections.map((section) => (
+        section.id === id ? { ...section, hideFromClientGallery } : section
+      )),
+    },
+  };
+}
+
+export function setItemsHidden(arrangement: MediaArrangement, ids: string[], hiddenFromGallery: boolean): MediaArrangement {
+  const current = readMediaArrangement(arrangement);
+  const chosen = new Set(ids.map((id) => text(id)).filter(Boolean));
+  const placements = current.placements.map((placement) => (
+    chosen.has(placement.id) ? { ...placement, hiddenFromGallery } : placement
+  ));
+  for (const id of chosen) {
+    if (!placements.some((placement) => placement.id === id)) {
+      placements.push({ id, sectionId: "", order: placements.length, hiddenFromGallery });
+    }
+  }
+  return readMediaArrangement({ ...current, placements });
+}
+
+export function setCover(arrangement: MediaArrangement, coverId: string): MediaArrangement {
+  const current = readMediaArrangement(arrangement);
+  const id = text(coverId, 180);
+  return id ? { ...current, coverId: id } : { ...current, coverId: undefined };
 }
 
 export function setSectionHidden(arrangement: MediaArrangement, id: string, hideFromListingSites: boolean): ArrangementWrite {
@@ -365,6 +460,7 @@ export function placeMedia(arrangement: MediaArrangement, placed: FlatPlacement[
   const known = new Set(current.sections.map((section) => section.id));
   const seen = new Set<string>();
   const counters = new Map<string, number>();
+  const hidden = new Map(current.placements.map((placement) => [placement.id, placement.hiddenFromGallery === true]));
   const placements: MediaPlacement[] = [];
   for (const row of placed) {
     const id = text(row.id);
@@ -373,7 +469,7 @@ export function placeMedia(arrangement: MediaArrangement, placed: FlatPlacement[
     const sectionId = known.has(row.sectionId) ? row.sectionId : "";
     const order = counters.get(sectionId) || 0;
     counters.set(sectionId, order + 1);
-    placements.push({ id, sectionId, order });
+    placements.push({ id, sectionId, order, hiddenFromGallery: hidden.get(id) === true });
     if (placements.length >= PLACEMENT_LIMIT) break;
   }
   return { ...current, placements };
@@ -435,6 +531,7 @@ export function sequenceArrangement(
   arrangement: MediaArrangement,
   address: string,
 ): SequencedArrangementItem[] {
+  const current = readMediaArrangement(arrangement);
   const byId = new Map(media.filter((item) => !item.culled).map((item) => [item.id, item]));
   let fileIndex = 0;
   let position = 0;
@@ -445,11 +542,15 @@ export function sequenceArrangement(
     position += 1;
     const file = item.kind !== "tour";
     if (file) fileIndex += 1;
+    const section = current.sections.find((entry) => entry.id === row.sectionId);
+    const placement = current.placements.find((entry) => entry.id === row.id);
+    const itemHidden = placement ? placement.hiddenFromGallery === true : item.hiddenFromGallery === true;
     sequenced.push({
       ...item,
       sectionId: row.sectionId,
       sortOrder: position,
       deliveryName: file ? arrangementFileName(fileIndex, address, item.name) : "",
+      hiddenFromGallery: itemHidden || section?.hideFromClientGallery === true,
     });
   }
   return sequenced;
@@ -459,6 +560,20 @@ export function hiddenSectionIdSet(arrangement: MediaArrangement): Set<string> {
   return new Set(
     readMediaArrangement(arrangement).sections.filter((section) => section.hideFromListingSites).map((section) => section.id),
   );
+}
+
+export function isHiddenFromClientGallery(
+  listing: { mediaArrangement?: unknown } | null | undefined,
+  row: Record<string, unknown>,
+): boolean {
+  if (row.hiddenFromGallery === true || row.culled === true) return true;
+  const arrangement = readMediaArrangement(listing?.mediaArrangement);
+  const id = text(row.id) || text(row.path) || text(row.storagePath) || text(row.url) || text(row.shareUrl);
+  const placement = id ? arrangement.placements.find((item) => item.id === id) : undefined;
+  if (placement?.hiddenFromGallery) return true;
+  const sectionId = text(row.sectionId, 32) || placement?.sectionId || "";
+  if (!sectionId) return false;
+  return arrangement.sections.some((section) => section.id === sectionId && section.hideFromClientGallery);
 }
 
 export function isHiddenFromListingSites(
@@ -540,6 +655,7 @@ export function stampListingArrangement(
       copy.sortOrder = hit.sortOrder;
       copy.order = hit.sortOrder;
       copy.sectionId = hit.sectionId;
+      copy.hiddenFromGallery = hit.hiddenFromGallery === true;
       if (hit.deliveryName) copy.deliveryName = hit.deliveryName;
       else delete copy.deliveryName;
       return copy;
@@ -581,6 +697,7 @@ export function stampGalleryMediaItems<T extends Record<string, unknown>>(
       name: hit.deliveryName,
       title: hit.deliveryName,
       sectionId: hit.sectionId,
+      hiddenFromGallery: hit.hiddenFromGallery === true,
     };
   });
 }
