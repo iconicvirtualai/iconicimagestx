@@ -382,6 +382,14 @@ function staffLabel(actor2) {
 function clean(value) {
   return typeof value === "string" ? value.trim() : "";
 }
+const STUDIO105_LEAD_SOURCE = "Studio 105";
+const STUDIO_PODCAST_ID = "studio-podcast";
+const STUDIO_PODCAST_IMAGE = "/media/home-v2/lifestyle/podcast-set-wide.jpg";
+const STUDIO_PODCAST_IMAGE_ALT = "The Iconic podcast set, cameras and lights";
+const STUDIO_PODCAST_DESCRIPTION = "Podcast setup in Studio 105. Rate confirmed when the hold is set.";
+function isStudio105Request(leadSource) {
+  return typeof leadSource === "string" && leadSource.trim() === STUDIO105_LEAD_SOURCE;
+}
 const services = [
   // Listings
   {
@@ -581,6 +589,15 @@ const services = [
     category: "studio",
     price: 0,
     description: "Bright white room at Studio 105. Rate confirmed when the hold is set."
+  },
+  {
+    id: STUDIO_PODCAST_ID,
+    name: "Podcast",
+    category: "studio",
+    price: 0,
+    description: STUDIO_PODCAST_DESCRIPTION,
+    image: STUDIO_PODCAST_IMAGE,
+    imageAlt: STUDIO_PODCAST_IMAGE_ALT
   }
 ];
 const APPRENTICESHIP_OVERAGE_LABEL = "$25 per 15-minute increment";
@@ -1143,7 +1160,8 @@ function collectBookingOffer(catalog, include) {
         features: pkg.includedServices.length ? pkg.includedServices : known?.features,
         isPopular: known?.isPopular,
         highlights: known?.highlights,
-        phase: known?.phase
+        phase: known?.phase,
+        ...known?.image ? { image: known.image, imageAlt: known.imageAlt || pkg.name } : {}
       });
       continue;
     }
@@ -1183,6 +1201,9 @@ function collectBookingOffer(catalog, include) {
 }
 function bookingOffer(catalog = packagesForStaffEditor([])) {
   return collectBookingOffer(catalog, (pkg) => isPubliclyBookable(pkg));
+}
+function bookingPriceHolds(catalog = packagesForStaffEditor([])) {
+  return collectBookingOffer(catalog, (pkg) => !isPubliclyBookable(pkg));
 }
 function publicBookingCatalogResponse(catalog = packagesForStaffEditor([])) {
   return {
@@ -6027,6 +6048,32 @@ function studioFromRecord(record2) {
   if (/podcast/.test(blob)) return "podcast-studio";
   return "offsite";
 }
+function studioIdFromBooking(input) {
+  const explicit = typeof input.studio === "string" ? input.studio.trim() : "";
+  if (explicit) {
+    const resolved = resolveAdminStudio(explicit);
+    const raw = explicit.toLowerCase();
+    if (resolved !== "offsite" || /off\s*site|on location/.test(raw)) return resolved;
+  }
+  const names = [];
+  if (typeof input.selectedService === "string") names.push(input.selectedService);
+  if (Array.isArray(input.lineItems)) {
+    for (const item of input.lineItems) {
+      if (typeof item === "string") names.push(item);
+      else if (item && typeof item === "object") {
+        const row = item;
+        if (typeof row.id === "string") names.push(row.id);
+        if (typeof row.name === "string") names.push(row.name);
+      }
+    }
+  }
+  const blob = names.join(" ").toLowerCase();
+  if (!blob.trim()) return null;
+  if (/studio-blanc|studio blanc/.test(blob)) return "studio-blanc";
+  if (/studio-noir|studio noir/.test(blob)) return "studio-noir";
+  if (/studio-podcast|podcast-studio|pre-sale\s*[—–-]\s*podcast\b/.test(blob)) return "podcast-studio";
+  return null;
+}
 function resolveAdminStudio(value) {
   const textValue = String(value ?? "").trim().toLowerCase().replace(/[_-]+/g, " ");
   if (/noir/.test(textValue)) return "studio-noir";
@@ -10823,10 +10870,6 @@ async function backfillHolidayCalendarEvents() {
   }
   return report;
 }
-const STUDIO105_LEAD_SOURCE = "Studio 105";
-function isStudio105Request(leadSource) {
-  return typeof leadSource === "string" && leadSource.trim() === STUDIO105_LEAD_SOURCE;
-}
 const CACHE_MS$1 = 15e3;
 let cache$1 = null;
 let loggedReadFailure = false;
@@ -11076,6 +11119,11 @@ router$B.post("/", async (req, res) => {
       sale = applyPayNowSavings(sale);
     }
     const lineItems = sale.lineItems;
+    const bookedStudio = studioIdFromBooking({
+      studio: req.body.studio,
+      selectedService: resolved.selectedService,
+      lineItems
+    });
     const total = sale.total;
     const pricing = { subtotal: sale.subtotal, tax: sale.tax, total: sale.total };
     const selectedService = resolved.selectedService;
@@ -11202,6 +11250,7 @@ router$B.post("/", async (req, res) => {
       selectedService: selectedService || null,
       selectedBasics: Array.isArray(selectedBasics) ? selectedBasics : [],
       selectedAddOns: Array.isArray(selectedAddOns) ? selectedAddOns : [],
+      ...bookedStudio === "podcast-studio" ? { studio: bookedStudio, projectType: "business" } : {},
       leadSource: leadSource || null,
       gclid: sanitizeGclid(req.body.gclid) || null,
       brokerage: typeof req.body.brokerage === "string" ? req.body.brokerage.trim().slice(0, 160) : null,
@@ -11825,6 +11874,12 @@ router$B.get("/catalog", async (_req, res) => {
   const rates = pricingRates(adjustments);
   return res.json({
     ...publicBookingCatalogResponse(catalog),
+    studioPriceHolds: bookingPriceHolds(catalog).services.filter((item) => item.category === "studio").map((item) => ({
+      id: item.id,
+      name: item.name,
+      price: item.price,
+      description: item.description
+    })),
     processingEnabled: processingEnabled() && rates.processingActive,
     pricingRates: rates,
     payAtClose: payAtClosePublicOffer(process.env, adjustments)
@@ -31749,7 +31804,7 @@ const PUBLIC_PAGES = [
     path: "/studio-105",
     file: "seo/studio-105.html",
     title: "Studio 105 | Iconic Images",
-    description: "Studio 105 in Spring has two portrait rooms, Studio Noir and Studio Blanc, for headshots, brand films, and product photos."
+    description: "Studio 105 in Spring has Studio Noir, Studio Blanc, and a podcast setup for headshots, brand films, product photos, and recorded conversations."
   },
   {
     path: "/portfolio",
@@ -34924,7 +34979,8 @@ const PAGES = [
     ]),
     block("rooms", "Rooms", [], [
       { id: "studio-noir", fields: [textField("name", "Name", "Studio Noir"), textField("vibe", "Vibe", "Dark / dramatic"), areaField("summary", "Summary", "A controlled black room for portraits with edge, branding films, and product that needs mood.")] },
-      { id: "studio-blanc", fields: [textField("name", "Name", "Studio Blanc"), textField("vibe", "Vibe", "Bright / white"), areaField("summary", "Summary", "A clean white room for crisp headshots, bright product, and holiday minis.")] }
+      { id: "studio-blanc", fields: [textField("name", "Name", "Studio Blanc"), textField("vibe", "Vibe", "Bright / white"), areaField("summary", "Summary", "A clean white room for crisp headshots, bright product, and holiday minis.")] },
+      { id: "studio-podcast", fields: [textField("name", "Name", "Podcast"), textField("vibe", "Vibe", "Podcast setup"), areaField("summary", "Summary", "Podcast setup in Studio 105. Rate confirmed when the hold is set."), imageField("image", "Photo", "/media/home-v2/lifestyle/podcast-set-wide.jpg"), textField("imageAlt", "Photo alt", "The Iconic podcast set, cameras and lights")] }
     ])
   ]),
   page("socials", "/socials", "Socials", [

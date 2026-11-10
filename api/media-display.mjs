@@ -419,6 +419,41 @@ function isHiddenFromListingSites(listing, row) {
   if (!id) return false;
   return arrangement.placements.some((placement) => placement.id === id && hidden.has(placement.sectionId));
 }
+const BUSINESS_CONTACT_LINE = "26410 Oakridge Dr. Ste 105 - 108, Spring, TX 77380 | 281.356.0965 | photos@iconicimagestx.com";
+const LEGAL_BUSINESS_NAME = "Iconic Images Photography, LLC";
+function parseContactLine(line) {
+  const parts = line.split(" | ");
+  if (parts.length !== 3) {
+    throw new Error("BUSINESS_CONTACT_LINE must be address | phone | email");
+  }
+  const [address, phoneDisplay, email] = parts;
+  const addressParts = address.split(", ");
+  if (addressParts.length !== 3) {
+    throw new Error("Public address must be street, city, ST ZIP");
+  }
+  const [streetAddress, city, stateZip] = addressParts;
+  const [state, postalCode] = stateZip.split(" ");
+  if (!streetAddress || !city || !state || !postalCode || !phoneDisplay || !email) {
+    throw new Error("BUSINESS_CONTACT_LINE is missing a public contact field");
+  }
+  const phoneDigits = phoneDisplay.replace(/\D/g, "");
+  return {
+    line,
+    address,
+    streetAddress,
+    addressLine2: `${city}, ${state} ${postalCode}`,
+    city,
+    state,
+    postalCode,
+    phoneDisplay,
+    phoneHref: `tel:+1${phoneDigits}`,
+    email,
+    emailHref: `mailto:${email}`,
+    mapsHref: `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`,
+    mapsEmbed: `https://maps.google.com/maps?q=${encodeURIComponent(address)}&output=embed`
+  };
+}
+parseContactLine(BUSINESS_CONTACT_LINE);
 const APPRENTICESHIP_RULES = [
   "Apprentices are learning.",
   "We do not make additional trips.",
@@ -669,41 +704,6 @@ function text$1(value) {
 function asRecord(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : null;
 }
-const BUSINESS_CONTACT_LINE = "26410 Oakridge Dr. Ste 105 - 108, Spring, TX 77380 | 281.356.0965 | photos@iconicimagestx.com";
-const LEGAL_BUSINESS_NAME = "Iconic Images Photography, LLC";
-function parseContactLine(line) {
-  const parts = line.split(" | ");
-  if (parts.length !== 3) {
-    throw new Error("BUSINESS_CONTACT_LINE must be address | phone | email");
-  }
-  const [address, phoneDisplay, email] = parts;
-  const addressParts = address.split(", ");
-  if (addressParts.length !== 3) {
-    throw new Error("Public address must be street, city, ST ZIP");
-  }
-  const [streetAddress, city, stateZip] = addressParts;
-  const [state, postalCode] = stateZip.split(" ");
-  if (!streetAddress || !city || !state || !postalCode || !phoneDisplay || !email) {
-    throw new Error("BUSINESS_CONTACT_LINE is missing a public contact field");
-  }
-  const phoneDigits = phoneDisplay.replace(/\D/g, "");
-  return {
-    line,
-    address,
-    streetAddress,
-    addressLine2: `${city}, ${state} ${postalCode}`,
-    city,
-    state,
-    postalCode,
-    phoneDisplay,
-    phoneHref: `tel:+1${phoneDigits}`,
-    email,
-    emailHref: `mailto:${email}`,
-    mapsHref: `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`,
-    mapsEmbed: `https://maps.google.com/maps?q=${encodeURIComponent(address)}&output=embed`
-  };
-}
-parseContactLine(BUSINESS_CONTACT_LINE);
 const PLACES = [
   { city: "The Woodlands", travelFee: "standard", zips: ["77380", "77381", "77382", "77384", "77385"] },
   { city: "Spring", travelFee: "standard", zips: ["77373", "77379", "77386", "77388", "77389"] },
@@ -745,7 +745,7 @@ const PUBLIC_PAGES = [
     path: "/studio-105",
     file: "seo/studio-105.html",
     title: "Studio 105 | Iconic Images",
-    description: "Studio 105 in Spring has two portrait rooms, Studio Noir and Studio Blanc, for headshots, brand films, and product photos."
+    description: "Studio 105 in Spring has Studio Noir, Studio Blanc, and a podcast setup for headshots, brand films, product photos, and recorded conversations."
   },
   {
     path: "/portfolio",
@@ -2060,7 +2060,8 @@ const PAGES = [
     ]),
     block("rooms", "Rooms", [], [
       { id: "studio-noir", fields: [textField("name", "Name", "Studio Noir"), textField("vibe", "Vibe", "Dark / dramatic"), areaField("summary", "Summary", "A controlled black room for portraits with edge, branding films, and product that needs mood.")] },
-      { id: "studio-blanc", fields: [textField("name", "Name", "Studio Blanc"), textField("vibe", "Vibe", "Bright / white"), areaField("summary", "Summary", "A clean white room for crisp headshots, bright product, and holiday minis.")] }
+      { id: "studio-blanc", fields: [textField("name", "Name", "Studio Blanc"), textField("vibe", "Vibe", "Bright / white"), areaField("summary", "Summary", "A clean white room for crisp headshots, bright product, and holiday minis.")] },
+      { id: "studio-podcast", fields: [textField("name", "Name", "Podcast"), textField("vibe", "Vibe", "Podcast setup"), areaField("summary", "Summary", "Podcast setup in Studio 105. Rate confirmed when the hold is set."), imageField("image", "Photo", "/media/home-v2/lifestyle/podcast-set-wide.jpg"), textField("imageAlt", "Photo alt", "The Iconic podcast set, cameras and lights")] }
     ])
   ]),
   page("socials", "/socials", "Socials", [

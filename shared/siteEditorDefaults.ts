@@ -461,6 +461,7 @@ const PAGES: ContentPage[] = [
     block("rooms", "Rooms", [], [
       { id: "studio-noir", fields: [textField("name", "Name", "Studio Noir"), textField("vibe", "Vibe", "Dark / dramatic"), areaField("summary", "Summary", "A controlled black room for portraits with edge, branding films, and product that needs mood.")] },
       { id: "studio-blanc", fields: [textField("name", "Name", "Studio Blanc"), textField("vibe", "Vibe", "Bright / white"), areaField("summary", "Summary", "A clean white room for crisp headshots, bright product, and holiday minis.")] },
+      { id: "studio-podcast", fields: [textField("name", "Name", "Podcast"), textField("vibe", "Vibe", "Podcast setup"), areaField("summary", "Summary", "Podcast setup in Studio 105. Rate confirmed when the hold is set."), imageField("image", "Photo", "/media/home-v2/lifestyle/podcast-set-wide.jpg"), textField("imageAlt", "Photo alt", "The Iconic podcast set, cameras and lights")] },
     ]),
   ]),
 

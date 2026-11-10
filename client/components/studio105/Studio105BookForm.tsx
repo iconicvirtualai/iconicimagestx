@@ -1,13 +1,24 @@
 import { FormEvent, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { createOrder } from "@/lib/createOrder";
 import { trackConversion } from "@/lib/tracking";
+import { usePodcastCatalogOffer } from "@/components/studio105/usePodcastCatalog";
 import { BUSINESS_CONTACT } from "@shared/businessContact";
-import { isStudioRoomId, STUDIO105_LEAD_SOURCE, studioRoomRequestName, type StudioRoomId } from "@shared/studio105";
+import {
+  isStudioRoomId,
+  STUDIO105_LEAD_SOURCE,
+  STUDIO_PODCAST_ADMIN_ID,
+  STUDIO_PODCAST_ID,
+  STUDIO_PODCAST_IMAGE,
+  STUDIO_PODCAST_IMAGE_ALT,
+  studioRoomRequestName,
+  type StudioRoomId,
+} from "@shared/studio105";
 
-const ROOMS: Array<{ id: StudioRoomId; name: string }> = [
+const ROOMS: Array<{ id: StudioRoomId; name: string; image?: string; imageAlt?: string }> = [
   { id: "studio-noir", name: "Studio Noir" },
   { id: "studio-blanc", name: "Studio Blanc" },
+  { id: STUDIO_PODCAST_ID, name: "Podcast", image: STUDIO_PODCAST_IMAGE, imageAlt: STUDIO_PODCAST_IMAGE_ALT },
 ];
 
 const TIMES = ["9:00 AM", "10:00 AM", "11:00 AM", "12:00 PM", "1:00 PM", "2:00 PM", "3:00 PM", "4:00 PM"];
@@ -33,7 +44,10 @@ export default function Studio105BookForm() {
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
   const [received, setReceived] = useState("");
+  const podcastOffer = usePodcastCatalogOffer();
   const room = useMemo(() => ROOMS.find((item) => item.id === roomId) || ROOMS[0], [roomId]);
+  const roomName = room.id === STUDIO_PODCAST_ID ? podcastOffer.name || room.name : room.name;
+  const podcastCheckout = room.id === STUDIO_PODCAST_ID && podcastOffer.price > 0;
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -52,12 +66,16 @@ export default function Studio105BookForm() {
         address: BUSINESS_CONTACT.address,
         serviceDate: preferredDate,
         serviceTime: preferredTime,
-        selectedService: studioRoomRequestName(room.name),
-        lineItems: [{ name: studioRoomRequestName(room.name), price: 0 }],
-        total: 0,
-        pricing: { subtotal: 0, total: 0 },
+        selectedService: studioRoomRequestName(roomName),
+        lineItems: [{ name: studioRoomRequestName(roomName), price: room.id === STUDIO_PODCAST_ID ? podcastOffer.price : 0 }],
+        total: room.id === STUDIO_PODCAST_ID ? podcastOffer.price : 0,
+        pricing: {
+          subtotal: room.id === STUDIO_PODCAST_ID ? podcastOffer.price : 0,
+          total: room.id === STUDIO_PODCAST_ID ? podcastOffer.price : 0,
+        },
+        ...(room.id === STUDIO_PODCAST_ID ? { studio: STUDIO_PODCAST_ADMIN_ID } : {}),
         vibeNote: [
-          `Room: ${room.name} (${room.id})`,
+          `Room: ${roomName} (${room.id})`,
           notes.trim(),
           "Request only. Confirm availability and the rate. Do not charge a card.",
         ].filter(Boolean).join("\n"),
@@ -79,7 +97,7 @@ export default function Studio105BookForm() {
     return (
       <div data-testid="studio105-request-received" className="rounded-[2rem] border border-white/10 bg-zinc-950 p-8">
         <p className="text-[11px] font-black uppercase tracking-[0.28em] text-[#2dd4bf]">Request received</p>
-        <h2 className="mt-3 text-3xl font-black uppercase tracking-tight">{room.name}</h2>
+        <h2 className="mt-3 text-3xl font-black uppercase tracking-tight">{roomName}</h2>
         <p className="mt-4 max-w-xl text-base leading-relaxed text-gray-300">
           We have the request. We confirm availability and the rate. This page does not charge a card.
         </p>
@@ -92,22 +110,53 @@ export default function Studio105BookForm() {
     <form data-testid="studio105-book-form" onSubmit={onSubmit} className="space-y-6 rounded-[2rem] border border-white/10 bg-zinc-950 p-6 sm:p-8">
       <fieldset>
         <legend className="text-[11px] font-black uppercase tracking-[0.22em] text-white/60">Room</legend>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          {ROOMS.map((item) => (
-            <label key={item.id} className={`cursor-pointer rounded-2xl border p-4 ${roomId === item.id ? "border-[#2dd4bf] bg-white/5" : "border-white/10"}`}>
-              <input
-                type="radio"
-                name="room"
-                value={item.id}
-                checked={roomId === item.id}
-                onChange={() => setRoomId(item.id)}
-                className="mr-2 accent-[#0d9488]"
-              />
-              <span className="font-black uppercase tracking-tight">{item.name}</span>
-            </label>
-          ))}
+        <div className="mt-3 grid grid-cols-1 items-stretch gap-3 md:grid-cols-3">
+          {ROOMS.map((item) => {
+            const label = item.id === STUDIO_PODCAST_ID ? podcastOffer.name || item.name : item.name;
+            return (
+              <label key={item.id} data-testid={`studio-room-${item.id}`} className={`relative flex h-28 cursor-pointer items-end overflow-hidden rounded-2xl border p-4 ${roomId === item.id ? "border-[#2dd4bf] bg-white/5" : "border-white/10"}`}>
+                {item.image ? (
+                  <>
+                    <img src={item.image} alt={item.imageAlt || label} className="absolute inset-0 h-full w-full object-cover" />
+                    <span className="absolute inset-0 bg-gradient-to-t from-black via-black/55 to-black/10" />
+                  </>
+                ) : null}
+                <span className="relative flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="room"
+                    value={item.id}
+                    checked={roomId === item.id}
+                    onChange={() => setRoomId(item.id)}
+                    className="accent-[#0d9488]"
+                  />
+                  <span className="font-black uppercase tracking-tight">{label}</span>
+                </span>
+              </label>
+            );
+          })}
         </div>
       </fieldset>
+      <aside data-testid="studio105-order-summary" className="rounded-2xl border border-white/10 p-5">
+        <p className="text-[11px] font-black uppercase tracking-[0.22em] text-white/60">Order summary</p>
+        <h2 className="mt-2 text-2xl font-black uppercase tracking-tight">{roomName}</h2>
+        {room.id === STUDIO_PODCAST_ID ? (
+          <>
+            <p className="mt-2 text-sm leading-relaxed text-white/70">{podcastOffer.description}</p>
+            {podcastCheckout ? (
+              <p className="mt-3 text-lg font-black">${podcastOffer.price}</p>
+            ) : (
+              <p className="mt-3 text-sm leading-relaxed text-white/70">
+                Rate confirmed when we accept the time. This page does not charge a card.
+              </p>
+            )}
+          </>
+        ) : (
+          <p className="mt-3 text-sm leading-relaxed text-white/70">
+            Request the room and a time. We confirm availability and the rate. This page does not charge a card.
+          </p>
+        )}
+      </aside>
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block text-sm font-semibold">
           First name
@@ -144,13 +193,22 @@ export default function Studio105BookForm() {
         Request the room and a time. We confirm availability and the rate. This page does not charge a card.
       </p>
       {error ? <p role="alert" className="text-sm font-semibold text-red-300">{error}</p> : null}
-      <button
-        type="submit"
-        disabled={pending}
-        className="inline-flex min-h-12 items-center rounded-full bg-white px-8 text-xs font-black uppercase tracking-widest text-black disabled:opacity-60"
-      >
-        {pending ? "Sending request..." : `Request ${room.name}`}
-      </button>
+      {podcastCheckout ? (
+        <Link
+          to={`/book?package=${STUDIO_PODCAST_ID}`}
+          className="inline-flex min-h-12 items-center rounded-full bg-white px-8 text-xs font-black uppercase tracking-widest text-black"
+        >
+          Continue to checkout
+        </Link>
+      ) : (
+        <button
+          type="submit"
+          disabled={pending}
+          className="inline-flex min-h-12 items-center rounded-full bg-white px-8 text-xs font-black uppercase tracking-widest text-black disabled:opacity-60"
+        >
+          {pending ? "Sending request..." : `Request ${roomName}`}
+        </button>
+      )}
     </form>
   );
 }

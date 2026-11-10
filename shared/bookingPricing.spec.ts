@@ -505,10 +505,12 @@ describe("booking catalog parity", () => {
     ];
     expect(offerIds).not.toContain("studio-noir");
     expect(offerIds).not.toContain("studio-blanc");
-    expect(bookingPriceHolds().services.map((item) => item.id).sort()).toEqual(["studio-blanc", "studio-noir"]);
+    expect(offerIds).not.toContain("studio-podcast");
+    expect(bookingPriceHolds().services.map((item) => item.id).sort()).toEqual(["studio-blanc", "studio-noir", "studio-podcast"]);
     const published = publicBookingCatalogResponse().packages.map((item) => item.id);
     expect(published).not.toContain("studio-noir");
     expect(published).not.toContain("studio-blanc");
+    expect(published).not.toContain("studio-podcast");
     expect(published).toContain("listing-essentials");
     expect(published).toContain("aerial-drone");
   });
@@ -519,6 +521,7 @@ describe("booking catalog parity", () => {
     expect(unpriced.map((item) => [item.id, item.name, item.price])).toEqual([
       ["studio-noir", "Studio Noir", 0],
       ["studio-blanc", "Studio Blanc", 0],
+      ["studio-podcast", "Podcast", 0],
     ]);
     expect(packagesForStaffEditor([], { includeInactive: true }).some((item) => item.id === "studio-noir")).toBe(true);
 

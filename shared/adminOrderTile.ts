@@ -238,6 +238,41 @@ function studioFromRecord(record: Record<string, unknown>): AdminStudioId {
   return "offsite";
 }
 
+/**
+ * Studio stamped on a new order. Returns null when the booking is not a studio room.
+ * Podcast matches the catalog id, the admin id, or the Studio 105 pre-sale line.
+ */
+export function studioIdFromBooking(input: {
+  studio?: unknown;
+  selectedService?: unknown;
+  lineItems?: unknown;
+}): AdminStudioId | null {
+  const explicit = typeof input.studio === "string" ? input.studio.trim() : "";
+  if (explicit) {
+    const resolved = resolveAdminStudio(explicit);
+    const raw = explicit.toLowerCase();
+    if (resolved !== "offsite" || /off\s*site|on location/.test(raw)) return resolved;
+  }
+  const names: string[] = [];
+  if (typeof input.selectedService === "string") names.push(input.selectedService);
+  if (Array.isArray(input.lineItems)) {
+    for (const item of input.lineItems) {
+      if (typeof item === "string") names.push(item);
+      else if (item && typeof item === "object") {
+        const row = item as { id?: unknown; name?: unknown };
+        if (typeof row.id === "string") names.push(row.id);
+        if (typeof row.name === "string") names.push(row.name);
+      }
+    }
+  }
+  const blob = names.join(" ").toLowerCase();
+  if (!blob.trim()) return null;
+  if (/studio-blanc|studio blanc/.test(blob)) return "studio-blanc";
+  if (/studio-noir|studio noir/.test(blob)) return "studio-noir";
+  if (/studio-podcast|podcast-studio|pre-sale\s*[—–-]\s*podcast\b/.test(blob)) return "podcast-studio";
+  return null;
+}
+
 export function resolveAdminStudio(value: unknown): AdminStudioId {
   const textValue = String(value ?? "").trim().toLowerCase().replace(/[_-]+/g, " ");
   if (/noir/.test(textValue)) return "studio-noir";

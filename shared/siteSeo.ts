@@ -70,7 +70,7 @@ export const PUBLIC_PAGES: readonly PublicPage[] = [
     file: "seo/studio-105.html",
     title: "Studio 105 | Iconic Images",
     description:
-      "Studio 105 in Spring has two portrait rooms, Studio Noir and Studio Blanc, for headshots, brand films, and product photos.",
+      "Studio 105 in Spring has Studio Noir, Studio Blanc, and a podcast setup for headshots, brand films, product photos, and recorded conversations.",
   },
   {
     path: "/portfolio",

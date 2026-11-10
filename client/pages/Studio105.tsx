@@ -4,7 +4,14 @@ import Studio105Shell from "@/components/studio105/Studio105Shell";
 import Studio105BookForm from "@/components/studio105/Studio105BookForm";
 import { itemText, useSiteItems, useSiteText } from "@/content/siteContent";
 import { BUSINESS_CONTACT } from "@shared/businessContact";
-import { STUDIO105_PATHS } from "@shared/studio105";
+import {
+  STUDIO105_PATHS,
+  STUDIO_PODCAST_DESCRIPTION,
+  STUDIO_PODCAST_ID,
+  STUDIO_PODCAST_IMAGE,
+  STUDIO_PODCAST_IMAGE_ALT,
+} from "@shared/studio105";
+import { usePodcastCatalogOffer } from "@/components/studio105/usePodcastCatalog";
 
 const ROOMS = [
   {
@@ -14,6 +21,8 @@ const ROOMS = [
     vibe: "Dark / dramatic",
     summary: "A controlled black room for portraits with edge, branding films, and product that needs mood.",
     uses: ["Headshots with contrast", "Brand films", "Dramatic product", "Evening portraits"],
+    image: "",
+    imageAlt: "",
     card: "bg-zinc-950 text-white border-white/10",
     chip: "bg-white text-black",
     button: "bg-white text-black hover:bg-zinc-200",
@@ -26,10 +35,26 @@ const ROOMS = [
     vibe: "Bright / white",
     summary: "A clean white room for crisp headshots, bright product, and holiday minis.",
     uses: ["Clean headshots", "Product on white", "Holiday minis", "Bright branding"],
+    image: "",
+    imageAlt: "",
     card: "bg-white text-black border-black/10",
     chip: "bg-black text-white",
     button: "bg-black text-white hover:bg-zinc-800",
     glow: "bg-teal-500/15",
+  },
+  {
+    id: STUDIO_PODCAST_ID,
+    path: STUDIO105_PATHS.podcast,
+    name: "Podcast",
+    vibe: "Podcast setup",
+    summary: STUDIO_PODCAST_DESCRIPTION,
+    uses: ["Host and guest", "Interview recording", "Multi-cam set", "Branded episodes"],
+    image: STUDIO_PODCAST_IMAGE,
+    imageAlt: STUDIO_PODCAST_IMAGE_ALT,
+    card: "bg-zinc-950 text-white border-white/10",
+    chip: "bg-white text-black",
+    button: "bg-white text-black hover:bg-zinc-200",
+    glow: "bg-teal-400/20",
   },
 ];
 
@@ -44,7 +69,7 @@ const FAQ = [
   },
   {
     q: "Which room should I book?",
-    a: "Studio Noir is the controlled black room for portraits with edge, branding films, and product that needs mood. Studio Blanc is the clean white room for crisp headshots, bright product, and holiday minis.",
+    a: "Studio Noir is the controlled black room for portraits with edge, branding films, and product that needs mood. Studio Blanc is the clean white room for crisp headshots, bright product, and holiday minis. Podcast is the podcast setup in Studio 105, with cameras and lights for a host and a guest.",
   },
   {
     q: "What happens after I send a request?",
@@ -56,6 +81,7 @@ function sectionOf(pathname: string): string {
   if (pathname.endsWith("/rooms")) return "rooms";
   if (pathname.endsWith("/noir")) return "noir";
   if (pathname.endsWith("/blanc")) return "blanc";
+  if (pathname.endsWith("/podcast")) return "podcast";
   if (pathname.endsWith("/rates")) return "rates";
   if (pathname.endsWith("/faq")) return "faq";
   if (pathname.endsWith("/location")) return "location";
@@ -96,11 +122,18 @@ function StudioMap() {
   );
 }
 
-function RoomCard({ room, bookLabel }: { room: (typeof ROOMS)[number]; bookLabel?: string }) {
+function RoomCard({ room, bookLabel }: { room: (typeof ROOMS)[number] & { bookHref?: string }; bookLabel?: string }) {
   return (
-    <article className={`relative overflow-hidden rounded-[2rem] border p-8 md:p-10 ${room.card}`}>
+    <article data-testid={`studio-room-${room.id}`} className={`relative flex h-full flex-col overflow-hidden rounded-[2rem] border p-8 md:p-10 ${room.card}`}>
       <div className={`pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full blur-3xl ${room.glow}`} />
-      <p className={`relative inline-flex rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] ${room.chip}`}>
+      {room.image ? (
+        <img
+          src={room.image}
+          alt={room.imageAlt || room.name}
+          className="relative mb-6 h-36 w-full rounded-2xl object-cover"
+        />
+      ) : null}
+      <p className={`relative inline-flex self-start rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] ${room.chip}`}>
         {room.vibe}
       </p>
       <h2 className="relative mt-6 text-4xl font-black uppercase tracking-tight">
@@ -112,12 +145,14 @@ function RoomCard({ room, bookLabel }: { room: (typeof ROOMS)[number]; bookLabel
           <li key={use} className="text-sm font-bold uppercase tracking-wider opacity-80">{use}</li>
         ))}
       </ul>
-      <Button asChild className={`relative mt-8 rounded-full px-8 py-6 font-black uppercase tracking-widest text-xs ${room.button}`}>
-        <Link to={`${STUDIO105_PATHS.book}?room=${room.id}`}>{bookLabel || `Book ${room.name}`}</Link>
-      </Button>
-      <p className="relative mt-4 text-xs opacity-60">
-        Request the room and a time. We confirm availability and the rate. This page does not charge a card.
-      </p>
+      <div className="relative mt-auto">
+        <Button asChild className={`mt-8 rounded-full px-8 py-6 font-black uppercase tracking-widest text-xs ${room.button}`}>
+          <Link to={room.bookHref || `${STUDIO105_PATHS.book}?room=${room.id}`}>{bookLabel || `Book ${room.name}`}</Link>
+        </Button>
+        <p className="mt-4 text-xs opacity-60">
+          Request the room and a time. We confirm availability and the rate. This page does not charge a card.
+        </p>
+      </div>
     </article>
   );
 }
@@ -127,14 +162,34 @@ export default function Studio105() {
   const section = sectionOf(pathname);
   const kicker = useSiteText("studio105", "hero", "kicker", "The physical studio");
   const title = useSiteText("studio105", "hero", "title", "Studio 105");
+  const podcastOffer = usePodcastCatalogOffer();
   const roomItems = useSiteItems("studio105", "rooms");
   const rooms = ROOMS.map((room) => {
     const item = roomItems?.find((entry) => entry.id === room.id);
-    return item
-      ? { ...room, name: itemText(item, "name") || room.name, vibe: itemText(item, "vibe") || room.vibe, summary: itemText(item, "summary") || room.summary }
+    const fromEditor = item
+      ? {
+          ...room,
+          name: itemText(item, "name") || room.name,
+          vibe: itemText(item, "vibe") || room.vibe,
+          summary: itemText(item, "summary") || room.summary,
+          image: itemText(item, "image") || room.image,
+          imageAlt: itemText(item, "imageAlt") || room.imageAlt,
+        }
       : room;
+    if (fromEditor.id !== STUDIO_PODCAST_ID) return fromEditor;
+    return {
+      ...fromEditor,
+      name: podcastOffer.name || fromEditor.name,
+      summary: podcastOffer.description || fromEditor.summary,
+      bookHref: podcastOffer.price > 0 ? `/book?package=${STUDIO_PODCAST_ID}` : undefined,
+    };
   });
-  const activeRoom = rooms.find((room) => section === "noir" ? room.id === "studio-noir" : section === "blanc" ? room.id === "studio-blanc" : false);
+  const activeRoom = rooms.find((room) => {
+    if (section === "noir") return room.id === "studio-noir";
+    if (section === "blanc") return room.id === "studio-blanc";
+    if (section === "podcast") return room.id === STUDIO_PODCAST_ID;
+    return false;
+  });
 
   return (
     <Studio105Shell>
@@ -150,12 +205,12 @@ export default function Studio105() {
                   <span data-site-page="studio105" data-site-block="hero" data-site-field="title" data-site-kind="text">{title}</span>
                 </h1>
                 <p className="mt-6 max-w-2xl text-lg leading-relaxed text-gray-300">
-                  Two rooms. One standard. Book Studio Noir when the frame should feel dramatic, or Studio Blanc when it should feel clean and bright.
+                  Three setups. One standard. Book Studio Noir when the frame should feel dramatic, Studio Blanc when it should feel clean and bright, or Podcast for the podcast setup.
                 </p>
               </div>
             </section>
             <section className="pb-24">
-              <div className="mx-auto grid max-w-[1100px] gap-6 px-6 md:grid-cols-2">
+              <div className="mx-auto grid max-w-[1100px] grid-cols-1 items-stretch gap-6 px-6 md:grid-cols-3">
                 {rooms.map((room) => <RoomCard key={room.id} room={room} />)}
               </div>
             </section>
@@ -168,7 +223,7 @@ export default function Studio105() {
             <div className="mx-auto max-w-[800px]">
               <RoomCard room={activeRoom} />
               <p className="mt-8 text-sm text-white/60">
-                <Link to={STUDIO105_PATHS.rooms} className="underline underline-offset-4">Both rooms</Link>
+                <Link to={STUDIO105_PATHS.rooms} className="underline underline-offset-4">All rooms</Link>
                 {" · "}
                 <Link to={STUDIO105_PATHS.rates} className="underline underline-offset-4">Rates</Link>
               </p>
@@ -182,9 +237,9 @@ export default function Studio105() {
               <p className="text-[11px] font-black uppercase tracking-[0.45em] text-teal-400">Rates</p>
               <h1 className="mt-4 text-5xl font-black uppercase tracking-tight">Confirmed with the request</h1>
               <p className="mt-6 text-lg leading-relaxed text-gray-300">
-                Studio Noir and Studio Blanc are requested here. The rate is confirmed when we accept the time. This page does not list a price and it does not charge a card.
+                Studio Noir, Studio Blanc, and Podcast are requested here. The rate is confirmed when we accept the time. This page does not list a price and it does not charge a card.
               </p>
-              <div className="mt-10 grid gap-4 sm:grid-cols-2">
+              <div className="mt-10 grid grid-cols-1 gap-4 md:grid-cols-3">
                 {rooms.map((room) => (
                   <Link key={room.id} to={`${STUDIO105_PATHS.book}?room=${room.id}`} className="rounded-[1.5rem] border border-white/10 p-6 hover:border-[#2dd4bf]">
                     <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#2dd4bf]">{room.vibe}</p>

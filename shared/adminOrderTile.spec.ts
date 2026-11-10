@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildAdminOrderTile, sampleAdminOrderTiles } from "./adminOrderTile.ts";
+import { buildAdminOrderTile, sampleAdminOrderTiles, studioIdFromBooking } from "./adminOrderTile.ts";
 import {
   clientSkinLabel,
   packageIdentity,
@@ -34,6 +34,21 @@ describe("admin order tiles share packageSkins", () => {
     expect(business.skinLabel).toBe(clientSkinLabel(partner));
     expect(business.priceLabel).toBe(packagePriceDisplay(partner));
     expect(business.priceNote).toBe(partner.priceNote);
+    expect(studioIdFromBooking({
+      studio: "podcast-studio",
+      selectedService: "Studio booking / pre-sale — Podcast",
+      lineItems: [{ name: "Studio booking / pre-sale — Podcast", price: 0 }],
+    })).toBe("podcast-studio");
+    expect(studioIdFromBooking({ selectedService: "studio-podcast" })).toBe("podcast-studio");
+    expect(studioIdFromBooking({ selectedService: "listing-essentials" })).toBeNull();
+    expect(buildAdminOrderTile({
+      id: "pod-1",
+      projectType: "business",
+      studio: "podcast-studio",
+      lineItems: [{ name: "Podcast", price: 0 }],
+      clientName: "Casey Lee",
+    }).studio).toBe("podcast-studio");
+
     expect(business).toMatchObject({
       typeLabel: "Business",
       channel: "Human Brand",
