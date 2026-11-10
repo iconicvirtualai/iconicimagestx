@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import AdminLayout from "@/components/AdminLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { ShootUploader } from "@/components/ops/ShootUploader";
@@ -139,6 +139,9 @@ export default function AdminPhotographer() {
 
   return (
     <AdminLayout title="Photographer">
+      <Link to="/shooter" className="mb-4 inline-flex rounded-xl bg-[#0d9488] px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white hover:bg-[#0f766e]">
+        Open Shooter app
+      </Link>
       <input
         ref={fileInputRef}
         type="file"

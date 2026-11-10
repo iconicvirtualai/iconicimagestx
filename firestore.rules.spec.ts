@@ -42,4 +42,12 @@ describe("communications firestore rules", () => {
     expect(rules).toContain("request.auth.uid in resource.data.participantIds");
     expect(rules).toMatch(/match \/contactThreads\/\{threadId\}[\s\S]*allow read, write: if false/);
   });
+
+  it("keeps team chat on narrow documents and hides phone routes", () => {
+    expect(rules).toContain("match /teamChatInbox/{uid}");
+    expect(rules).toContain("match /teamThreadLive/{threadId}");
+    expect(rules).toMatch(/match \/teamSmsRoutes\/\{routeId\}[\s\S]*allow read, write: if false/);
+    expect(rules).toMatch(/match \/teamSmsLog\/\{logId\}[\s\S]*allow read: if isCoordinator\(\)/);
+    expect(rules).toMatch(/match \/teamChatInbox\/\{uid\}[\s\S]*allow write: if false/);
+  });
 });

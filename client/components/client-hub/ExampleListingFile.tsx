@@ -25,9 +25,14 @@ export function ExampleListingFile() {
               note="Empty agent fields on the listing site use the profile saved in Settings."
             />
           ) : null}
-          <Link to="/portal/order?example=1" className="inline-flex min-h-12 items-center rounded-2xl bg-[#0d9488] px-5 text-xs font-black uppercase tracking-widest text-white">
-            Place Order
-          </Link>
+          <div className="flex flex-wrap gap-3">
+            <Link to="/portal/home?example=1&section=messages" data-testid="message-shooter" className="inline-flex min-h-12 items-center rounded-2xl bg-[#0d9488] px-5 text-xs font-black uppercase tracking-widest text-white">
+              Message shooter
+            </Link>
+            <Link to="/portal/order?example=1" className="inline-flex min-h-12 items-center rounded-2xl border border-[#0d9488] px-5 text-xs font-black uppercase tracking-widest text-[#0f766e]">
+              Place Order
+            </Link>
+          </div>
         </div>
       </PortalShell>
     </div>

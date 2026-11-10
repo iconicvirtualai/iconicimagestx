@@ -17,7 +17,7 @@ function isCulledShot(shot) {
   return shot.culled === true;
 }
 function keptShots(items) {
-  const rows = items.map((item, index) => ({ item, index })).filter(({ item }) => !isCulledShot(item));
+  const rows = items.map((item, index) => ({ item, index })).filter(({ item }) => !isCulledShot(item) && item.hiddenFromGallery !== true);
   const any = rows.some(({ item }) => finiteOrder(item.sortOrder) != null);
   if (!any) return rows.map(({ item }) => item);
   return rows.sort((a, b) => {
@@ -27,6 +27,97 @@ function keptShots(items) {
     const bKey = bo == null ? Number.MAX_SAFE_INTEGER : bo;
     return aKey - bKey || a.index - b.index;
   }).map(({ item }) => item);
+}
+const SECTION_ID = /^s[a-z0-9]{4,16}$/;
+const SECTION_LIMIT = 24;
+const PLACEMENT_LIMIT = 400;
+function sectionIdOk(value) {
+  return SECTION_ID.test(value);
+}
+function text$3(value, limit = 180) {
+  if (typeof value !== "string") return "";
+  return value.replace(/\u0000/g, "").trim().slice(0, limit);
+}
+function sectionName(value) {
+  return text$3(value, 60);
+}
+function readMediaArrangement(value) {
+  const row = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  const sections = [];
+  const seenSections = /* @__PURE__ */ new Set();
+  if (Array.isArray(row.sections)) {
+    for (const item of row.sections) {
+      if (!item || typeof item !== "object") continue;
+      const section = item;
+      const id = text$3(section.id, 32);
+      const name = sectionName(section.name);
+      if (!sectionIdOk(id) || !name || seenSections.has(id)) continue;
+      seenSections.add(id);
+      sections.push({
+        id,
+        name,
+        order: typeof section.order === "number" && Number.isFinite(section.order) ? section.order : sections.length,
+        hideFromListingSites: section.hideFromListingSites === true,
+        hideFromClientGallery: section.hideFromClientGallery === true
+      });
+      if (sections.length >= SECTION_LIMIT) break;
+    }
+  }
+  sections.sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
+  sections.forEach((section, order) => {
+    section.order = order;
+  });
+  const known = new Set(sections.map((section) => section.id));
+  const placements = [];
+  const seenIds = /* @__PURE__ */ new Set();
+  const counters = /* @__PURE__ */ new Map();
+  if (Array.isArray(row.placements)) {
+    const draft = [];
+    for (const item of row.placements) {
+      if (!item || typeof item !== "object") continue;
+      const placement = item;
+      const id = text$3(placement.id);
+      if (!id || seenIds.has(id)) continue;
+      seenIds.add(id);
+      const sectionId = text$3(placement.sectionId, 32);
+      draft.push({
+        id,
+        sectionId: known.has(sectionId) ? sectionId : "",
+        order: typeof placement.order === "number" && Number.isFinite(placement.order) ? placement.order : draft.length,
+        hiddenFromGallery: placement.hiddenFromGallery === true,
+        index: draft.length
+      });
+      if (draft.length >= PLACEMENT_LIMIT) break;
+    }
+    draft.sort((a, b) => a.order - b.order || a.index - b.index);
+    for (const placement of draft) {
+      const order = counters.get(placement.sectionId) || 0;
+      counters.set(placement.sectionId, order + 1);
+      placements.push({
+        id: placement.id,
+        sectionId: placement.sectionId,
+        order,
+        hiddenFromGallery: placement.hiddenFromGallery === true
+      });
+    }
+  }
+  const coverId = text$3(row.coverId, 180);
+  return coverId ? { sections, placements, coverId } : { sections, placements };
+}
+function hiddenSectionIdSet(arrangement) {
+  return new Set(
+    readMediaArrangement(arrangement).sections.filter((section) => section.hideFromListingSites).map((section) => section.id)
+  );
+}
+function isHiddenFromListingSites(listing, row) {
+  const arrangement = readMediaArrangement(listing?.mediaArrangement);
+  const hidden = hiddenSectionIdSet(arrangement);
+  if (hidden.size === 0) return false;
+  const sectionId = text$3(row.sectionId, 32);
+  if (sectionId && hidden.has(sectionId)) return true;
+  const id = text$3(row.id) || text$3(row.path) || text$3(row.storagePath) || text$3(row.url);
+  if (!id) return false;
+  return arrangement.placements.some((placement) => placement.id === id && hidden.has(placement.sectionId));
 }
 const RAW_EXT$1 = /\.(cr2|cr3|nef|nrw|arw|srf|sr2|dng|raw|rw2|orf|raf|pef|3fr|fff|iiq)$/i;
 const PREVIEW_EXT = /\.(jpe?g|png|webp|gif)$/i;
@@ -122,36 +213,36 @@ const VIDEO_FILE = /\.(mp4|m4v|mov|webm)(\?|#|$)/i;
 const BLOCKED_EXT = /\.(zip|pdf|dng|cr2|cr3|nef|nrw|arw|srf|sr2|raw|rw2|orf|raf|pef|3fr|fff|iiq|heic|heif|mp4|m4v|mov|webm)(\?|#|$)/i;
 const FILE_KEYS = ["downloadUrl", "fileUrl", "originalUrl", "fullResUrl", "mlsUrl", "zipUrl", "printUrl", "reelUrl", "mp4Url", "rawUrl", "src"];
 const DISPLAY_KEYS = ["previewUrl", "displayUrl", "webUrl", "thumbnailUrl"];
-function text$3(value) {
+function text$2(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function rowOf(item) {
   return item && typeof item === "object" ? item : null;
 }
 function shareableUrl(value) {
-  const url = text$3(value);
+  const url = text$2(value);
   if (!url || url.startsWith("//") || url.includes("\\") || url.includes("..")) return "";
   if (url.startsWith("/")) return url;
   if (url.startsWith("https://") || url.startsWith("http://")) return url;
   return "";
 }
 function mediaName(row, fallback) {
-  return text$3(row.deliveryName) || text$3(row.name) || text$3(row.fileName) || text$3(row.title) || fallback;
+  return text$2(row.deliveryName) || text$2(row.name) || text$2(row.fileName) || text$2(row.title) || fallback;
 }
 function labelOf(row) {
-  return `${text$3(row.fileName)} ${text$3(row.name)} ${text$3(row.title)} ${text$3(row.path)} ${text$3(row.storagePath)}`.toLowerCase();
+  return `${text$2(row.fileName)} ${text$2(row.name)} ${text$2(row.title)} ${text$2(row.path)} ${text$2(row.storagePath)}`.toLowerCase();
 }
 function isMls(row) {
-  const category = text$3(row.category).toLowerCase();
-  const type = text$3(row.type).toLowerCase();
+  const category = text$2(row.category).toLowerCase();
+  const type = text$2(row.type).toLowerCase();
   if (category === "mls" || type === "mls") return true;
   const label = labelOf(row);
   if (/(^|[^a-z0-9])mls([^a-z0-9]|$)/.test(label)) return true;
   return /\/mls\//.test(label);
 }
 function isFullRes(row) {
-  const category = text$3(row.category).toLowerCase();
-  const type = text$3(row.type).toLowerCase();
+  const category = text$2(row.category).toLowerCase();
+  const type = text$2(row.type).toLowerCase();
   if (category === "full-res" || category === "fullres" || type === "full-res" || type === "fullres") return true;
   const label = labelOf(row);
   if (/(^|[^a-z0-9])full[\s_-]?res([^a-z0-9]|$)/.test(label)) return true;
@@ -160,7 +251,7 @@ function isFullRes(row) {
 function isRasterUrl(url, row) {
   if (!url || BLOCKED_EXT.test(url.split("#")[0]) || VIDEO_FILE.test(url.split("#")[0])) return false;
   if (RASTER.test(url.split("#")[0])) return true;
-  const content = text$3(row.contentType).toLowerCase();
+  const content = text$2(row.contentType).toLowerCase();
   return /^image\/(jpeg|jpg|png|webp|gif)/.test(content);
 }
 function blockedFileUrls(row, includeOwnUrl) {
@@ -189,11 +280,11 @@ function separateDisplay(row) {
 }
 function rasterShareSource(row, legacyDropTagged = false) {
   if (legacyDropTagged && isMls(row)) return "";
-  const type = text$3(row.type).toLowerCase();
+  const type = text$2(row.type).toLowerCase();
   if (type === "video" || type === "reel" || type === "file" || type === "matterport") return "";
-  const content = text$3(row.contentType).toLowerCase();
+  const content = text$2(row.contentType).toLowerCase();
   if (content.startsWith("video/") || content === "application/pdf" || content === "application/zip") return "";
-  const path2 = `${text$3(row.path)} ${text$3(row.storagePath)}`.toLowerCase();
+  const path2 = `${text$2(row.path)} ${text$2(row.storagePath)}`.toLowerCase();
   if (/\/(raw|downloads?|print|zips?)\//.test(path2)) return "";
   const display = separateDisplay(row);
   if (legacyDropTagged && isFullRes(row)) return display;
@@ -223,11 +314,11 @@ function videoFileUrl(row) {
 function videoPlaceholderSource(row) {
   if (rasterPoster(row)) return "";
   const file = videoFileUrl(row);
-  const type = text$3(row.type).toLowerCase();
-  const content = text$3(row.contentType).toLowerCase();
+  const type = text$2(row.type).toLowerCase();
+  const content = text$2(row.contentType).toLowerCase();
   const named = type === "video" || type === "reel" || content.startsWith("video/");
   if (!file && !named) return "";
-  const id = text$3(row.id) || file || text$3(row.path) || text$3(row.storagePath) || text$3(row.name) || text$3(row.fileName);
+  const id = text$2(row.id) || file || text$2(row.path) || text$2(row.storagePath) || text$2(row.name) || text$2(row.fileName);
   if (!id) return "";
   return `${VIDEO_PLACEHOLDER_PREFIX}${encodeURIComponent(id)}`;
 }
@@ -285,8 +376,8 @@ function listingOwnerDisplayItems(listing) {
   return items;
 }
 function isGalleryFloor(row) {
-  const type = text$3(row.type).toLowerCase();
-  const category = text$3(row.category).toLowerCase();
+  const type = text$2(row.type).toLowerCase();
+  const category = text$2(row.category).toLowerCase();
   return type === "floorplan" || type === "floor-plan" || category === "floorplan" || category === "floor-plan";
 }
 function galleryOwnerDisplayItems(media) {
@@ -294,7 +385,7 @@ function galleryOwnerDisplayItems(media) {
   const seen = /* @__PURE__ */ new Set();
   const rows = media.map(rowOf).filter((row) => Boolean(row));
   for (const row of rows) {
-    const type = text$3(row.type).toLowerCase();
+    const type = text$2(row.type).toLowerCase();
     if (type === "video" || type === "reel" || type === "matterport" || type === "tour" || type === "file" || type === "pdf") continue;
     const source = rasterShareSource(row);
     if (!source) continue;
@@ -302,7 +393,7 @@ function galleryOwnerDisplayItems(media) {
     pushDisplay(items, seen, mediaName(row, floor ? "Floor plan" : "Photo"), source, floor ? "floorPlan" : "image");
   }
   for (const row of rows) {
-    const type = text$3(row.type).toLowerCase();
+    const type = text$2(row.type).toLowerCase();
     if (type !== "video" && type !== "reel") continue;
     const poster = rasterPoster(row) || videoPlaceholderSource(row);
     pushDisplay(items, seen, mediaName(row, "Video"), poster, "poster");
@@ -336,89 +427,20 @@ function listingBlock(listing, related) {
   }
   return null;
 }
-const SECTION_ID = /^s[a-z0-9]{4,16}$/;
-const SECTION_LIMIT = 24;
-const PLACEMENT_LIMIT = 400;
-function sectionIdOk(value) {
-  return SECTION_ID.test(value);
-}
-function text$2(value, limit = 180) {
-  if (typeof value !== "string") return "";
-  return value.replace(/\u0000/g, "").trim().slice(0, limit);
-}
-function sectionName(value) {
-  return text$2(value, 60);
-}
-function readMediaArrangement(value) {
-  const row = value && typeof value === "object" && !Array.isArray(value) ? value : {};
-  const sections = [];
-  const seenSections = /* @__PURE__ */ new Set();
-  if (Array.isArray(row.sections)) {
-    for (const item of row.sections) {
-      if (!item || typeof item !== "object") continue;
-      const section = item;
-      const id = text$2(section.id, 32);
-      const name = sectionName(section.name);
-      if (!sectionIdOk(id) || !name || seenSections.has(id)) continue;
-      seenSections.add(id);
-      sections.push({
-        id,
-        name,
-        order: typeof section.order === "number" && Number.isFinite(section.order) ? section.order : sections.length,
-        hideFromListingSites: section.hideFromListingSites === true
-      });
-      if (sections.length >= SECTION_LIMIT) break;
-    }
-  }
-  sections.sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
-  sections.forEach((section, order) => {
-    section.order = order;
-  });
-  const known = new Set(sections.map((section) => section.id));
-  const placements = [];
-  const seenIds = /* @__PURE__ */ new Set();
-  const counters = /* @__PURE__ */ new Map();
-  if (Array.isArray(row.placements)) {
-    const draft = [];
-    for (const item of row.placements) {
-      if (!item || typeof item !== "object") continue;
-      const placement = item;
-      const id = text$2(placement.id);
-      if (!id || seenIds.has(id)) continue;
-      seenIds.add(id);
-      const sectionId = text$2(placement.sectionId, 32);
-      draft.push({
-        id,
-        sectionId: known.has(sectionId) ? sectionId : "",
-        order: typeof placement.order === "number" && Number.isFinite(placement.order) ? placement.order : draft.length,
-        index: draft.length
-      });
-      if (draft.length >= PLACEMENT_LIMIT) break;
-    }
-    draft.sort((a, b) => a.order - b.order || a.index - b.index);
-    for (const placement of draft) {
-      const order = counters.get(placement.sectionId) || 0;
-      counters.set(placement.sectionId, order + 1);
-      placements.push({ id: placement.id, sectionId: placement.sectionId, order });
-    }
-  }
-  return { sections, placements };
-}
-function hiddenSectionIdSet(arrangement) {
-  return new Set(
-    readMediaArrangement(arrangement).sections.filter((section) => section.hideFromListingSites).map((section) => section.id)
-  );
-}
-function isHiddenFromListingSites(listing, row) {
-  const arrangement = readMediaArrangement(listing?.mediaArrangement);
-  const hidden = hiddenSectionIdSet(arrangement);
-  if (hidden.size === 0) return false;
-  const sectionId = text$2(row.sectionId, 32);
-  if (sectionId && hidden.has(sectionId)) return true;
-  const id = text$2(row.id) || text$2(row.path) || text$2(row.storagePath) || text$2(row.url);
-  if (!id) return false;
-  return arrangement.placements.some((placement) => placement.id === id && hidden.has(placement.sectionId));
-}
+const VIDEO_BRANDS = ["branded", "unbranded", "both", "none"];
+new Set(VIDEO_BRANDS);
+const LISTING_KIT_SLOTS = [
+  { id: "marketing", title: "Marketing materials", group: "neighborhood" },
+  { id: "social-templates", title: "Social media templates", group: "neighborhood" },
+  { id: "neighborhood", title: "Neighborhood info", group: "neighborhood" },
+  { id: "popular", title: "Most popular", group: "neighborhood" },
+  { id: "facts", title: "Fun facts and stats", group: "neighborhood" },
+  { id: "things", title: "What is there to do", group: "neighborhood" },
+  { id: "jobs", title: "Jobs nearby", group: "neighborhood" },
+  { id: "lifestyle", title: "Free time and lifestyle", group: "neighborhood" },
+  { id: "crime", title: "Crime rate", group: "safety" }
+];
+new Set(LISTING_KIT_SLOTS.map((slot) => slot.id));
 const BUSINESS_CONTACT_LINE = "26410 Oakridge Dr. Ste 105 - 108, Spring, TX 77380 | 281.356.0965 | photos@iconicimagestx.com";
 const LEGAL_BUSINESS_NAME = "Iconic Images Photography, LLC";
 function parseContactLine(line) {

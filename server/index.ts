@@ -36,6 +36,7 @@ import opsPreviewRouter from "./routes/opsPreview";
 import studioScratchRouter from "./routes/studioScratch";
 import placesRouter from "./routes/places";
 import smsRouter from "./routes/sms";
+import teamChatRouter from "./routes/teamChat";
 import contactRouter from "./routes/contact";
 import seniorLivingRouter from "./routes/seniorLiving";
 import apprenticeshipRouter from "./routes/apprenticeship";
@@ -313,6 +314,7 @@ export function createServer() {
   app.use("/api/studio/scratch", studioScratchRouter);
   app.use("/api/places", placesRouter);
   app.use("/api/sms", smsRouter);
+  app.use("/api/team-chat", teamChatRouter);
   // Portal contact threads. Separate from live-chat email/SMS delivery.
   app.use("/api/contact", contactThreadsRouter);
   app.use("/api/contact", liveChatRouter);

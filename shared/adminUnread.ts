@@ -97,6 +97,7 @@ export function communicationUnreadTotal(counts: AdminUnreadCounts, includeBotRo
 
 export function navUnreadCount(href: string, counts: AdminUnreadCounts, role: string): number {
   if (href === "/admin/communications") return communicationUnreadTotal(counts, role === "admin");
+  if (href === "/shooter") return whole(counts.chat);
   if (href === "/admin/botroom") return role === "admin" ? whole(counts.botroom) : 0;
   if (href === "/admin/orders") return whole(counts.orders);
   if (href === "/admin/events") return whole(counts.events);

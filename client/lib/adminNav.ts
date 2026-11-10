@@ -11,6 +11,7 @@ import {
   LayoutDashboard,
   Mail,
   MessageSquare,
+  Smartphone,
   Newspaper,
   Package,
   Share2,
@@ -73,6 +74,7 @@ export const navGroups: { label: string; items: AdminNavItem[] }[] = [
     items: [
       { label: "Shoots", href: "/admin/ops", icon: Images, roles: ["admin", "coordinator", "editor"] },
       { label: "My jobs", href: "/admin/photographer", icon: Camera, roles: ["photographer"] },
+      { label: "Shooter app", href: "/shooter", icon: Smartphone, roles: ALL_STAFF },
     ],
   },
   {

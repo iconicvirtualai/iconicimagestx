@@ -119,7 +119,7 @@ export function ClientHomeView({
             </Link>
           </div>
         ) : section === "messages" ? (
-          <PortalMessages />
+          <PortalMessages example={example} />
         ) : (
           <ScheduleCalendar appointments={appointments} today={today} truncated={appointmentsTruncated} />
         )}

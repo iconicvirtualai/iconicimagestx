@@ -104,6 +104,15 @@ export function PortalListingDetailView({
           <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500 mt-6">Listing file</p>
           <h1 className="text-3xl font-black mt-2">{detail.title}</h1>
           <p className="text-gray-400 text-sm mt-1 uppercase tracking-widest">{detail.status.replace(/_/g, " ")}</p>
+          {canEdit ? (
+            <Link
+              to={`/portal/home?section=messages&listing=${encodeURIComponent(detail.id)}`}
+              data-testid="message-shooter"
+              className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-[#0d9488] px-4 text-[10px] font-black uppercase tracking-widest text-white"
+            >
+              Message shooter
+            </Link>
+          ) : null}
         </div>
       </header>
 
