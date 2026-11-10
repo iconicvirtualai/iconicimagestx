@@ -176,24 +176,23 @@ async function maskFromOverride(mask: Buffer, width: number, height: number): Pr
       const luma = data[p] * 0.2126 + data[p + 1] * 0.7152 + data[p + 2] * 0.0722;
       alpha[i] = luma >= 128 ? 255 : 0;
     }
-    return softenMask(alpha, width, height);
+    for (let i = 0; i < alpha.length; i += 1) alpha[i] = alpha[i] >= 128 ? 255 : 0;
+    return featherMask(alpha, width, height);
   } catch {
     throw Object.assign(new Error("The lawn mask could not be read."), { status: 400 });
   }
 }
 
 async function upsampleMask(binary: Uint8Array, sw: number, sh: number, width: number, height: number): Promise<Uint8Array> {
-  const blurred = boxBlur(binary, sw, sh, 1);
   const sharp = await loadSharp();
   const resized = await grayFrom(
-    sharp(Buffer.from(blurred), { raw: { width: sw, height: sh, channels: 1 } })
-      .resize(width, height, { fit: "fill", kernel: "lanczos3" }),
+    sharp(Buffer.from(binary), { raw: { width: sw, height: sh, channels: 1 } })
+      .resize(width, height, { fit: "fill", kernel: "nearest" }),
     width,
     height,
   );
-  for (let i = 0; i < resized.length; i += 1) if (resized[i] < 8) resized[i] = 0;
-  const sigma = clamp(Math.round(Math.min(width, height) * 0.01), 2, 16);
-  return softenMask(resized, width, height, sigma);
+  for (let i = 0; i < resized.length; i += 1) resized[i] = resized[i] >= 128 ? 255 : 0;
+  return featherMask(resized, width, height);
 }
 
 async function grayFrom(pipeline: ReturnType<Sharp>, width: number, height: number): Promise<Uint8Array> {
@@ -204,11 +203,14 @@ async function grayFrom(pipeline: ReturnType<Sharp>, width: number, height: numb
   return out;
 }
 
-async function softenMask(alpha: Uint8Array, width: number, height: number, sigma = 0): Promise<Uint8Array> {
+/** A few pixels of edge falloff, so the composite does not leave a hard halo. */
+async function featherMask(alpha: Uint8Array, width: number, height: number): Promise<Uint8Array> {
   const sharp = await loadSharp();
-  let pipeline = sharp(Buffer.from(alpha), { raw: { width, height, channels: 1 } });
-  if (sigma > 0) pipeline = pipeline.blur(sigma);
-  const out = await grayFrom(pipeline, width, height);
+  const out = await grayFrom(
+    sharp(Buffer.from(alpha), { raw: { width, height, channels: 1 } }).blur(1.15),
+    width,
+    height,
+  );
   for (let i = 0; i < out.length; i += 1) if (out[i] < 8) out[i] = 0;
   return out;
 }
@@ -345,7 +347,13 @@ function patchSample(sources: Rgb[], cellX: number, cellY: number, x: number, y:
   return [source.data[i], source.data[i + 1], source.data[i + 2]];
 }
 
-/** Seat the fill in the original light. Low-frequency luminance stays the photo's. */
+/**
+ * Put the original lawn's light back on the fill.
+ * Luminance is the photo's, times only the fill's blade detail, so cast
+ * shadows and dapples stay at full strength. Chroma keeps the original
+ * lawn's white balance and contrast, not only its average color.
+ * A repeating crosshatch is dropped instead of seated.
+ */
 function seatFill(photo: Rgb, alpha: Uint8Array, fill: Rgb): { raw: Uint8Array; alpha: Uint8Array } {
   const { data, width, height } = photo;
   const raw = new Uint8Array(data);
@@ -358,39 +366,160 @@ function seatFill(photo: Rgb, alpha: Uint8Array, fill: Rgb): { raw: Uint8Array; 
     const f = Math.min(fill.data.length - 3, p);
     fillY[i] = yOf(fill.data[f], fill.data[f + 1], fill.data[f + 2]);
   }
-  const lightRadius = clamp(Math.round(Math.min(width, height) * 0.04), 8, 56);
-  const detailRadius = clamp(Math.round(Math.min(width, height) * 0.012), 2, 10);
-  const origLight = boxBlurFloat(origY, width, height, lightRadius);
-  const fillDetail = boxBlurFloat(fillY, width, height, detailRadius);
-  let sceneChroma = 0;
-  let fillChroma = 0;
-  let samples = 0;
-  const step = Math.max(1, Math.floor(Math.sqrt(count / 6000)));
+  const gain = textureGain(fillY, alpha, width, height);
+  let n = 0;
+  let cbO = 0;
+  let crO = 0;
+  let cbF = 0;
+  let crF = 0;
+  let chromaO = 0;
+  let chromaO2 = 0;
+  let chromaF = 0;
+  let chromaF2 = 0;
+  const step = Math.max(1, Math.floor(Math.sqrt(count / 8000)));
   for (let i = 0; i < count; i += step) {
     if (alpha[i] < 200) continue;
     const p = i * 3;
-    sceneChroma += chromaOf(data[p], data[p + 1], data[p + 2]);
     const f = Math.min(fill.data.length - 3, p);
-    fillChroma += chromaOf(fill.data[f], fill.data[f + 1], fill.data[f + 2]);
-    samples += 1;
+    const [cbPhoto, crPhoto] = cbcrOf(data[p], data[p + 1], data[p + 2]);
+    const [cbFill, crFill] = cbcrOf(fill.data[f], fill.data[f + 1], fill.data[f + 2]);
+    const photoChroma = chromaOf(data[p], data[p + 1], data[p + 2]);
+    const fillChroma = chromaOf(fill.data[f], fill.data[f + 1], fill.data[f + 2]);
+    cbO += cbPhoto;
+    crO += crPhoto;
+    cbF += cbFill;
+    crF += crFill;
+    chromaO += photoChroma;
+    chromaO2 += photoChroma * photoChroma;
+    chromaF += fillChroma;
+    chromaF2 += fillChroma * fillChroma;
+    n += 1;
   }
-  const chromaScale = samples
-    ? clamp((sceneChroma / samples) * 1.15 / Math.max(8, fillChroma / samples), 0.4, 1.05)
-    : 0.8;
+  const meanCbO = n ? cbO / n : 128;
+  const meanCrO = n ? crO / n : 128;
+  const meanCbF = n ? cbF / n : 128;
+  const meanCrF = n ? crF / n : 128;
+  const stdO = n ? Math.sqrt(Math.max(0, chromaO2 / n - (chromaO / n) ** 2)) : 12;
+  const stdF = n ? Math.sqrt(Math.max(0, chromaF2 / n - (chromaF / n) ** 2)) : 12;
+  const chromaScale = clamp(stdO / Math.max(1.5, stdF), 0.45, 1.8);
 
   for (let i = 0; i < count; i += 1) {
     const amount = alpha[i] / 255;
     if (amount === 0) continue;
     const p = i * 3;
     const f = Math.min(fill.data.length - 3, p);
-    const y = origLight[i] + (fillY[i] - fillDetail[i]) * 0.72;
+    const y = origY[i] * gain[i];
     const [cb, cr] = cbcrOf(fill.data[f], fill.data[f + 1], fill.data[f + 2]);
-    const [r, g, b] = fromYCbCr(y, 128 + (cb - 128) * chromaScale, 128 + (cr - 128) * chromaScale);
+    const [r, g, b] = fromYCbCr(
+      y,
+      meanCbO + (cb - meanCbF) * chromaScale,
+      meanCrO + (cr - meanCrF) * chromaScale,
+    );
     raw[p] = clamp(data[p] * (1 - amount) + r * amount, 0, 255);
     raw[p + 1] = clamp(data[p + 1] * (1 - amount) + g * amount, 0, 255);
     raw[p + 2] = clamp(data[p + 2] * (1 - amount) + b * amount, 0, 255);
   }
   return { raw, alpha };
+}
+
+/** Blade detail from the fill, finer toward the far edge of the lawn. A crosshatch is rejected. */
+function textureGain(fillY: Float32Array, alpha: Uint8Array, width: number, height: number): Float32Array {
+  const gain = new Float32Array(fillY.length);
+  gain.fill(1);
+  const radius = clamp(Math.round(Math.min(width, height) * 0.008), 2, 6);
+  const smooth = boxBlurFloat(fillY, width, height, radius);
+  if (repeatingCrosshatch(fillY, smooth, alpha, width, height)) return gain;
+  let top = height;
+  let bottom = 0;
+  for (let i = 0; i < alpha.length; i += 1) {
+    if (alpha[i] < 128) continue;
+    const y = Math.floor(i / width);
+    if (y < top) top = y;
+    if (y > bottom) bottom = y;
+  }
+  if (bottom <= top + 8) return gain;
+  const cx = (width - 1) / 2;
+  for (let y = 0; y < height; y += 1) {
+    const depth = clamp((y - top) / (bottom - top), 0, 1);
+    const step = 1.9 - depth * 1.3;
+    for (let x = 0; x < width; x += 1) {
+      const sx = clamp(Math.round(cx + (x - cx) * step), 0, width - 1);
+      const sy = clamp(Math.round(top + (y - top) * step), 0, height - 1);
+      const sample = fillY[sy * width + sx] / Math.max(8, smooth[sy * width + sx]);
+      gain[y * width + x] = clamp(sample, 0.84, 1.16);
+    }
+  }
+  return gain;
+}
+
+function repeatingCrosshatch(
+  fillY: Float32Array,
+  smooth: Float32Array,
+  alpha: Uint8Array,
+  width: number,
+  height: number,
+): boolean {
+  const rows: number[] = [];
+  const cols: number[] = [];
+  for (let y = Math.floor(height * 0.55); y < height * 0.92; y += Math.max(4, Math.floor(height / 18))) {
+    const line: number[] = [];
+    for (let x = Math.floor(width * 0.2); x < width * 0.8; x += 1) {
+      const i = y * width + x;
+      if (alpha[i] < 180) continue;
+      line.push(fillY[i] - smooth[i]);
+    }
+    if (lineRepeats(line)) rows.push(1);
+  }
+  for (let x = Math.floor(width * 0.25); x < width * 0.75; x += Math.max(6, Math.floor(width / 14))) {
+    const line: number[] = [];
+    for (let y = Math.floor(height * 0.55); y < height * 0.92; y += 1) {
+      const i = y * width + x;
+      if (alpha[i] < 180) continue;
+      line.push(fillY[i] - smooth[i]);
+    }
+    if (lineRepeats(line)) cols.push(1);
+  }
+  return rows.length >= 2 && cols.length >= 2;
+}
+
+function lineRepeats(samples: number[]): boolean {
+  const n = samples.length;
+  if (n < 28) return false;
+  let mean = 0;
+  for (const value of samples) mean += value;
+  mean /= n;
+  let energy = 0;
+  const centered = samples.map((value) => {
+    const delta = value - mean;
+    energy += delta * delta;
+    return delta;
+  });
+  if (energy < n * 4) return false;
+  let peak = 0;
+  let peakLag = 0;
+  for (let lag = 3; lag <= 18; lag += 1) {
+    let corr = 0;
+    let count = 0;
+    for (let i = 0; i + lag < n; i += 1) {
+      corr += centered[i] * centered[i + lag];
+      count += 1;
+    }
+    const norm = corr / (energy * (count / n));
+    if (norm > peak) {
+      peak = norm;
+      peakLag = lag;
+    }
+  }
+  if (peak < 0.42 || peakLag === 0) return false;
+  const harmonic = peakLag * 2;
+  if (harmonic >= n - 4) return peak > 0.55;
+  let corr = 0;
+  let count = 0;
+  for (let i = 0; i + harmonic < n; i += 1) {
+    corr += centered[i] * centered[i + harmonic];
+    count += 1;
+  }
+  return corr / (energy * (count / n)) > 0.22;
 }
 
 function yOf(r: number, g: number, b: number): number {
@@ -450,7 +579,7 @@ export function segmentLawn(rgb: Uint8Array, width: number, height: number): Uin
       const sky = (b > r + 12 && b > g + 4 && value > 0.42 && y < height * 0.8)
         || (value > 0.88 && sat < 0.16 && y < height * 0.62)
         || (y < height * 0.48 && b > g + 6 && r > g && sat > 0.1 && value > 0.32);
-      const hard = sat < 0.12 && value > 0.46 && Math.abs(r - g) < 16 && Math.abs(g - b) < 20 && g < r + 12;
+      const hard = isHardscape(r, g, b);
       const mulch = value < 0.22 && r > g + 2 && r > b + 8 && sat > 0.18 && y > height * 0.18;
       if (sky || hard || mulch) {
         blocked[i] = 1;
@@ -468,6 +597,7 @@ export function segmentLawn(rgb: Uint8Array, width: number, height: number): Uin
   }
 
   suppressCanopy(candidate, luma, width, height);
+  sealHardscapeBands(rgb, blocked, width, height);
 
   const mask = floodLowerLawn(candidate, bare, blocked, width, height);
   if (!mask) return null;
@@ -477,6 +607,7 @@ export function segmentLawn(rgb: Uint8Array, width: number, height: number): Uin
   extendBareGround(rgb, mask, blocked, width, height);
   fillInteriorGaps(mask, blocked, width, height);
   removePeople(rgb, mask, width, height);
+  carveHardscape(rgb, mask);
   if (!lawnIsPlausible(mask, width, height)) return null;
   for (let i = 0; i < mask.length; i += 1) mask[i] = mask[i] ? 255 : 0;
   return mask;
@@ -796,14 +927,62 @@ function isSkin(r: number, g: number, b: number): boolean {
   return r > 150 && g > 90 && b > 70 && r > g + 12 && r > b + 18 && g > b && (g - b) < 38 && sat > 0.14 && sat < 0.58 && value > 0.45 && value < 0.96;
 }
 
+/** Pale concrete, pavers, and gray-beige hardscape. Real lawn green is not included. */
+function isHardscape(r: number, g: number, b: number): boolean {
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const sat = max === 0 ? 0 : (max - min) / max;
+  const value = max / 255;
+  if (value < 0.16 || value > 0.98) return false;
+  if (g > r + 8 && g > b + 10 && sat > 0.12) return false;
+  return sat <= 0.26 && Math.abs(r - g) <= 34 && r - b < 58 && g - b < 52 && r + 6 >= g;
+}
+
+/**
+ * A wide horizontal run of concrete stays blocked even when it sits between
+ * two lawns. Short green gaps inside that run do not become lawn.
+ */
+function sealHardscapeBands(rgb: Uint8Array, blocked: Uint8Array, width: number, height: number) {
+  const minSpan = Math.round(width * 0.18);
+  for (let y = Math.floor(height * 0.3); y < height; y += 1) {
+    let first = -1;
+    let last = -1;
+    let hard = 0;
+    for (let x = 0; x < width; x += 1) {
+      const p = (y * width + x) * 3;
+      if (!isHardscape(rgb[p], rgb[p + 1], rgb[p + 2])) continue;
+      hard += 1;
+      if (first < 0) first = x;
+      last = x;
+    }
+    const span = last - first + 1;
+    if (first < 0 || span < minSpan || hard / span < 0.55) continue;
+    for (let x = first; x <= last; x += 1) {
+      const i = y * width + x;
+      const p = i * 3;
+      const r = rgb[p];
+      const g = rgb[p + 1];
+      const b = rgb[p + 2];
+      const strongGreen = g > r + 14 && g > b + 14;
+      if (!strongGreen) blocked[i] = 1;
+    }
+  }
+}
+
+function carveHardscape(rgb: Uint8Array, mask: Uint8Array) {
+  for (let i = 0; i < mask.length; i += 1) {
+    if (!mask[i]) continue;
+    const p = i * 3;
+    if (isHardscape(rgb[p], rgb[p + 1], rgb[p + 2])) mask[i] = 0;
+  }
+}
+
 function isYardGround(r: number, g: number, b: number): boolean {
   const max = Math.max(r, g, b);
   const min = Math.min(r, g, b);
   const sat = max === 0 ? 0 : (max - min) / max;
   const value = max / 255;
-  if (value < 0.08) return false;
-  const concrete = sat < 0.1 && value > 0.45 && Math.abs(r - g) < 14 && Math.abs(g - b) < 16;
-  if (concrete) return false;
+  if (value < 0.08 || isHardscape(r, g, b)) return false;
   const green = g + 2 >= r && g > b + 4 && g > 24;
   const earth = b + 8 < Math.max(r, g) && r > 35 && g > 30 && sat > 0.05 && sat < 0.72 && value < 0.86 && r < g + 55;
   return green || earth;

@@ -10,9 +10,10 @@ export const GRASS_APPLIED_NOTE =
 export const GRASS_INPAINT_PROMPT = [
   "The first image is the listing photograph. The second image is a real lawn and is only a style reference for blade color and texture.",
   "Replace only the transparent area of the mask, which is the lawn, including bare dirt and thin patches inside that lawn.",
-  "Paint photoreal turf that follows this photo's perspective: larger blades in the foreground, finer grass toward the horizon.",
-  "Match the existing light, cast shadows, and color temperature. Keep natural olive, straw, and green variation.",
-  "Do not use neon green, a flat fill, or a repeating stripe.",
+  "Paint photoreal turf whose blades get finer toward the far edge of the lawn and coarser in the foreground. Do not use one texture scale for the whole yard.",
+  "Keep the photograph's cast shadows, dappled shade, contrast, and white balance. Do not flatten or relight the lawn.",
+  "Keep natural olive, straw, and green variation.",
+  "Do not use neon green, a flat fill, a repeating stripe, or a crosshatched carpet texture.",
   "Do not change the house, trees, shrubs, flower beds, driveway, walkway, sky, people, or any pixel outside the mask.",
 ].join(" ");
 

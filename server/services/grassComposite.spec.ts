@@ -40,6 +40,52 @@ function outsideIsExact(original: Uint8Array, edited: Uint8Array, alpha: Uint8Ar
   return { outside, exact, inside, changed };
 }
 
+function meanLuma(
+  raw: Uint8Array,
+  alpha: Uint8Array,
+  width: number,
+  pick: (x: number, y: number) => boolean,
+) {
+  let sum = 0;
+  let n = 0;
+  const height = alpha.length / width;
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const i = y * width + x;
+      if (alpha[i] < 180 || !pick(x, y)) continue;
+      const p = i * 3;
+      sum += raw[p] * 0.2126 + raw[p + 1] * 0.7152 + raw[p + 2] * 0.0722;
+      n += 1;
+    }
+  }
+  return n ? sum / n : 0;
+}
+
+function repeatPeak(samples: number[]) {
+  const n = samples.length;
+  let mean = 0;
+  for (const value of samples) mean += value;
+  mean /= n;
+  let energy = 0;
+  const centered = samples.map((value) => {
+    const delta = value - mean;
+    energy += delta * delta;
+    return delta;
+  });
+  if (energy < 1) return 0;
+  let peak = 0;
+  for (let lag = 3; lag <= 16; lag += 1) {
+    let corr = 0;
+    let count = 0;
+    for (let i = 0; i + lag < n; i += 1) {
+      corr += centered[i] * centered[i + lag];
+      count += 1;
+    }
+    peak = Math.max(peak, corr / (energy * (count / n)));
+  }
+  return peak;
+}
+
 describe("grass composite", () => {
   it("replaces the lawn and leaves sky, house, and canopy pixels exact", async () => {
     const width = 320;
@@ -66,6 +112,141 @@ describe("grass composite", () => {
     expect(result.alpha![120 * width + 160]).toBe(0);
     expect(result.alpha![30 * width + 48]).toBe(0);
     expect(result.alpha![210 * width + 20]).toBeGreaterThan(200);
+  });
+
+  it("keeps a wide pale driveway out of the mask, including Marias", async () => {
+    const width = 180;
+    const height = 120;
+    const rgb = new Uint8Array(width * height * 3);
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        const i = (y * width + x) * 3;
+        const driveway = y > 62 && y < 82;
+        if (y < 36) {
+          rgb[i] = 90; rgb[i + 1] = 160; rgb[i + 2] = 220;
+        } else if (driveway) {
+          rgb[i] = 214; rgb[i + 1] = 202; rgb[i + 2] = 184;
+        } else {
+          rgb[i] = 46 + (x % 3); rgb[i + 1] = 128; rgb[i + 2] = 44;
+        }
+      }
+    }
+    const synthetic = segmentLawn(rgb, width, height);
+    expect(synthetic).not.toBeNull();
+    expect(synthetic![50 * width + 40]).toBe(255);
+    expect(synthetic![100 * width + 40]).toBe(255);
+    expect(synthetic![72 * width + 90]).toBe(0);
+    let driveOn = 0;
+    let drive = 0;
+    for (let y = 64; y < 80; y += 1) {
+      for (let x = 8; x < width - 8; x += 1) {
+        drive += 1;
+        if (synthetic![y * width + x] >= 128) driveOn += 1;
+      }
+    }
+    expect(driveOn / drive).toBe(0);
+
+    const photo = await fs.readFile(path.join(process.cwd(), "public/media/pay-at-close/luxury/marias/01-front-day.jpg"));
+    const oriented = await sharp(photo).rotate().resize({ width: 640, height: 640, fit: "inside" }).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+    const mask = segmentLawn(new Uint8Array(oriented.data), oriented.info.width, oriented.info.height);
+    expect(mask).not.toBeNull();
+    const photoWidth = oriented.info.width;
+    const photoHeight = oriented.info.height;
+    let concrete = 0;
+    let concreteMasked = 0;
+    let foreground = 0;
+    let foregroundMasked = 0;
+    for (let y = 0; y < photoHeight; y += 1) {
+      for (let x = 0; x < photoWidth; x += 1) {
+        const i = y * photoWidth + x;
+        const p = i * 3;
+        const r = oriented.data[p];
+        const g = oriented.data[p + 1];
+        const b = oriented.data[p + 2];
+        const max = Math.max(r, g, b);
+        const min = Math.min(r, g, b);
+        const sat = max === 0 ? 0 : (max - min) / max;
+        const beige = sat <= 0.22 && max > 150 && r + 4 >= g && g + 4 >= b && Math.abs(r - g) < 28;
+        const lawnGreen = g > r + 10 && g > b + 12 && sat > 0.18;
+        const on = mask![i] >= 128;
+        if (beige && y > photoHeight * 0.46 && y < photoHeight * 0.64 && x > photoWidth * 0.08 && x < photoWidth * 0.92) {
+          concrete += 1;
+          if (on) concreteMasked += 1;
+        }
+        if (lawnGreen && y > photoHeight * 0.75) {
+          foreground += 1;
+          if (on) foregroundMasked += 1;
+        }
+      }
+    }
+    expect(concrete).toBeGreaterThan(200);
+    expect(concreteMasked / concrete).toBeLessThan(0.04);
+    expect(foregroundMasked / foreground).toBeGreaterThan(0.75);
+  });
+
+  it("keeps the original cast shadow when the model paints flat light", async () => {
+    const width = 160;
+    const height = 120;
+    const { jpeg } = await jpegFrom(width, height, (x, y) => {
+      if (y < 40) return [80, 150, 220];
+      const shadow = x > 70 && x < 108;
+      return shadow ? [18, 48, 20] : [70, 150, 55];
+    });
+    const reference = await sharp({
+      create: { width: 24, height: 24, channels: 3, background: { r: 40, g: 130, b: 50 } },
+    }).jpeg().toBuffer();
+    const flat = await sharp({
+      create: { width: 80, height: 60, channels: 3, background: { r: 190, g: 230, b: 120 } },
+    }).png().toBuffer();
+    const result = await compositeGrass({
+      photo: jpeg,
+      reference,
+      retainRaw: true,
+      inpaint: async () => flat,
+    });
+    expect(result.applied).toBe(true);
+    const decoded = new Uint8Array(await sharp(jpeg).rotate().removeAlpha().raw().toBuffer());
+    const shadow = meanLuma(result.raw!, result.alpha!, width, (x, y) => y > 70 && x > 78 && x < 100);
+    const sun = meanLuma(result.raw!, result.alpha!, width, (x, y) => y > 70 && x > 20 && x < 50);
+    const originalShadow = meanLuma(decoded, result.alpha!, width, (x, y) => y > 70 && x > 78 && x < 100);
+    const originalSun = meanLuma(decoded, result.alpha!, width, (x, y) => y > 70 && x > 20 && x < 50);
+    expect(sun).toBeGreaterThan(shadow * 1.6);
+    expect(shadow / sun).toBeLessThan((originalShadow / originalSun) * 1.2);
+    expect(shadow / sun).toBeGreaterThan((originalShadow / originalSun) * 0.8);
+  });
+
+  it("drops a repeating crosshatch instead of seating it on the lawn", async () => {
+    const width = 160;
+    const height = 120;
+    const { jpeg } = await jpegFrom(width, height, (_x, y) => (y < 36 ? [80, 150, 220] : [55, 125, 48]));
+    const reference = await sharp({
+      create: { width: 24, height: 24, channels: 3, background: { r: 40, g: 120, b: 45 } },
+    }).jpeg().toBuffer();
+    const grid = Buffer.alloc(96 * 72 * 3);
+    for (let y = 0; y < 72; y += 1) {
+      for (let x = 0; x < 96; x += 1) {
+        const on = (Math.floor(x / 4) + Math.floor(y / 4)) % 2 === 0;
+        const i = (y * 96 + x) * 3;
+        grid[i] = on ? 210 : 90;
+        grid[i + 1] = on ? 230 : 120;
+        grid[i + 2] = on ? 140 : 60;
+      }
+    }
+    const model = await sharp(grid, { raw: { width: 96, height: 72, channels: 3 } }).png().toBuffer();
+    const result = await compositeGrass({
+      photo: jpeg,
+      reference,
+      retainRaw: true,
+      inpaint: async () => model,
+    });
+    expect(result.applied).toBe(true);
+    const row: number[] = [];
+    const y = 90;
+    for (let x = 30; x < 130; x += 1) {
+      const p = (y * width + x) * 3;
+      row.push(result.raw![p] * 0.2126 + result.raw![p + 1] * 0.7152 + result.raw![p + 2] * 0.0722);
+    }
+    expect(repeatPeak(row)).toBeLessThan(0.35);
   });
 
   it("includes bare dirt at the bottom of the lawn and still skips the walk", () => {
