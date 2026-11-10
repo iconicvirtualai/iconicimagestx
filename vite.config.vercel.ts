@@ -56,6 +56,7 @@ export default defineConfig({
         "stripe",
         "nodemailer",
         "twilio",
+        "web-push",
         "googleapis",
         "zod",
         "serverless-http",

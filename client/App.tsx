@@ -100,6 +100,7 @@ import AdminOps from "./pages/AdminOps";
 import AdminPhotographerPreview from "./pages/AdminPhotographerPreview";
 import LegacyOpsRedirect from "./components/ops/LegacyOpsRedirect";
 import PhotographerHome from "./components/ops/PhotographerHome";
+import ShooterApp from "./pages/ShooterApp";
 import AdminEditor from "./pages/AdminEditor";
 import AdminTeam from "./pages/AdminTeam";
 import AdminStudioHome from "./pages/AdminStudioHome";
@@ -285,6 +286,7 @@ const App = () => (
             <Route path="/admin/communications/email/campaigns" element={<ProtectedRoute requiredRole="admin"><CampaignsPage /></ProtectedRoute>} />
             <Route path="/admin/communications/email/account" element={<ProtectedRoute requiredRole="admin"><AccountPage /></ProtectedRoute>} />
             <Route path="/admin/photographer" element={<ProtectedRoute requiredRole="photographer"><PhotographerHome /></ProtectedRoute>} />
+            <Route path="/shooter" element={<ShooterApp />} />
             <Route path="/admin/upload" element={<ProtectedRoute requiredRole="photographer"><LegacyOpsRedirect /></ProtectedRoute>} />
             <Route path="/admin/editor" element={<ProtectedRoute requiredRole="editor"><AdminEditor /></ProtectedRoute>} />
             <Route path="/admin/team" element={<ProtectedRoute requiredRole="admin"><AdminTeam /></ProtectedRoute>} />

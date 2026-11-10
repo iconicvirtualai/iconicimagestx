@@ -474,6 +474,57 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Team chat. One inbox document per staff login, and one live document
+    // for the open thread. Clients read only an order thread they own.
+    // Phone numbers are not stored in these documents. teamSmsRoutes and
+    // teamSmsInbound are server-only. Publish this file in the Firebase
+    // console. Vercel does not deploy rules.
+    match /teamChatInbox/{uid} {
+      allow read: if isStaff() && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    match /teamThreadLive/{threadId} {
+      allow read: if isStaff() && request.auth.uid in resource.data.memberIds
+        || (isAuthenticated() && resource.data.clientId == request.auth.uid);
+      allow write: if false;
+    }
+
+    match /teamThreads/{threadId} {
+      allow read: if isStaff() && request.auth.uid in resource.data.memberIds
+        || (isAuthenticated() && resource.data.clientId == request.auth.uid);
+      allow write: if false;
+
+      match /messages/{messageId} {
+        allow read: if isStaff() && request.auth.uid in get(/databases/$(database)/documents/teamThreads/$(threadId)).data.memberIds
+          || (isAuthenticated() && get(/databases/$(database)/documents/teamThreads/$(threadId)).data.clientId == request.auth.uid);
+        allow write: if false;
+      }
+    }
+
+    match /teamChatPrefs/{uid} {
+      allow read: if isStaff() && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    match /teamPushSubscriptions/{uid} {
+      allow read: if isStaff() && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    match /teamSmsLog/{logId} {
+      allow read: if isCoordinator();
+      allow write: if false;
+    }
+
+    match /teamSmsRoutes/{routeId} {
+      allow read, write: if false;
+    }
+
+    match /teamSmsInbound/{sid} {
+      allow read, write: if false;
+    }
+
     // ─── Catch-all: deny everything else ─────────────────────────────────────
     match /{document=**} {
       allow read, write: if false;

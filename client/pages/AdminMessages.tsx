@@ -28,11 +28,12 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import BotRoomPanel from "@/components/communications/BotRoomPanel";
 import OperationsStatsGrid from "@/components/OperationsStatsGrid";
-import ContactLiveChat from "@/components/ContactLiveChat";
 import { useAuth } from "@/contexts/AuthContext";
 import { UnifiedThreads } from "@/components/communications/UnifiedThreads";
 import { AssistantPanes } from "@/components/communications/AssistantPanes";
 import { CommunicationsTabBar, type CommunicationsTabId } from "@/components/communications/CommunicationsTabBar";
+import { ContactChatPane } from "@/components/communications/TeamChat";
+import type { TeamChatSampleView } from "@/components/communications/teamChatSample";
 import { useAdminUnread } from "@/components/admin/AdminUnreadProvider";
 import { communicationTabUnreadKey } from "@shared/adminUnread";
 
@@ -137,6 +138,13 @@ function timeAgo(ts: { seconds: number } | null) {
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
+
+function teamSampleView(value: string | null): TeamChatSampleView {
+  if (value === "list" || value === "group" || value === "dm" || value === "new" || value === "log" || value === "channel") {
+    return value;
+  }
+  return "channel";
+}
 
 function initialCommunicationsTab(pathname: string, search: string): Tab {
   const params = new URLSearchParams(search);
@@ -501,7 +509,7 @@ export default function AdminMessages() {
 
           {tab === "contact" && (
             <div className="flex-1 p-4 text-sm text-gray-400 leading-relaxed">
-              Site contact chats are on the right. A reply stays in that thread and is not emailed or texted.
+              Team channels, groups, and direct messages are on the right. Site visitor chats stay under Site chats and are not emailed or texted.
             </div>
           )}
 
@@ -521,7 +529,13 @@ export default function AdminMessages() {
             <p className="p-6 text-sm text-gray-600">Bot Room is for owners and admins.</p>
           ) : null}
 
-          {tab === "contact" && <ContactLiveChat />}
+          {tab === "contact" && (
+            <ContactChatPane
+              sample={import.meta.env.DEV && new URLSearchParams(location.search).get("sample") === "1"}
+              view={teamSampleView(new URLSearchParams(location.search).get("view"))}
+              threadId={new URLSearchParams(location.search).get("thread") || ""}
+            />
+          )}
 
           {/* ── Sweep tab ── */}
           {tab === "sweep" && (

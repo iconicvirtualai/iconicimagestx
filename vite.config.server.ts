@@ -33,6 +33,7 @@ export default defineConfig({
         "express",
         "cors",
         "sharp",
+        "web-push",
       ],
       output: {
         format: "es",
