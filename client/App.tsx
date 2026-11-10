@@ -92,6 +92,9 @@ import ContactDetailPage from "./pages/marketing/ContactDetailPage";
 import SegmentsPage from "./pages/marketing/SegmentsPage";
 import SuppressionPage from "./pages/marketing/SuppressionPage";
 import CampaignsPage from "./pages/marketing/CampaignsPage";
+import CampaignListPage from "./pages/campaigns/CampaignListPage";
+import CampaignCalendarPage from "./pages/campaigns/CampaignCalendarPage";
+import CampaignDetailPage from "./pages/campaigns/CampaignDetailPage";
 import CampaignBuilder from "./pages/marketing/CampaignBuilder";
 import CampaignReport from "./pages/marketing/CampaignReport";
 import AccountPage from "./pages/marketing/AccountPage";
@@ -273,6 +276,9 @@ const App = () => (
             ) : null}
             <Route path="/admin/botroom" element={<ProtectedRoute requiredRole="admin"><AdminMessages /></ProtectedRoute>} />
             <Route path="/admin/botroom/connect" element={<ProtectedRoute requiredRole="admin"><AdminBotRoomConnect /></ProtectedRoute>} />
+            <Route path="/admin/campaigns" element={<ProtectedRoute requiredRole="staff"><CampaignListPage /></ProtectedRoute>} />
+            <Route path="/admin/campaigns/calendar" element={<ProtectedRoute requiredRole="staff"><CampaignCalendarPage /></ProtectedRoute>} />
+            <Route path="/admin/campaigns/:id" element={<ProtectedRoute requiredRole="staff"><CampaignDetailPage /></ProtectedRoute>} />
             <Route path="/admin/communications/email" element={<ProtectedRoute requiredRole="admin"><EmailHome /></ProtectedRoute>} />
             <Route path="/admin/communications/email/contacts" element={<ProtectedRoute requiredRole="admin"><ContactsPage /></ProtectedRoute>} />
             <Route path="/admin/communications/email/contacts/view" element={<ProtectedRoute requiredRole="admin"><ContactDetailPage /></ProtectedRoute>} />

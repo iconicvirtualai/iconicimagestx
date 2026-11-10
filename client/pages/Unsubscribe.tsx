@@ -19,7 +19,11 @@ export default function Unsubscribe() {
       const response = await fetch("/api/marketing/unsubscribe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, token: params.get("token") || "" }),
+        body: JSON.stringify({
+          email,
+          token: params.get("token") || "",
+          campaignId: params.get("campaign") || "",
+        }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || "Could not unsubscribe.");

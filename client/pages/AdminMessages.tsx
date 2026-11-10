@@ -537,14 +537,22 @@ export default function AdminMessages() {
                   <p className="text-gray-400 text-sm mt-2 max-w-3xl">
                     This center is the required home for team, client, email, text, portal, and social communications. AICON should sweep it automatically and flag anything unanswered, failed, urgent, or financially connected.
                   </p>
-                  {isAdmin ? (
+                  <div className="mt-4 flex flex-wrap gap-2">
                     <Link
-                      to="/admin/communications/email"
-                      className="mt-4 inline-flex items-center gap-2 rounded-lg bg-teal-600 px-4 py-2 text-xs font-bold uppercase tracking-widest text-white hover:bg-teal-500"
+                      to="/admin/campaigns"
+                      className="inline-flex items-center gap-2 rounded-lg bg-teal-600 px-4 py-2 text-xs font-extrabold uppercase tracking-widest text-white hover:bg-teal-500"
                     >
-                      <Mail className="h-4 w-4" /> Email marketing
+                      Campaigns
                     </Link>
-                  ) : null}
+                    {isAdmin ? (
+                      <Link
+                        to="/admin/communications/email"
+                        className="inline-flex items-center gap-2 rounded-lg border border-white/20 px-4 py-2 text-xs font-extrabold uppercase tracking-widest text-white hover:bg-white/10"
+                      >
+                        <Mail className="h-4 w-4" /> Email marketing
+                      </Link>
+                    ) : null}
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

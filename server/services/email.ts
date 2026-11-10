@@ -208,6 +208,41 @@ export async function sendEmail(options: SendEmailOptions): Promise<{ sent: bool
   }
 }
 
+/**
+ * Campaign mail uses the same SMTP transport as sendEmail.
+ * The campaign route checks CAMPAIGN_SEND_LIVE before a recipient send.
+ * This function does not read CLIENT_NOTIFY_LIVE, BOOKING_NOTIFY_LIVE,
+ * THANKFUL_RSVP_CONFIRM_LIVE, or CLIENT_PORTAL_ENABLED.
+ */
+export async function deliverRawEmail(message: {
+  to: string;
+  subject: string;
+  html: string;
+  text?: string;
+}): Promise<void> {
+  if (emailDeliveryOverride) {
+    await emailDeliveryOverride({
+      to: message.to,
+      subject: message.subject,
+      html: message.html,
+      text: message.text,
+    });
+    return;
+  }
+  const transporter = createTransport();
+  try {
+    await transporter.sendMail({
+      from: `"Iconic Images" <${process.env.EMAIL_FROM || process.env.SMTP_USER}>`,
+      to: message.to,
+      subject: message.subject,
+      html: message.html,
+      ...(message.text ? { text: message.text } : {}),
+    });
+  } finally {
+    transporter.close();
+  }
+}
+
 // ─── Template Variable Interpolation ─────────────────────────────────────────
 
 // Client mail prints BUSINESS_CONTACT.line through clientEmailContactLineHtml (direct tel: and mailto:).

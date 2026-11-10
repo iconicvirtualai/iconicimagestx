@@ -60,6 +60,11 @@ export default function EmailHome() {
           </Link>
         ))}
       </div>
+      <p className="mt-4 text-sm text-gray-600">
+        Emails, texts, and posts for one send live in{" "}
+        <Link to="/admin/campaigns" className="font-extrabold uppercase tracking-widest text-[#0d9488]">Campaigns</Link>.
+        This page stays the GMass contact list.
+      </p>
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
         <section className={`${cardCls} p-5`}>
           <div className="flex items-center justify-between gap-3">

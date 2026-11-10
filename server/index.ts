@@ -28,6 +28,7 @@ import listingsRouter from "./routes/listings";
 import campaignsRouter from "./routes/campaigns";
 import marketingRouter from "./routes/marketing";
 import marketingCampaignsRouter from "./routes/marketingCampaigns";
+import channelCampaignsRouter from "./routes/channelCampaigns";
 import agentsRouter from "./routes/agents";
 import botRoomRouter from "./routes/botroom";
 import mediaJobsRouter from "./routes/mediaJobs";
@@ -305,6 +306,7 @@ export function createServer() {
   app.use("/api/campaigns", campaignsRouter);
   app.use("/api/marketing", marketingRouter);
   app.use("/api/marketing", marketingCampaignsRouter);
+  app.use("/api/channel-campaigns", channelCampaignsRouter);
   app.use("/api/agents", agentsRouter);
   app.use("/api/botroom", botRoomRouter);
   app.use("/api/media-jobs", mediaJobsRouter);
