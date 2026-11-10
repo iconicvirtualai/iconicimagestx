@@ -2,7 +2,7 @@ import * as React from "react";
 import AdminLayout from "@/components/AdminLayout";
 import { X, Archive, Calendar, Layers, RefreshCw } from "lucide-react";
 import { db } from "@/lib/firebase";
-import { collection, onSnapshot, writeBatch, doc, serverTimestamp, addDoc, getDoc, getDocs, updateDoc } from "firebase/firestore";
+import { collection, onSnapshot, writeBatch, doc, serverTimestamp, addDoc, getDoc, getDocs, updateDoc, setDoc } from "firebase/firestore";
 import { toast } from "sonner";
 import { listingAppointmentDate, projectCarryFromOrder, scheduleTimeInputValue, stableOrderRequestListingId } from "@shared/listingWrite";
 import { photographerPreferenceForNames } from "@shared/suggestedAppointments";
@@ -16,12 +16,17 @@ import { linkOrderToListing, resolvePortalClientId } from "@/lib/listingClient";
 import { assignBookingPhotographer } from "@/lib/assignBookingPhotographer";
 import { listingLinkFields } from "@shared/orderProjectInvoice";
 import { Button } from "@/components/ui/button";
-import OperationsStatsGrid from "@/components/OperationsStatsGrid";
 import { upsertScheduledAppointment } from "@/lib/scheduleRecords";
 import { filterAssignableStaff, recordAllowsQaStaff } from "@shared/qaStaff";
 import { recordAddressText } from "@shared/addressText";
 import { type AdminStudioId } from "@shared/adminOrderTile";
 import { adminOrdersViewStorageKey } from "@shared/adminOrderList";
+import {
+  DEFAULT_ORDER_DESK_PREFS,
+  orderDeskPrefsFields,
+  parseOrderDeskPrefs,
+  type OrderDeskPrefs,
+} from "@shared/adminOrdersDesk";
 import { AdminOrdersBrowser } from "@/components/admin/AdminOrdersBrowser";
 import { useAuth } from "@/contexts/AuthContext";
 import { cancelOrderRequest } from "@/lib/cancelOrderRequest";
@@ -48,6 +53,8 @@ export default function AdminOrders() {
   const [archiveConfirm, setArchiveConfirm] = React.useState(false);
   const [isBulkProjecting, setIsBulkProjecting] = React.useState(false);
   const [bulkProjectType, setBulkProjectType] = React.useState<"real_estate" | "business">("real_estate");
+  const [editRequests, setEditRequests] = React.useState<Record<string, unknown>[]>([]);
+  const [deskPrefs, setDeskPrefs] = React.useState<OrderDeskPrefs>(DEFAULT_ORDER_DESK_PREFS);
 
   React.useEffect(() => {
     const unsub = onSnapshot(collection(db, "orderRequests"), snap => {
@@ -55,13 +62,41 @@ export default function AdminOrders() {
       setLoading(false);
     }, err => { console.error(err); toast.error("Failed to load orders"); setLoading(false); });
 
+    const unsubEdits = onSnapshot(collection(db, "editRequests"), snap => {
+      setEditRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, err => console.warn("[AdminOrders] Edit requests could not be loaded.", err));
+
     getDocs(collection(db, "staff")).then(snap => {
       setStaff(snap.docs.map(d => ({ id: d.id, name: d.data().name || `${d.data().firstName || ""} ${d.data().lastName || ""}`.trim(), ...d.data() })).filter((s: any) => s.isActive !== false));
     });
 
     const interval = setInterval(() => setNow(Date.now()), 60000);
-    return () => { unsub(); clearInterval(interval); };
+    return () => { unsub(); unsubEdits(); clearInterval(interval); };
   }, []);
+
+  React.useEffect(() => {
+    if (!user?.uid) return undefined;
+    const unsub = onSnapshot(doc(db, "orderDeskPrefs", user.uid), snap => {
+      setDeskPrefs(parseOrderDeskPrefs(snap.data()));
+    }, err => console.warn("[AdminOrders] Desk preferences could not be loaded.", err));
+    return () => unsub();
+  }, [user?.uid]);
+
+  const saveDeskPrefs = async (next: OrderDeskPrefs) => {
+    const previous = deskPrefs;
+    setDeskPrefs(next);
+    if (!user?.uid) return;
+    try {
+      await setDoc(doc(db, "orderDeskPrefs", user.uid), {
+        ...orderDeskPrefsFields(next),
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+    } catch (err) {
+      console.error("[AdminOrders] Could not save desk preferences.", err);
+      setDeskPrefs(previous);
+      toast.error("Could not save that orders preference.");
+    }
+  };
 
   const toggleSelect = (id: string) => {
     const next = new Set(selection);
@@ -258,9 +293,6 @@ export default function AdminOrders() {
 
   return (
     <AdminLayout title="Orders">
-      <div className="pb-10">
-        <OperationsStatsGrid />
-      </div>
       {loading ? (
         <div className="flex items-center justify-center py-24"><div className="w-6 h-6 border-2 border-[#0d9488] border-t-transparent rounded-full animate-spin" /></div>
       ) : (
@@ -272,6 +304,10 @@ export default function AdminOrders() {
           onToggleSelect={toggleSelect}
           onSelectIds={selectAll}
           onStudioChange={setStudio}
+          editRequests={editRequests}
+          now={new Date(now)}
+          prefs={deskPrefs}
+          onPrefsChange={(next) => { void saveDeskPrefs(next); }}
         />
       )}
 

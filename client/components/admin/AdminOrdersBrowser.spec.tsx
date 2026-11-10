@@ -15,15 +15,17 @@ let container: HTMLDivElement | null = null;
 
 const orders = sampleAdminOrderRecords();
 const staff = sampleAdminOrderStaff();
+const NOW = new Date("2026-11-10T18:00:00.000Z");
 
-function Harness({ storageKey }: { storageKey: string }) {
+function Harness({ storageKey, list = orders }: { storageKey: string; list?: Record<string, unknown>[] }) {
   return (
     <MemoryRouter>
       <AdminOrdersBrowser
-        orders={orders}
+        orders={list}
         staff={staff}
         selection={new Set()}
         storageKey={storageKey}
+        now={NOW}
         onToggleSelect={() => undefined}
         onSelectIds={() => undefined}
         onStudioChange={() => undefined}
@@ -32,30 +34,30 @@ function Harness({ storageKey }: { storageKey: string }) {
   );
 }
 
-async function renderAt(storageKey: string) {
+async function renderAt(storageKey: string, list = orders) {
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
   await act(async () => {
-    root?.render(<Harness storageKey={storageKey} />);
+    root?.render(<Harness storageKey={storageKey} list={list} />);
   });
 }
 
 function buttonByText(rootNode: ParentNode, label: string) {
   return [...rootNode.querySelectorAll("button")].find((button) => {
-    const text = button.textContent?.replace(/[↑↓]/g, "").replace(/\s+/g, " ").trim();
+    const text = button.textContent?.replace(/\s+/g, " ").trim();
     return text === label;
   }) as HTMLButtonElement | undefined;
 }
 
-function activeSection() {
-  const section = container?.querySelector("[data-section='active']");
-  if (!section) throw new Error("Missing all-orders section");
-  return section;
+function section(id: string) {
+  const node = container?.querySelector(`[data-section='${id}']`);
+  if (!node) throw new Error(`Missing section ${id}`);
+  return node;
 }
 
-function activeIds() {
-  return [...activeSection().querySelectorAll("[data-order-id]")].map((node) => node.getAttribute("data-order-id"));
+function idsIn(id: string) {
+  return [...section(id).querySelectorAll("[data-order-id]")].map((node) => node.getAttribute("data-order-id"));
 }
 
 async function clickButton(rootNode: ParentNode, label: string) {
@@ -64,10 +66,6 @@ async function clickButton(rootNode: ParentNode, label: string) {
   await act(async () => {
     button.click();
   });
-}
-
-async function chooseList() {
-  await clickButton(container!, "List view");
 }
 
 beforeEach(() => {
@@ -84,8 +82,143 @@ afterEach(async () => {
   localStorage.clear();
 });
 
-describe("calendar hold failure badge", () => {
-  it("shows Calendar hold failed on the tile and the list", async () => {
+describe("orders desk sections", () => {
+  it("keeps triage orders out of all orders and collapses archives", async () => {
+    await renderAt("adminOrdersView:desk");
+    expect(container?.querySelector("[data-orders-view]")?.getAttribute("data-orders-view")).toBe("list");
+    expect(section("archived").textContent).toContain("Collapsed");
+    expect(section("archived").querySelector("[data-order-id]")).toBeNull();
+    expect(idsIn("action").sort()).toEqual(["fixture-birch", "fixture-oak"]);
+    expect(idsIn("active").sort()).toEqual(["fixture-cedar", "fixture-maple", "fixture-pine"]);
+    expect(section("action").textContent).toContain("Unscheduled");
+    expect(section("action").textContent).toContain("No photographer assigned");
+    expect(section("action").textContent).toContain("Schedule");
+    expect(section("action").textContent).toContain("Assign");
+    const schedule = section("action").querySelector("a[href*='desk=schedule']");
+    expect(schedule?.getAttribute("href")).toContain("/admin/order-request/");
+
+    const expand = section("archived").querySelector("[aria-label='Expand Archives & Cancellations']") as HTMLButtonElement;
+    await act(async () => {
+      expand.click();
+    });
+    expect(idsIn("archived")).toEqual(["fixture-elm"]);
+    expect(section("active").textContent).not.toContain("Sample Client Eden Frost");
+  });
+
+  it("filters every section from the one search box and the status tabs", async () => {
+    await renderAt("adminOrdersView:filter");
+    const input = container?.querySelector("[data-testid='orders-search']") as HTMLInputElement;
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+      setter?.call(input, "Maple");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    expect(idsIn("active")).toEqual(["fixture-maple"]);
+    expect(idsIn("action")).toEqual([]);
+    expect(container?.textContent).not.toContain("Sample Client Blair Quinn");
+
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+      setter?.call(input, "");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await clickButton(container!, "Unscheduled1");
+    expect(idsIn("action")).toEqual(["fixture-birch"]);
+    expect(idsIn("active")).toEqual([]);
+  });
+
+  it("shows order, payment, and gallery as plain text with one neutral dot", async () => {
+    await renderAt("adminOrdersView:status");
+    const maple = section("active").querySelector("[data-order-id='fixture-maple']");
+    expect(maple?.textContent).toContain("Order");
+    expect(maple?.textContent).toContain("Scheduled");
+    expect(maple?.textContent).toContain("Payment");
+    expect(maple?.textContent).toContain("Paid");
+    expect(maple?.textContent).toContain("Gallery");
+    expect(maple?.textContent).toContain("Editing");
+    expect(maple?.querySelectorAll("i.rounded-full").length).toBe(1);
+    expect(maple?.innerHTML).not.toMatch(/bg-red-|bg-green-|bg-blue-|rounded-full px-/);
+    expect(maple?.textContent).toContain(adminOrderTotalLabel(orders.find((order) => order.id === "fixture-maple")!));
+    const link = maple?.querySelector("a[data-order-link='fixture-maple']") as HTMLAnchorElement | null;
+    expect(link?.getAttribute("href")).toBe("/admin/order-request/fixture-maple");
+    expect(section("active").textContent).toContain("The Showcase");
+    expect(section("active").textContent).toContain("+1");
+  });
+
+  it("remembers list or board per user", async () => {
+    await renderAt("adminOrdersView:uid-a");
+    await clickButton(container!, "Board");
+    expect(localStorage.getItem("adminOrdersView:uid-a")).toBe("board");
+    expect(container?.querySelector("[data-testid='orders-board']")).toBeTruthy();
+    expect(container?.textContent).toContain("Unscheduled");
+    expect(container?.textContent).toContain("Delivered — Paid");
+    expect(container?.querySelector("[data-section='action']")).toBeNull();
+
+    await act(async () => {
+      root?.render(<Harness storageKey="adminOrdersView:uid-b" />);
+    });
+    expect(container?.querySelector("[data-orders-view]")?.getAttribute("data-orders-view")).toBe("list");
+    expect(localStorage.getItem("adminOrdersView:uid-a")).toBe("board");
+  });
+});
+
+describe("orders desk overrides and selection", () => {
+  it("sets a manual KPI value and resets it", async () => {
+    await renderAt("adminOrdersView:manual");
+    const adjust = container?.querySelector("[aria-label='Adjust Revenue this week']") as HTMLButtonElement;
+    await act(async () => {
+      adjust.click();
+    });
+    await clickButton(container!, "Set manual value");
+    const input = container?.querySelector("#kpi-manual-revenue") as HTMLInputElement;
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+      setter?.call(input, "1804.91");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await clickButton(container!, "Save");
+    const card = container?.querySelector("[data-kpi='revenue']");
+    expect(card?.textContent).toContain("$1,804.91");
+    expect(card?.getAttribute("data-manual")).toBe("true");
+    expect(card?.textContent).toContain("Manual");
+    const reset = [...(card?.querySelectorAll("button") || [])].find((button) => button.textContent === "Reset") as HTMLButtonElement;
+    await act(async () => {
+      reset.click();
+    });
+    expect(container?.querySelector("[data-kpi='revenue']")?.getAttribute("data-manual")).toBe("false");
+  });
+
+  it("selects the filtered orders from one control", async () => {
+    const seen: string[][] = [];
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    await act(async () => {
+      root?.render(
+        <MemoryRouter>
+          <AdminOrdersBrowser
+            orders={orders}
+            staff={staff}
+            selection={new Set()}
+            storageKey="adminOrdersView:select"
+            now={NOW}
+            onToggleSelect={() => undefined}
+            onSelectIds={(ids) => seen.push(ids)}
+            onStudioChange={() => undefined}
+          />
+        </MemoryRouter>,
+      );
+    });
+    const box = container.querySelector("[data-testid='orders-select-all']") as HTMLInputElement;
+    await act(async () => {
+      box.click();
+    });
+    expect(seen[0]?.sort()).toEqual(orders.map((order) => String(order.id)).sort());
+    expect(container.querySelector("[data-testid='orders-select-all-action']")).toBeNull();
+    expect(container.querySelector("[aria-label='Orders per page']")).toBeNull();
+  });
+
+  it("shows Calendar hold failed on the row", async () => {
     const failed = {
       id: "hold-fail",
       orderNumber: "#099",
@@ -95,213 +228,11 @@ describe("calendar hold failure badge", () => {
       address: "9 Sample Hold Lane",
       appointmentDate: "2026-04-12",
       appointmentTime: "10:00 AM",
+      assignedPhotographerName: "Sample Photographer Jordan Hale",
       officeFlag: "calendar_hold_failed",
-      officeNote: "Calendar hold failed for Mike Luna. Add it to the calendar manually.",
       createdAt: { toDate: () => new Date("2026-04-02T15:00:00Z"), seconds: 0 },
     };
-    container = document.createElement("div");
-    document.body.appendChild(container);
-    root = createRoot(container);
-    await act(async () => {
-      root?.render(
-        <MemoryRouter>
-          <AdminOrdersBrowser
-            orders={[failed]}
-            staff={staff}
-            selection={new Set()}
-            storageKey="adminOrdersView:hold"
-            onToggleSelect={() => undefined}
-            onSelectIds={() => undefined}
-            onStudioChange={() => undefined}
-          />
-        </MemoryRouter>,
-      );
-    });
-    expect(container?.querySelector("[data-admin-order-tile] [data-slot='calendar-hold']")?.textContent).toContain("Calendar hold failed");
-    await chooseList();
-    expect(container?.querySelector("[data-order-list] [data-slot='calendar-hold']")?.textContent).toContain("Calendar hold failed");
-  });
-});
-
-describe("admin orders tile and list toggle", () => {
-  it("remembers the view per user and leaves the other user on tiles", async () => {
-    await renderAt("adminOrdersView:uid-a");
-    expect(container?.querySelector("[data-orders-view]")?.getAttribute("data-orders-view")).toBe("tile");
-    expect(container?.querySelector("[data-admin-order-tile]")).toBeTruthy();
-    await chooseList();
-    expect(localStorage.getItem("adminOrdersView:uid-a")).toBe("list");
-    expect(container?.querySelector("[data-orders-view]")?.getAttribute("data-orders-view")).toBe("list");
-    expect(activeSection().querySelector("[data-order-list]")).toBeTruthy();
-    expect(activeSection().querySelector("[data-admin-order-tile]")).toBeNull();
-
-    await act(async () => {
-      root?.render(<Harness storageKey="adminOrdersView:uid-b" />);
-    });
-    expect(container?.querySelector("[data-orders-view]")?.getAttribute("data-orders-view")).toBe("tile");
-    expect(localStorage.getItem("adminOrdersView:uid-a")).toBe("list");
-    expect(localStorage.getItem("adminOrdersView:uid-b")).toBeNull();
-
-    await act(async () => {
-      root?.unmount();
-    });
-    container?.remove();
-    await renderAt("adminOrdersView:uid-a");
-    expect(container?.querySelector("[data-orders-view]")?.getAttribute("data-orders-view")).toBe("list");
-    const listPressed = buttonByText(container!, "List view");
-    expect(listPressed?.getAttribute("aria-pressed")).toBe("true");
-  });
-});
-
-describe("admin orders list", () => {
-  it("sorts from column headers, links the row, and maps payment and totals", async () => {
-    await renderAt("adminOrdersView:uid-list");
-    await chooseList();
-    const section = activeSection();
-    const list = section.querySelector("[data-order-list]");
-    expect(list?.getAttribute("data-sort-field")).toBe("shoot");
-    expect(list?.getAttribute("data-sort-order")).toBe("desc");
-    expect(activeIds()).toEqual(["fixture-oak", "fixture-cedar", "fixture-maple", "fixture-pine"]);
-
-    const shootHeader = [...section.querySelectorAll("button")].find((button) => button.textContent?.includes("Shoot date"));
-    expect(shootHeader?.getAttribute("aria-sort")).toBe("descending");
-
-    await clickButton(section, "Client name");
-    expect(activeIds()).toEqual(["fixture-maple", "fixture-oak", "fixture-pine", "fixture-cedar"]);
-    await clickButton(section, "Client name");
-    expect(activeIds()).toEqual(["fixture-cedar", "fixture-pine", "fixture-oak", "fixture-maple"]);
-
-    await clickButton(section, "Total");
-    expect(section.querySelector("[data-order-list]")?.getAttribute("data-sort-field")).toBe("total");
-    expect(section.querySelector("[data-order-list]")?.getAttribute("data-sort-order")).toBe("desc");
-    expect(activeIds()).toEqual(["fixture-maple", "fixture-oak", "fixture-cedar", "fixture-pine"]);
-
-    const link = section.querySelector("a[data-order-link='fixture-maple']") as HTMLAnchorElement | null;
-    expect(link?.tagName).toBe("A");
-    expect(link?.getAttribute("href")).toBe("/admin/order-request/fixture-maple");
-    expect(link?.className).toContain("focus-visible:ring-2");
-    expect(link?.tabIndex).toBe(0);
-    link?.focus();
-    expect(document.activeElement).toBe(link);
-
-    expect(section.textContent).toContain("Paid");
-    expect(section.textContent).toContain("Unpaid");
-    expect(section.textContent).toContain("No invoice");
-    const money = [...section.querySelectorAll("[data-slot='money']")].map((node) => node.textContent);
-    const maple = orders.find((order) => order.id === "fixture-maple")!;
-    expect(money).toContain(adminOrderTotalLabel(maple));
-    expect(money).toContain("$641.47");
-    expect(money).toContain("$359.80");
-    expect(money).toContain("$199.00");
-    expect(section.textContent).toContain("The Showcase + Twilight photos");
-    expect(section.textContent).toContain("#012");
-    expect(section.textContent).toContain("ORD - L - 33018");
-    expect(section.textContent).toContain("Apr 12, 2026, 10:30 AM");
-  });
-
-  it("applies the all-orders search to the list and the tiles", async () => {
-    await renderAt("adminOrdersView:uid-filter");
-    await chooseList();
-    const input = container?.querySelector("[data-testid='orders-search-active']") as HTMLInputElement;
-    await act(async () => {
-      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
-      setter?.call(input, "Maple");
-      input.dispatchEvent(new Event("input", { bubbles: true }));
-    });
-    expect(activeIds()).toEqual(["fixture-maple"]);
-    expect(activeSection().textContent).not.toContain("Sample Client Blair Quinn");
-
-    await clickButton(container!, "Tile view");
-    expect(localStorage.getItem("adminOrdersView:uid-filter")).toBe("tile");
-    const tiles = [...activeSection().querySelectorAll("[data-admin-order-tile]")];
-    expect(tiles).toHaveLength(1);
-    expect(activeSection().textContent).toContain("Sample Client Avery North");
-    expect(activeSection().textContent).not.toContain("Sample Client Blair Quinn");
-  });
-
-  it("renders stacked label and value pairs without a wide table", async () => {
-    await renderAt("adminOrdersView:uid-mobile");
-    await chooseList();
-    const section = activeSection();
-    const labels = [...section.querySelectorAll("[data-field]")];
-    expect(labels.length).toBeGreaterThan(0);
-    for (const label of labels) {
-      const caption = label.querySelector("div");
-      expect(caption?.className).toContain("sm:sr-only");
-      expect(caption?.className).not.toContain("hidden");
-      expect(label.className).toContain("[word-break:normal]");
-    }
-    const list = section.querySelector("[data-order-list]");
-    expect(list?.className).not.toMatch(/min-w-\[(?:[7-9]\d{2}|\d{4,})px\]/);
-    expect(list?.className).toContain("overflow-hidden");
-    expect(list?.className).toContain("[word-break:normal]");
-    expect(section.textContent).toContain("Property address");
-    expect(section.textContent).toContain("Gallery / delivery status");
-    const money = section.querySelector("[data-slot='money']");
-    expect(money?.className).toContain("whitespace-nowrap");
-    expect(section.textContent).toContain("Notes");
-    expect(section.textContent).toContain("Placed");
-    expect(section.textContent).toContain("Items");
-  });
-
-  it("opens the notes and items popups and clamps notes on the phone row", async () => {
-    await renderAt("adminOrdersView:uid-notes");
-    await chooseList();
-    const section = activeSection();
-    const maple = section.querySelector("[data-order-id='fixture-maple']");
-    const pine = section.querySelector("[data-order-id='fixture-pine']");
-    if (!maple || !pine) throw new Error("Missing fixture rows");
-
-    expect(section.textContent).toContain("Apr 2");
-    expect(section.textContent).toContain("sample.avery.north@example.com");
-    expect(section.textContent).toContain("#fixtur");
-
-    const link = maple.querySelector("a[data-order-link='fixture-maple']");
-    expect(link?.querySelector("[data-notes-open]")).toBeNull();
-    expect(link?.querySelector("[data-items-button]")).toBeNull();
-    expect(link?.querySelector("[data-notes-expand]")).toBeNull();
-
-    const notesText = maple.querySelector("[data-notes-text]") as HTMLElement;
-    expect(notesText.className).toContain("line-clamp-3");
-    expect(notesText.className).toContain("whitespace-pre-wrap");
-    expect(notesText.textContent).toContain("Sample vibe: bright and airy.");
-    const expand = maple.querySelector("[data-notes-expand]") as HTMLButtonElement;
-    expect(expand.textContent).toBe("Expand");
-    await act(async () => {
-      expand.click();
-    });
-    expect(maple.querySelector("[data-notes-text]")?.className).not.toContain("line-clamp-3");
-    expect(expand.textContent).toBe("Show less");
-
-    expect(pine.querySelector("[data-notes-open]")).toBeNull();
-    expect(pine.querySelector("[data-field='Notes']")?.textContent).toContain("—");
-
-    await act(async () => {
-      (maple.querySelector("[data-notes-open]") as HTMLButtonElement).click();
-    });
-    const notesDialog = document.querySelector("[role='dialog']");
-    expect(notesDialog?.getAttribute("aria-label")).toBe("Order Notes");
-    expect(notesDialog?.textContent).toContain("Gate code is 0000. Park on the sample street.");
-    expect(notesDialog?.textContent).toContain("Internal: confirm twilight add-on.");
-    await act(async () => {
-      buttonByText(document, "Close")?.click();
-    });
-    expect(document.querySelector("[role='dialog']")).toBeNull();
-
-    await act(async () => {
-      (maple.querySelector("[data-items-button]") as HTMLButtonElement).click();
-    });
-    const itemsDialog = document.querySelector("[role='dialog']");
-    expect(itemsDialog?.getAttribute("aria-label")).toBe("Order Items");
-    expect(itemsDialog?.textContent).toContain("The Showcase");
-    expect(itemsDialog?.textContent).toContain("$549.00");
-    expect(itemsDialog?.textContent).toContain("Twilight photos");
-    expect(itemsDialog?.textContent).toContain("$75.00");
-    await act(async () => {
-      (document.querySelector("[aria-label='Close Order Items']") as HTMLButtonElement).click();
-    });
-    expect(document.querySelector("[role='dialog']")).toBeNull();
-
-    await clickButton(section, "Placed");
-    expect(activeIds()).toEqual(["fixture-cedar", "fixture-maple", "fixture-oak", "fixture-pine"]);
+    await renderAt("adminOrdersView:hold", [failed]);
+    expect(container?.querySelector("[data-slot='calendar-hold']")?.textContent).toContain("Calendar hold failed");
   });
 });

@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import AdminLayout from "@/components/AdminLayout";
 import { MoneyAmount } from "@/components/MoneyAmount";
 import { Button } from "@/components/ui/button";
@@ -136,6 +136,7 @@ function Field({ label, value, editing, editValue, onChange, type = "text", span
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function AdminOrderRequest() {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useAuth();
   const [order, setOrder] = React.useState<any>(null);
@@ -143,7 +144,7 @@ export default function AdminOrderRequest() {
   const [editing, setEditing] = React.useState(false);
   const [form, setForm] = React.useState<any>({});
   const [saving, setSaving] = React.useState(false);
-  const [showSchedule, setShowSchedule] = React.useState(false);
+  const [showSchedule, setShowSchedule] = React.useState(searchParams.get("desk") === "schedule");
   const [schedDate, setSchedDate] = React.useState("");
   const [schedTime, setSchedTime] = React.useState("");
   const [schedSlotStart, setSchedSlotStart] = React.useState("");

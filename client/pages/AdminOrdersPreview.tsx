@@ -9,7 +9,7 @@ export default function AdminOrdersPreview() {
   const storageKey = "adminOrdersView:preview-sample";
   React.useState(() => {
     const requested = new URLSearchParams(window.location.search).get("view");
-    if (requested === "list" || requested === "tile") localStorage.setItem(storageKey, requested);
+    if (requested === "list" || requested === "board" || requested === "tile") localStorage.setItem(storageKey, requested === "tile" ? "board" : requested);
     return requested;
   });
   const [selection, setSelection] = React.useState<Set<string>>(new Set());
