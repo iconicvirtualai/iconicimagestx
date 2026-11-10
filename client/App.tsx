@@ -163,6 +163,7 @@ const App = () => (
             <Route path="/studio-105/rooms" element={<Studio105 />} />
             <Route path="/studio-105/noir" element={<Studio105 />} />
             <Route path="/studio-105/blanc" element={<Studio105 />} />
+            <Route path="/studio-105/podcast" element={<Studio105 />} />
             <Route path="/studio-105/rates" element={<Studio105 />} />
             <Route path="/studio-105/faq" element={<Studio105 />} />
             <Route path="/studio-105/location" element={<Studio105 />} />

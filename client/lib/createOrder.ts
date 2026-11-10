@@ -52,6 +52,9 @@ export async function createOrder(formData: any) {
     billingPhone:           formData.billingPhone           || "",
     billToAddress:          formData.billToAddress          || "",
     selectedService:        formData.selectedService        || null,
+    ...(typeof formData.studio === "string" && formData.studio.trim()
+      ? { studio: formData.studio.trim() }
+      : {}),
     selectedBasics:         Array.isArray(formData.selectedBasics) ? formData.selectedBasics : [],
     selectedAddOns:         Array.isArray(formData.selectedAddOns) ? formData.selectedAddOns : [],
     premiumUpgrade:         Boolean(formData.premiumUpgrade),

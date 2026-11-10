@@ -24,6 +24,7 @@ describe("public booking catalog", () => {
     expect(html).toContain("Select your Campaign Tier");
     expect(html).not.toContain("Studio Noir");
     expect(html).not.toContain("Studio Blanc");
+    expect(html).not.toContain("Podcast");
     expect(html).not.toContain("Call for pricing");
     expect(html).not.toContain("price-hold-");
     expect(html).not.toContain("Studio 105");
@@ -83,6 +84,7 @@ describe("public booking catalog", () => {
     const ids = response.packages.map((item) => item.id);
     expect(ids).not.toContain("twilight-hold");
     expect(ids).not.toContain("studio-noir");
+    expect(ids).not.toContain("studio-podcast");
     expect(ids).toContain("aerial-drone");
     expect(ids).toContain("listing-essentials");
     expect(bookingOffer(catalog).addOns.some((group) => group.items.some((item) => item.id === "twilight-hold"))).toBe(false);

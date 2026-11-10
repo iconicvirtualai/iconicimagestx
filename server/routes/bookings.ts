@@ -45,7 +45,7 @@ import { HOLIDAY_SLOT_TAKEN_MESSAGE, holidaySlotClaim, holidaySlotIsFull, holida
 import { HOLIDAY_OFFICE_CALENDAR_ID, classifyHolidayCalendarOrder } from "../../shared/holidayCalendar";
 import { createHolidaySquareCheckout } from "../services/holidaySquareCheckout";
 import { loadHolidaySlotOrders } from "../services/holidaySlots";
-import { packagesForStaffEditor, publicBookingCatalogResponse } from "../../shared/bookingCatalog";
+import { bookingPriceHolds, packagesForStaffEditor, publicBookingCatalogResponse } from "../../shared/bookingCatalog";
 import { pricingRates, taxDollars } from "../../shared/pricingSettings";
 import { isPromoInvoiceLine } from "../../shared/invoiceFace";
 import { loadPricingAdjustments, loadPricingRates } from "../services/pricingAdjustments";
@@ -81,6 +81,7 @@ import {
 import { createHolidayCalendarEvent, deleteHolidayCalendarEvent } from "../services/holidayCalendar";
 import { backfillHolidayCalendarEvents } from "../services/holidayCalendarBackfill";
 import { isStudio105Request } from "../../shared/studio105";
+import { studioIdFromBooking } from "../../shared/adminOrderTile";
 import { isPreferredWindowBooking, resolveBookingAssignment } from "../../shared/bookingAvailability";
 import { suggestedAppointmentsAreEnabled } from "../services/suggestedAppointmentsFlag";
 import { BUSINESS_CONTACT } from "../../shared/businessContact";
@@ -325,6 +326,11 @@ router.post("/", async (req, res) => {
       sale = applyPayNowSavings(sale);
     }
     const lineItems = sale.lineItems;
+    const bookedStudio = studioIdFromBooking({
+      studio: req.body.studio,
+      selectedService: resolved.selectedService,
+      lineItems,
+    });
     const total = sale.total;
     const pricing = { subtotal: sale.subtotal, tax: sale.tax, total: sale.total };
     const selectedService = resolved.selectedService;
@@ -466,6 +472,7 @@ router.post("/", async (req, res) => {
       selectedService: selectedService || null,
       selectedBasics: Array.isArray(selectedBasics) ? selectedBasics : [],
       selectedAddOns: Array.isArray(selectedAddOns) ? selectedAddOns : [],
+      ...(bookedStudio === "podcast-studio" ? { studio: bookedStudio, projectType: "business" as const } : {}),
       leadSource: leadSource || null,
       gclid: sanitizeGclid(req.body.gclid) || null,
       brokerage: typeof req.body.brokerage === "string" ? req.body.brokerage.trim().slice(0, 160) : null,
@@ -1179,6 +1186,14 @@ router.get("/catalog", async (_req, res) => {
   const rates = pricingRates(adjustments);
   return res.json({
     ...publicBookingCatalogResponse(catalog),
+    studioPriceHolds: bookingPriceHolds(catalog).services
+      .filter((item) => item.category === "studio")
+      .map((item) => ({
+        id: item.id,
+        name: item.name,
+        price: item.price,
+        description: item.description,
+      })),
     processingEnabled: processingEnabled() && rates.processingActive,
     pricingRates: rates,
     payAtClose: payAtClosePublicOffer(process.env, adjustments),

@@ -1,3 +1,10 @@
+import {
+  STUDIO_PODCAST_DESCRIPTION,
+  STUDIO_PODCAST_IMAGE,
+  STUDIO_PODCAST_IMAGE_ALT,
+  STUDIO_PODCAST_ID,
+} from "../../shared/studio105.ts";
+
 export interface Service {
   id: string;
   name: string;
@@ -9,6 +16,8 @@ export interface Service {
   phase?: 1 | 2;
   highlights?: string;
   features?: string[];
+  image?: string;
+  imageAlt?: string;
 }
 
 export const services: Service[] = [
@@ -213,5 +222,14 @@ export const services: Service[] = [
     category: "studio",
     price: 0,
     description: "Bright white room at Studio 105. Rate confirmed when the hold is set.",
+  },
+  {
+    id: STUDIO_PODCAST_ID,
+    name: "Podcast",
+    category: "studio",
+    price: 0,
+    description: STUDIO_PODCAST_DESCRIPTION,
+    image: STUDIO_PODCAST_IMAGE,
+    imageAlt: STUDIO_PODCAST_IMAGE_ALT,
   }
 ];

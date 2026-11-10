@@ -1839,6 +1839,14 @@
       "destination": "/seo/app.html"
     },
     {
+      "source": "/studio-105/podcast",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/studio-105/podcast/",
+      "destination": "/seo/app.html"
+    },
+    {
       "source": "/studio-105/rates",
       "destination": "/seo/app.html"
     },

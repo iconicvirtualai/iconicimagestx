@@ -1064,7 +1064,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
                           exit={{ height: 0, opacity: 0 }}
                           className="overflow-hidden"
                         >
-                          <div className={cat === "listings" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 px-1 pb-1 pt-4" : "space-y-2 px-1 pb-1 pt-4"}>
+                          <div className={cat === "listings" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 px-1 pb-1 pt-4" : cat === "studio" ? "grid grid-cols-1 items-stretch gap-3 px-1 pb-1 pt-4 md:grid-cols-3" : "space-y-2 px-1 pb-1 pt-4"}>
                             {cat === "business" && (
                               <div className="w-full">
                                 <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-2 px-1">Phase 1: Establishing Foundation</p>
@@ -1098,6 +1098,9 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
                                     </span>
                                   ) : null}
                                   <div className={`flex-1 space-y-1 ${cat === "business" && socialOffLabel ? "pr-16" : ""}`}>
+                                    {cat === "studio" && s.image ? (
+                                      <img src={s.image} alt={s.imageAlt || s.name} className="mb-3 h-28 w-full rounded-xl object-cover" />
+                                    ) : null}
                                     <h4 className="font-black text-black uppercase text-[11px] leading-tight">{s.name}</h4>
                                     <p className="text-[10px] text-gray-500 leading-relaxed line-clamp-2">{s.description}</p>
                                   </div>

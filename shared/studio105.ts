@@ -11,6 +11,7 @@ export const STUDIO105_PATHS = {
   rooms: "/studio-105/rooms",
   noir: "/studio-105/noir",
   blanc: "/studio-105/blanc",
+  podcast: "/studio-105/podcast",
   rates: "/studio-105/rates",
   faq: "/studio-105/faq",
   location: "/studio-105/location",
@@ -22,6 +23,7 @@ export const STUDIO105_APP_SOURCES = [
   STUDIO105_PATHS.rooms,
   STUDIO105_PATHS.noir,
   STUDIO105_PATHS.blanc,
+  STUDIO105_PATHS.podcast,
   STUDIO105_PATHS.rates,
   STUDIO105_PATHS.faq,
   STUDIO105_PATHS.location,
@@ -29,13 +31,44 @@ export const STUDIO105_APP_SOURCES = [
 ] as const;
 
 export const STUDIO105_SEO_DESCRIPTION =
-  "Studio Noir and Studio Blanc at Studio 105 in Spring, Texas. Request a room and a time. We confirm availability and the rate.";
+  "Studio Noir, Studio Blanc, and the Podcast setup at Studio 105 in Spring, Texas. Request a room and a time. We confirm availability and the rate.";
 
 /** Saved on the booking as leadSource. The API uses this to skip client mail. */
 export const STUDIO105_LEAD_SOURCE = "Studio 105";
 
-export const STUDIO_ROOM_IDS = ["studio-noir", "studio-blanc"] as const;
+export const STUDIO_ROOM_IDS = ["studio-noir", "studio-blanc", "studio-podcast"] as const;
 export type StudioRoomId = (typeof STUDIO_ROOM_IDS)[number];
+
+/** Catalog id for the podcast setup. Staff edit the price on this package. */
+export const STUDIO_PODCAST_ID = "studio-podcast";
+
+/** Admin order studio value. The orders tile already labels this Podcast Studio. */
+export const STUDIO_PODCAST_ADMIN_ID = "podcast-studio";
+
+/** Existing library still. Not a generated image. */
+export const STUDIO_PODCAST_IMAGE = "/media/home-v2/lifestyle/podcast-set-wide.jpg";
+export const STUDIO_PODCAST_IMAGE_ALT = "The Iconic podcast set, cameras and lights";
+
+/**
+ * Placeholder until staff set a catalog price. Same shape as Noir and Blanc:
+ * price 0, no separate duration, rate confirmed when the hold is set.
+ */
+export const STUDIO_PODCAST_DESCRIPTION =
+  "Podcast setup in Studio 105. Rate confirmed when the hold is set.";
+
+export function podcastCatalogFields(
+  packages: Array<{ id?: string; bookingId?: string; name?: string; price?: unknown; description?: string }>,
+): { name: string; price: number; description: string } {
+  const seed = { name: "Podcast", price: 0, description: STUDIO_PODCAST_DESCRIPTION };
+  const live = packages.find((item) => item?.id === STUDIO_PODCAST_ID || item?.bookingId === STUDIO_PODCAST_ID);
+  if (!live) return seed;
+  const amount = typeof live.price === "number" ? live.price : Number(live.price);
+  return {
+    name: typeof live.name === "string" && live.name.trim() ? live.name.trim() : seed.name,
+    price: Number.isFinite(amount) && amount > 0 ? amount : 0,
+    description: typeof live.description === "string" && live.description.trim() ? live.description.trim() : seed.description,
+  };
+}
 
 export function isStudioRoomId(value: string): value is StudioRoomId {
   return (STUDIO_ROOM_IDS as readonly string[]).includes(value);

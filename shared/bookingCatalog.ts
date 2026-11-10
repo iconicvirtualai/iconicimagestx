@@ -798,6 +798,8 @@ export interface BookingOfferService {
   isPopular?: boolean;
   highlights?: string;
   phase?: 1 | 2;
+  image?: string;
+  imageAlt?: string;
 }
 
 export interface BookingOffer {
@@ -875,6 +877,7 @@ function collectBookingOffer(
         isPopular: known?.isPopular,
         highlights: known?.highlights,
         phase: known?.phase,
+        ...(known?.image ? { image: known.image, imageAlt: known.imageAlt || pkg.name } : {}),
       });
       continue;
     }

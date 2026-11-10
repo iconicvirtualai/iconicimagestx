@@ -43,6 +43,10 @@ describe("Studio 105 microsite", () => {
     expect(home).toContain("Iconic Images");
     expect(home).toContain("Studio Noir");
     expect(home).toContain("Studio Blanc");
+    expect(home).toContain("Podcast");
+    expect(home).toContain("/media/home-v2/lifestyle/podcast-set-wide.jpg");
+    expect(home).toContain("md:grid-cols-3");
+    expect(home).toContain("grid-cols-1");
     expect(home).toContain("does not charge a card");
     expect(home).toContain(BUSINESS_CONTACT.address);
     expect(home).not.toContain("Book Now");
@@ -54,6 +58,8 @@ describe("Studio 105 microsite", () => {
     );
     expect(book).toContain('data-testid="studio105-book-form"');
     expect(book).toContain("Studio Blanc");
+    expect(book).toContain("Podcast");
+    expect(book).toContain('data-testid="studio105-order-summary"');
     expect(book).toContain("does not charge a card");
     expect(metaPlan("/studio-105/book").kind).toBe("public");
   });

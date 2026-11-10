@@ -239,6 +239,7 @@ describe("conversion helpers", () => {
   it("maps Studio Noir and Studio Blanc to studio_request", () => {
     expect(isStudioRequestPackage("studio-noir")).toBe(true);
     expect(isStudioRequestPackage("studio-blanc")).toBe(true);
+    expect(isStudioRequestPackage("studio-podcast")).toBe(true);
     expect(isStudioRequestPackage("listing-essentials")).toBe(false);
     expect(conversionForBooking({ packageId: "studio-noir", value: 0 }).name).toBe("studio_request");
     expect(conversionForBooking({ packageId: "studio-blanc", value: 0 }).name).toBe("studio_request");
