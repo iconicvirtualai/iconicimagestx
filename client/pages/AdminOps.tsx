@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import AdminLayout from "@/components/AdminLayout";
 import { OpsBoard } from "@/components/ops/OpsBoard";
 import { useAuth } from "@/contexts/AuthContext";
@@ -38,8 +38,18 @@ export default function AdminOps() {
   const role = staffProfile?.role || "";
   const canUpload = role === "admin" || role === "coordinator" || role === "photographer";
 
+  const sample = params.get("sample") === "1";
   const load = useCallback(async () => {
     if (!user) return;
+    if (sample) {
+      setDemo(true);
+      setDemoBoard(sampleOpsBoard());
+      setListings([]);
+      setStudioJobs([]);
+      setRows([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const token = await user.getIdToken();
@@ -79,7 +89,7 @@ export default function AdminOps() {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, sample]);
 
   useEffect(() => {
     void load();
@@ -144,6 +154,14 @@ export default function AdminOps() {
 
   return (
     <AdminLayout title="Shoots">
+      <div className="mb-4 flex justify-end">
+        <Link
+          to={sample ? "/admin/ops" : "/admin/ops?sample=1&stage=uploads&job=sampleUpload001"}
+          className="text-xs font-bold uppercase tracking-widest text-[#0d9488]"
+        >
+          {sample ? "Live shoots" : "View sample"}
+        </Link>
+      </div>
       {loading ? (
         <div className="flex items-center justify-center py-24">
           <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#0d9488] border-t-transparent" />

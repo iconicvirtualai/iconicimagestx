@@ -9,11 +9,16 @@ import {
   readTaskBoardOverlay,
   reorderTasks,
   sampleTaskBoard,
+  chunkItems,
+  describeTaskBoardSaveError,
   taskBoardStats,
+  taskBoardWriteData,
   taskFilterCounts,
   taskRemovalWrite,
   taskToOverlay,
+  withRestored,
   withStage,
+  withoutTasks,
   type TaskBoardTask,
 } from "./taskBoard";
 
@@ -52,6 +57,9 @@ describe("task board derivation", () => {
       overlays: [{ ...taskToOverlay(task), dismissed: true, fingerprint: task.fingerprint }],
     });
     expect(hidden.tasks).toHaveLength(0);
+    expect(hidden.cleared).toHaveLength(1);
+    expect(hidden.cleared[0].dismissed).toBe(true);
+    expect(hidden.cleared[0].orderHref).toBe(task.orderHref);
 
     const returned = buildTaskBoard({
       orderRequests: [{ ...unscheduled(), status: "new" }],
@@ -221,6 +229,44 @@ describe("task board derivation", () => {
     const reordered = reorderTasks(board.tasks, manual[0].id, manual[2].id);
     expect(reordered.find((task) => task.id === manual[0].id)?.sort).not.toBe(manual[0].sort);
     expect(board.tasks.map((task) => task.sort)).toEqual(before);
+  });
+
+  it("clears selected tasks without dropping order links and restores them", () => {
+    const board = sampleTaskBoard(TODAY);
+    const ids = board.tasks.filter((task) => task.origin === "schedule").map((task) => task.id);
+    const cleared = withoutTasks(board.tasks, ids);
+    expect(cleared.removed.length).toBe(ids.length);
+    expect(cleared.removed.every((task) => task.dismissed && task.orderHref)).toBe(true);
+    expect(cleared.tasks.some((task) => ids.includes(task.id))).toBe(false);
+    const restored = withRestored(cleared.tasks, cleared.removed, ids);
+    expect(restored.some((task) => ids.includes(task.id) && !task.dismissed)).toBe(true);
+    expect(chunkItems(ids.concat(ids), 3)).toHaveLength(Math.ceil((ids.length * 2) / 3));
+  });
+
+  it("writes a Firestore document without undefined fields", () => {
+    const task = sampleTaskBoard(TODAY).tasks[0];
+    const dirty = {
+      ...task,
+      sort: Number.NaN,
+      contentKind: undefined,
+      activity: [{ at: "2026-11-08T15:00:00.000Z", text: "Moved", sample: undefined }],
+    } as TaskBoardTask;
+    const data = taskBoardWriteData(dirty);
+    expect(JSON.stringify(data)).not.toContain("undefined");
+    expect(data.sort).toBeNull();
+    expect(data.eventId).toBeNull();
+    const activity = data.activity as Array<Record<string, unknown>>;
+    expect(activity[0]).toEqual({ at: "2026-11-08T15:00:00.000Z", text: "Moved" });
+    expect("sample" in activity[0]).toBe(false);
+  });
+
+  it("names the save failure", () => {
+    expect(describeTaskBoardSaveError(Object.assign(new Error("Missing or insufficient permissions."), { code: "permission-denied" })).summary)
+      .toContain("permission-denied");
+    expect(describeTaskBoardSaveError(Object.assign(new Error("Unsupported field value: undefined"), { code: "invalid-argument" })).summary)
+      .toContain("validation");
+    expect(describeTaskBoardSaveError(Object.assign(new Error("missing staff auth token"), { code: "unauthenticated" })).summary)
+      .toContain("unauthenticated");
   });
 
   it("removes the task record only", () => {

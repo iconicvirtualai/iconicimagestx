@@ -19,6 +19,7 @@ function renderBoard(view: "list" | "board" = "list") {
         sample
         emailNotice={model.emailNotice}
         sourceErrors={[]}
+        cleared={[]}
         view={view}
         selectedId={null}
         onView={() => undefined}
@@ -31,6 +32,8 @@ function renderBoard(view: "list" | "board" = "list") {
         onStage={() => undefined}
         onReorder={() => undefined}
         onCreate={() => undefined}
+        onClear={() => undefined}
+        onRestore={() => undefined}
       />
     </MemoryRouter>,
   );
@@ -58,6 +61,9 @@ describe("task board view", () => {
     expect(html).toContain("does not open the mailbox");
     expect(html).toContain("does not send email");
     expect(html).toContain("Delete removes this task only");
+    expect(html).toContain("Select all");
+    expect(html).toContain('data-testid="task-select"');
+    expect(html).toContain('data-testid="task-show-cleared"');
   });
 
   it("uses the same tasks on the board", () => {

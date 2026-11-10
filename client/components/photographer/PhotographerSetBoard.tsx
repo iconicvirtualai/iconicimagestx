@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, type PointerEvent as ReactPointerEvent } from "react";
 import { Link } from "react-router-dom";
 import { hdrBracketGroups } from "@shared/gallerySequence";
 import { studioEditorHref } from "@shared/studioEditorHref";
 import { sequenceNamesFor, type WorkingShot } from "@/lib/photoOrder";
+import { DragGhost, dragDropClass, type DragGhostModel } from "@/components/drag/DragGhost";
 
 export default function PhotographerSetBoard({
   listingId,
@@ -28,6 +29,38 @@ export default function PhotographerSetBoard({
   onExportZip: () => void;
 }) {
   const [dragKey, setDragKey] = useState("");
+  const [ghost, setGhost] = useState<DragGhostModel | null>(null);
+
+  function beginDrag(event: ReactPointerEvent, shot: WorkingShot) {
+    if (event.button !== 0) return;
+    const target = event.target;
+    if (target instanceof Element && target.closest("button, a, input, label")) return;
+    const originX = event.clientX;
+    const originY = event.clientY;
+    let active = false;
+    let over = "";
+    const move = (pointer: PointerEvent) => {
+      if (!active && Math.hypot(pointer.clientX - originX, pointer.clientY - originY) < 8) return;
+      active = true;
+      const hit = document.elementFromPoint(pointer.clientX, pointer.clientY);
+      const card = hit instanceof Element ? hit.closest("[data-shot-key]") : null;
+      const next = card?.getAttribute("data-shot-key") || "";
+      if (next && next !== shot.key) over = next;
+      setDragKey(over);
+      setGhost({ x: pointer.clientX, y: pointer.clientY, title: shot.name, imageUrl: shot.url });
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+      setGhost(null);
+      setDragKey("");
+      if (active && over && over !== shot.key) onReorder(shot.key, over);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+  }
   const names = sequenceNamesFor(shots, address || "listing");
   const nameByKey = new Map(names.map((item) => [item.key, item.name]));
   const groups = hdrBracketGroups(shots.map((shot) => ({
@@ -38,6 +71,7 @@ export default function PhotographerSetBoard({
 
   return (
     <section data-testid="photographer-set" className="mb-6 rounded-[2rem] border border-gray-100 bg-white p-6 shadow-sm">
+      <DragGhost ghost={ghost} />
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="text-sm font-black uppercase tracking-widest">Shoot order</h2>
@@ -94,16 +128,13 @@ export default function PhotographerSetBoard({
             <article
               key={shot.key}
               data-testid={`set-shot-${shot.key}`}
-              draggable
-              onDragStart={() => setDragKey(shot.key)}
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={() => {
-                if (dragKey) onReorder(dragKey, shot.key);
-                setDragKey("");
-              }}
-              className={`overflow-hidden rounded-2xl border bg-gray-50 ${shot.culled ? "border-red-200 opacity-60" : "border-gray-100"}`}
+              data-shot-key={shot.key}
+              data-drop={dragKey === shot.key ? "true" : "false"}
+              onPointerDown={(event) => beginDrag(event, shot)}
+              style={{ touchAction: "none" }}
+              className={`overflow-hidden rounded-2xl border bg-gray-50 ${shot.culled ? "border-red-200 opacity-60" : "border-gray-100"} ${dragKey === shot.key ? `mt-3 ${dragDropClass(true)}` : ""}`}
             >
-              <img src={shot.url} alt={shot.name} className="aspect-[4/3] w-full object-cover" />
+              <img src={shot.url} alt={shot.name} draggable={false} className="aspect-[4/3] w-full object-cover" />
               <div className="space-y-1 p-2">
                 <p className="truncate text-[11px] font-bold text-gray-800">{shot.name}</p>
                 <p data-testid={`sequence-name-${shot.key}`} className="truncate text-[10px] font-black uppercase tracking-widest text-[#0d9488]">

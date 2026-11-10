@@ -182,7 +182,8 @@ export function AdminOrdersBrowser({
           )}
           <PerPage value={sect1.perPage} onChange={(perPage) => setSect1({ ...sect1, perPage })} />
           <SelectVisible
-            ids={idsOf(actionShown)}
+            testId="orders-select-all-action"
+            ids={idsOf(actionSearched)}
             selection={selection}
             onSelectIds={onSelectIds}
           />
@@ -216,7 +217,7 @@ export function AdminOrdersBrowser({
             </>
           )}
           <PerPage value={sect2.perPage} onChange={(perPage) => setSect2({ ...sect2, perPage })} />
-          <SelectVisible ids={idsOf(activeShown)} selection={selection} onSelectIds={onSelectIds} />
+          <SelectVisible testId="orders-select-all-active" ids={idsOf(activeSearched)} selection={selection} onSelectIds={onSelectIds} />
         </SectionHeader>
         {!sect2.collapsed && (view === "list" ? renderList("active", activeShown as any) : renderTiles(activeShown))}
       </section>
@@ -233,7 +234,7 @@ export function AdminOrdersBrowser({
         >
           <SearchBox label="Search archives" value={sect3.search} onChange={(search) => setSect3({ ...sect3, search })} />
           <PerPage value={sect3.perPage} onChange={(perPage) => setSect3({ ...sect3, perPage })} />
-          <SelectVisible ids={idsOf(archivedShown)} selection={selection} onSelectIds={onSelectIds} />
+          <SelectVisible testId="orders-select-all-archived" ids={idsOf(archivedSearched)} selection={selection} onSelectIds={onSelectIds} />
         </SectionHeader>
         {!sect3.collapsed && (
           <div className="opacity-70">
@@ -336,20 +337,23 @@ function SelectVisible({
   ids,
   selection,
   onSelectIds,
+  testId,
 }: {
   ids: string[];
   selection: Set<string>;
   onSelectIds: (ids: string[]) => void;
+  testId?: string;
 }) {
   return (
     <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-500">
       <input
         type="checkbox"
+        data-testid={testId}
         onChange={() => onSelectIds(ids)}
         checked={ids.length > 0 && ids.every((id) => selection.has(id))}
         className="h-4 w-4 rounded border-gray-300 text-[#0d9488] focus:ring-[#0d9488]"
       />
-      Select
+      Select all
     </label>
   );
 }

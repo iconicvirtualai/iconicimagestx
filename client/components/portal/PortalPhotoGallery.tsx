@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { Check, ChevronLeft, ChevronRight, Download, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { DragGhost, dragDropClass, type DragGhostModel } from "@/components/drag/DragGhost";
 import { galleryHttpUrl } from "@/components/gallery/clientGalleryMedia";
 import {
   PHOTO_EDIT_NOTE_LIMIT,
@@ -46,6 +47,7 @@ export function PortalPhotoGallery({
   const [noteOpen, setNoteOpen] = useState(false);
   const [note, setNote] = useState("");
   const [dropId, setDropId] = useState("");
+  const [ghost, setGhost] = useState<DragGhostModel | null>(null);
   const [slides, setSlides] = useState<Record<string, number>>({});
   const [scale, setScale] = useState(0);
   const [scaleReady, setScaleReady] = useState(false);
@@ -165,6 +167,13 @@ export function PortalPhotoGallery({
       const hit = document.elementFromPoint(ev.clientX, ev.clientY);
       const card = hit instanceof Element ? hit.closest("[data-photo-id]") : null;
       setDropId(card?.getAttribute("data-photo-id") || "");
+      const source = flat.find((item) => item.id === id);
+      setGhost({
+        x: ev.clientX,
+        y: ev.clientY,
+        title: source?.name || "Photo",
+        imageUrl: source?.url || undefined,
+      });
     }
 
     function up(ev: PointerEvent) {
@@ -173,6 +182,7 @@ export function PortalPhotoGallery({
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
       window.removeEventListener("pointercancel", up);
+      setGhost(null);
       if (swipe) {
         suppressClick.current = true;
         nudge(id, swipe, slideCount);
@@ -211,7 +221,7 @@ export function PortalPhotoGallery({
         key={`${mode}-${item.id}`}
         data-photo-id={mode === "gallery" ? item.id : undefined}
         data-testid={mode === "gallery" ? `media-photo-${item.id}` : `revision-card-${item.id}`}
-        className={`min-w-0 ${item.hidden ? "opacity-80" : ""} ${mode === "gallery" && dropId === item.id ? "rounded-lg ring-2 ring-[#0d9488]" : ""} ${isSelected ? "rounded-lg ring-2 ring-black" : ""}`}
+        className={`min-w-0 ${item.hidden ? "opacity-80" : ""} ${mode === "gallery" && dropId === item.id ? `mt-3 rounded-lg ${dragDropClass(true)}` : ""} ${isSelected ? "rounded-lg ring-2 ring-black" : ""}`}
       >
         <PhotoTile
           item={item}
@@ -244,6 +254,7 @@ export function PortalPhotoGallery({
 
   return (
     <section>
+      <DragGhost ghost={ghost} />
       <div className="mb-3">
         <h2 className="text-xs font-black uppercase tracking-widest text-[#0d9488]">Photos</h2>
         <p className="mt-1 text-xs text-gray-500">

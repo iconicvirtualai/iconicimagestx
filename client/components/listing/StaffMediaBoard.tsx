@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { DragGhost, dragDropClass, type DragGhostModel } from "@/components/drag/DragGhost";
 import {
   createSection,
   deleteSection,
@@ -53,6 +54,7 @@ export function StaffMediaBoard({
   const [moveTarget, setMoveTarget] = useState("");
   const [error, setError] = useState("");
   const [saveError, setSaveError] = useState("");
+  const [ghost, setGhost] = useState<DragGhostModel | null>(null);
   const stopDrag = useRef<(() => void) | null>(null);
 
   if (savedKey !== baseline) {
@@ -119,11 +121,20 @@ export function StaffMediaBoard({
       const next = element?.getAttribute("data-media-id") || "";
       if (next && !draggingIds.includes(next)) over = next;
       setDropId(over);
+      const source = media.find((item) => item.id === id);
+      setGhost({
+        x: pointer.clientX,
+        y: pointer.clientY,
+        title: source?.name || "Media",
+        subtitle: draggingIds.length > 1 ? `${draggingIds.length} files` : source?.kind,
+        imageUrl: source?.url || undefined,
+      });
     };
     const up = (pointer: PointerEvent) => {
       stopDrag.current?.();
       stopDrag.current = null;
       setDropId("");
+      setGhost(null);
       if (!dragging) {
         selectAt(id, pointer);
         return;
@@ -154,6 +165,7 @@ export function StaffMediaBoard({
 
   return (
     <div data-testid="staff-media-board" className="mt-6">
+      <DragGhost ghost={ghost} />
       <div className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-gray-100 bg-gray-50 p-3">
         <label className="flex min-w-[180px] flex-1 items-center gap-3 text-[10px] font-black uppercase tracking-widest text-gray-500">
           Size
@@ -334,7 +346,7 @@ export function StaffMediaBoard({
                       data-media-id={item.id}
                       data-selected={isSelected ? "true" : "false"}
                       data-drop={dropId === item.id ? "true" : "false"}
-                      className={`overflow-hidden rounded-2xl border bg-white ${isSelected ? "border-black ring-2 ring-black" : "border-gray-100"} ${dropId === item.id ? "border-[#0d9488]" : ""}`}
+                      className={`overflow-hidden rounded-2xl border bg-white ${isSelected ? "border-black ring-2 ring-black" : "border-gray-100"} ${dropId === item.id ? `mt-3 ${dragDropClass(true)}` : ""}`}
                       style={{ touchAction: "none" }}
                       onPointerDown={(event) => onPointerDown(event, item.id)}
                     >

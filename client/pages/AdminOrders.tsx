@@ -45,6 +45,7 @@ export default function AdminOrders() {
   const [selection, setSelection] = React.useState<Set<string>>(new Set());
   const [staff, setStaff] = React.useState<any[]>([]);
   const [isBulkScheduling, setIsBulkScheduling] = React.useState(false);
+  const [archiveConfirm, setArchiveConfirm] = React.useState(false);
   const [isBulkProjecting, setIsBulkProjecting] = React.useState(false);
   const [bulkProjectType, setBulkProjectType] = React.useState<"real_estate" | "business">("real_estate");
 
@@ -77,6 +78,47 @@ export default function AdminOrders() {
     setSelection(next);
   };
 
+  const writeOrderStatus = async (ids: string[], statusFor: (id: string) => string) => {
+    const size = 400;
+    for (let index = 0; index < ids.length; index += size) {
+      const batch = writeBatch(db);
+      ids.slice(index, index + size).forEach((id) => {
+        batch.update(doc(db, "orderRequests", id), { status: statusFor(id), updatedAt: serverTimestamp() });
+      });
+      await batch.commit();
+    }
+  };
+
+  const archiveSelected = async () => {
+    const ids = Array.from(selection);
+    if (ids.length === 0) return;
+    const prior = new Map(ids.map((id) => {
+      const order = orders.find((item) => item.id === id);
+      const status = typeof order?.status === "string" && order.status ? order.status : "submitted";
+      return [id, status] as const;
+    }));
+    setArchiveConfirm(false);
+    try {
+      await writeOrderStatus(ids, () => "archived");
+      toast.success(`Archived ${ids.length} orders.`, {
+        action: {
+          label: "Undo",
+          onClick: () => {
+            void writeOrderStatus(ids, (id) => prior.get(id) || "submitted").catch((err) => {
+              console.error("[AdminOrders] Undo archive failed.", err);
+              toast.error("Could not undo that archive.");
+            });
+          },
+        },
+      });
+      setSelection(new Set());
+    } catch (err) {
+      console.error("[AdminOrders] Archive failed.", err);
+      const code = err && typeof err === "object" && "code" in err ? String((err as { code?: unknown }).code) : "";
+      toast.error(code ? `Could not archive those orders (${code}).` : "Could not archive those orders.");
+    }
+  };
+
   const handleBulkStatus = async (status: string) => {
     if (selection.size === 0) return;
     if (status === "cancelled") {
@@ -101,11 +143,14 @@ export default function AdminOrders() {
       setSelection(new Set());
       return;
     }
-    const batch = writeBatch(db);
-    selection.forEach(id => batch.update(doc(db, "orderRequests", id), { status, updatedAt: serverTimestamp() }));
-    await batch.commit();
-    toast.success(`Updated ${selection.size} orders.`);
-    setSelection(new Set());
+    try {
+      await writeOrderStatus(Array.from(selection), () => status);
+      toast.success(`Updated ${selection.size} orders.`);
+      setSelection(new Set());
+    } catch (err) {
+      console.error("[AdminOrders] Bulk status failed.", err);
+      toast.error("Could not update those orders.");
+    }
   };
 
   const handleBulkProject = async () => {
@@ -231,6 +276,19 @@ export default function AdminOrders() {
       )}
 
       {/* ── BULK ACTION BAR ── */}
+      {archiveConfirm && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="orders-archive-title" data-testid="orders-archive-confirm">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <h3 id="orders-archive-title" className="text-lg font-semibold text-slate-950">Archive {selection.size} orders?</h3>
+            <p className="mt-2 text-sm text-slate-600">They move to Archives. Order data is not deleted. You can undo this from the notice, or find them under Archives.</p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setArchiveConfirm(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600">Cancel</button>
+              <button type="button" data-testid="orders-archive-confirm-button" onClick={() => { void archiveSelected(); }} className="rounded-xl bg-black px-4 py-2 text-xs font-bold text-white">Archive {selection.size}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {selection.size > 0 && (
         <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-4 duration-300">
           <div className="bg-black text-white px-6 py-4 rounded-3xl shadow-2xl border border-white/10 flex flex-wrap items-center gap-4 max-w-[calc(100vw-2rem)]">
@@ -239,7 +297,7 @@ export default function AdminOrders() {
               <span className="text-xs font-bold uppercase tracking-wider">Orders Selected</span>
             </div>
             <div className="flex items-center gap-4">
-              <button onClick={() => handleBulkStatus("archived")} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest hover:text-[#0d9488] transition-colors"><Archive className="w-4 h-4" /> Archive</button>
+              <button type="button" onClick={() => setArchiveConfirm(true)} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest hover:text-[#0d9488] transition-colors"><Archive className="w-4 h-4" /> Archive</button>
               <button onClick={() => handleBulkStatus("cancelled")} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest hover:text-red-500 transition-colors"><X className="w-4 h-4" /> Cancel</button>
               <div className="flex rounded-xl bg-white/10 p-0.5" role="group" aria-label="Project type">
                 <button type="button" onClick={() => setBulkProjectType("real_estate")} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest ${bulkProjectType === "real_estate" ? "bg-[#0d9488] text-white" : "text-gray-300"}`}>Real Estate</button>

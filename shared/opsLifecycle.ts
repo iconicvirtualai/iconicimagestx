@@ -248,7 +248,10 @@ export function sampleOpsBoard(today = "2026-10-27"): OpsJob[] {
         photographerName: "Sample Photographer",
         apptDate: "2026-10-20",
         apptTime: "1:00 PM",
-        images: [{ name: "front.jpg" }, { name: "kitchen.jpg" }],
+        images: [
+          { name: "front.jpg", url: "/media/photos/luxury-exterior.jpg" },
+          { name: "kitchen.jpg", url: "/media/photos/luxury-interior.jpg" },
+        ],
       },
       {
         id: "sampleReview001",

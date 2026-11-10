@@ -1,6 +1,7 @@
-import { useRef, useState, type DragEvent, type FormEvent } from "react";
+import { useRef, useState, type FormEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { Link } from "react-router-dom";
 import { GripVertical, Plus, Search, Trash2, X } from "lucide-react";
+import { DragGhost, dragDropClass, type DragGhostModel } from "@/components/drag/DragGhost";
 import {
   TASK_PRIORITIES,
   TASK_PRIORITY_LABEL,
@@ -11,6 +12,7 @@ import {
   displayTasks,
   dueLabel,
   isOverdue,
+  isTaskStage,
   manualOrderSaved,
   shortName,
   taskBoardStats,
@@ -37,6 +39,7 @@ export function TaskBoardView({
   sample,
   emailNotice,
   sourceErrors,
+  cleared,
   view,
   selectedId,
   onView,
@@ -49,6 +52,8 @@ export function TaskBoardView({
   onStage,
   onReorder,
   onCreate,
+  onClear,
+  onRestore,
 }: {
   tasks: TaskBoardTask[];
   staff: TaskAssignee[];
@@ -57,6 +62,7 @@ export function TaskBoardView({
   sample: boolean;
   emailNotice: string;
   sourceErrors: string[];
+  cleared: TaskBoardTask[];
   view: "list" | "board";
   selectedId: string | null;
   onView: (view: "list" | "board") => void;
@@ -69,16 +75,29 @@ export function TaskBoardView({
   onStage: (id: string, stage: TaskStage) => void;
   onReorder: (activeId: string, overId: string) => void;
   onCreate: (input: { title: string; assignee: TaskAssignee | null; priority: TaskPriority; dueOn: string | null; stage: TaskStage }) => void;
+  onClear: (ids: string[]) => void;
+  onRestore: (ids: string[]) => void;
 }) {
   const [filter, setFilter] = useState<TaskFilter>("all");
   const [query, setQuery] = useState("");
   const [prioritySort, setPrioritySort] = useState(false);
   const [adding, setAdding] = useState(false);
   const [hiddenDetail, setHiddenDetail] = useState(false);
-  const dragId = useRef<string | null>(null);
+  const [showCleared, setShowCleared] = useState(false);
+  const [picked, setPicked] = useState<string[]>([]);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [ghost, setGhost] = useState<DragGhostModel | null>(null);
+  const [dropTarget, setDropTarget] = useState<{ id: string; column: string } | null>(null);
+  const suppressClick = useRef(false);
   const stats = taskBoardStats(tasks, today);
   const counts = taskFilterCounts(tasks, meId, today);
-  const visible = displayTasks(tasks, { filter, meId, today, query, prioritySort });
+  const shown = showCleared
+    ? [...tasks, ...cleared.filter((task) => !tasks.some((item) => item.id === task.id))]
+    : tasks;
+  const visible = displayTasks(shown, { filter, meId, today, query, prioritySort });
+  const visibleIds = visible.map((task) => task.id);
+  const clearIds = picked.filter((id) => visible.some((task) => task.id === id && !task.dismissed));
+  const restoreIds = picked.filter((id) => visible.some((task) => task.id === id && task.dismissed));
   const selected = hiddenDetail
     ? null
     : tasks.find((task) => task.id === selectedId)
@@ -88,12 +107,103 @@ export function TaskBoardView({
   const saved = manualOrderSaved(tasks);
 
   const choose = (id: string) => {
+    if (suppressClick.current) {
+      suppressClick.current = false;
+      return;
+    }
     setHiddenDetail(false);
     onSelect(id);
   };
 
+  const togglePick = (id: string) => {
+    setPicked((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
+  };
+
+  const selectIds = (ids: string[]) => {
+    setPicked((current) => {
+      const all = ids.length > 0 && ids.every((id) => current.includes(id));
+      if (all) return current.filter((id) => !ids.includes(id));
+      return [...new Set([...current, ...ids])];
+    });
+  };
+
+  const startPointerDrag = (event: ReactPointerEvent, task: TaskBoardTask) => {
+    if (event.button !== 0) return;
+    const target = event.target;
+    if (target instanceof Element && target.closest("a, input, select, textarea, label")) return;
+    if (target instanceof Element && target.closest("button") && !target.closest("[data-drag-handle]")) return;
+    const originX = event.clientX;
+    const originY = event.clientY;
+    let active = false;
+    const move = (pointer: PointerEvent) => {
+      if (!active && Math.hypot(pointer.clientX - originX, pointer.clientY - originY) < 8) return;
+      active = true;
+      const hit = document.elementFromPoint(pointer.clientX, pointer.clientY);
+      const card = hit instanceof Element ? hit.closest("[data-task-id]") : null;
+      const column = hit instanceof Element ? hit.closest("[data-task-column]") : null;
+      const overId = card?.getAttribute("data-task-id") || "";
+      setDropTarget({
+        id: overId === task.id ? "" : overId,
+        column: column?.getAttribute("data-task-column") || "",
+      });
+      setGhost({ x: pointer.clientX, y: pointer.clientY, title: task.title, subtitle: task.sourceLine });
+    };
+    const up = (pointer: PointerEvent) => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+      setGhost(null);
+      setDropTarget(null);
+      if (!active) return;
+      suppressClick.current = true;
+      const hit = document.elementFromPoint(pointer.clientX, pointer.clientY);
+      const card = hit instanceof Element ? hit.closest("[data-task-id]") : null;
+      const column = hit instanceof Element ? hit.closest("[data-task-column]") : null;
+      const overId = card?.getAttribute("data-task-id") || "";
+      const overColumn = column?.getAttribute("data-task-column") || "";
+      const overTask = tasks.find((item) => item.id === overId) || cleared.find((item) => item.id === overId);
+      if (view === "board") {
+        const nextStage = overTask ? columnStage(overTask) : (isTaskStage(overColumn) ? overColumn : null);
+        if (nextStage && nextStage !== columnStage(task)) onStage(task.id, nextStage);
+        else if (!prioritySort && overId && overId !== task.id) onReorder(task.id, overId);
+        return;
+      }
+      if (!prioritySort && overId && overId !== task.id) onReorder(task.id, overId);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+  };
+
   return (
     <div data-testid="task-board" className="min-w-0 text-slate-900">
+      <DragGhost ghost={ghost} />
+      {confirmClear ? (
+        <div className="fixed inset-0 z-[70] flex items-start justify-center bg-black/50 p-4 pt-52" role="dialog" aria-modal="true" aria-labelledby="task-clear-title" data-testid="task-clear-confirm">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <h3 id="task-clear-title" className="text-lg font-semibold text-slate-950">Clear {clearIds.length} from the board?</h3>
+            <p className="mt-2 text-sm text-slate-600">
+              This hides the selected cards. Orders, galleries, and deliveries stay. Turn on Show cleared to bring them back.
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setConfirmClear(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600">Cancel</button>
+              <button
+                type="button"
+                data-testid="task-clear-confirm-button"
+                onClick={() => {
+                  const ids = clearIds;
+                  setConfirmClear(false);
+                  setPicked((current) => current.filter((id) => !ids.includes(id)));
+                  onClear(ids);
+                }}
+                className="rounded-xl bg-black px-4 py-2 text-xs font-bold text-white"
+              >
+                Clear {clearIds.length}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -154,7 +264,7 @@ export function TaskBoardView({
           </div>
 
           <div className="space-y-3 px-4 py-3">
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap items-center gap-1.5">
               {FILTERS.map((item) => (
                 <button
                   key={item.id}
@@ -165,6 +275,47 @@ export function TaskBoardView({
                   {item.label} {counts[item.id]}
                 </button>
               ))}
+              <button
+                type="button"
+                data-testid="task-select-all"
+                aria-pressed={visibleIds.length > 0 && visibleIds.every((id) => picked.includes(id))}
+                onClick={() => selectIds(visibleIds)}
+                className="rounded-full border border-slate-200 px-3 py-1 text-[11px] font-semibold text-slate-700"
+              >
+                Select all
+              </button>
+              <button
+                type="button"
+                data-testid="task-show-cleared"
+                aria-pressed={showCleared}
+                onClick={() => setShowCleared((current) => !current)}
+                className={`rounded-full px-3 py-1 text-[11px] font-semibold ${showCleared ? "bg-[#0d9488] text-white" : "border border-slate-200 text-slate-600"}`}
+              >
+                Show cleared {cleared.length ? `(${cleared.length})` : ""}
+              </button>
+              {clearIds.length > 0 ? (
+                <button
+                  type="button"
+                  data-testid="task-clear-selected"
+                  onClick={() => setConfirmClear(true)}
+                  className="rounded-full bg-black px-3 py-1 text-[11px] font-semibold text-white"
+                >
+                  Clear selected ({clearIds.length})
+                </button>
+              ) : null}
+              {restoreIds.length > 0 ? (
+                <button
+                  type="button"
+                  data-testid="task-restore-selected"
+                  onClick={() => {
+                    onRestore(restoreIds);
+                    setPicked((current) => current.filter((id) => !restoreIds.includes(id)));
+                  }}
+                  className="rounded-full border border-[#0d9488] px-3 py-1 text-[11px] font-semibold text-[#0d9488]"
+                >
+                  Restore selected ({restoreIds.length})
+                </button>
+              ) : null}
             </div>
             <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
               <label className="relative min-w-0 flex-1">
@@ -218,15 +369,18 @@ export function TaskBoardView({
               today={today}
               selectedId={selected?.id || null}
               prioritySort={prioritySort}
-              dragId={dragId}
+              picked={picked}
+              dropId={dropTarget?.id || ""}
               onSelect={choose}
               onToggle={onToggle}
+              onTogglePick={togglePick}
               onDelete={onDelete}
+              onRestore={onRestore}
               onAssign={onAssign}
               onPriority={onPriority}
               onDue={onDue}
               onStage={onStage}
-              onReorder={onReorder}
+              onDragStart={startPointerDrag}
             />
           ) : (
             <TaskBoard
@@ -234,10 +388,12 @@ export function TaskBoardView({
               tasks={visible}
               today={today}
               selectedId={selected?.id || null}
-              dragId={dragId}
+              picked={picked}
+              dropTarget={dropTarget}
               onSelect={choose}
-              onStage={onStage}
-              onReorder={onReorder}
+              onTogglePick={togglePick}
+              onSelectColumn={(ids) => selectIds(ids)}
+              onDragStart={startPointerDrag}
               prioritySort={prioritySort}
             />
           )}
@@ -275,15 +431,18 @@ function TaskList({
   today,
   selectedId,
   prioritySort,
-  dragId,
+  picked,
+  dropId,
   onSelect,
   onToggle,
+  onTogglePick,
   onDelete,
+  onRestore,
   onAssign,
   onPriority,
   onDue,
   onStage,
-  onReorder,
+  onDragStart,
 }: {
   sample: boolean;
   tasks: TaskBoardTask[];
@@ -291,19 +450,23 @@ function TaskList({
   today: string;
   selectedId: string | null;
   prioritySort: boolean;
-  dragId: { current: string | null };
+  picked: string[];
+  dropId: string;
   onSelect: (id: string) => void;
   onToggle: (id: string) => void;
+  onTogglePick: (id: string) => void;
   onDelete: (id: string) => void;
+  onRestore: (id: string[]) => void;
   onAssign: (id: string, assignee: TaskAssignee | null) => void;
   onPriority: (id: string, priority: TaskPriority) => void;
   onDue: (id: string, dueOn: string | null) => void;
   onStage: (id: string, stage: TaskStage) => void;
-  onReorder: (activeId: string, overId: string) => void;
+  onDragStart: (event: ReactPointerEvent, task: TaskBoardTask) => void;
 }) {
   return (
     <div data-testid="task-list">
-      <div className="hidden grid-cols-[28px_28px_minmax(0,1.5fr)_132px_88px_88px_118px_32px] gap-2 px-4 pb-1 text-[10px] font-bold uppercase tracking-widest text-slate-400 md:grid">
+      <div className="hidden grid-cols-[28px_28px_28px_minmax(0,1.5fr)_132px_88px_88px_118px_32px] gap-2 px-4 pb-1 text-[10px] font-bold uppercase tracking-widest text-slate-400 md:grid">
+        <span />
         <span />
         <span />
         <span>Task / source</span>
@@ -317,34 +480,40 @@ function TaskList({
         {tasks.map((task) => {
           const selected = task.id === selectedId;
           const done = task.status === "done";
+          const landing = dropId === task.id;
           return (
             <li
               key={task.id}
               data-testid="task-row"
               data-task-id={task.id}
               data-completed={done ? "true" : "false"}
-              onDragOver={(event) => {
-                if (!prioritySort) event.preventDefault();
-              }}
-              onDrop={(event) => {
-                event.preventDefault();
-                const activeId = dragId.current || event.dataTransfer.getData("text/plain");
-                dragId.current = null;
-                if (!prioritySort && activeId && activeId !== task.id) onReorder(activeId, task.id);
-              }}
-              className={`px-3 py-2.5 md:px-4 ${selected ? "border-l-2 border-[#0d9488] bg-[#f0fdfa]" : "border-l-2 border-transparent"}`}
+              data-drop={landing ? "true" : "false"}
+              data-cleared={task.dismissed ? "true" : "false"}
+              style={{ touchAction: "pan-y" }}
+              className={`px-3 py-2.5 md:px-4 ${selected ? "border-l-2 border-[#0d9488] bg-[#f0fdfa]" : "border-l-2 border-transparent"} ${landing ? "mt-3" : ""} ${dragDropClass(landing)}`}
             >
-              <div className="grid grid-cols-[24px_24px_minmax(0,1fr)_auto] items-start gap-2 md:grid-cols-[28px_28px_minmax(0,1.5fr)_132px_88px_88px_118px_32px] md:items-center">
+              <div className="grid grid-cols-[24px_24px_24px_minmax(0,1fr)_auto] items-start gap-2 md:grid-cols-[28px_28px_28px_minmax(0,1.5fr)_132px_88px_88px_118px_32px] md:items-center">
                 <button
                   type="button"
-                  draggable={!prioritySort}
+                  data-drag-handle
                   aria-label={`Drag ${task.title}`}
                   title={prioritySort ? "Turn off priority sort to reorder the saved queue" : "Drag to reorder"}
-                  onDragStart={(event) => startDrag(event, task.id, dragId)}
-                  className="mt-0.5 cursor-grab text-slate-300 active:cursor-grabbing"
+                  onPointerDown={(event) => {
+                    if (prioritySort) return;
+                    onDragStart(event, task);
+                  }}
+                  className="mt-0.5 cursor-grab touch-none text-slate-300 active:cursor-grabbing"
                 >
                   <GripVertical className="h-4 w-4" />
                 </button>
+                <input
+                  type="checkbox"
+                  checked={picked.includes(task.id)}
+                  data-testid="task-select"
+                  aria-label={`Select ${task.title}`}
+                  onChange={() => onTogglePick(task.id)}
+                  className="mt-0.5 h-4 w-4 accent-slate-900"
+                />
                 <input
                   type="checkbox"
                   checked={done}
@@ -359,6 +528,7 @@ function TaskList({
                   </span>
                   <span className="mt-0.5 flex flex-wrap items-center gap-x-1 text-[11px] text-slate-400">
                     <span>{task.sourceLine}</span>
+                    {task.dismissed ? <span className="font-semibold text-amber-700">Cleared</span> : null}
                     {task.primaryHref && task.primaryHrefLabel ? (
                         <Link to={keepSample(task.primaryHref, sample)} data-testid="task-link" className="whitespace-nowrap font-semibold text-[#0d9488] hover:underline" onClick={(event) => event.stopPropagation()}>
                         {task.primaryHrefLabel}
@@ -372,9 +542,13 @@ function TaskList({
                   <DueField task={task} today={today} onDue={onDue} />
                   <StageSelect task={task} onStage={onStage} />
                 </div>
-                <button type="button" aria-label={`Delete ${task.title}`} onClick={() => onDelete(task.id)} className="text-slate-300 hover:text-red-500">
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
+                {task.dismissed ? (
+                  <button type="button" aria-label={`Restore ${task.title}`} onClick={() => onRestore([task.id])} className="text-[10px] font-bold text-[#0d9488]">Restore</button>
+                ) : (
+                  <button type="button" aria-label={`Delete ${task.title}`} onClick={() => onDelete(task.id)} className="text-slate-300 hover:text-red-500">
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                )}
               </div>
             </li>
           );
@@ -389,80 +563,98 @@ function TaskBoard({
   tasks,
   today,
   selectedId,
-  dragId,
+  picked,
+  dropTarget,
   prioritySort,
   onSelect,
-  onStage,
-  onReorder,
+  onTogglePick,
+  onSelectColumn,
+  onDragStart,
 }: {
   sample: boolean;
   tasks: TaskBoardTask[];
   today: string;
   selectedId: string | null;
-  dragId: { current: string | null };
+  picked: string[];
+  dropTarget: { id: string; column: string } | null;
   prioritySort: boolean;
   onSelect: (id: string) => void;
-  onStage: (id: string, stage: TaskStage) => void;
-  onReorder: (activeId: string, overId: string) => void;
+  onTogglePick: (id: string) => void;
+  onSelectColumn: (ids: string[]) => void;
+  onDragStart: (event: ReactPointerEvent, task: TaskBoardTask) => void;
 }) {
   return (
     <div data-testid="task-board-columns" className="grid grid-cols-1 gap-3 px-3 pb-4 sm:grid-cols-2 xl:grid-cols-5">
       {TASK_STAGES.map((stage) => {
         const column = tasks.filter((task) => columnStage(task) === stage);
+        const columnIds = column.map((task) => task.id);
+        const columnHot = Boolean(dropTarget && dropTarget.column === stage);
         return (
           <section
             key={stage}
             aria-label={TASK_STAGE_LABEL[stage]}
-            onDragOver={(event) => event.preventDefault()}
-            onDrop={(event) => {
-              event.preventDefault();
-              const activeId = dragId.current || event.dataTransfer.getData("text/plain");
-              dragId.current = null;
-              if (activeId) onStage(activeId, stage);
-            }}
-            className="min-w-0 rounded-xl bg-slate-50 p-2"
+            data-task-column={stage}
+            data-drop={columnHot ? "true" : "false"}
+            className={`min-w-0 rounded-xl bg-slate-50 p-2 ${columnHot && !dropTarget?.id ? dragDropClass(true) : ""}`}
           >
-            <header className="mb-2 flex items-center justify-between px-1">
+            <header className="mb-2 flex items-center justify-between gap-2 px-1">
               <h4 className="text-[11px] font-bold uppercase tracking-widest text-slate-500">{TASK_STAGE_LABEL[stage]}</h4>
-              <span className="text-[11px] font-semibold text-slate-400">{column.length}</span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  data-testid={`task-select-column-${stage}`}
+                  onClick={() => onSelectColumn(columnIds)}
+                  className="text-[10px] font-semibold text-slate-500"
+                >
+                  {columnIds.length > 0 && columnIds.every((id) => picked.includes(id)) ? "Clear" : "Select all"}
+                </button>
+                <span className="text-[11px] font-semibold text-slate-400">{column.length}</span>
+              </div>
             </header>
             <div className="space-y-2">
               {column.length === 0 ? <p className="px-1 py-3 text-[11px] text-slate-400">Nothing in this stage.</p> : null}
-              {column.map((task) => (
-                <article
-                  key={task.id}
-                  data-testid="task-card"
-                  data-task-id={task.id}
-                  data-completed={task.status === "done" ? "true" : "false"}
-                  draggable
-                  onDragStart={(event) => startDrag(event, task.id, dragId)}
-                  onDragOver={(event) => event.preventDefault()}
-                  onDrop={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    const activeId = dragId.current || event.dataTransfer.getData("text/plain");
-                    dragId.current = null;
-                    if (!activeId || activeId === task.id) return;
-                    if (columnStage(tasks.find((item) => item.id === activeId) || task) !== stage) onStage(activeId, stage);
-                    else if (!prioritySort) onReorder(activeId, task.id);
-                  }}
-                  onClick={() => onSelect(task.id)}
-                  className={`cursor-pointer rounded-xl border bg-white p-3 shadow-sm ${task.id === selectedId ? "border-[#0d9488]" : "border-slate-200"}`}
-                >
-                  <p className={`break-words text-sm font-medium ${task.status === "done" ? "text-slate-400 line-through" : "text-slate-900"}`} data-testid="task-title">{task.title}</p>
-                  <p className="mt-1 text-[11px] text-slate-400">{task.sourceLine}</p>
-                  {task.primaryHref && task.primaryHrefLabel ? (
-                    <Link to={keepSample(task.primaryHref, sample)} data-testid="task-link" className="mt-1 inline-block text-[11px] font-semibold text-[#0d9488]" onClick={(event) => event.stopPropagation()}>
-                      {task.primaryHrefLabel}
-                    </Link>
-                  ) : null}
-                  <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] font-semibold">
-                    <span data-testid="task-assignee" className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">{shortName(task.assigneeName) || "Unassigned"}</span>
-                    <span className={priorityClass(task.priority)}>{TASK_PRIORITY_LABEL[task.priority]}</span>
-                    <span className={isOverdue(task, today) ? "text-red-600" : "text-slate-400"}>{dueLabel(task.dueOn, task.status, today)}</span>
-                  </div>
-                </article>
-              ))}
+              {column.map((task) => {
+                const landing = dropTarget?.id === task.id;
+                return (
+                  <article
+                    key={task.id}
+                    data-testid="task-card"
+                    data-task-id={task.id}
+                    data-completed={task.status === "done" ? "true" : "false"}
+                    data-drop={landing ? "true" : "false"}
+                    onPointerDown={(event) => onDragStart(event, task)}
+                    onClick={() => onSelect(task.id)}
+                    style={{ touchAction: "none" }}
+                    className={`cursor-pointer rounded-xl border bg-white p-3 shadow-sm ${task.id === selectedId ? "border-[#0d9488]" : "border-slate-200"} ${landing ? "mt-3" : ""} ${dragDropClass(landing)} ${prioritySort ? "" : ""}`}
+                  >
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <input
+                        type="checkbox"
+                        checked={picked.includes(task.id)}
+                        data-testid="task-select"
+                        aria-label={`Select ${task.title}`}
+                        onPointerDown={(event) => event.stopPropagation()}
+                        onClick={(event) => event.stopPropagation()}
+                        onChange={() => onTogglePick(task.id)}
+                        className="h-4 w-4 accent-slate-900"
+                      />
+                      {task.dismissed ? <span className="text-[10px] font-bold uppercase tracking-widest text-amber-700">Cleared</span> : null}
+                    </div>
+                    <p className={`break-words text-sm font-medium ${task.status === "done" ? "text-slate-400 line-through" : "text-slate-900"}`} data-testid="task-title">{task.title}</p>
+                    <p className="mt-1 text-[11px] text-slate-400">{task.sourceLine}</p>
+                    {task.primaryHref && task.primaryHrefLabel ? (
+                      <Link to={keepSample(task.primaryHref, sample)} data-testid="task-link" className="mt-1 inline-block text-[11px] font-semibold text-[#0d9488]" onClick={(event) => event.stopPropagation()}>
+                        {task.primaryHrefLabel}
+                      </Link>
+                    ) : null}
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] font-semibold">
+                      <span data-testid="task-assignee" className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">{shortName(task.assigneeName) || "Unassigned"}</span>
+                      <span className={priorityClass(task.priority)}>{TASK_PRIORITY_LABEL[task.priority]}</span>
+                      <span className={isOverdue(task, today) ? "text-red-600" : "text-slate-400"}>{dueLabel(task.dueOn, task.status, today)}</span>
+                    </div>
+                  </article>
+                );
+              })}
             </div>
           </section>
         );
@@ -786,12 +978,6 @@ function RelatedRow({ label, href, linkLabel }: { label: string; href: string | 
       )}
     </div>
   );
-}
-
-function startDrag(event: DragEvent, id: string, dragId: { current: string | null }) {
-  dragId.current = id;
-  event.dataTransfer.setData("text/plain", id);
-  event.dataTransfer.effectAllowed = "move";
 }
 
 function tabClass(active: boolean): string {

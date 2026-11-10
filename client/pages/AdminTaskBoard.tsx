@@ -16,9 +16,11 @@ import {
   withAssignee,
   withDue,
   withPriority,
+  withRestored,
   withStage,
   withToggled,
   withoutTask,
+  withoutTasks,
   type TaskPriority,
   type TaskStage,
 } from "@shared/taskBoard";
@@ -86,6 +88,7 @@ export default function AdminTaskBoard() {
             sample={data.sample}
             emailNotice={data.emailNotice}
             sourceErrors={data.sourceErrors}
+            cleared={data.cleared}
             view={view}
             selectedId={selectedId}
             onView={setView}
@@ -93,9 +96,22 @@ export default function AdminTaskBoard() {
             onToggle={(id) => commit(withToggled(tasks, id, stamp()))}
             onDelete={(id) => {
               const result = withoutTask(tasks, id);
-              commit(result.tasks, result.removed);
-              toast(result.removed?.manual ? "Task deleted." : "Removed from the board. The order stays.");
+              if (!result.removed) return;
+              commit(result.tasks, [{ task: result.removed, mode: result.removed.manual ? "delete" : "clear" }]);
+              toast(result.removed.manual ? "Task deleted." : "Removed from the board. The order stays.");
             }}
+            onClear={(ids) => {
+              const result = withoutTasks(tasks, ids);
+              if (result.removed.length === 0) return;
+              commit(result.tasks, result.removed.map((task) => ({ task, mode: "clear" as const })));
+              toast(`Cleared ${result.removed.length} from the board.`, {
+                action: {
+                  label: "Undo",
+                  onClick: () => commit(withRestored(result.tasks, result.removed, result.removed.map((task) => task.id))),
+                },
+              });
+            }}
+            onRestore={(ids) => commit(withRestored(tasks, data.cleared, ids))}
             onAssign={(id, assignee) => commit(withAssignee(tasks, id, assignee, stamp()))}
             onPriority={(id, priority) => commit(withPriority(tasks, id, priority, stamp()))}
             onDue={(id, dueOn) => commit(withDue(tasks, id, dueOn, stamp()))}
