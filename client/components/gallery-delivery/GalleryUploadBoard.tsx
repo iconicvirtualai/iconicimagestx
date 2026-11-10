@@ -16,7 +16,7 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
-import { DragGhost, DropPlaceholder, SectionDropBar, type DragGhostModel } from "@/components/gallery/DragGhost";
+import { DragGhost, dragDropClass, type DragGhostModel } from "@/components/drag/DragGhost";
 import { recordAddressText } from "@shared/addressText";
 import {
   GALLERY_TABS,
@@ -63,6 +63,8 @@ const VIDEO_BRAND_OPTIONS: Array<{ id: VideoBrand; label: string }> = [
   { id: "both", label: "Both" },
   { id: "none", label: "None" },
 ];
+
+type BoardDrag = DragGhostModel & { id: string; kind: "item" | "section" };
 
 const COMING_SOON_SOURCES = [
   "From camera",
@@ -190,7 +192,7 @@ export function GalleryUploadBoard({
     setAnchor(id);
   }
 
-  function beginPointerDrag(event: ReactPointerEvent<HTMLElement>, model: DragGhostModel & { id: string }) {
+  function beginPointerDrag(event: ReactPointerEvent<HTMLElement>, model: BoardDrag) {
     if (event.button !== 0) return;
     const target = event.target;
     if (target instanceof Element && target.closest("button, a, input, select, textarea, label")) return;
@@ -202,12 +204,24 @@ export function GalleryUploadBoard({
     const move = (pointer: PointerEvent) => {
       if (!dragging && Math.hypot(pointer.clientX - originX, pointer.clientY - originY) < 8) return;
       dragging = true;
-      setGhost({ ...model, x: pointer.clientX, y: pointer.clientY });
+      setGhost({
+        x: pointer.clientX,
+        y: pointer.clientY,
+        title: model.title,
+        subtitle: model.subtitle,
+        imageUrl: model.imageUrl,
+      });
       const element = document.elementFromPoint(pointer.clientX, pointer.clientY);
       overItem = element?.closest("[data-media-id]")?.getAttribute("data-media-id") || "";
       overSection = element?.closest("[data-section-id]")?.getAttribute("data-section-id") || "";
-      if (model.kind === "item") setDropId(overItem && overItem !== model.id ? overItem : "");
-      if (model.kind === "section") setDropSection(overSection && overSection !== model.id ? overSection : "");
+      if (model.kind === "item") {
+        setDropId(overItem && overItem !== model.id ? overItem : "");
+        setDropSection(!overItem && overSection ? overSection : "");
+      }
+      if (model.kind === "section") {
+        setDropId("");
+        setDropSection(overSection && overSection !== model.id ? overSection : "");
+      }
     };
     const up = (pointer: PointerEvent) => {
       stopDrag.current?.();
@@ -620,7 +634,7 @@ export function GalleryUploadBoard({
                   key={group.id || "loose"}
                   data-section-id={group.section?.id || ""}
                   data-testid={group.section ? `gallery-section-${group.section.id}` : "gallery-section-loose"}
-                  className={hiddenSection ? "opacity-70" : ""}
+                  className={`${hiddenSection ? "opacity-70" : ""} ${dragDropClass(Boolean(dropSection) && dropSection === (group.section?.id || ""))}`}
                   onDragOver={(event) => { if (hasFiles(event)) { event.preventDefault(); setFileHover(group.section?.id || "loose"); } }}
                   onDrop={(event) => {
                     if (!hasFiles(event)) return;
@@ -630,9 +644,6 @@ export function GalleryUploadBoard({
                     void uploadFiles(Array.from(event.dataTransfer.files), group.section?.id || "");
                   }}
                 >
-                  {ghost?.kind === "section" && dropSection && dropSection === group.section?.id && (
-                    <SectionDropBar label={`Drop section here`} />
-                  )}
                   <div className="mb-3 flex items-center gap-2 rounded-xl px-1 py-1">
                     {group.section && (
                       <button
@@ -717,6 +728,7 @@ export function GalleryUploadBoard({
                           <TourCard
                             key={item.id}
                             item={item}
+                            drop={dropId === item.id}
                             selected={selected.includes(item.id)}
                             onPointerDown={(event) => beginPointerDrag(event, ghostModel(item, event))}
                             onCopy={() => { void navigator.clipboard.writeText(item.url); toast.success("Link copied."); }}
@@ -732,6 +744,7 @@ export function GalleryUploadBoard({
                           <FileCard
                             key={item.id}
                             item={item}
+                            drop={dropId === item.id}
                             selected={selected.includes(item.id)}
                             onPointerDown={(event) => beginPointerDrag(event, ghostModel(item, event))}
                             onHide={() => commit(setItemsHidden(current, [item.id], !item.hiddenFromGallery))}
@@ -964,14 +977,13 @@ function FragmentTile({
   onDownload: (mode: "high" | "web") => void;
 }) {
   return (
-    <>
-      {drop && <DropPlaceholder />}
-      <article
+    <article
         data-testid={`gallery-media-${item.id}`}
         data-media-id={item.id}
         data-selected={selected ? "true" : "false"}
+        data-drop={drop ? "true" : "false"}
         onPointerDown={onPointerDown}
-        className={`group relative cursor-grab overflow-hidden rounded-2xl bg-[#dde3e0] shadow-sm ${portrait ? "aspect-[9/16]" : "aspect-[4/3]"} ${selected ? "outline outline-2 outline-offset-2 outline-[#14a08a]" : ""} ${item.hiddenFromGallery ? "brightness-90 grayscale-[.35]" : ""}`}
+        className={`group relative cursor-grab overflow-hidden rounded-2xl bg-[#dde3e0] shadow-sm ${portrait ? "aspect-[9/16]" : "aspect-[4/3]"} ${selected ? "outline outline-2 outline-offset-2 outline-[#14a08a]" : ""} ${item.hiddenFromGallery ? "brightness-90 grayscale-[.35]" : ""} ${dragDropClass(drop)}`}
         style={{ touchAction: "none" }}
       >
         {item.url && (item.kind === "photo" || item.kind === "floorplan" || item.kind === "video") ? (
@@ -1017,16 +1029,16 @@ function FragmentTile({
           {item.deliveryName && <p className="truncate text-[11px] text-white/80">{item.deliveryName}</p>}
           {item.caption && <p className="truncate text-[11px] text-white/80">{item.caption}</p>}
         </div>
-      </article>
-    </>
+    </article>
   );
 }
 
 function TourCard({
-  item, selected, onPointerDown, onCopy, onHide, onDelete,
+  item, selected, drop, onPointerDown, onCopy, onHide, onDelete,
 }: {
   item: SequencedArrangementItem;
   selected: boolean;
+  drop: boolean;
   onPointerDown: (event: ReactPointerEvent<HTMLElement>) => void;
   onCopy: () => void;
   onHide: () => void;
@@ -1040,7 +1052,7 @@ function TourCard({
       data-media-id={item.id}
       data-selected={selected ? "true" : "false"}
       onPointerDown={onPointerDown}
-      className={`flex gap-3 rounded-2xl border bg-white p-4 ${selected ? "border-[#14a08a] outline outline-2 outline-[#14a08a]" : "border-[#e6e9e7]"} ${item.hiddenFromGallery ? "border-dashed opacity-60" : ""}`}
+      className={`flex gap-3 rounded-2xl border bg-white p-4 ${selected ? "border-[#14a08a] outline outline-2 outline-[#14a08a]" : "border-[#e6e9e7]"} ${item.hiddenFromGallery ? "border-dashed opacity-60" : ""} ${dragDropClass(drop)}`}
       style={{ touchAction: "none" }}
     >
       <div className="grid h-14 w-[72px] shrink-0 place-items-center rounded-[10px] bg-gradient-to-br from-[#1a1d1c] to-[#14a08a] text-[11px] font-extrabold text-white">3D</div>
@@ -1062,10 +1074,11 @@ function TourCard({
 }
 
 function FileCard({
-  item, selected, onPointerDown, onHide, onDelete, onDownload,
+  item, selected, drop, onPointerDown, onHide, onDelete, onDownload,
 }: {
   item: SequencedArrangementItem;
   selected: boolean;
+  drop: boolean;
   onPointerDown: (event: ReactPointerEvent<HTMLElement>) => void;
   onHide: () => void;
   onDelete: () => void;
@@ -1076,7 +1089,7 @@ function FileCard({
     <article
       data-media-id={item.id}
       onPointerDown={onPointerDown}
-      className={`rounded-2xl border bg-white p-4 ${selected ? "outline outline-2 outline-[#14a08a]" : "border-[#e6e9e7]"} ${item.hiddenFromGallery ? "border-dashed opacity-60" : ""}`}
+      className={`rounded-2xl border bg-white p-4 ${selected ? "outline outline-2 outline-[#14a08a]" : "border-[#e6e9e7]"} ${item.hiddenFromGallery ? "border-dashed opacity-60" : ""} ${dragDropClass(drop)}`}
       style={{ touchAction: "none" }}
     >
       <div className="flex items-start gap-3">
@@ -1430,7 +1443,7 @@ function defaultLooseName(tab: string) {
   return "Files";
 }
 
-function ghostModel(item: SequencedArrangementItem, event: ReactPointerEvent): DragGhostModel & { id: string } {
+function ghostModel(item: SequencedArrangementItem, event: ReactPointerEvent): BoardDrag {
   return {
     id: item.id,
     kind: "item",
