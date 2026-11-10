@@ -1794,7 +1794,7 @@ function receiptProcessing(input) {
   const paymentStatus = text$y(input.invoice.paymentStatus).toLowerCase();
   if (status2 === "comped" || paymentStatus === "comped") return 0;
   const base = roundCents$1(input.subtotal - input.promotions + input.fees);
-  const stored = finite$1(input.invoice.processing);
+  const stored = finite$2(input.invoice.processing);
   const quoted = stored != null ? Math.max(0, stored) : processingFee(base);
   const quotedCents = toCents(quoted);
   if (quotedCents <= 0) return 0;
@@ -1820,9 +1820,9 @@ function receiptLines(lineItems) {
     const name = typeof row.name === "string" && row.name.trim() ? row.name.trim() : "Service";
     const qtyRaw = Number(row.qty ?? row.quantity ?? 1);
     const qty = Number.isFinite(qtyRaw) && qtyRaw > 0 ? qtyRaw : 1;
-    const unit = finite$1(row.unitPrice);
-    const linePrice = finite$1(row.price);
-    const explicitTotal = finite$1(row.total);
+    const unit = finite$2(row.unitPrice);
+    const linePrice = finite$2(row.price);
+    const explicitTotal = finite$2(row.total);
     const total = explicitTotal ?? linePrice ?? (unit != null ? roundCents$1(unit * qty) : 0);
     const shownUnit = unit ?? (qty ? roundCents$1(total / qty) : total);
     lines.push({ name, qty, unit: shownUnit, total });
@@ -2070,7 +2070,7 @@ function roundCents$1(value) {
 function toCents(value) {
   return Math.round((Number(value) || 0) * 100);
 }
-function finite$1(value) {
+function finite$2(value) {
   if (value == null || value === "") return null;
   const amount = Number(value);
   return Number.isFinite(amount) ? amount : null;
@@ -2838,13 +2838,13 @@ const ADDRESS_LIMIT = 300;
 const PLACE_ID_LIMIT = 300;
 function serviceLocationFromInput(value) {
   if (typeof value === "string") {
-    const formatted2 = clip$1(value, ADDRESS_LIMIT);
+    const formatted2 = clip$2(value, ADDRESS_LIMIT);
     return formatted2 ? { kind: "text", formatted: formatted2 } : null;
   }
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const row = value;
-  const formatted = clip$1(firstString(row, ["formatted", "description", "label"]), ADDRESS_LIMIT);
-  const placeId = clip$1(firstString(row, ["placeId", "place_id"]), PLACE_ID_LIMIT);
+  const formatted = clip$2(firstString(row, ["formatted", "description", "label"]), ADDRESS_LIMIT);
+  const placeId = clip$2(firstString(row, ["placeId", "place_id"]), PLACE_ID_LIMIT);
   const lat = readCoord$1(row.lat ?? row.latitude, "lat");
   const lng = readCoord$1(row.lng ?? row.longitude, "lng");
   if (formatted && placeId && lat != null && lng != null) {
@@ -2885,7 +2885,7 @@ function firstString(row, keys) {
   }
   return "";
 }
-function clip$1(value, limit) {
+function clip$2(value, limit) {
   if (typeof value !== "string") return "";
   return value.trim().slice(0, limit);
 }
@@ -13990,7 +13990,7 @@ function isCulledShot(shot) {
   return shot.culled === true;
 }
 function keptShots(items) {
-  const rows = items.map((item, index) => ({ item, index })).filter(({ item }) => !isCulledShot(item));
+  const rows = items.map((item, index) => ({ item, index })).filter(({ item }) => !isCulledShot(item) && item.hiddenFromGallery !== true);
   const any = rows.some(({ item }) => finiteOrder(item.sortOrder) != null);
   if (!any) return rows.map(({ item }) => item);
   return rows.sort((a, b) => {
@@ -14492,6 +14492,366 @@ async function readInvoiceDoc(get, startId) {
   }
   return null;
 }
+const SECTION_ID = /^s[a-z0-9]{4,16}$/;
+const SECTION_LIMIT = 24;
+const PLACEMENT_LIMIT = 400;
+const FILE_EXT = /* @__PURE__ */ new Set(["jpg", "png", "webp", "gif", "tif", "mp4", "mov", "m4v", "webm", "pdf", "svg"]);
+function sectionIdOk(value) {
+  return SECTION_ID.test(value);
+}
+function text$e(value, limit = 180) {
+  if (typeof value !== "string") return "";
+  return value.replace(/\u0000/g, "").trim().slice(0, limit);
+}
+function httpUrl$1(value) {
+  const url = text$e(value, 2e3);
+  return /^https?:\/\//i.test(url) ? url : "";
+}
+function arrangementFileName(index, addressOrSlug, originalName) {
+  const n = Math.max(1, Math.floor(Number.isFinite(index) ? index : 1));
+  const match = originalName.toLowerCase().match(/\.([a-z0-9]{1,8})$/);
+  let ext = match?.[1] || "jpg";
+  if (ext === "jpeg" || ext === "heic" || ext === "heif") ext = "jpg";
+  if (ext === "tiff") ext = "tif";
+  if (!FILE_EXT.has(ext)) ext = "jpg";
+  return `${String(n).padStart(3, "0")}_${addressSlug(addressOrSlug)}.${ext}`;
+}
+function rowId(row, fallback) {
+  for (const key of ["id", "path", "storagePath", "url", "shareUrl"]) {
+    const value = text$e(row[key]);
+    if (value) return value.slice(0, 180);
+  }
+  return fallback.slice(0, 180);
+}
+function rowName(row, fallback) {
+  return text$e(row.name) || text$e(row.fileName) || text$e(row.title) || fallback;
+}
+function isVideoRow(row) {
+  const content = text$e(row.contentType).toLowerCase();
+  if (content.startsWith("video/")) return true;
+  const name = `${rowName(row, "")} ${text$e(row.path)} ${text$e(row.url)}`;
+  return /\.(mp4|mov|m4v|webm)(\?|#|$)/i.test(name);
+}
+function pushRow(out, seen, row, kind, bucket2, index, fallbackName) {
+  const url = httpUrl$1(row.url) || httpUrl$1(row.shareUrl) || httpUrl$1(row.embedUrl);
+  if (!url) return;
+  const id = rowId(row, `${kind}-${index}`);
+  if (!id || seen.has(id)) return;
+  seen.add(id);
+  const width = typeof row.width === "number" && Number.isFinite(row.width) ? row.width : void 0;
+  const height = typeof row.height === "number" && Number.isFinite(row.height) ? row.height : void 0;
+  const assetType = text$e(row.assetType) || text$e(row.type);
+  const brandLabel = text$e(row.brandLabel, 20);
+  const aspectLabel = text$e(row.aspectLabel, 24);
+  const platform = text$e(row.platform, 40);
+  const caption = text$e(row.caption, 500);
+  const webUrl = httpUrl$1(row.webUrl) || httpUrl$1(row.previewUrl) || httpUrl$1(row.displayUrl) || httpUrl$1(row.thumbnailUrl);
+  out.push({
+    id,
+    kind,
+    name: rowName(row, fallbackName),
+    path: text$e(row.path) || text$e(row.storagePath),
+    url,
+    culled: row.culled === true,
+    bucket: bucket2,
+    index,
+    ...assetType ? { assetType } : {},
+    ...brandLabel ? { brandLabel } : {},
+    ...aspectLabel ? { aspectLabel } : {},
+    ...platform ? { platform } : {},
+    ...caption ? { caption } : {},
+    ...width != null ? { width } : {},
+    ...height != null ? { height } : {},
+    ...webUrl ? { webUrl } : {},
+    ...row.hiddenFromGallery === true ? { hiddenFromGallery: true } : {}
+  });
+}
+function rowsOf$1(value) {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item) => item && typeof item === "object");
+}
+function collectArrangementMedia(listing) {
+  const source = listing || {};
+  const out = [];
+  const seen = /* @__PURE__ */ new Set();
+  const seenTourUrls = /* @__PURE__ */ new Set();
+  rowsOf$1(source.images).forEach((row, index) => {
+    const asset = text$e(row.assetType).toLowerCase() || text$e(row.type).toLowerCase();
+    const kind = asset === "floorplan" ? "floorplan" : asset === "file" || asset === "document" ? "file" : asset === "video" || isVideoRow(row) ? "video" : "photo";
+    pushRow(out, seen, row, kind, asset === "social" ? "socialAssets" : "images", index, `Photo ${index + 1}`);
+  });
+  rowsOf$1(source.videos).forEach((row, index) => {
+    pushRow(out, seen, row, "video", "videos", index, `Video ${index + 1}`);
+  });
+  rowsOf$1(source.floorplans).forEach((row, index) => {
+    pushRow(out, seen, row, "floorplan", "floorplans", index, `Floor plan ${index + 1}`);
+  });
+  rowsOf$1(source.floorPlans).forEach((row, index) => {
+    pushRow(out, seen, row, "floorplan", "floorPlans", index, `Floor plan ${index + 1}`);
+  });
+  for (const key of ["tourUrl", "matterportUrl", "virtualTourUrl", "virtualTour", "threeDTourUrl", "tourLink"]) {
+    const url = httpUrl$1(source[key]);
+    if (!url || seenTourUrls.has(url)) continue;
+    seenTourUrls.add(url);
+    pushRow(out, seen, { id: key, url, name: "Virtual tour", type: "tour" }, "tour", "", -1, "Virtual tour");
+  }
+  rowsOf$1(source.tours).forEach((row, index) => {
+    const url = httpUrl$1(row.url) || httpUrl$1(row.shareUrl) || httpUrl$1(row.embedUrl);
+    if (!url || seenTourUrls.has(url)) return;
+    seenTourUrls.add(url);
+    pushRow(out, seen, row, "tour", "tours", index, "Virtual tour");
+  });
+  rowsOf$1(source.files).forEach((row, index) => {
+    pushRow(out, seen, row, "file", "files", index, `File ${index + 1}`);
+  });
+  rowsOf$1(source.socialAssets).forEach((row, index) => {
+    pushRow(out, seen, { ...row, assetType: text$e(row.assetType) || "social" }, "photo", "socialAssets", index, `Social ${index + 1}`);
+  });
+  rowsOf$1(source.clientPortalUploads).forEach((row, index) => {
+    const kind = text$e(row.kind);
+    const arrangementKind = kind === "video" ? "video" : "file";
+    pushRow(out, seen, row, arrangementKind, "clientPortalUploads", index, `File ${index + 1}`);
+  });
+  return out;
+}
+function sectionName(value) {
+  return text$e(value, 60);
+}
+function readMediaArrangement(value) {
+  const row = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  const sections = [];
+  const seenSections = /* @__PURE__ */ new Set();
+  if (Array.isArray(row.sections)) {
+    for (const item of row.sections) {
+      if (!item || typeof item !== "object") continue;
+      const section = item;
+      const id = text$e(section.id, 32);
+      const name = sectionName(section.name);
+      if (!sectionIdOk(id) || !name || seenSections.has(id)) continue;
+      seenSections.add(id);
+      sections.push({
+        id,
+        name,
+        order: typeof section.order === "number" && Number.isFinite(section.order) ? section.order : sections.length,
+        hideFromListingSites: section.hideFromListingSites === true,
+        hideFromClientGallery: section.hideFromClientGallery === true
+      });
+      if (sections.length >= SECTION_LIMIT) break;
+    }
+  }
+  sections.sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
+  sections.forEach((section, order) => {
+    section.order = order;
+  });
+  const known = new Set(sections.map((section) => section.id));
+  const placements = [];
+  const seenIds = /* @__PURE__ */ new Set();
+  const counters = /* @__PURE__ */ new Map();
+  if (Array.isArray(row.placements)) {
+    const draft = [];
+    for (const item of row.placements) {
+      if (!item || typeof item !== "object") continue;
+      const placement = item;
+      const id = text$e(placement.id);
+      if (!id || seenIds.has(id)) continue;
+      seenIds.add(id);
+      const sectionId = text$e(placement.sectionId, 32);
+      draft.push({
+        id,
+        sectionId: known.has(sectionId) ? sectionId : "",
+        order: typeof placement.order === "number" && Number.isFinite(placement.order) ? placement.order : draft.length,
+        hiddenFromGallery: placement.hiddenFromGallery === true,
+        index: draft.length
+      });
+      if (draft.length >= PLACEMENT_LIMIT) break;
+    }
+    draft.sort((a, b) => a.order - b.order || a.index - b.index);
+    for (const placement of draft) {
+      const order = counters.get(placement.sectionId) || 0;
+      counters.set(placement.sectionId, order + 1);
+      placements.push({
+        id: placement.id,
+        sectionId: placement.sectionId,
+        order,
+        hiddenFromGallery: placement.hiddenFromGallery === true
+      });
+    }
+  }
+  const coverId = text$e(row.coverId, 180);
+  return coverId ? { sections, placements, coverId } : { sections, placements };
+}
+function arrangementActive(arrangement) {
+  return arrangement.sections.length > 0 || arrangement.placements.length > 0;
+}
+function flatArrangement(media, arrangement) {
+  const current = readMediaArrangement(arrangement);
+  const live = media.filter((item) => !item.culled);
+  const byId = new Map(live.map((item) => [item.id, item]));
+  const placed = /* @__PURE__ */ new Set();
+  const unsectioned = [];
+  const bySection = /* @__PURE__ */ new Map();
+  const ranked = [...current.placements].sort((a, b) => a.order - b.order);
+  for (const placement of ranked) {
+    if (!byId.has(placement.id) || placed.has(placement.id)) continue;
+    placed.add(placement.id);
+    if (placement.sectionId) {
+      const list2 = bySection.get(placement.sectionId) || [];
+      list2.push(placement.id);
+      bySection.set(placement.sectionId, list2);
+    } else {
+      unsectioned.push(placement.id);
+    }
+  }
+  for (const item of live) {
+    if (!placed.has(item.id)) unsectioned.push(item.id);
+  }
+  const flat = unsectioned.map((id) => ({ id, sectionId: "" }));
+  for (const section of current.sections) {
+    for (const id of bySection.get(section.id) || []) flat.push({ id, sectionId: section.id });
+  }
+  return flat;
+}
+function sequenceArrangement(media, arrangement, address) {
+  const current = readMediaArrangement(arrangement);
+  const byId = new Map(media.filter((item) => !item.culled).map((item) => [item.id, item]));
+  let fileIndex = 0;
+  let position = 0;
+  const sequenced = [];
+  for (const row of flatArrangement(media, arrangement)) {
+    const item = byId.get(row.id);
+    if (!item) continue;
+    position += 1;
+    const file = item.kind !== "tour";
+    if (file) fileIndex += 1;
+    const section = current.sections.find((entry2) => entry2.id === row.sectionId);
+    const placement = current.placements.find((entry2) => entry2.id === row.id);
+    const itemHidden = placement ? placement.hiddenFromGallery === true : item.hiddenFromGallery === true;
+    sequenced.push({
+      ...item,
+      sectionId: row.sectionId,
+      sortOrder: position,
+      deliveryName: file ? arrangementFileName(fileIndex, address, item.name) : "",
+      hiddenFromGallery: itemHidden || section?.hideFromClientGallery === true
+    });
+  }
+  return sequenced;
+}
+function hiddenSectionIdSet(arrangement) {
+  return new Set(
+    readMediaArrangement(arrangement).sections.filter((section) => section.hideFromListingSites).map((section) => section.id)
+  );
+}
+function isHiddenFromClientGallery(listing, row) {
+  if (row.hiddenFromGallery === true || row.culled === true) return true;
+  const arrangement = readMediaArrangement(listing?.mediaArrangement);
+  const id = text$e(row.id) || text$e(row.path) || text$e(row.storagePath) || text$e(row.url) || text$e(row.shareUrl);
+  const placement = id ? arrangement.placements.find((item) => item.id === id) : void 0;
+  if (placement?.hiddenFromGallery) return true;
+  const sectionId = text$e(row.sectionId, 32) || placement?.sectionId || "";
+  if (!sectionId) return false;
+  return arrangement.sections.some((section) => section.id === sectionId && section.hideFromClientGallery);
+}
+function isHiddenFromListingSites(listing, row) {
+  const arrangement = readMediaArrangement(listing?.mediaArrangement);
+  const hidden = hiddenSectionIdSet(arrangement);
+  if (hidden.size === 0) return false;
+  const sectionId = text$e(row.sectionId, 32);
+  if (sectionId && hidden.has(sectionId)) return true;
+  const id = text$e(row.id) || text$e(row.path) || text$e(row.storagePath) || text$e(row.url);
+  if (!id) return false;
+  return arrangement.placements.some((placement) => placement.id === id && hidden.has(placement.sectionId));
+}
+const STAMP_BUCKETS = ["images", "videos", "floorplans", "floorPlans", "tours", "files", "clientPortalUploads"];
+function syncPortalMedia(current, sequenced, sections) {
+  const base = current && typeof current === "object" && !Array.isArray(current) ? { ...current } : {};
+  const keys = { photo: "photos", video: "videos", floorplan: "floorplans", tour: "tours" };
+  for (const key of Object.values(keys)) {
+    const existing = base[key] && typeof base[key] === "object" && !Array.isArray(base[key]) ? { ...base[key] } : {};
+    base[key] = existing;
+  }
+  for (const item of sequenced) {
+    const key = keys[item.kind];
+    if (!key) continue;
+    const bucket2 = base[key];
+    const prev = bucket2[item.id] && typeof bucket2[item.id] === "object" ? bucket2[item.id] : {};
+    bucket2[item.id] = {
+      hidden: prev.hidden === true,
+      order: item.sortOrder,
+      groupId: item.kind === "photo" ? item.sectionId : ""
+    };
+  }
+  base.photoGroups = sections.map((section) => ({
+    id: section.id,
+    name: section.name,
+    order: section.order,
+    hideFromListingSites: section.hideFromListingSites
+  }));
+  return base;
+}
+function stampListingArrangement(listing, arrangement, address) {
+  const media = collectArrangementMedia(listing);
+  const current = readMediaArrangement(arrangement);
+  const sequenced = sequenceArrangement(media, current, address);
+  const byKey = new Map(sequenced.filter((item) => item.bucket).map((item) => [`${item.bucket}:${item.index}`, item]));
+  const next = {
+    ...listing,
+    mediaArrangement: current
+  };
+  for (const bucket2 of STAMP_BUCKETS) {
+    if (!Array.isArray(listing[bucket2])) continue;
+    next[bucket2] = listing[bucket2].map((row, index) => {
+      if (!row || typeof row !== "object") return row;
+      const copy = { ...row };
+      const hit = byKey.get(`${bucket2}:${index}`);
+      if (!hit) {
+        if (copy.culled === true) delete copy.deliveryName;
+        return copy;
+      }
+      copy.sortOrder = hit.sortOrder;
+      copy.order = hit.sortOrder;
+      copy.sectionId = hit.sectionId;
+      copy.hiddenFromGallery = hit.hiddenFromGallery === true;
+      if (hit.deliveryName) copy.deliveryName = hit.deliveryName;
+      else delete copy.deliveryName;
+      return copy;
+    });
+  }
+  next.portalMedia = syncPortalMedia(listing.portalMedia, sequenced, current.sections);
+  return {
+    listing: next,
+    names: sequenced.map((item) => item.deliveryName).filter(Boolean),
+    sequenced
+  };
+}
+function stampGalleryMediaItems(items, sequenced) {
+  const byPath2 = /* @__PURE__ */ new Map();
+  const byId = /* @__PURE__ */ new Map();
+  const byUrl = /* @__PURE__ */ new Map();
+  for (const row of sequenced) {
+    if (!row.deliveryName) continue;
+    byId.set(row.id, row);
+    if (row.path) byPath2.set(row.path, row);
+    if (row.url) byUrl.set(row.url, row);
+  }
+  return items.map((item) => {
+    const path2 = text$e(item.storagePath) || text$e(item.path);
+    const id = text$e(item.id);
+    const url = text$e(item.url) || text$e(item.shareUrl);
+    const hit = path2 && byPath2.get(path2) || id && byId.get(id) || url && byUrl.get(url) || void 0;
+    if (!hit) return item;
+    return {
+      ...item,
+      sortOrder: hit.sortOrder,
+      order: hit.sortOrder,
+      deliveryName: hit.deliveryName,
+      fileName: hit.deliveryName,
+      name: hit.deliveryName,
+      title: hit.deliveryName,
+      sectionId: hit.sectionId,
+      hiddenFromGallery: hit.hiddenFromGallery === true
+    };
+  });
+}
 const AI_EDIT_PRESETS = [
   {
     id: "virtual_stage",
@@ -14696,18 +15056,18 @@ function statusOf(doc) {
 function isReleased(doc) {
   return RELEASED_GALLERY_STATUSES.includes(statusOf(doc));
 }
-function text$e(value) {
+function text$d(value) {
   return typeof value === "string" ? value.trim() : "";
 }
-function httpUrl$1(value) {
-  const url = text$e(value);
+function httpUrl(value) {
+  const url = text$d(value);
   return url.startsWith("https://") || url.startsWith("http://") ? url : "";
 }
 function shareableUrl(value) {
-  const url = text$e(value);
+  const url = text$d(value);
   if (!url || url.startsWith("//") || url.includes("\\") || url.includes("..")) return "";
   if (url.startsWith("/")) return url;
-  return httpUrl$1(url);
+  return httpUrl(url);
 }
 function galleryResult(doc, via) {
   const status2 = statusOf(doc) || "unknown";
@@ -14746,64 +15106,104 @@ function isPrivateMedia(path2, name, url) {
   return PRIVATE_FILE.test(name) || PRIVATE_FILE.test(url);
 }
 function mediaName(row, fallback) {
-  return text$e(row.name) || text$e(row.fileName) || text$e(row.title) || fallback;
+  return text$d(row.name) || text$d(row.fileName) || text$d(row.title) || fallback;
 }
 function publicImages(listing) {
   if (!Array.isArray(listing.images)) return [];
   const images = [];
   keptShots(listing.images).forEach((item, index) => {
     const frame = frameFromListingImage(item, index);
-    const url = httpUrl$1(frame?.url);
+    const url = httpUrl(frame?.url);
     if (!frame || frame.raw || !url) return;
     if (isPrivateMedia(frame.path, frame.name, url)) return;
+    if (isHiddenFromClientGallery(listing, item)) return;
+    const content = typeof item.contentType === "string" ? item.contentType.toLowerCase() : "";
+    const asset = typeof item.assetType === "string" ? item.assetType.toLowerCase() : "";
+    const kind = typeof item.type === "string" ? item.type.toLowerCase() : "";
+    if (content.startsWith("video/") || asset === "social" || asset === "floorplan" || asset === "file" || kind === "video" || kind === "floorplan" || kind === "file" || kind === "social") return;
     const downloadName = deliveryFileName(item, index);
     images.push({ url, name: downloadName, downloadName });
   });
+  const coverId = readMediaArrangement(listing.mediaArrangement).coverId;
+  if (coverId && Array.isArray(listing.images)) {
+    const cover = listing.images.find((row) => text$d(row.id) === coverId || text$d(row.path) === coverId || text$d(row.url) === coverId);
+    const coverUrl = cover ? httpUrl(cover.url) : "";
+    const index = coverUrl ? images.findIndex((image) => image.url === coverUrl) : -1;
+    if (index > 0) {
+      const [hit] = images.splice(index, 1);
+      images.unshift(hit);
+    }
+  }
   return images.slice(0, 200);
 }
 function publicVideos(listing) {
-  if (!Array.isArray(listing.videos)) return [];
+  const groups = [listing.videos, listing.images];
   const videos = [];
-  keptShots(listing.videos).forEach((item, index) => {
-    const row = rowOf(item);
-    if (!row) return;
-    const url = httpUrl$1(row.url);
-    const original = mediaName(row, "Video");
-    const name = deliveryFileName(row, index);
-    const path2 = text$e(row.path) || text$e(row.storagePath);
-    if (!url || isPrivateMedia(path2, original, url) || isPrivateMedia(path2, name, url)) return;
-    videos.push({ url, name, downloadName: name });
-  });
+  for (const group of groups) {
+    if (!Array.isArray(group)) continue;
+    keptShots(group).forEach((item, index) => {
+      const row = rowOf(item);
+      if (!row) return;
+      const content = text$d(row.contentType).toLowerCase();
+      const nameHint = `${mediaName(row, "")} ${text$d(row.url)}`;
+      const video = content.startsWith("video/") || /\.(mp4|mov|m4v|webm)(\?|#|$)/i.test(nameHint) || text$d(row.assetType) === "video" || text$d(row.type) === "video";
+      if (!video) return;
+      const url = httpUrl(row.url);
+      const original = mediaName(row, "Video");
+      const name = deliveryFileName(row, index);
+      const path2 = text$d(row.path) || text$d(row.storagePath);
+      if (!url || isPrivateMedia(path2, original, url) || isPrivateMedia(path2, name, url)) return;
+      if (isHiddenFromClientGallery(listing, row)) return;
+      if (videos.some((clip2) => clip2.url === url)) return;
+      videos.push({ url, name, downloadName: name });
+    });
+  }
   return videos.slice(0, 40);
 }
 function publicTour(listing) {
   for (const key of ["tourUrl", "matterportUrl", "virtualTourUrl", "virtualTour", "threeDTourUrl", "tourLink"]) {
-    const url = httpUrl$1(listing[key]);
-    if (url && !isPrivateMedia("", key, url)) return url;
+    const url = httpUrl(listing[key]);
+    if (!url || isPrivateMedia("", key, url)) continue;
+    if (isHiddenFromClientGallery(listing, { id: key, url })) continue;
+    return url;
+  }
+  if (Array.isArray(listing.tours)) {
+    for (const item of listing.tours) {
+      const row = rowOf(item);
+      if (!row || isHiddenFromClientGallery(listing, row)) continue;
+      const url = httpUrl(row.url) || httpUrl(row.embedUrl);
+      if (url && !isPrivateMedia("", mediaName(row, "tour"), url)) return url;
+    }
   }
   return "";
 }
 function agentNameOf$1(listing) {
-  const direct = text$e(listing.agentName) || text$e(listing.listingAgent);
+  const direct = text$d(listing.agentName) || text$d(listing.listingAgent);
   if (direct) return direct;
   const agent = listing.agent;
-  if (agent && typeof agent === "object") return text$e(agent.name);
+  if (agent && typeof agent === "object") return text$d(agent.name);
   if (typeof agent === "string") return agent.trim();
   return "";
 }
 function publicFloorPlans(listing) {
-  const groups = [listing.floorplans, listing.floorPlans];
+  const groups = [listing.floorplans, listing.floorPlans, listing.images];
   const plans = [];
   for (const group of groups) {
     if (!Array.isArray(group)) continue;
     keptShots(group).forEach((item, index) => {
       const row = rowOf(item);
       if (!row) return;
-      const url = httpUrl$1(row.url) || httpUrl$1(row.shareUrl);
+      const asset = text$d(row.assetType).toLowerCase();
+      const type = text$d(row.type).toLowerCase();
+      const fromImages = group === listing.images;
+      if (fromImages && asset !== "floorplan" && type !== "floorplan") return;
+      const url = httpUrl(row.url) || httpUrl(row.shareUrl);
       const original = mediaName(row, "Floor plan");
       const name = deliveryFileName(row, index);
-      const path2 = text$e(row.path) || text$e(row.storagePath);
+      const path2 = text$d(row.path) || text$d(row.storagePath);
       if (!url || isPrivateMedia(path2, original, url) || isPrivateMedia(path2, name, url)) return;
+      if (isHiddenFromClientGallery(listing, row)) return;
+      if (plans.some((plan) => plan.url === url)) return;
       plans.push({ url, name, downloadName: name });
     });
   }
@@ -14811,7 +15211,7 @@ function publicFloorPlans(listing) {
 }
 function downloadUrlOf(row) {
   for (const key of ["downloadUrl", "fullResUrl", "mlsUrl", "originalUrl", "zipUrl", "printUrl"]) {
-    const url = httpUrl$1(row[key]);
+    const url = httpUrl(row[key]);
     if (url) return url;
   }
   return "";
@@ -14823,17 +15223,17 @@ function ownerFiles(listing) {
     files.push({ url, name });
   };
   for (const key of ["zipUrl", "downloadUrl", "mlsUrl", "mlsPackageUrl", "fullResUrl"]) {
-    push(httpUrl$1(listing[key]), key);
+    push(httpUrl(listing[key]), key);
   }
   const groups = [listing.images, listing.files, listing.downloads, listing.mlsFiles, listing.floorplans, listing.floorPlans];
   for (const group of groups) {
     if (!Array.isArray(group)) continue;
     group.forEach((item, index) => {
       const row = rowOf(item);
-      if (!row) return;
+      if (!row || isHiddenFromClientGallery(listing, row)) return;
       const name = mediaName(row, `File ${index + 1}`);
-      const path2 = text$e(row.path) || text$e(row.storagePath);
-      const display = httpUrl$1(row.url);
+      const path2 = text$d(row.path) || text$d(row.storagePath);
+      const display = httpUrl(row.url);
       const download = downloadUrlOf(row);
       if (download) push(download, name);
       if (display && isPrivateMedia(path2, name, display)) push(display, name);
@@ -14847,7 +15247,7 @@ function ownerImageDownloads(listing, images) {
     for (const item of listing.images) {
       const row = rowOf(item);
       if (!row) continue;
-      const display = httpUrl$1(row.url);
+      const display = httpUrl(row.url);
       const download = downloadUrlOf(row);
       if (display && download && download !== display) byUrl.set(display, download);
     }
@@ -14863,12 +15263,12 @@ function ownerRevisions(listing) {
     const row = rowOf(item) || {};
     const photoIndex = typeof row.photoIndex === "number" ? row.photoIndex : null;
     return {
-      id: text$e(row.id) || `revision-${index + 1}`,
-      type: text$e(row.type) || "gallery",
+      id: text$d(row.id) || `revision-${index + 1}`,
+      type: text$d(row.type) || "gallery",
       photoIndex,
-      description: text$e(row.description),
-      status: text$e(row.status) || "pending",
-      createdAt: text$e(row.createdAt)
+      description: text$d(row.description),
+      status: text$d(row.status) || "pending",
+      createdAt: text$d(row.createdAt)
     };
   });
 }
@@ -14877,11 +15277,11 @@ function invoiceOf(listing) {
   if (nested2 && typeof nested2 === "object" && typeof nested2.status === "string") {
     return { status: nested2.status };
   }
-  const status2 = text$e(listing.invoiceStatus);
+  const status2 = text$d(listing.invoiceStatus);
   return status2 ? { status: status2 } : null;
 }
 function pickReleasedGallery(listing, related) {
-  const preferred = text$e(listing.galleryId) || text$e(listing.playtestGalleryId);
+  const preferred = text$d(listing.galleryId) || text$d(listing.playtestGalleryId);
   const released = related.filter((doc) => isReleased(doc));
   if (preferred) {
     const match = released.find((doc) => doc.id === preferred);
@@ -14972,24 +15372,24 @@ function isStreamUrl(url) {
   return /(youtube\.com|youtu\.be|vimeo\.com|player\.vimeo\.com|mux\.com|stream\.mux|cloudflarestream\.com)/i.test(url);
 }
 function isFullResOrMls(row) {
-  const category = text$e(row.category).toLowerCase();
-  const type = text$e(row.type).toLowerCase();
+  const category = text$d(row.category).toLowerCase();
+  const type = text$d(row.type).toLowerCase();
   if (category === "mls" || category === "full-res" || category === "fullres" || type === "mls") return true;
-  const label = `${text$e(row.fileName)} ${text$e(row.name)} ${text$e(row.title)} ${text$e(row.path)} ${text$e(row.storagePath)}`.toLowerCase();
+  const label = `${text$d(row.fileName)} ${text$d(row.name)} ${text$d(row.title)} ${text$d(row.path)} ${text$d(row.storagePath)}`.toLowerCase();
   if (/(^|[^a-z0-9])(full[\s_-]?res|mls)([^a-z0-9]|$)/.test(label)) return true;
   return /\/(mls|full)\//.test(label);
 }
 function rowIsDeliveryOriginal(row) {
   if (row.downloadable === true || isFullResOrMls(row)) return true;
-  const type = text$e(row.type).toLowerCase();
+  const type = text$d(row.type).toLowerCase();
   if (type === "video" || type === "reel" || type === "file") return true;
-  const content = text$e(row.contentType).toLowerCase();
+  const content = text$d(row.contentType).toLowerCase();
   if (content.startsWith("video/") || content === "application/zip" || content === "application/pdf") return true;
   const candidates = [row.url, row.shareUrl, row.embedUrl, ...FILE_URL_KEYS.map((key) => row[key])];
-  return candidates.some((value) => isOriginalFileUrl(httpUrl$1(value) || text$e(value)));
+  return candidates.some((value) => isOriginalFileUrl(httpUrl(value) || text$d(value)));
 }
 function pushNeedle(needles, value) {
-  const raw = text$e(value);
+  const raw = text$d(value);
   if (raw.length >= 12) needles.push(raw);
 }
 function walkOriginalNeedles(value, needles, inheritedOriginal = false) {
@@ -15004,7 +15404,7 @@ function walkOriginalNeedles(value, needles, inheritedOriginal = false) {
   if (original) {
     const fileUrls = new Set(FILE_URL_KEYS.map((key) => shareableUrl(row[key])).filter(Boolean));
     for (const key of ["url", "shareUrl", "embedUrl", "sourcePath", "storagePath", "path"]) {
-      const raw = text$e(row[key]);
+      const raw = text$d(row[key]);
       if (!raw) continue;
       const asUrl = shareableUrl(raw);
       if (asUrl && isStreamUrl(asUrl)) continue;
@@ -15012,7 +15412,7 @@ function walkOriginalNeedles(value, needles, inheritedOriginal = false) {
       pushNeedle(needles, raw);
     }
     for (const key of DISPLAY_IMAGE_KEYS) {
-      const url = httpUrl$1(row[key]);
+      const url = httpUrl(row[key]);
       if (!url || isDisplayImageUrl(url) || isStreamUrl(url)) continue;
       pushNeedle(needles, url);
     }
@@ -15107,11 +15507,11 @@ function embedTour(listing, needles) {
     if (!Array.isArray(group)) continue;
     for (const item of group) {
       const row = rowOf(item);
-      if (!row) continue;
+      if (!row || isHiddenFromClientGallery(listing, row)) continue;
       for (const key of ["embedUrl", "url", "shareUrl"]) {
         const url = shareableUrl(row[key]);
         if (!url || isOriginalFileUrl(url) || containsOriginal(url, needles)) continue;
-        const type = text$e(row.type).toLowerCase();
+        const type = text$d(row.type).toLowerCase();
         if (type === "matterport" || type === "tour" || /matterport\.com/i.test(url)) return url;
       }
     }
@@ -15133,7 +15533,7 @@ function displaySafeShareMedia(listing) {
 function ownerStudioProject(listing, pub, gate2 = {}) {
   const authoritativeInvoice = Object.prototype.hasOwnProperty.call(gate2, "invoice");
   const invoiceDoc = authoritativeInvoice && gate2.invoice && typeof gate2.invoice === "object" ? gate2.invoice : null;
-  const invoiceStatus = authoritativeInvoice ? text$e(invoiceDoc?.status) : text$e(invoiceOf(listing)?.status);
+  const invoiceStatus = authoritativeInvoice ? text$d(invoiceDoc?.status) : text$d(invoiceOf(listing)?.status);
   const invoice = invoiceStatus ? { status: invoiceStatus } : null;
   const downloadsUnlocked = studioDownloadsUnlocked({
     listing: {
@@ -15152,9 +15552,9 @@ function ownerStudioProject(listing, pub, gate2 = {}) {
   const project = {
     ...source,
     view: "owner",
-    clientName: text$e(listing.clientName),
-    clientEmail: text$e(listing.clientEmail),
-    clientPhone: text$e(listing.clientPhone),
+    clientName: text$d(listing.clientName),
+    clientEmail: text$d(listing.clientEmail),
+    clientPhone: text$d(listing.clientPhone),
     revisions: ownerRevisions(listing),
     lockDownloads: lockDownloadsOn(listing.lockDownloads),
     requirePayment: requirePaymentOn(listing.requirePayment),
@@ -15200,8 +15600,8 @@ function decideClientGalleryLink(input) {
   }
   if (input.pointedListing) return listingResult(input.pointedListing, input.relatedGalleries);
   if (input.order) {
-    const galleryId = text$e(input.order.galleryId);
-    const listingId = text$e(input.order.listingId);
+    const galleryId = text$d(input.order.galleryId);
+    const listingId = text$d(input.order.listingId);
     if (galleryId || listingId) {
       return {
         ok: false,
@@ -15218,8 +15618,8 @@ function decideClientGalleryLink(input) {
     };
   }
   if (input.orderRequest) {
-    const galleryId = text$e(input.orderRequest.galleryId);
-    const listingId = text$e(input.orderRequest.listingId);
+    const galleryId = text$d(input.orderRequest.galleryId);
+    const listingId = text$d(input.orderRequest.listingId);
     if (galleryId || listingId) {
       return {
         ok: false,
@@ -15878,318 +16278,110 @@ function jsonSafe(value) {
   }
   return value;
 }
-const SECTION_ID = /^s[a-z0-9]{4,16}$/;
-const SECTION_LIMIT = 24;
-const PLACEMENT_LIMIT = 400;
-const FILE_EXT = /* @__PURE__ */ new Set(["jpg", "png", "webp", "gif", "tif", "mp4", "mov", "m4v", "webm", "pdf", "svg"]);
-function sectionIdOk(value) {
-  return SECTION_ID.test(value);
+const VIDEO_BRANDS = ["branded", "unbranded", "both", "none"];
+const BRAND_SET = new Set(VIDEO_BRANDS);
+function videoBrand(value) {
+  const brand = typeof value === "string" ? value.trim().toLowerCase() : "";
+  return BRAND_SET.has(brand) ? brand : "";
 }
-function text$d(value, limit = 180) {
+function galleryUploadExtra(extra) {
+  if (!extra || typeof extra !== "object") return {};
+  const src = extra;
+  const out = {};
+  const displayName = clip$1(src.displayName, 180);
+  if (displayName) out.displayName = displayName;
+  const brand = videoBrand(src.brandLabel);
+  if (brand) out.brandLabel = brand;
+  const asset = oneOf(src.assetType, ["photo", "video", "social", "floorplan", "file"]);
+  if (asset) out.assetType = asset;
+  const type = oneOf(src.type, ["photo", "video", "social", "floorplan", "file", "tour", "document"]);
+  if (type) out.type = type;
+  const width = finite$1(src.width);
+  const height = finite$1(src.height);
+  if (width != null && width > 0 && width < 2e4) out.width = Math.round(width);
+  if (height != null && height > 0 && height < 2e4) out.height = Math.round(height);
+  const aspect = clip$1(src.aspectLabel, 24);
+  if (aspect) out.aspectLabel = aspect;
+  const platform = clip$1(src.platform, 40);
+  if (platform) out.platform = platform;
+  const caption = clip$1(src.caption, 500);
+  if (caption) out.caption = caption;
+  return out;
+}
+const LISTING_KIT_SLOTS = [
+  { id: "marketing", title: "Marketing materials", group: "neighborhood" },
+  { id: "social-templates", title: "Social media templates", group: "neighborhood" },
+  { id: "neighborhood", title: "Neighborhood info", group: "neighborhood" },
+  { id: "popular", title: "Most popular", group: "neighborhood" },
+  { id: "facts", title: "Fun facts and stats", group: "neighborhood" },
+  { id: "things", title: "What is there to do", group: "neighborhood" },
+  { id: "jobs", title: "Jobs nearby", group: "neighborhood" },
+  { id: "lifestyle", title: "Free time and lifestyle", group: "neighborhood" },
+  { id: "crime", title: "Crime rate", group: "safety" }
+];
+const SLOT_IDS = new Set(LISTING_KIT_SLOTS.map((slot) => slot.id));
+function emptyListingKit() {
+  return {
+    slots: LISTING_KIT_SLOTS.map((slot) => ({
+      id: slot.id,
+      title: slot.title,
+      group: slot.group,
+      body: "",
+      showOnGallery: true
+    })),
+    fields: {},
+    generatedAt: "",
+    source: ""
+  };
+}
+function readListingKit(value) {
+  const base = emptyListingKit();
+  const row = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  const stored = /* @__PURE__ */ new Map();
+  if (Array.isArray(row.slots)) {
+    for (const item of row.slots) {
+      if (!item || typeof item !== "object") continue;
+      const slot = item;
+      const id = typeof slot.id === "string" ? slot.id : "";
+      if (!SLOT_IDS.has(id)) continue;
+      stored.set(id, {
+        body: clip$1(slot.body, 2e3),
+        showOnGallery: slot.showOnGallery !== false
+      });
+    }
+  }
+  const fields = {};
+  const rawFields = row.fields && typeof row.fields === "object" ? row.fields : {};
+  for (const [key, shown] of Object.entries(rawFields)) {
+    if (!/^[a-zA-Z][a-zA-Z0-9]{0,40}$/.test(key)) continue;
+    if (typeof shown === "boolean") fields[key] = shown;
+  }
+  return {
+    slots: base.slots.map((slot) => {
+      const saved = stored.get(slot.id);
+      return saved ? { ...slot, body: saved.body, showOnGallery: saved.showOnGallery } : slot;
+    }),
+    fields,
+    generatedAt: clip$1(row.generatedAt, 40),
+    source: row.source === "paid-order" ? "paid-order" : ""
+  };
+}
+function listingKitFieldShown(kit, fieldId) {
+  const state = readListingKit(kit);
+  if (!Object.prototype.hasOwnProperty.call(state.fields, fieldId)) return true;
+  return state.fields[fieldId] !== false;
+}
+function clip$1(value, limit) {
   if (typeof value !== "string") return "";
   return value.replace(/\u0000/g, "").trim().slice(0, limit);
 }
-function httpUrl(value) {
-  const url = text$d(value, 2e3);
-  return /^https?:\/\//i.test(url) ? url : "";
+function oneOf(value, allowed) {
+  const text2 = clip$1(value, 40).toLowerCase();
+  return allowed.includes(text2) ? text2 : "";
 }
-function arrangementFileName(index, addressOrSlug, originalName) {
-  const n = Math.max(1, Math.floor(Number.isFinite(index) ? index : 1));
-  const match = originalName.toLowerCase().match(/\.([a-z0-9]{1,8})$/);
-  let ext = match?.[1] || "jpg";
-  if (ext === "jpeg" || ext === "heic" || ext === "heif") ext = "jpg";
-  if (ext === "tiff") ext = "tif";
-  if (!FILE_EXT.has(ext)) ext = "jpg";
-  return `${String(n).padStart(3, "0")}_${addressSlug(addressOrSlug)}.${ext}`;
-}
-function rowId(row, fallback) {
-  for (const key of ["id", "path", "storagePath", "url", "shareUrl"]) {
-    const value = text$d(row[key]);
-    if (value) return value.slice(0, 180);
-  }
-  return fallback.slice(0, 180);
-}
-function rowName(row, fallback) {
-  return text$d(row.name) || text$d(row.fileName) || text$d(row.title) || fallback;
-}
-function isVideoRow(row) {
-  const content = text$d(row.contentType).toLowerCase();
-  if (content.startsWith("video/")) return true;
-  const name = `${rowName(row, "")} ${text$d(row.path)} ${text$d(row.url)}`;
-  return /\.(mp4|mov|m4v|webm)(\?|#|$)/i.test(name);
-}
-function pushRow(out, seen, row, kind, bucket2, index, fallbackName) {
-  const url = httpUrl(row.url) || httpUrl(row.shareUrl) || httpUrl(row.embedUrl);
-  if (!url) return;
-  const id = rowId(row, `${kind}-${index}`);
-  if (!id || seen.has(id)) return;
-  seen.add(id);
-  out.push({
-    id,
-    kind,
-    name: rowName(row, fallbackName),
-    path: text$d(row.path) || text$d(row.storagePath),
-    url,
-    culled: row.culled === true,
-    bucket: bucket2,
-    index
-  });
-}
-function rowsOf$1(value) {
-  if (!Array.isArray(value)) return [];
-  return value.filter((item) => item && typeof item === "object");
-}
-function collectArrangementMedia(listing) {
-  const source = listing || {};
-  const out = [];
-  const seen = /* @__PURE__ */ new Set();
-  const seenTourUrls = /* @__PURE__ */ new Set();
-  rowsOf$1(source.images).forEach((row, index) => {
-    pushRow(out, seen, row, isVideoRow(row) ? "video" : "photo", "images", index, `Photo ${index + 1}`);
-  });
-  rowsOf$1(source.videos).forEach((row, index) => {
-    pushRow(out, seen, row, "video", "videos", index, `Video ${index + 1}`);
-  });
-  rowsOf$1(source.floorplans).forEach((row, index) => {
-    pushRow(out, seen, row, "floorplan", "floorplans", index, `Floor plan ${index + 1}`);
-  });
-  rowsOf$1(source.floorPlans).forEach((row, index) => {
-    pushRow(out, seen, row, "floorplan", "floorPlans", index, `Floor plan ${index + 1}`);
-  });
-  for (const key of ["tourUrl", "matterportUrl", "virtualTourUrl", "virtualTour", "threeDTourUrl", "tourLink"]) {
-    const url = httpUrl(source[key]);
-    if (!url || seenTourUrls.has(url)) continue;
-    seenTourUrls.add(url);
-    pushRow(out, seen, { id: key, url, name: "Virtual tour", type: "tour" }, "tour", "", -1, "Virtual tour");
-  }
-  rowsOf$1(source.tours).forEach((row, index) => {
-    const url = httpUrl(row.url) || httpUrl(row.shareUrl) || httpUrl(row.embedUrl);
-    if (!url || seenTourUrls.has(url)) return;
-    seenTourUrls.add(url);
-    pushRow(out, seen, row, "tour", "tours", index, "Virtual tour");
-  });
-  rowsOf$1(source.files).forEach((row, index) => {
-    pushRow(out, seen, row, "file", "files", index, `File ${index + 1}`);
-  });
-  rowsOf$1(source.clientPortalUploads).forEach((row, index) => {
-    const kind = text$d(row.kind);
-    const arrangementKind = kind === "video" ? "video" : "file";
-    pushRow(out, seen, row, arrangementKind, "clientPortalUploads", index, `File ${index + 1}`);
-  });
-  return out;
-}
-function sectionName(value) {
-  return text$d(value, 60);
-}
-function readMediaArrangement(value) {
-  const row = value && typeof value === "object" && !Array.isArray(value) ? value : {};
-  const sections = [];
-  const seenSections = /* @__PURE__ */ new Set();
-  if (Array.isArray(row.sections)) {
-    for (const item of row.sections) {
-      if (!item || typeof item !== "object") continue;
-      const section = item;
-      const id = text$d(section.id, 32);
-      const name = sectionName(section.name);
-      if (!sectionIdOk(id) || !name || seenSections.has(id)) continue;
-      seenSections.add(id);
-      sections.push({
-        id,
-        name,
-        order: typeof section.order === "number" && Number.isFinite(section.order) ? section.order : sections.length,
-        hideFromListingSites: section.hideFromListingSites === true
-      });
-      if (sections.length >= SECTION_LIMIT) break;
-    }
-  }
-  sections.sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
-  sections.forEach((section, order) => {
-    section.order = order;
-  });
-  const known = new Set(sections.map((section) => section.id));
-  const placements = [];
-  const seenIds = /* @__PURE__ */ new Set();
-  const counters = /* @__PURE__ */ new Map();
-  if (Array.isArray(row.placements)) {
-    const draft = [];
-    for (const item of row.placements) {
-      if (!item || typeof item !== "object") continue;
-      const placement = item;
-      const id = text$d(placement.id);
-      if (!id || seenIds.has(id)) continue;
-      seenIds.add(id);
-      const sectionId = text$d(placement.sectionId, 32);
-      draft.push({
-        id,
-        sectionId: known.has(sectionId) ? sectionId : "",
-        order: typeof placement.order === "number" && Number.isFinite(placement.order) ? placement.order : draft.length,
-        index: draft.length
-      });
-      if (draft.length >= PLACEMENT_LIMIT) break;
-    }
-    draft.sort((a, b) => a.order - b.order || a.index - b.index);
-    for (const placement of draft) {
-      const order = counters.get(placement.sectionId) || 0;
-      counters.set(placement.sectionId, order + 1);
-      placements.push({ id: placement.id, sectionId: placement.sectionId, order });
-    }
-  }
-  return { sections, placements };
-}
-function arrangementActive(arrangement) {
-  return arrangement.sections.length > 0 || arrangement.placements.length > 0;
-}
-function flatArrangement(media, arrangement) {
-  const current = readMediaArrangement(arrangement);
-  const live = media.filter((item) => !item.culled);
-  const byId = new Map(live.map((item) => [item.id, item]));
-  const placed = /* @__PURE__ */ new Set();
-  const unsectioned = [];
-  const bySection = /* @__PURE__ */ new Map();
-  const ranked = [...current.placements].sort((a, b) => a.order - b.order);
-  for (const placement of ranked) {
-    if (!byId.has(placement.id) || placed.has(placement.id)) continue;
-    placed.add(placement.id);
-    if (placement.sectionId) {
-      const list2 = bySection.get(placement.sectionId) || [];
-      list2.push(placement.id);
-      bySection.set(placement.sectionId, list2);
-    } else {
-      unsectioned.push(placement.id);
-    }
-  }
-  for (const item of live) {
-    if (!placed.has(item.id)) unsectioned.push(item.id);
-  }
-  const flat = unsectioned.map((id) => ({ id, sectionId: "" }));
-  for (const section of current.sections) {
-    for (const id of bySection.get(section.id) || []) flat.push({ id, sectionId: section.id });
-  }
-  return flat;
-}
-function sequenceArrangement(media, arrangement, address) {
-  const byId = new Map(media.filter((item) => !item.culled).map((item) => [item.id, item]));
-  let fileIndex = 0;
-  let position = 0;
-  const sequenced = [];
-  for (const row of flatArrangement(media, arrangement)) {
-    const item = byId.get(row.id);
-    if (!item) continue;
-    position += 1;
-    const file = item.kind !== "tour";
-    if (file) fileIndex += 1;
-    sequenced.push({
-      ...item,
-      sectionId: row.sectionId,
-      sortOrder: position,
-      deliveryName: file ? arrangementFileName(fileIndex, address, item.name) : ""
-    });
-  }
-  return sequenced;
-}
-function hiddenSectionIdSet(arrangement) {
-  return new Set(
-    readMediaArrangement(arrangement).sections.filter((section) => section.hideFromListingSites).map((section) => section.id)
-  );
-}
-function isHiddenFromListingSites(listing, row) {
-  const arrangement = readMediaArrangement(listing?.mediaArrangement);
-  const hidden = hiddenSectionIdSet(arrangement);
-  if (hidden.size === 0) return false;
-  const sectionId = text$d(row.sectionId, 32);
-  if (sectionId && hidden.has(sectionId)) return true;
-  const id = text$d(row.id) || text$d(row.path) || text$d(row.storagePath) || text$d(row.url);
-  if (!id) return false;
-  return arrangement.placements.some((placement) => placement.id === id && hidden.has(placement.sectionId));
-}
-const STAMP_BUCKETS = ["images", "videos", "floorplans", "floorPlans", "tours", "files", "clientPortalUploads"];
-function syncPortalMedia(current, sequenced, sections) {
-  const base = current && typeof current === "object" && !Array.isArray(current) ? { ...current } : {};
-  const keys = { photo: "photos", video: "videos", floorplan: "floorplans", tour: "tours" };
-  for (const key of Object.values(keys)) {
-    const existing = base[key] && typeof base[key] === "object" && !Array.isArray(base[key]) ? { ...base[key] } : {};
-    base[key] = existing;
-  }
-  for (const item of sequenced) {
-    const key = keys[item.kind];
-    if (!key) continue;
-    const bucket2 = base[key];
-    const prev = bucket2[item.id] && typeof bucket2[item.id] === "object" ? bucket2[item.id] : {};
-    bucket2[item.id] = {
-      hidden: prev.hidden === true,
-      order: item.sortOrder,
-      groupId: item.kind === "photo" ? item.sectionId : ""
-    };
-  }
-  base.photoGroups = sections.map((section) => ({
-    id: section.id,
-    name: section.name,
-    order: section.order,
-    hideFromListingSites: section.hideFromListingSites
-  }));
-  return base;
-}
-function stampListingArrangement(listing, arrangement, address) {
-  const media = collectArrangementMedia(listing);
-  const current = readMediaArrangement(arrangement);
-  const sequenced = sequenceArrangement(media, current, address);
-  const byKey = new Map(sequenced.filter((item) => item.bucket).map((item) => [`${item.bucket}:${item.index}`, item]));
-  const next = {
-    ...listing,
-    mediaArrangement: current
-  };
-  for (const bucket2 of STAMP_BUCKETS) {
-    if (!Array.isArray(listing[bucket2])) continue;
-    next[bucket2] = listing[bucket2].map((row, index) => {
-      if (!row || typeof row !== "object") return row;
-      const copy = { ...row };
-      const hit = byKey.get(`${bucket2}:${index}`);
-      if (!hit) {
-        if (copy.culled === true) delete copy.deliveryName;
-        return copy;
-      }
-      copy.sortOrder = hit.sortOrder;
-      copy.order = hit.sortOrder;
-      copy.sectionId = hit.sectionId;
-      if (hit.deliveryName) copy.deliveryName = hit.deliveryName;
-      else delete copy.deliveryName;
-      return copy;
-    });
-  }
-  next.portalMedia = syncPortalMedia(listing.portalMedia, sequenced, current.sections);
-  return {
-    listing: next,
-    names: sequenced.map((item) => item.deliveryName).filter(Boolean),
-    sequenced
-  };
-}
-function stampGalleryMediaItems(items, sequenced) {
-  const byPath2 = /* @__PURE__ */ new Map();
-  const byId = /* @__PURE__ */ new Map();
-  const byUrl = /* @__PURE__ */ new Map();
-  for (const row of sequenced) {
-    if (!row.deliveryName) continue;
-    byId.set(row.id, row);
-    if (row.path) byPath2.set(row.path, row);
-    if (row.url) byUrl.set(row.url, row);
-  }
-  return items.map((item) => {
-    const path2 = text$d(item.storagePath) || text$d(item.path);
-    const id = text$d(item.id);
-    const url = text$d(item.url) || text$d(item.shareUrl);
-    const hit = path2 && byPath2.get(path2) || id && byId.get(id) || url && byUrl.get(url) || void 0;
-    if (!hit) return item;
-    return {
-      ...item,
-      sortOrder: hit.sortOrder,
-      order: hit.sortOrder,
-      deliveryName: hit.deliveryName,
-      fileName: hit.deliveryName,
-      name: hit.deliveryName,
-      title: hit.deliveryName,
-      sectionId: hit.sectionId
-    };
-  });
+function finite$1(value) {
+  const number = typeof value === "number" ? value : typeof value === "string" && value.trim() ? Number(value) : NaN;
+  return Number.isFinite(number) ? number : null;
 }
 const db$s = () => admin.firestore();
 const bucket$3 = () => admin.storage().bucket();
@@ -16284,17 +16476,22 @@ async function registerListingPhoto(options) {
     const value = Number(item?.sortOrder);
     return Number.isFinite(value) ? Math.max(max, value) : max;
   }, 0);
+  const delivery = galleryUploadExtra(options.extra);
+  const displayName = typeof delivery.displayName === "string" ? delivery.displayName : "";
+  delete delivery.displayName;
   const image = {
     id: storagePath,
     url,
-    name: safeStorageFileName(fileName2),
+    name: displayName || safeStorageFileName(fileName2),
     path: storagePath,
     contentType: contentTypeForUpload(fileName2, options.contentType),
     uploadedAt: (/* @__PURE__ */ new Date()).toISOString(),
     uploadedBy,
     sortOrder: maxOrder + 1,
     culled: false,
-    ...studioImageExtra(options.extra)
+    hiddenFromGallery: false,
+    ...studioImageExtra(options.extra),
+    ...delivery
   };
   const already = images.find((item) => item?.path === storagePath);
   if (!already) {
@@ -21136,6 +21333,7 @@ function visitorPortalListingDetail(detail) {
     videos: detail.videos.filter((item) => !item.hidden),
     tours: detail.tours.filter((item) => !item.hidden),
     floorplans: detail.floorplans.filter((item) => !item.hidden),
+    facts: detail.facts.filter((fact) => fact.galleryHidden !== true).map(({ galleryHidden: _hidden, ...fact }) => fact),
     socialAssets: [],
     clientFiles: [],
     invoices: [],
@@ -21216,7 +21414,14 @@ function buildPortalListingDetail(sources) {
     address,
     facts: FACT_DEFS.map((fact) => {
       const value = factText(readFact(records, fact.keys));
-      return { id: fact.id, label: fact.label, value: value || EMPTY, empty: !value };
+      const galleryHidden = !listingKitFieldShown(listing.listingKit, fact.id);
+      return {
+        id: fact.id,
+        label: fact.label,
+        value: value || EMPTY,
+        empty: !value,
+        ...galleryHidden ? { galleryHidden: true } : {}
+      };
     }),
     photos,
     videos,
@@ -21689,7 +21894,7 @@ function mapEmbedUrl(lat, lng) {
   return `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat.toFixed(6)}%2C${lng.toFixed(6)}`;
 }
 function collectPhotos(listing, galleries, store, savedOrder = false) {
-  return finishMedia("photo", [...rowsFrom(listing.images), ...galleryRows(galleries)], store.photos, (row) => isPhoto(row), savedOrder);
+  return finishMedia("photo", [...rowsFrom(listing.images), ...galleryRows(galleries)], store.photos, (row) => isPhoto(row), savedOrder, listing);
 }
 function collectVideos(listing, galleries, store, savedOrder = false) {
   return finishMedia(
@@ -21697,20 +21902,24 @@ function collectVideos(listing, galleries, store, savedOrder = false) {
     [...rowsFrom(listing.videos), ...rowsFrom(listing.images), ...clientUploadRows(listing, "video"), ...galleryRows(galleries)],
     store.videos,
     (row) => isVideo(row),
-    savedOrder
+    savedOrder,
+    listing
   );
 }
 function collectClientUploads(listing, kind, savedOrder = false) {
-  return finishMedia(kind === "social" ? "photo" : "floorplan", clientUploadRows(listing, kind), {}, () => true, savedOrder).map((item) => ({ ...item, kind: kind === "social" ? "photo" : "floorplan" }));
+  const tagged = rowsFrom(listing.images).filter((row) => text$9(row.assetType).toLowerCase() === kind || text$9(row.type).toLowerCase() === kind);
+  const socialBucket = kind === "social" ? rowsFrom(listing.socialAssets) : [];
+  return finishMedia(kind === "social" ? "photo" : "floorplan", [...clientUploadRows(listing, kind), ...tagged, ...socialBucket], {}, () => true, savedOrder, listing).map((item) => ({ ...item, kind: kind === "social" ? "photo" : "floorplan" }));
 }
 function collectFloorplans(listing, galleries, store, savedOrder = false) {
   const rows = [
     ...rowsFrom(listing.floorplans).filter(isRasterFloorplan),
+    ...rowsFrom(listing.images).filter((row) => (text$9(row.assetType).toLowerCase() === "floorplan" || text$9(row.type).toLowerCase() === "floorplan") && isRasterFloorplan(row)),
     ...rowsFrom(listing.designAssets).filter(isFloorplan),
     ...rowsFrom(listing.cubiCasaImports).filter(isFloorplan),
     ...galleryRows(galleries).filter(isFloorplan)
   ];
-  return finishMedia("floorplan", rows, store.floorplans, () => true, savedOrder);
+  return finishMedia("floorplan", rows, store.floorplans, () => true, savedOrder, listing);
 }
 function collectTours(listing, galleries, store, savedOrder = false) {
   const rows = [];
@@ -21740,7 +21949,7 @@ function collectTours(listing, galleries, store, savedOrder = false) {
       name: text$9(row.name) || text$9(row.title) || provider || "Virtual tour",
       url,
       contentType: text$9(row.contentType),
-      hidden: prefs?.hidden === true || row.hiddenFromPresentation === true,
+      hidden: prefs?.hidden === true || row.hiddenFromPresentation === true || isHiddenFromClientGallery(listing, row),
       order: savedOrder ? storedOrder ?? index + 1e5 : prefs?.order ?? index,
       groupId: "",
       uploadedAt: portalTimestamp(row.uploadedAt || row.createdAt),
@@ -21754,7 +21963,7 @@ function collectTours(listing, galleries, store, savedOrder = false) {
 function isTourField(id) {
   return /tour|matterport/i.test(id);
 }
-function finishMedia(kind, rows, prefs, include, savedOrder = false) {
+function finishMedia(kind, rows, prefs, include, savedOrder = false, listing = {}) {
   const seen = /* @__PURE__ */ new Set();
   const items = [];
   rows.forEach((row, index) => {
@@ -21777,7 +21986,7 @@ function finishMedia(kind, rows, prefs, include, savedOrder = false) {
       name: text$9(row.name) || text$9(row.fileName) || text$9(row.title) || `${kind} ${items.length + 1}`,
       url,
       contentType: text$9(row.contentType).toLowerCase(),
-      hidden: pref?.hidden === true || row.hiddenFromPresentation === true || row.portalHidden === true,
+      hidden: pref?.hidden === true || row.hiddenFromPresentation === true || row.portalHidden === true || isHiddenFromClientGallery(listing, row),
       order: savedOrder ? storedOrder ?? index + 1e5 : pref?.order ?? index,
       groupId: kind === "photo" ? savedOrder ? sectionId : groupIdText(pref?.groupId) : "",
       uploadedAt: portalTimestamp(row.uploadedAt || row.createdAt),
@@ -21843,6 +22052,7 @@ function isVideo(row) {
 function isPhoto(row) {
   const declared = text$9(row.type).toLowerCase();
   const asset = text$9(row.assetType).toLowerCase();
+  if (asset === "social" || asset === "file" || declared === "social" || declared === "file" || declared === "document") return false;
   if (isVideo(row) || declared === "floorplan" || asset === "floorplan" || isRaw(row)) return false;
   const type = text$9(row.type).toLowerCase();
   if (type === "tour" || type === "matterport" || type === "video" || type === "reel" || type === "file" || type === "document") return false;
@@ -24980,7 +25190,8 @@ router$q.post("/:id/photos", requirePhotographer, async (req, res) => {
         fileName: fileName2,
         contentType: saved.contentType,
         uploadedBy: req.user.uid,
-        existingUrl: saved.url
+        existingUrl: saved.url,
+        extra: req.body?.extra
       });
       await noteRawUpload(listingId, registered2.image, req.user.uid);
       const autoQueue2 = await noteOrderEditQueue(listingId, req.user.uid);
@@ -24996,7 +25207,8 @@ router$q.post("/:id/photos", requirePhotographer, async (req, res) => {
       storagePath,
       fileName: fileName2,
       contentType: req.body?.contentType,
-      uploadedBy: req.user.uid
+      uploadedBy: req.user.uid,
+      extra: req.body?.extra
     });
     await noteRawUpload(listingId, registered.image, req.user.uid);
     const autoQueue = await noteOrderEditQueue(listingId, req.user.uid);
