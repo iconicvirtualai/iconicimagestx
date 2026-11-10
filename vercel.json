@@ -24,13 +24,13 @@
   "functions": {
     "api/index.mjs": {
       "maxDuration": 60,
-      "includeFiles": "{dist/spa/index.html,public/studio/grass-reference.jpg,node_modules/sharp/**,node_modules/.pnpm/@img+sharp-linux-x64@*/node_modules/@img/sharp-linux-x64/**,node_modules/.pnpm/@img+sharp-libvips-linux-x64@*/node_modules/@img/sharp-libvips-linux-x64/**,node_modules/.pnpm/sharp@*/node_modules/sharp/**}",
-      "excludeFiles": "{node_modules/.pnpm/@img+sharp-linuxmusl-x64@*/**,node_modules/.pnpm/@img+sharp-libvips-linuxmusl-x64@*/**,node_modules/.pnpm/@img+sharp-darwin-x64@*/**,node_modules/.pnpm/@img+sharp-darwin-arm64@*/**,node_modules/.pnpm/@img+sharp-win32-x64@*/**,node_modules/.pnpm/@img+sharp-linux-arm64@*/**,node_modules/.pnpm/@img+sharp-libvips-darwin-x64@*/**,node_modules/.pnpm/@img+sharp-libvips-darwin-arm64@*/**,node_modules/.pnpm/@img+sharp-libvips-win32-x64@*/**,node_modules/.pnpm/@img+sharp-libvips-linux-arm64@*/**}"
+      "includeFiles": "{dist/spa/index.html,public/studio/grass-reference.jpg,node_modules/**/sharp/**,node_modules/**/sharp-linux-x64/**,node_modules/**/sharp-libvips-linux-x64/**}",
+      "excludeFiles": "node_modules/**/@img/sharp*{linuxmusl,darwin,win32,wasm,linux-arm}*/**"
     },
     "api/media-display.mjs": {
       "maxDuration": 60,
-      "includeFiles": "node_modules/.pnpm/@img+sharp-libvips-linux-x64@*/node_modules/@img/sharp-libvips-linux-x64/**",
-      "excludeFiles": "{public/media/**,node_modules/.pnpm/@img+sharp-linuxmusl-x64@*/**,node_modules/.pnpm/@img+sharp-libvips-linuxmusl-x64@*/**}"
+      "includeFiles": "node_modules/**/sharp-libvips-linux-x64/**",
+      "excludeFiles": "{public/media/**,node_modules/**/@img/sharp*{linuxmusl,darwin,win32,wasm,linux-arm}*/**}"
     }
   },
   "redirects": [

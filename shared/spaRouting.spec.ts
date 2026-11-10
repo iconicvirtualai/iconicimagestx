@@ -46,13 +46,19 @@ describe("vercel function split", () => {
     const display = vercel.functions["api/media-display.mjs"];
     expect(typeof main.includeFiles).toBe("string");
     expect(typeof display.includeFiles).toBe("string");
-    expect(main.includeFiles).toContain("node_modules/sharp/**");
+    expect(main.includeFiles).toContain("**/sharp/**");
     expect(main.includeFiles).toContain("sharp-linux-x64");
     expect(main.includeFiles).toContain("sharp-libvips-linux-x64");
-    expect(main.excludeFiles).not.toContain("node_modules/sharp/**");
+    expect(main.includeFiles).toContain("public/studio/grass-reference.jpg");
     expect(main.excludeFiles).toContain("linuxmusl");
-    expect(JSON.stringify(display.includeFiles)).toContain("sharp-libvips");
+    expect(main.excludeFiles).not.toContain("node_modules/sharp/**");
+    expect(display.includeFiles).toContain("sharp-libvips-linux-x64");
     expect(display.excludeFiles).toContain("public/media");
+    for (const config of Object.values(vercel.functions)) {
+      for (const value of Object.values(config)) {
+        if (typeof value === "string") expect(value.length).toBeLessThanOrEqual(256);
+      }
+    }
   });
 });
 
