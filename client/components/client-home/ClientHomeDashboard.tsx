@@ -10,6 +10,8 @@ import {
 import { PortalShell, portalHref, type PortalHomeSection } from "@/components/client-hub/PortalShell";
 import { MoneyAmount } from "@/components/MoneyAmount";
 import { downloadBrandedInvoice } from "@/lib/downloadBrandedInvoice";
+import { BUSINESS_CONTACT, LEGAL_BUSINESS_NAME } from "@shared/businessContact";
+import { formatInvoicePhone } from "@shared/invoiceProcessing";
 import {
   appointmentSummary,
   appointmentTone,
@@ -312,7 +314,10 @@ function InvoiceDetail({ invoice }: { invoice: ClientInvoiceStatement }) {
           {invoice.clientName ? <p className="font-bold">{invoice.clientName}</p> : null}
           {invoice.address ? <p className="ink3">{invoice.address}</p> : null}
         </div>
-        <img className="doc-logo" src="/media/logos/iconic-graffiti-logo.png" alt="Iconic Images" />
+        <div className="doc-brand" aria-label="Iconic">
+          <img src="/media/logos/iconic-camera-logo.png" alt="" />
+          <span>ICONIC</span>
+        </div>
       </div>
       <table>
         <thead>
@@ -350,9 +355,14 @@ function InvoiceDetail({ invoice }: { invoice: ClientInvoiceStatement }) {
         <div className="kicker">Notes</div>
         <p>{notes}</p>
       </div>
-      <p className="ink3" style={{ marginTop: 16 }}>
-        Iconic Images Photography, LLC · photos@iconicimagestx.com
-      </p>
+      <div className="ink3" style={{ marginTop: 16, fontSize: 13.5 }}>
+        <p className="kicker">Payment information</p>
+        <p>{LEGAL_BUSINESS_NAME}</p>
+        <p>{BUSINESS_CONTACT.streetAddress}</p>
+        <p>{BUSINESS_CONTACT.addressLine2}</p>
+        <p>{formatInvoicePhone(BUSINESS_CONTACT.phoneDisplay)}</p>
+        <p>{BUSINESS_CONTACT.email}</p>
+      </div>
       <p style={{ marginTop: 8, fontWeight: 800 }}>Thank you for being Iconic.</p>
       <div className="actions-inline">
         {due > 0 ? (

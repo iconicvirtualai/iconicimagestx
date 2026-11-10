@@ -145,7 +145,7 @@ export default function ClientInvoice() {
   };
 
   return (
-    <div className="iframe-safe-page bg-[#f4f7f8]">
+    <div className="iframe-safe-page bg-[#f5f2ea]">
       <main className="max-w-3xl mx-auto px-4 py-8">
         <BrandedInvoiceShell
           invoiceNumber={invoiceNumber}
@@ -153,15 +153,14 @@ export default function ClientInvoice() {
           status={paid ? "Paid" : "Payment due"}
           amountPaid={face.amountPaid}
           amountDue={face.amountDue}
-          notes={notes}
-          templateFrame
+          notes={notes.trim() || "No notes on this invoice."}
           footer={(
             <>
               <button
                 type="button"
                 data-testid="download-invoice-pdf"
                 onClick={downloadPdf}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[#FFD700] bg-black px-4 py-3 text-xs font-black uppercase tracking-widest text-[#FFD700] hover:bg-zinc-900"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[#0d9488] bg-white px-4 py-3 text-xs font-black uppercase tracking-widest text-[#0f766e] hover:bg-[#f5f2ea]"
               >
                 <Download className="h-4 w-4" /> Download PDF
               </button>
@@ -173,7 +172,7 @@ export default function ClientInvoice() {
                   </div>
                   <DoorsOpenReceiptNote optInUrl={typeof invoice.dotOptInUrl === "string" ? invoice.dotOptInUrl : ""} />
                   {invoice.galleryId && (
-                    <Button asChild className="w-full h-12 bg-black hover:bg-gray-900 text-white rounded-xl font-bold">
+                    <Button asChild className="w-full h-12 bg-[#0d9488] hover:bg-[#0f766e] text-white rounded-xl font-bold">
                       <Link to={`/gallery/${invoice.galleryId}`}>Open Gallery</Link>
                     </Button>
                   )}
@@ -191,7 +190,7 @@ export default function ClientInvoice() {
                       type="button"
                       data-testid="pay-at-close-checkout"
                       onClick={startPayAtClose}
-                      className="w-full h-12 bg-black hover:bg-zinc-800 text-[#FFD700] rounded-xl font-bold"
+                      className="w-full h-12 border border-[#0d9488] bg-white text-[#0f766e] hover:bg-[#f5f2ea] rounded-xl font-bold"
                       disabled={payAtCloseStarting}
                     >
                       {payAtCloseStarting ? "Opening Pay at Close..." : "Pay at Close"}
