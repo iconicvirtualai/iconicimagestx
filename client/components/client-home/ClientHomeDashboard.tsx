@@ -4,12 +4,10 @@ import {
   Building2,
   CalendarClock,
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   Download,
   Home,
 } from "lucide-react";
-import { PortalShell, type PortalHomeSection } from "@/components/client-hub/PortalShell";
+import { PortalShell, portalHref, type PortalHomeSection } from "@/components/client-hub/PortalShell";
 import { MoneyAmount } from "@/components/MoneyAmount";
 import { downloadBrandedInvoice } from "@/lib/downloadBrandedInvoice";
 import {
@@ -18,6 +16,7 @@ import {
   clientInvoicePdfInput,
   clientListingPath,
   humanStatus,
+  mergeListingShoots,
   sortNewestFirst,
   usd,
   type AppointmentTone,
@@ -27,6 +26,7 @@ import {
 } from "@shared/clientHome";
 import { ListingPackageCard } from "@/components/listing-card/ListingPackageCard";
 import { PortalMessages } from "@/components/communications/PortalMessages";
+import { PortalListingsHome } from "@/components/client-home/PortalListingsHome";
 
 export type ClientHomeSection = PortalHomeSection;
 
@@ -56,6 +56,7 @@ const LISTING_BADGE: Record<string, { label: string; badge: string }> = {
 
 export function ClientHomeView({
   firstName,
+  accountName,
   listings,
   invoices,
   appointments,
@@ -69,8 +70,10 @@ export function ClientHomeView({
   loading = false,
   error = "",
   example = false,
+  messageCount = 0,
 }: {
   firstName: string;
+  accountName?: string;
   listings: ClientListingCard[];
   invoices: ClientInvoiceStatement[];
   appointments: ClientAppointment[];
@@ -84,17 +87,21 @@ export function ClientHomeView({
   loading?: boolean;
   error?: string;
   example?: boolean;
+  messageCount?: number;
 }) {
   const orderedListings = useMemo(() => sortNewestFirst(listings), [listings]);
+  const calendarAppointments = useMemo(() => mergeListingShoots(appointments, orderedListings), [appointments, orderedListings]);
+  const upcoming = calendarAppointments.filter((item) => item.date && item.date >= today).length;
 
   return (
     <PortalShell
       firstName={firstName}
+      accountName={accountName}
       onSignOut={onSignOut}
-      active={section === "orders" ? "billing" : section}
+      active={section}
       example={example}
       onSection={onSection}
-      counts={{ listings: orderedListings.length, schedule: appointments.length }}
+      counts={{ listings: orderedListings.length, schedule: upcoming || calendarAppointments.length, messages: messageCount }}
     >
       <div data-section={section}>
         {loading ? (
@@ -106,47 +113,38 @@ export function ClientHomeView({
             <p className="font-bold">{error}</p>
           </div>
         ) : section === "listings" ? (
-          <ListingGrid listings={orderedListings} truncated={listingsTruncated} />
+          <>
+            {listingsTruncated ? <p className="lede">Showing the latest listings stored for this account.</p> : null}
+            <PortalListingsHome
+              firstName={firstName}
+              listings={orderedListings}
+              appointments={calendarAppointments}
+              example={example}
+              today={today}
+              onSection={onSection}
+            />
+          </>
         ) : section === "orders" ? (
-          <div className="bg-white rounded-2xl border border-gray-100 p-8">
-            <h2 className="font-black text-xl">Order history</h2>
-            <p className="text-sm text-gray-500 mt-2">
-              {invoices.length === 0 ? "No invoices are stored on this account yet." : `${invoices.length} invoice${invoices.length === 1 ? "" : "s"} on file.`}
-              {invoicesTruncated ? " Showing the latest invoices." : ""}
-            </p>
-            <Link to="/portal/settings/billing" className="inline-flex mt-4 rounded-xl bg-black text-white px-4 py-3 text-[10px] font-black uppercase tracking-widest">
-              Open billing
-            </Link>
-          </div>
+          invoices.length === 0 ? (
+            <div className="card">
+              <h2>Order history</h2>
+              <p>No invoices are stored on this account yet.</p>
+              <Link to={portalHref("/portal/settings/billing", example)} className="btn btn-ink btn-md" style={{ marginTop: 16 }}>Open billing</Link>
+            </div>
+          ) : (
+            <OrderHistory invoices={invoices} truncated={invoicesTruncated} filterable exampleOpen={example} />
+          )
         ) : section === "messages" ? (
-          <PortalMessages />
+          <div id="messages-jump">
+            <PortalMessages example={example} />
+          </div>
         ) : (
-          <ScheduleCalendar appointments={appointments} today={today} truncated={appointmentsTruncated} />
+          <div id="schedule-jump">
+            <ScheduleCalendar appointments={calendarAppointments} today={today} truncated={appointmentsTruncated} />
+          </div>
         )}
       </div>
     </PortalShell>
-  );
-}
-
-function ListingGrid({ listings, truncated }: { listings: ClientListingCard[]; truncated: boolean }) {
-  if (listings.length === 0) {
-    return (
-      <EmptyState
-        title="No listings yet"
-        body="No listings are tied to this account yet. A project saved for this login shows up here."
-      />
-    );
-  }
-
-  return (
-    <div>
-      <SectionHeading title="Listings" note={truncated ? "Showing the latest listings stored for this account." : ""} />
-      <div className="grid items-start gap-6 [grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),360px))]">
-        {listings.map((listing) => (
-          <ListingTile key={listing.id} listing={listing} />
-        ))}
-      </div>
-    </div>
   );
 }
 
@@ -206,14 +204,16 @@ export function OrderHistory({
   openId,
   onToggle,
   filterable = false,
+  exampleOpen = false,
 }: {
   invoices: ClientInvoiceStatement[];
   truncated?: boolean;
   openId?: string | null;
   onToggle?: (id: string) => void;
   filterable?: boolean;
+  exampleOpen?: boolean;
 }) {
-  const [localOpen, setLocalOpen] = useState<string | null>(null);
+  const [localOpen, setLocalOpen] = useState<string | null>(exampleOpen ? invoices[0]?.id || null : null);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
   const opened = openId !== undefined ? openId : localOpen;
@@ -299,61 +299,85 @@ export function OrderHistory({
 }
 
 function InvoiceDetail({ invoice }: { invoice: ClientInvoiceStatement }) {
+  const due = invoice.amountDue ?? 0;
+  const notes = invoice.notes?.trim() || "No notes on this invoice.";
   return (
-    <div className="px-5 pb-5 bg-gray-50 border-t border-gray-100">
-      <div className="py-4 space-y-2">
-        {invoice.clientName ? <p className="text-sm font-bold">{invoice.clientName}</p> : null}
-        {invoice.address ? <p className="text-sm text-gray-600">{invoice.address}</p> : null}
-        {invoice.lineItems.length === 0 ? (
-          <p className="text-sm text-gray-500">No line items are stored on this invoice.</p>
-        ) : (
-          invoice.lineItems.map((item, index) => (
-            <div key={`${item.name}-${index}`} className="flex items-baseline justify-between gap-4 text-sm">
-              <span className="min-w-0 font-bold">
-                {item.name}
-                {item.qty != null ? <span className="font-medium text-gray-500"> × {item.qty}</span> : null}
-              </span>
-              {item.amount == null ? (
-                <span className="shrink-0">Amount not stored</span>
-              ) : (
-                <MoneyAmount>{usd(item.amount)}</MoneyAmount>
-              )}
-            </div>
-          ))
-        )}
-        <MoneyRow label="Subtotal" value={invoice.subtotal} />
-        <MoneyRow label="Tax" value={invoice.tax} />
-        <MoneyRow label="Total" value={invoice.total} />
-        <MoneyRow label="Amount paid" value={invoice.amountPaid} />
-        <MoneyRow label="Amount due" value={invoice.amountDue} />
+    <div className="doc">
+      <div className="doc-top">
+        <div>
+          <div className="kicker">Invoice</div>
+          <h2 style={{ fontSize: 28, fontWeight: 900, letterSpacing: "-0.03em" }}>{invoice.invoiceNumber}</h2>
+          <p className="ink3">{[invoice.issuedOn, invoice.status ? humanStatus(invoice.status) : ""].filter(Boolean).join(" · ")}</p>
+          <p className="kicker" style={{ marginTop: 16 }}>Invoice to</p>
+          {invoice.clientName ? <p className="font-bold">{invoice.clientName}</p> : null}
+          {invoice.address ? <p className="ink3">{invoice.address}</p> : null}
+        </div>
+        <img className="doc-logo" src="/media/logos/iconic-graffiti-logo.png" alt="Iconic Images" />
       </div>
-      <div className="flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          onClick={() => downloadInvoicePdf(invoice)}
-          className="inline-flex items-center gap-2 rounded-xl bg-black text-white px-4 py-2.5 text-[10px] font-black uppercase tracking-widest hover:bg-zinc-800"
-        >
+      <table>
+        <thead>
+          <tr>
+            <th>Description</th>
+            <th className="r">Qty</th>
+            <th className="r">Price</th>
+            <th className="r">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {invoice.lineItems.length === 0 ? (
+            <tr><td colSpan={4}>No line items are stored on this invoice.</td></tr>
+          ) : invoice.lineItems.map((item, index) => (
+            <tr key={`${item.name}-${index}`}>
+              <td>{item.name}</td>
+              <td className="r">{item.qty ?? ""}</td>
+              <td className="r">{item.amount == null ? "Amount not stored" : <MoneyAmount>{usd(item.amount)}</MoneyAmount>}</td>
+              <td className="r">{item.amount == null ? "" : <MoneyAmount>{usd(item.amount)}</MoneyAmount>}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="totals">
+        <MoneyLine label="Subtotal" value={invoice.subtotal} />
+        <MoneyLine label="Processing" value={invoice.processing ?? 0} />
+        <MoneyLine label="Promotions" value={invoice.promoDiscount ?? 0} />
+        <MoneyLine label="Fees" value={invoice.fees ?? 0} />
+        {invoice.tax != null ? <MoneyLine label="Tax" value={invoice.tax} /> : null}
+        <MoneyLine label="Total" value={invoice.total} />
+        <MoneyLine label="Amount paid" value={invoice.amountPaid} />
+        <div className="due"><span>Amount due</span><MoneyAmount>{invoice.amountDue == null ? "Amount not stored" : usd(invoice.amountDue)}</MoneyAmount></div>
+      </div>
+      <div className="notes-box">
+        <div className="kicker">Notes</div>
+        <p>{notes}</p>
+      </div>
+      <p className="ink3" style={{ marginTop: 16 }}>
+        Iconic Images Photography, LLC · photos@iconicimagestx.com
+      </p>
+      <p style={{ marginTop: 8, fontWeight: 800 }}>Thank you for being Iconic.</p>
+      <div className="actions-inline">
+        {due > 0 ? (
+          invoice.payPath ? (
+            <Link className="btn btn-teal btn-md" to={invoice.payPath}>Pay {usd(due)}</Link>
+          ) : (
+            <button type="button" className="btn btn-teal btn-md">Pay {usd(due)}</button>
+          )
+        ) : null}
+        {due > 0 ? <Link className="btn btn-outline btn-md" to="/pay-at-close">Pay at Close</Link> : null}
+        {invoice.payPath ? <Link className="btn btn-ghost btn-md" to={invoice.payPath}>View invoice</Link> : <span className="btn btn-ghost btn-md">View invoice</span>}
+        <button type="button" className="btn btn-ink btn-md" onClick={() => downloadInvoicePdf(invoice)}>
           <Download className="w-3.5 h-3.5" /> Download PDF
         </button>
-        {invoice.payPath ? (
-          <Link
-            to={invoice.payPath}
-            className="inline-flex items-center rounded-xl border border-black px-4 py-2.5 text-[10px] font-black uppercase tracking-widest"
-          >
-            View invoice
-          </Link>
-        ) : null}
       </div>
+      <p className="muted" style={{ marginTop: 10, fontSize: 12 }}>$0 due until closing with financing arranged by Titus.</p>
     </div>
   );
 }
 
-function MoneyRow({ label, value }: { label: string; value: number | null }) {
-  if (value == null) return null;
+function MoneyLine({ label, value }: { label: string; value: number | null }) {
   return (
-    <div className="flex items-baseline justify-between gap-4 text-sm">
-      <span className="min-w-0 text-gray-500">{label}</span>
-      <MoneyAmount className="font-bold">{usd(value)}</MoneyAmount>
+    <div>
+      <span>{label}</span>
+      {value == null ? <span>Amount not stored</span> : <MoneyAmount>{usd(value)}</MoneyAmount>}
     </div>
   );
 }
@@ -390,35 +414,30 @@ function ScheduleCalendar({
 
   return (
     <div>
-      <SectionHeading
-        title="Schedule"
-        note={truncated ? "Showing the latest appointments stored for this account." : ""}
-      />
-      <div className="flex flex-wrap gap-2 mb-4">
-        <Legend swatch="bg-gray-200 border-gray-200" label="Past" />
-        <Legend swatch="bg-blue-600 border-blue-600" label="You submitted" />
-        <Legend swatch="bg-green-600 border-green-600" label="Iconic accepted" />
-        <Legend swatch="bg-orange-500 border-orange-500" label="Different time, approval still open" />
+      <div className="page-head">
+        <div>
+          <div className="kicker">Schedule</div>
+          <h1>Your appointments</h1>
+          {truncated ? <p className="sub">Showing the latest appointments stored for this account.</p> : <p className="sub">Times are in America/Chicago.</p>}
+        </div>
+      </div>
+      <div className="legend">
+        <Legend swatch="dot past" label="Past" />
+        <Legend swatch="dot sub" label="You submitted" />
+        <Legend swatch="dot acc" label="Iconic accepted" />
+        <Legend swatch="dot open" label="Different time, approval still open" />
       </div>
 
-      <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden">
-        <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-100">
-          <button type="button" aria-label="Previous month" onClick={() => setMonth((current) => shiftMonth(current, -1))} className="p-2 rounded-xl hover:bg-gray-50">
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <h3 className="text-sm font-black uppercase tracking-widest">{monthTitle(month)}</h3>
-          <button type="button" aria-label="Next month" onClick={() => setMonth((current) => shiftMonth(current, 1))} className="p-2 rounded-xl hover:bg-gray-50">
-            <ChevronRight className="w-4 h-4" />
-          </button>
+      <div className="cal-wrap">
+        <div className="cal-nav">
+          <button type="button" className="btn btn-ghost btn-sm" aria-label="Previous month" onClick={() => setMonth((current) => shiftMonth(current, -1))}>Previous</button>
+          <h2>{monthTitle(month)}</h2>
+          <button type="button" className="btn btn-ghost btn-sm" aria-label="Next month" onClick={() => setMonth((current) => shiftMonth(current, 1))}>Next</button>
         </div>
-        <div className="grid grid-cols-7 border-b border-gray-50">
+        <div className="cal">
           {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
-            <div key={day} className="py-3 text-center">
-              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">{day}</span>
-            </div>
+            <div key={day} className="dow">{day}</div>
           ))}
-        </div>
-        <div className="grid grid-cols-7">
           {cells.map((cell) => {
             const dayAppointments = byDate.get(cell.key) || [];
             const isToday = cell.key === today;
@@ -426,35 +445,48 @@ function ScheduleCalendar({
               <div
                 key={cell.key}
                 data-date={cell.key}
-                className={`min-h-24 sm:min-h-32 border-r border-b border-gray-50 p-1.5 sm:p-2 ${cell.inMonth ? "" : "bg-gray-50/40"} ${isToday ? "bg-[#0d9488]/5" : ""}`}
+                className={`day${cell.inMonth ? "" : " out"}${isToday ? " today" : ""}`}
               >
-                <span className={`inline-flex text-xs font-black ${isToday ? "bg-[#0d9488] text-white w-6 h-6 items-center justify-center rounded-lg" : cell.inMonth ? "text-gray-500" : "text-gray-300"}`}>
-                  {cell.label}
-                </span>
-                <div className="mt-1 space-y-1">
-                  {dayAppointments.map((appointment) => {
-                    const tone = appointmentTone(appointment, today);
-                    const summary = appointmentSummary(appointment, today);
-                    return (
-                      <button
-                        key={appointment.id}
-                        type="button"
-                        data-tone={tone}
-                        title={summary}
-                        onClick={() => setSelectedId(appointment.id)}
-                        className={`w-full text-left rounded-lg border px-1.5 py-1 ${TONE_CLASS[tone]}`}
-                      >
-                        <span className="block text-[10px] font-black truncate">{appointment.time || "Time not stored"}</span>
-                        <span className="block text-[10px] font-bold truncate opacity-90">{appointment.address}</span>
-                      </button>
-                    );
-                  })}
-                </div>
+                <span className="n">{cell.label}</span>
+                {dayAppointments.map((appointment) => {
+                  const tone = appointmentTone(appointment, today);
+                  const summary = appointmentSummary(appointment, today);
+                  return (
+                    <button
+                      key={appointment.id}
+                      type="button"
+                      data-tone={tone}
+                      title={summary}
+                      onClick={() => setSelectedId(appointment.id)}
+                      className={`ev${tone === "past" ? " past" : ""}${tone === "change" ? " open" : ""} ${TONE_CLASS[tone]}`}
+                    >
+                      {appointment.address}
+                    </button>
+                  );
+                })}
               </div>
             );
           })}
         </div>
       </div>
+
+      {appointments.length > 0 ? (
+        <div className="agenda">
+          {appointments.map((appointment) => {
+            const tone = appointmentTone(appointment, today);
+            return (
+              <article key={appointment.id} className="ag">
+                <div className="when">{[formatDay(appointment.date), appointment.time].filter(Boolean).join(" · ") || "Date not stored"}</div>
+                <div>
+                  <strong>{appointment.address}</strong>
+                  <div className="muted">{appointmentSummary(appointment, today)}</div>
+                </div>
+                <span className={`tag${tone === "past" ? "" : " ok"}`}>{tone === "past" ? "Past" : tone === "accepted" ? "Iconic accepted" : tone === "submitted" ? "You submitted" : tone === "change" ? "Approval still open" : humanStatus(appointment.status) || "On file"}</span>
+              </article>
+            );
+          })}
+        </div>
+      ) : null}
 
       {appointments.length === 0 ? (
         <p className="mt-4 text-sm text-gray-500">No appointments are stored on this account yet.</p>
@@ -491,8 +523,8 @@ function ScheduleCalendar({
 
 function Legend({ swatch, label }: { swatch: string; label: string }) {
   return (
-    <span className="inline-flex items-center gap-2 rounded-full bg-white border border-gray-100 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-gray-600">
-      <span className={`w-2.5 h-2.5 rounded-full border ${swatch}`} />
+    <span className="leg">
+      <span className={swatch} />
       {label}
     </span>
   );

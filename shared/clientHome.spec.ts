@@ -191,7 +191,7 @@ describe("invoice statements", () => {
     expect(pdf).toContain("TOTAL");
     expect(pdf).toContain("$ 250");
     expect(pdf).toContain("PROCESSING");
-    expect(pdf).toContain("$ 0");
+    expect(pdf).toContain("$0.00");
     expect(pdf).toContain("PAYMENT INFORMATION:");
     expect(pdf).toContain("Iconic Images Photography, LLC");
     expect(pdf).toContain("26410 Oakridge Dr. Ste 105 - 108");
@@ -230,7 +230,7 @@ describe("invoice statements", () => {
     expect(pdf).toContain("DESCRIPTION");
     expect(pdf).toContain("PROCESSING");
     expect(pdf).toContain("TOTAL");
-    expect(pdf).toContain("$ 0");
+    expect(pdf).toContain("$0.00");
     expect(pdf).not.toContain("No line items yet");
   });
 

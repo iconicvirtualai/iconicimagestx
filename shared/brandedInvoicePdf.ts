@@ -151,9 +151,9 @@ function layout(input: BrandedInvoicePdfInput): string {
 
   const cells: Array<{ id: string; label: string; amount: string; x: number }> = [
     { id: "subtotal", label: "SUB TOTAL", amount: formatInvoiceAmount(presented.subtotal), x: T.cells.subtotal },
-    { id: "processing", label: "PROCESSING", amount: formatInvoiceAmount(presented.processing), x: T.cells.processing },
+    { id: "processing", label: "PROCESSING", amount: explicitZero(presented.processing), x: T.cells.processing },
     { id: "promotions", label: "PROMOTIONS", amount: promoAmount(presented.promotions), x: T.cells.promotions },
-    { id: "fees", label: "FEES", amount: formatInvoiceAmount(presented.fees), x: T.cells.fees },
+    { id: "fees", label: "FEES", amount: explicitZero(presented.fees), x: T.cells.fees },
   ];
   if (presented.travel !== 0) cells.push({ id: "travel", label: "TRAVEL", amount: formatInvoiceAmount(presented.travel), x: 0 });
   if (presented.tax !== 0) cells.push({ id: "tax", label: "TAX", amount: formatInvoiceAmount(presented.tax), x: 0 });
@@ -226,9 +226,14 @@ function tableRows(lines: InvoiceFaceLine[]): Array<{ name: string; qty: string;
   return filled.slice(0, 12);
 }
 
+function explicitZero(value: number): string {
+  if (!value) return "$0.00";
+  return formatInvoiceAmount(value);
+}
+
 function promoAmount(value: number): string {
   if (value > 0) return formatInvoiceAmount(-value);
-  return formatInvoiceAmount(0);
+  return explicitZero(0);
 }
 
 function fillRect(x: number, y: number, w: number, h: number, rgb: RGB): string {

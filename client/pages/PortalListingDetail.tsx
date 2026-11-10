@@ -32,6 +32,9 @@ import {
 } from "@shared/photoEditRequest";
 import { MoneyAmount } from "@/components/MoneyAmount";
 import { Button } from "@/components/ui/button";
+import { PortalShell, portalHref } from "@/components/client-hub/PortalShell";
+import { ICONIC_DOWNLOAD_LOCK, amountStillDue } from "@shared/paymentAccess";
+import { samplePortalProfile } from "@/lib/exampleHub";
 import { ClientGalleryMediaFrame } from "@/components/gallery/ClientGalleryMedia";
 import type { ClientGalleryItem } from "@/components/gallery/clientGalleryMedia";
 import { PortalFileUpload } from "@/components/portal/PortalFileUpload";
@@ -44,7 +47,6 @@ import { toast } from "sonner";
 import NotFound from "./NotFound";
 import { marketingMaterialFromProfile, type ClientHubProfile, type HubAgentBranding } from "@shared/clientHubSettings";
 import { MarketingAgentCard } from "@/components/client-hub/MarketingAgentCard";
-import { ExampleListingFile } from "@/components/client-hub/ExampleListingFile";
 import { exampleProfile } from "@/lib/exampleHub";
 
 export function PortalListingDetailView({
@@ -67,6 +69,9 @@ export function PortalListingDetailView({
   onRequestPhotoEdit,
   marketingAgent = null,
   onUpload,
+  example = false,
+  accountName,
+  onSignOut,
 }: {
   detail: PortalListingDetailModel;
   tab: PortalListingTabId;
@@ -87,28 +92,56 @@ export function PortalListingDetailView({
   onRequestPhotoEdit: (photoId: string, note: string) => Promise<boolean>;
   marketingAgent?: HubAgentBranding | null;
   onUpload?: (kind: PortalUploadKind, file: File, onProgress: (pct: number) => void) => Promise<void>;
+  example?: boolean;
+  accountName?: string;
+  onSignOut?: () => void;
 }) {
   const mediaEditing = canEdit ? editing : null;
   const shown = canEdit ? detail : visitorPortalListingDetail(detail);
-  return (
-    <div className="iframe-safe-page bg-[#f6f7f8] text-black" data-testid="portal-listing-detail" data-can-edit={canEdit ? "true" : "false"}>
-      <header className="bg-black text-white">
-        <div className="max-w-5xl mx-auto px-4 py-8">
+  const dueInvoice = shown.invoices.find((invoice) => amountStillDue({ status: invoice.status, total: invoice.total, amountDue: invoice.amountDue }) > 0) || null;
+  const locked = Boolean(canEdit && dueInvoice);
+  const file = (
+    <div data-testid="portal-listing-detail" data-can-edit={canEdit ? "true" : "false"}>
+      <div className="page-head">
+        <div>
           {canEdit ? (
-            <Link to="/portal/home" className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.28em] text-gray-500 hover:text-white">
+            <Link to={portalHref("/portal/home", example)} className="back">
               <ArrowLeft className="w-3.5 h-3.5" /> Portal home
             </Link>
           ) : (
-            <p className="text-[10px] font-black uppercase tracking-[0.28em] text-gray-500">Iconic Images</p>
+            <p className="kicker">Iconic Images</p>
           )}
-          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500 mt-6">Listing file</p>
-          <h1 className="text-3xl font-black mt-2">{detail.title}</h1>
-          <p className="text-gray-400 text-sm mt-1 uppercase tracking-widest">{detail.status.replace(/_/g, " ")}</p>
+          <p className="kicker">Listing file</p>
+          <h1>{detail.title}</h1>
+          <p className="sub">{detail.status.replace(/_/g, " ")}{example ? <span className="sample">Sample</span> : null}</p>
         </div>
-      </header>
+        <div className="actions-inline">
+          {canEdit ? <Link className="btn btn-teal btn-md" to={portalHref("/portal/order", example)}>Place Order</Link> : null}
+          <span className={`btn btn-ghost btn-sm${locked ? " locked" : ""}`} aria-disabled={locked || undefined}>High res</span>
+          <span className={`btn btn-ghost btn-sm${locked ? " locked" : ""}`} aria-disabled={locked || undefined}>Web res</span>
+        </div>
+      </div>
+      {locked && dueInvoice ? (
+        <section className="unlock" data-testid="listing-unlock">
+          <div>
+            <h2>{ICONIC_DOWNLOAD_LOCK.title}</h2>
+            <p>{ICONIC_DOWNLOAD_LOCK.message}</p>
+          </div>
+          <div>
+            <div className="due"><span>Amount due</span>{money(amountStillDue({ status: dueInvoice.status, total: dueInvoice.total, amountDue: dueInvoice.amountDue }))}</div>
+            <p className="muted">{dueInvoice.invoiceNumber}</p>
+            <div className="unlock-actions">
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => onTab("orders")}>View invoice</button>
+              <Link className="btn btn-ink btn-sm" to={portalHref("/portal/home", example, "orders")}>Pay now</Link>
+              <Link className="btn btn-outline btn-sm" to="/pay-at-close">Pay at Close</Link>
+            </div>
+            <p className="muted" style={{ marginTop: 8, fontSize: 12 }}>$0 due until closing with financing arranged by Titus.</p>
+          </div>
+        </section>
+      ) : null}
 
-      <div className="bg-white border-b border-gray-100 sticky top-0 z-10">
-        <nav className="max-w-5xl mx-auto px-4 flex gap-1 overflow-x-auto" aria-label="Listing sections">
+      <div>
+        <nav className="ltabs" aria-label="Listing sections">
           {PORTAL_LISTING_TABS.map((item) => (
             <button
               key={item.id}
@@ -231,13 +264,26 @@ export function PortalListingDetailView({
       </main>
     </div>
   );
+  if (!accountName && !onSignOut) return file;
+  const first = (accountName || "there").split(" ")[0] || "there";
+  return (
+    <PortalShell
+      firstName={first}
+      accountName={accountName}
+      example={example}
+      active="listings"
+      onSignOut={onSignOut}
+    >
+      {file}
+    </PortalShell>
+  );
 }
 
 export default function PortalListingDetail() {
   const { listingId = "" } = useParams();
   const id = portalListingId(listingId);
   const [searchParams, setSearchParams] = useSearchParams();
-  const { user, userType, loading, mustChangePassword, signOutUser } = useAuth();
+  const { user, userType, loading, mustChangePassword, signOutUser, clientProfile } = useAuth();
   const [detail, setDetail] = useState<PortalListingDetailModel | null>(null);
   const [website, setWebsite] = useState<PortalWebsiteSettings | null>(null);
   const [error, setError] = useState("");
@@ -249,8 +295,9 @@ export default function PortalListingDetail() {
   const [dataEditing, setDataEditing] = useState(false);
   const [dataDraft, setDataDraft] = useState<PortalListingFactsDraft | null>(null);
   const [marketingAgent, setMarketingAgent] = useState<HubAgentBranding | null>(null);
-  const tab = portalListingTab(searchParams.get("tab"));
+  const rawTab = searchParams.get("tab");
   const exampleListing = searchParams.get("example") === "1" && id === "example-listing";
+  const tab = exampleListing && !rawTab ? "photos" : portalListingTab(rawTab);
   const mode = portalListingPageMode({
     loading,
     isClient: Boolean(user) && userType === "client",
@@ -333,8 +380,19 @@ export default function PortalListingDetail() {
   if (!exampleListing && !loading && user && mustChangePassword) {
     return <Navigate to={CHANGE_PASSWORD_PATH} replace />;
   }
-  if (exampleListing && tab === "website") return <ExampleWebsitePreview />;
-  if (exampleListing) return <ExampleListingFile />;
+  if (exampleListing) {
+    return (
+      <ExampleListingExperience
+        tab={tab}
+        onTab={(next) => {
+          const params = new URLSearchParams(searchParams);
+          params.set("example", "1");
+          params.set("tab", next);
+          setSearchParams(params, { replace: true });
+        }}
+      />
+    );
+  }
   if (!id || missing) return <NotFound />;
   if (loading || fetching) return <Pending />;
 
@@ -372,7 +430,7 @@ export default function PortalListingDetail() {
             {canEdit ? (
               <>
                 <Button asChild className="mt-4 bg-black text-white">
-                  <Link to="/portal/home">Back to portal home</Link>
+                  <Link to={portalHref("/portal/home", searchParams.get("example") === "1")}>Back to portal home</Link>
                 </Button>
                 <button type="button" className="block mx-auto mt-4 text-xs text-gray-400 underline" onClick={() => signOutUser()}>Sign out</button>
               </>
@@ -426,6 +484,9 @@ export default function PortalListingDetail() {
             setDetail(saved);
             setWebsite(saved.website);
           }}
+          example={searchParams.get("example") === "1"}
+          accountName={canEdit ? [clientProfile?.firstName, clientProfile?.lastName].filter(Boolean).join(" ") || clientProfile?.firstName || "there" : undefined}
+          onSignOut={canEdit ? () => void signOutUser() : undefined}
           onDataSave={() => {
             void (async () => {
               const saved = await send(portalListingDataApiPath(id), dataDraft ?? portalFactsDraftFromDetail(detail));
@@ -950,24 +1011,68 @@ function UploadGrid({
   );
 }
 
+const SAMPLE_GALLERY = [
+  ["/media/portal-v2/deliver-hero.jpg", "front.jpg"],
+  ["/media/portal-v2/deliver-living.jpg", "living.jpg"],
+  ["/media/portal-v2/deliver-kitchen.jpg", "kitchen.jpg"],
+  ["/media/portal-v2/deliver-dining.jpg", "dining.jpg"],
+  ["/media/portal-v2/deliver-bedroom.jpg", "bedroom.jpg"],
+  ["/media/portal-v2/deliver-bath.jpg", "bath.jpg"],
+  ["/media/portal-v2/deliver-yard.jpg", "yard.jpg"],
+] as const;
+
 const EXAMPLE_WEBSITE_DETAIL = buildPortalListingDetail({
   listing: {
     id: "example-listing",
     status: "delivered",
     address: { street: "100 Example Street", city: "Spring", state: "TX", zip: "77373" },
-    images: [{ id: "example-front", name: "example-front.jpg", url: "/media/photos/headshot-gracepoint-1.jpg", contentType: "image/jpeg" }],
+    bedrooms: 4,
+    bathrooms: 3,
+    sqft: "2,480",
+    yearBuilt: "2012",
+    neighborhood: "Example Grove",
   },
+  invoices: [{ id: "example-invoice", invoiceNumber: "#001", orderNumber: "#001", status: "partial", total: 250, amountDue: 128.5, amountPaid: 121.5 }],
 });
+EXAMPLE_WEBSITE_DETAIL.photos = SAMPLE_GALLERY.map(([url, name], index) => ({
+  id: `example-photo-${index}`,
+  kind: "photo",
+  name,
+  url,
+  contentType: "image/jpeg",
+  hidden: false,
+  order: index,
+  groupId: "",
+  uploadedAt: "2026-10-04T00:00:00.000Z",
+}));
+EXAMPLE_WEBSITE_DETAIL.floorplans = [{
+  id: "example-plan",
+  kind: "floorplan",
+  name: "floorplan.jpg",
+  url: "/media/portal-v2/floorplan.jpg",
+  contentType: "image/jpeg",
+  hidden: false,
+  order: 0,
+  groupId: "",
+  uploadedAt: "2026-10-04T00:00:00.000Z",
+}];
 
-function ExampleWebsitePreview() {
-  const [searchParams, setSearchParams] = useSearchParams();
+function ExampleListingExperience({
+  tab,
+  onTab,
+}: {
+  tab: PortalListingTabId;
+  onTab: (tab: PortalListingTabId) => void;
+}) {
   const saved = defaultPortalWebsite();
   const [website, setWebsite] = useState<PortalWebsiteSettings>({ ...saved, design: "premiere" });
-  const agent = marketingMaterialFromProfile(exampleProfile());
+  const branded = marketingMaterialFromProfile(exampleProfile());
+  const agent = branded ? { ...branded, headshotUrl: "" } : null;
+  const profile = samplePortalProfile();
   return (
     <PortalListingDetailView
       detail={EXAMPLE_WEBSITE_DETAIL}
-      tab="website"
+      tab={tab}
       editing={null}
       saving={false}
       website={website}
@@ -975,12 +1080,10 @@ function ExampleWebsitePreview() {
       dataEditing={false}
       dataDraft={portalFactsDraftFromDetail(EXAMPLE_WEBSITE_DETAIL)}
       marketingAgent={agent}
-      onTab={(next) => {
-        const params = new URLSearchParams(searchParams);
-        params.set("example", "1");
-        params.set("tab", next);
-        setSearchParams(params, { replace: true });
-      }}
+      example
+      accountName={`${profile.firstName} ${profile.lastName}`}
+      onSignOut={() => { window.location.assign("/portal?example=1"); }}
+      onTab={onTab}
       onToggleEditing={() => undefined}
       onMedia={() => undefined}
       onWebsite={setWebsite}

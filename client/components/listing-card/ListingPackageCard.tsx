@@ -12,7 +12,7 @@ const FONT = "Inter, system-ui, sans-serif";
  * Client project tile. One Local Legend blend shell, sixteen skins.
  * Listing address is a street + city block. No overlapping address pills.
  */
-export function ListingPackageCard({ listing }: { listing: ClientListingCard }) {
+export function ListingPackageCard({ listing, example = false }: { listing: ClientListingCard; example?: boolean }) {
   const look = listing.look;
   if (!look) return null;
   const skin = packageSkin(look);
@@ -23,7 +23,7 @@ export function ListingPackageCard({ listing }: { listing: ClientListingCard }) 
 
   return (
     <Link
-      to={clientListingPath(listing.id)}
+      to={example ? `${clientListingPath(listing.id)}?example=1` : clientListingPath(listing.id)}
       data-look={look}
       data-category={skin.category}
       aria-label={`${skin.title} project, ${listing.address || skin.title}`}

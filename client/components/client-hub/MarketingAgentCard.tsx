@@ -5,7 +5,7 @@ export function MarketingAgentCard({ agent, title, note }: { agent: HubAgentBran
     <article className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm" data-testid={`marketing-agent-${title.toLowerCase().replace(/\s+/g, "-")}`}>
       <p className="text-[10px] font-black uppercase tracking-widest text-[#0d9488]">{title}</p>
       <div className="mt-3 flex items-center gap-3">
-        {agent.headshotUrl ? <img src={agent.headshotUrl} alt="" className="h-14 w-14 rounded-full object-cover bg-gray-100" /> : null}
+        {agent.headshotUrl ? <img src={agent.headshotUrl} alt="" className="h-14 w-14 rounded-full object-cover bg-gray-100" /> : <span className="av" style={{ width: 56, height: 56 }}>{initials(agent.name)}</span>}
         <div className="min-w-0">
           <h3 className="font-black truncate">{agent.name || "Agent"}</h3>
           <p className="text-xs text-gray-500 truncate">{agent.brokerage}</p>
@@ -37,4 +37,8 @@ export function MarketingAgentCard({ agent, title, note }: { agent: HubAgentBran
       <p className="mt-3 text-xs text-gray-500">{note}</p>
     </article>
   );
+}
+
+function initials(name: string): string {
+  return name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase() || "").join("") || "EA";
 }

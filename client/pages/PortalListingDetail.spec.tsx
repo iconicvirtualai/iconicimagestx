@@ -3,6 +3,7 @@ import { renderToString } from "react-dom/server";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import PortalListingDetail, { PortalListingDetailView } from "./PortalListingDetail";
 import { buildPortalListingDetail, defaultPortalWebsite, portalFactsDraftFromDetail } from "@shared/portalListingDetail";
+import { portalOrderNumberLabel } from "@shared/orderProjectInvoice";
 
 vi.mock("@/contexts/AuthContext", () => ({
   useAuth: () => ({
@@ -91,8 +92,9 @@ describe("portal listing detail page", () => {
     expect(editing).toContain('value="18 Oak Hollow"');
     expect(editing).toContain('value="3"');
     expect(editing).toContain('placeholder="Not on file yet"');
-    expect(editing).not.toContain("Pay now");
-    expect(editing).not.toContain("Download");
+    expect(editing).toContain("Pay now");
+    expect(editing).toContain("Your Iconic files are locked");
+    expect(editing).not.toContain(">Download<");
 
     const visitorEditing = render("data", null, false, true);
     expect(visitorEditing).not.toContain("data-edit-toggle");
@@ -107,7 +109,7 @@ describe("portal listing detail page", () => {
     expect(html).not.toContain("Earlier");
     expect(html).not.toContain("Later");
     expect(html).not.toContain('type="checkbox"');
-    expect(html).not.toContain("Pay now");
+    expect(html).toContain("listing-unlock");
 
     const requested = buildPortalListingDetail({
       listing: {
@@ -263,15 +265,16 @@ describe("portal listing detail page", () => {
   it("scaffolds marketing, invoices, and activity without a pay action", () => {
     expect(render("marketing")).toContain("Design tools are not connected yet.");
     const orders = render("orders");
-    expect(orders).toContain("INV-2026-100");
+    expect(orders).toContain(portalOrderNumberLabel({ id: "req1" }));
     expect(orders).toContain("draft");
     expect(orders).toContain("Total");
     expect(orders).toContain("$100.00");
     expect(orders).toContain('data-slot="money"');
     expect(orders).toContain("whitespace-nowrap");
-    expect(orders).not.toContain("View invoice");
+    expect(orders).toContain("View invoice");
     expect(orders).not.toContain("/invoice/");
-    expect(orders).not.toContain("Pay now");
+    expect(orders).toContain("Pay now");
+    expect(orders).toContain("Nothing is sent for payment from this page.");
     expect(render("activity")).toContain("Booking request received");
     expect(render("website")).toContain('data-testid="listing-site-status-row"');
     expect(render("website")).toContain('data-testid="listing-site-publish-bar"');
@@ -454,7 +457,8 @@ describe("portal listing detail page", () => {
     expect(html).toContain('preload="metadata"');
     expect(html).toContain("controls");
     expect(html).not.toContain("<iframe");
-    expect(html).not.toContain("Download");
+    expect(html).not.toContain(">Download<");
+    expect(html).not.toContain("download=");
   });
 
   it("embeds Matterport, shows a PNG floor plan, and opens a PDF floor plan in a new tab", () => {

@@ -72,7 +72,13 @@ export function PortalTemplatePicker({
                   ref={markThumbInert}
                   data-testid={`listing-style-thumb-${template.id}`}
                 >
-                  <div className="style-card-thumb-scale">
+                  <img
+                    src={`/media/portal-v2/styles/${template.id}.png`}
+                    alt=""
+                    className="style-shot"
+                    style={{ width: "100%", height: 88, objectFit: "cover", objectPosition: "top" }}
+                  />
+                  <div className="style-card-thumb-scale" style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)" }}>
                     <div className="style-card-thumb-page">
                       <ListingSiteView inquiry={false} site={previewSite(detail, preset)} />
                     </div>

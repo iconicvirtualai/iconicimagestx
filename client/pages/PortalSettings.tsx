@@ -11,11 +11,10 @@ import {
   type TeamMemberRecord,
 } from "@shared/clientHubSettings";
 import type { ClientInvoiceStatement, ClientListingCard } from "@shared/clientHome";
-import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { PortalShell, portalHref, type PortalSettingsSection } from "@/components/client-hub/PortalShell";
 import { BillingSettings, ClientsSettings, ProfileSettings, TeamSettings } from "@/components/client-hub/SettingsPages";
-import { exampleBilling, exampleContacts, exampleInvoice, exampleListing, exampleMembers, exampleOrders, exampleProfile } from "@/lib/exampleHub";
+import { exampleBilling, exampleContacts, exampleInvoice, exampleListing, exampleMembers, exampleOrders, samplePortalProfile } from "@/lib/exampleHub";
 
 const SECTIONS = new Set(["profile", "team", "clients", "billing"]);
 
@@ -57,29 +56,53 @@ export default function PortalSettings() {
     if (gate.type !== "show-home" || !user) return <Navigate to="/portal" replace />;
   }
 
-  const firstName = example ? exampleProfile().firstName : clientProfile?.firstName || "there";
+  const sample = example ? samplePortalProfile() : null;
+  const firstName = sample?.firstName || clientProfile?.firstName || "there";
+  const accountName = sample ? `${sample.firstName} ${sample.lastName}` : [clientProfile?.firstName, clientProfile?.lastName].filter(Boolean).join(" ") || firstName;
 
   return (
-    <div className="iframe-safe-page bg-[#f6f7f8] flex flex-col">
+    <div className="iframe-safe-page">
       <PortalShell
         firstName={firstName}
+        accountName={accountName}
         example={example}
         active={active}
-        onSignOut={example ? undefined : () => void signOutUser().then(() => { window.location.assign("/portal"); })}
+        onSignOut={() => void signOutUser().then(() => { window.location.assign(portalHref("/portal", example)); })}
       >
-        {active === "profile" ? <ProfileRoute example={example} /> : null}
-        {active === "team" ? <TeamRoute example={example} /> : null}
-        {active === "clients" ? <ClientsRoute example={example} /> : null}
-        {active === "billing" ? <BillingRoute example={example} /> : null}
+        <div className="page-head">
+          <div>
+            <div className="kicker">Settings</div>
+            <h1>Settings</h1>
+          </div>
+        </div>
+        <nav className="stabs" aria-label="Settings sections">
+          {(["profile", "team", "clients", "billing"] as const).map((id) => (
+            <Link key={id} to={portalHref(`/portal/settings/${id}`, example)} className={active === id ? "active" : undefined}>{id}</Link>
+          ))}
+        </nav>
+        {example ? (
+          <div className="settings-stack">
+            <ProfileRoute example />
+            <TeamRoute example />
+            <ClientsRoute example />
+            <BillingRoute example />
+          </div>
+        ) : (
+          <>
+            {active === "profile" ? <ProfileRoute example={false} /> : null}
+            {active === "team" ? <TeamRoute example={false} /> : null}
+            {active === "clients" ? <ClientsRoute example={false} /> : null}
+            {active === "billing" ? <BillingRoute example={false} /> : null}
+          </>
+        )}
       </PortalShell>
-      <Footer />
     </div>
   );
 }
 
 function ProfileRoute({ example }: { example: boolean }) {
   const { user } = useAuth();
-  const [profile, setProfile] = useState<ClientHubProfile | null>(example ? exampleProfile() : null);
+  const [profile, setProfile] = useState<ClientHubProfile | null>(example ? samplePortalProfile() : null);
   const [error, setError] = useState("");
   useEffect(() => {
     if (example || !user) return;
@@ -242,7 +265,7 @@ function BillingRoute({ example }: { example: boolean }) {
     example ? {
       billing: exampleBilling(),
       invoices: [exampleInvoice()],
-      payments: [{ id: "example-payment", invoiceNumber: "INV-EXAMPLE-1001", status: "partial", amount: 121.5, issuedOn: "Oct 2, 2026" }],
+      payments: [{ id: "example-payment", invoiceNumber: "#001", status: "partial", amount: 121.5, issuedOn: "Oct 2, 2026" }],
     } : null,
   );
   const [error, setError] = useState("");
@@ -286,7 +309,7 @@ function BillingRoute({ example }: { example: boolean }) {
 }
 
 export function portalOrderPrefill() {
-  return billingPrefill(exampleProfile(), exampleBilling());
+  return billingPrefill(samplePortalProfile(), exampleBilling());
 }
 
 function Pending() {
