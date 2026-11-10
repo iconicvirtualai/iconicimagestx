@@ -2,7 +2,7 @@ import fs from "fs/promises";
 import path from "path";
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
-import { compositeGrass } from "./grassComposite";
+import { compositeGrass, segmentLawn } from "./grassComposite";
 
 const referencePath = path.join(process.cwd(), "public/studio/grass-reference.jpg");
 
@@ -68,6 +68,61 @@ describe("grass composite", () => {
     expect(result.alpha![210 * width + 20]).toBeGreaterThan(200);
   });
 
+  it("includes bare dirt at the bottom of the lawn and still skips the walk", () => {
+    const width = 120;
+    const height = 90;
+    const rgb = new Uint8Array(width * height * 3);
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        const i = (y * width + x) * 3;
+        const walk = x > 50 && x < 68;
+        if (y < 28) {
+          rgb[i] = 80; rgb[i + 1] = 150; rgb[i + 2] = 220;
+        } else if (walk) {
+          rgb[i] = 176; rgb[i + 1] = 176; rgb[i + 2] = 172;
+        } else if (y > 72) {
+          rgb[i] = 158; rgb[i + 1] = 124; rgb[i + 2] = 68;
+        } else {
+          rgb[i] = 48; rgb[i + 1] = 132; rgb[i + 2] = 46;
+        }
+      }
+    }
+    const mask = segmentLawn(rgb, width, height);
+    expect(mask).not.toBeNull();
+    expect(mask![80 * width + 12]).toBe(255);
+    expect(mask![80 * width + 58]).toBe(0);
+    expect(mask![8 * width + 12]).toBe(0);
+  });
+
+  it("composites only the masked lawn from a model frame and keeps the original resolution", async () => {
+    const width = 200;
+    const height = 140;
+    const { jpeg } = await jpegFrom(width, height, (_x, y) => (y < 50 ? [80, 150, 210] : [40, 110, 42]));
+    const reference = await sharp({
+      create: { width: 32, height: 32, channels: 3, background: { r: 30, g: 120, b: 40 } },
+    }).jpeg().toBuffer();
+    const model = await sharp({
+      create: { width: 64, height: 48, channels: 3, background: { r: 255, g: 0, b: 0 } },
+    }).png().toBuffer();
+    const result = await compositeGrass({
+      photo: jpeg,
+      reference,
+      retainRaw: true,
+      inpaint: async () => model,
+    });
+    expect(result.applied).toBe(true);
+    expect(result.note).toMatch(/masked inpaint/i);
+    expect(result.width).toBe(width);
+    expect(result.height).toBe(height);
+    const decoded = await sharp(jpeg).removeAlpha().raw().toBuffer();
+    const counts = outsideIsExact(new Uint8Array(decoded), result.raw!, result.alpha!);
+    expect(counts.exact).toBe(counts.outside);
+    const lawn = 110 * width + 20;
+    expect(result.alpha![lawn]).toBeGreaterThan(200);
+    expect(result.raw![lawn * 3]).not.toBe(255);
+    expect(result.raw![lawn * 3 + 1]).toBeGreaterThan(20);
+  });
+
   it("uses a staff mask and does not paint outside it", async () => {
     const width = 200;
     const height = 160;
@@ -112,8 +167,8 @@ describe("grass composite", () => {
       ["marias-front-day", "public/media/pay-at-close/luxury/marias/01-front-day.jpg"],
       ["forest-heights-twilight", "public/media/photos/forest-heights-twilight-front.jpg"],
     ] as const;
-    const artifactDir = "/opt/cursor/artifacts/grass";
-    await fs.mkdir(artifactDir, { recursive: true });
+    const artifactDir = process.env.GRASS_WRITE_ARTIFACTS === "1" ? "/opt/cursor/artifacts/grass" : "";
+    if (artifactDir) await fs.mkdir(artifactDir, { recursive: true });
 
     for (const [name, rel] of photos) {
       const photo = await fs.readFile(path.join(process.cwd(), rel));
@@ -139,9 +194,11 @@ describe("grass composite", () => {
       }
       expect(topOn / top, name).toBeLessThan(0.01);
 
-      await fs.writeFile(path.join(artifactDir, `${name}-before.jpg`), photo);
-      await fs.writeFile(path.join(artifactDir, `${name}-after.jpg`), result.bytes);
-      await fs.writeFile(path.join(artifactDir, `${name}-mask.png`), result.maskPng!);
+      if (artifactDir) {
+        await fs.writeFile(path.join(artifactDir, `${name}-before.jpg`), photo);
+        await fs.writeFile(path.join(artifactDir, `${name}-after.jpg`), result.bytes);
+        await fs.writeFile(path.join(artifactDir, `${name}-mask.png`), result.maskPng!);
+      }
     }
   }, 120_000);
 });

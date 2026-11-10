@@ -11,6 +11,8 @@ import {
   OpenAiEditError,
   editListingPhotoWithOpenAI,
   editSizeForImage,
+  grassInpaintSize,
+  inpaintMaskedPhoto,
   imageSize,
   inspectFinishedListingJpeg,
   openAiErrorNote,
@@ -32,6 +34,35 @@ describe("OpenAI image edit request", () => {
     expect(readOpenAiApiKey({ OPENAI_API_KEY: "  sk-live  " })).toBe("sk-live");
     expect(readOpenAiApiKey({})).toBe("");
     expect(readOpenAiApiKey({ OPENAI_API_KEY: "   " })).toBe("");
+  });
+
+  it("snaps a lawn inpaint near the original size and sends the mask plus the grass reference", async () => {
+    expect(grassInpaintSize(1920, 1080)).toEqual({ width: 1920, height: 1088, size: "1920x1088" });
+    const fetchImpl = vi.fn(async (_url: string, init: RequestInit) => {
+      const form = init.body as FormData;
+      expect(form.get("model")).toBe(OPENAI_IMAGE_EDIT_MODEL);
+      expect(form.get("size")).toBe("1920x1088");
+      expect(form.get("quality")).toBe("high");
+      expect(form.get("output_format")).toBe("png");
+      expect(form.get("input_fidelity")).toBeNull();
+      expect((form.get("mask") as File).name).toBe("lawn-mask.png");
+      const images = form.getAll("image[]");
+      expect(images).toHaveLength(2);
+      expect((images[0] as File).name).toBe("listing.png");
+      expect((images[1] as File).name).toBe("grass-reference.jpg");
+      return new Response(JSON.stringify({ data: [{ b64_json: Buffer.from("png-bytes-long-enough-for-the-edit-check").toString("base64") }] }), { status: 200 });
+    });
+    const result = await inpaintMaskedPhoto({
+      apiKey: "sk-test",
+      prompt: "Replace only the masked lawn.",
+      image: png(32, 32),
+      maskPng: png(32, 32),
+      reference: Buffer.from([0xff, 0xd8, 0xff, 0xd9]),
+      size: "1920x1088",
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    });
+    expect(result.contentType).toBe("image/png");
+    expect(fetchImpl).toHaveBeenCalledOnce();
   });
 
   it("defaults to gpt-image-2.5-sunburst and gpt-4o-mini", () => {

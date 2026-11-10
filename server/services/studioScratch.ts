@@ -77,10 +77,17 @@ export async function applyGrassToPhoto(
   mask?: Buffer,
   env?: NodeJS.ProcessEnv,
   readGrass?: () => Promise<{ bytes: Buffer; contentType: "image/jpeg" }>,
+  fetchImpl?: typeof fetch,
 ): Promise<GrassCompositeResult> {
   const grass = readGrass ? await readGrass() : await readGrassReference(env);
   try {
-    return await compositeGrass({ photo, reference: grass.bytes, mask });
+    return await compositeGrass({
+      photo,
+      reference: grass.bytes,
+      mask,
+      apiKey: readOpenAiApiKey(env ?? process.env),
+      fetchImpl,
+    });
   } catch (err) {
     throw editError(err);
   }
@@ -142,7 +149,7 @@ export async function editScratchPhoto(input: {
   }
 
   if (wantsGrass) {
-    const grass = await applyGrassToPhoto(bytes, input.mask, input.env, input.readGrass);
+    const grass = await applyGrassToPhoto(bytes, input.mask, input.env, input.readGrass, input.fetchImpl);
     if (!grass.applied) {
       return {
         bytes,

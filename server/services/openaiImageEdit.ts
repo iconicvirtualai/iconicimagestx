@@ -162,6 +162,97 @@ export function openAiErrorNote(status: number, body: string): string {
   return `OpenAI could not edit this photo (${status}). Queue the edit again.`;
 }
 
+const GRASS_INPAINT_MAX_EDGE = 3840;
+const GRASS_INPAINT_MAX_PIXELS = 8_294_400;
+const GRASS_INPAINT_MIN_PIXELS = 655_360;
+
+/** Snap a photo to a gpt-image-2.5 custom size so the lawn inpaint stays near the original resolution. */
+export function grassInpaintSize(width: number, height: number): { width: number; height: number; size: string } {
+  const safeW = Math.max(16, width || 1536);
+  const safeH = Math.max(16, height || 1024);
+  let scale = Math.min(1, GRASS_INPAINT_MAX_EDGE / Math.max(safeW, safeH));
+  if (safeW * safeH * scale * scale > GRASS_INPAINT_MAX_PIXELS) {
+    scale = Math.sqrt(GRASS_INPAINT_MAX_PIXELS / (safeW * safeH));
+  }
+  let tw = Math.max(16, Math.round((safeW * scale) / 16) * 16);
+  let th = Math.max(16, Math.round((safeH * scale) / 16) * 16);
+  if (tw / th > 3) th = Math.max(16, Math.round(tw / 3 / 16) * 16);
+  if (th / tw > 3) tw = Math.max(16, Math.round(th / 3 / 16) * 16);
+  while (tw * th > GRASS_INPAINT_MAX_PIXELS) {
+    if (tw >= th) tw -= 16;
+    else th -= 16;
+  }
+  while (tw * th < GRASS_INPAINT_MIN_PIXELS) {
+    tw += 16;
+    th += 16;
+  }
+  return { width: tw, height: th, size: `${tw}x${th}` };
+}
+
+/**
+ * Masked lawn inpaint. Transparent mask pixels are the lawn. The reference is a
+ * style image, not a tile. The caller must composite the result; this return
+ * value is never the delivered frame.
+ */
+export async function inpaintMaskedPhoto(input: {
+  apiKey: string;
+  prompt: string;
+  image: Buffer;
+  maskPng: Buffer;
+  reference?: Buffer;
+  size: string;
+  fetchImpl?: typeof fetch;
+  timeoutMs?: number;
+}): Promise<{ bytes: Buffer; contentType: "image/png" }> {
+  const apiKey = input.apiKey.trim();
+  if (!apiKey) throw new OpenAiEditError("OPENAI_API_KEY is not configured on the server, so this photo was not edited.");
+  const prompt = input.prompt.trim();
+  if (prompt.length < 3) throw new OpenAiEditError("Describe the AI edit.");
+  const photo = imagePart(input.image, "image/png", "listing.png");
+  const mask = imagePart(input.maskPng, "image/png", "lawn-mask.png");
+  const form = new FormData();
+  form.append("model", OPENAI_IMAGE_EDIT_MODEL);
+  form.append("prompt", prompt);
+  form.append("image[]", photo.blob, photo.filename);
+  if (input.reference?.length) {
+    const reference = imagePart(input.reference, "image/jpeg", "grass-reference.jpg");
+    form.append("image[]", reference.blob, reference.filename);
+  }
+  form.append("mask", mask.blob, mask.filename);
+  form.append("n", "1");
+  form.append("size", input.size);
+  form.append("quality", "high");
+  form.append("output_format", "png");
+
+  const fetchImpl = input.fetchImpl || fetch;
+  const timeoutMs = input.timeoutMs ?? 120_000;
+  let response: Response;
+  try {
+    response = await fetchImpl(OPENAI_IMAGE_EDITS_URL, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}` },
+      body: form,
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+  } catch (err) {
+    if (isTimeoutError(err)) throw new OpenAiEditError(AI_EDIT_TIMEOUT_NOTE);
+    throw new OpenAiEditError("Studio could not reach OpenAI. Queue the edit again.");
+  }
+  const body = await response.text();
+  if (!response.ok) throw new OpenAiEditError(openAiErrorNote(response.status, body), response.status);
+  let parsed: { data?: Array<{ b64_json?: string }> };
+  try {
+    parsed = JSON.parse(body) as { data?: Array<{ b64_json?: string }> };
+  } catch {
+    throw new OpenAiEditError("OpenAI returned an unreadable image edit.");
+  }
+  const encoded = parsed.data?.[0]?.b64_json || "";
+  if (!encoded) throw new OpenAiEditError("OpenAI returned no edited image.");
+  const bytes = Buffer.from(encoded, "base64");
+  if (bytes.length < 32) throw new OpenAiEditError("OpenAI returned an empty edited image.");
+  return { bytes, contentType: "image/png" };
+}
+
 export async function editListingPhotoWithOpenAI(input: {
   apiKey: string;
   prompt: string;

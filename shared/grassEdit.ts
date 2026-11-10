@@ -5,7 +5,16 @@
  */
 
 export const GRASS_APPLIED_NOTE =
-  "Replaced the lawn with Cadi's grass reference. Trees, house, sky, hardscape, and every other non-lawn pixel stay on the original photo.";
+  "Replaced the lawn with a masked inpaint guided by Cadi's grass photo. Trees, house, sky, hardscape, and every other non-lawn pixel stay on the original photo.";
+
+export const GRASS_INPAINT_PROMPT = [
+  "The first image is the listing photograph. The second image is a real lawn and is only a style reference for blade color and texture.",
+  "Replace only the transparent area of the mask, which is the lawn, including bare dirt and thin patches inside that lawn.",
+  "Paint photoreal turf that follows this photo's perspective: larger blades in the foreground, finer grass toward the horizon.",
+  "Match the existing light, cast shadows, and color temperature. Keep natural olive, straw, and green variation.",
+  "Do not use neon green, a flat fill, or a repeating stripe.",
+  "Do not change the house, trees, shrubs, flower beds, driveway, walkway, sky, people, or any pixel outside the mask.",
+].join(" ");
 
 export const GRASS_SKIPPED_NOTE = "No lawn detected. Grass was not added.";
 
