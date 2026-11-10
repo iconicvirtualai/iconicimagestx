@@ -9,6 +9,7 @@ import twilio from "twilio";
 import { google } from "googleapis";
 import crypto, { randomBytes, createHmac as createHmac$1, timingSafeEqual as timingSafeEqual$1, randomUUID } from "crypto";
 import crypto$1, { timingSafeEqual, createHmac, randomUUID as randomUUID$1, randomBytes as randomBytes$1, createHash } from "node:crypto";
+import sharp from "sharp";
 import Stripe from "stripe";
 import * as XLSX from "xlsx";
 import fs$1 from "node:fs";
@@ -8364,21 +8365,21 @@ function squareBuyerAddress(value) {
   return { address_line_1: line, country: "US" };
 }
 function fnv1a32(input) {
-  let hash = 2166136261;
+  let hash2 = 2166136261;
   for (let i = 0; i < input.length; i += 1) {
-    hash ^= input.charCodeAt(i);
-    hash = Math.imul(hash, 16777619);
+    hash2 ^= input.charCodeAt(i);
+    hash2 = Math.imul(hash2, 16777619);
   }
-  return (hash >>> 0).toString(16).padStart(8, "0");
+  return (hash2 >>> 0).toString(16).padStart(8, "0");
 }
 function squarePaymentLinkIdempotencyKey(input) {
   const invoiceId = String(input.invoiceId || "").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 80);
   const purpose = input.purpose === "deposit" ? "deposit" : "checkout";
   const amountCents = Number.isFinite(input.amountCents) ? Math.round(input.amountCents) : 0;
   const attempt = input.attempt > 0 ? 1 : 0;
-  const hash = fnv1a32(`${purpose}|${invoiceId}|${amountCents}|${attempt}`);
+  const hash2 = fnv1a32(`${purpose}|${invoiceId}|${amountCents}|${attempt}`);
   const prefix = purpose === "deposit" ? "dep" : "pay";
-  return `${prefix}-${invoiceId}-${amountCents}-a${attempt}-${hash}`.slice(
+  return `${prefix}-${invoiceId}-${amountCents}-a${attempt}-${hash2}`.slice(
     0,
     192
   );
@@ -14562,7 +14563,7 @@ function finalsObjectPath(listingId, fileName2, now = Date.now()) {
 function listingAddressLabel(listing) {
   return recordAddressText(listing) || "Untitled listing";
 }
-function clamp(value, min, max) {
+function clamp$1(value, min, max) {
   if (!Number.isFinite(value)) return 0;
   return Math.min(max, Math.max(min, value));
 }
@@ -14571,11 +14572,11 @@ function clampAdjustments(input) {
   const rotate = source.rotate === 90 || source.rotate === 180 || source.rotate === 270 ? source.rotate : 0;
   const crop = source.crop === "1:1" || source.crop === "4:5" || source.crop === "16:9" ? source.crop : "original";
   return {
-    exposure: clamp(Number(source.exposure), -100, 100),
-    shadows: clamp(Number(source.shadows), -100, 100),
-    saturation: clamp(Number(source.saturation), -100, 100),
-    sharpness: clamp(Number(source.sharpness), 0, 100),
-    tint: clamp(Number(source.tint), -100, 100),
+    exposure: clamp$1(Number(source.exposure), -100, 100),
+    shadows: clamp$1(Number(source.shadows), -100, 100),
+    saturation: clamp$1(Number(source.saturation), -100, 100),
+    sharpness: clamp$1(Number(source.sharpness), 0, 100),
+    tint: clamp$1(Number(source.tint), -100, 100),
     rotate,
     crop
   };
@@ -15244,18 +15245,18 @@ function decideClientGalleryLink(input) {
 }
 const ORDER_GALLERY_RELEASE = "hold_until_order_complete";
 const SHOWCASE_PHOTO_COUNT = 30;
-const ICONIC_POLISH_TREATMENTS = [
+const ICONIC_POLISH_CURB_APPEAL = "Add curb appeal. Keep trees, shrubs, foliage, and existing landscaping unchanged. Do not add, remove, move, or restyle plants.";
+const ICONIC_POLISH_AI_TREATMENTS = [
   "Remove dirt and debris",
   "Remove harsh shadows and reflections",
   "Remove cords and powerlines",
   "Clean driveways",
-  "Add grass",
-  "Add curb appeal",
+  ICONIC_POLISH_CURB_APPEAL,
   "Add TVs and screens",
   "Firepits and fireplaces"
 ];
-const ICONIC_POLISH_LIMITS = "Keep the architecture and camera angle. Do not add people. Standalone grass replacement is a separate edit, not a substitute for this full polish.";
-const ICONIC_POLISH_INSTRUCTION = `Iconic Polish: ${ICONIC_POLISH_TREATMENTS.join("; ")}. ${ICONIC_POLISH_LIMITS}`;
+const ICONIC_POLISH_LIMITS = "Keep the architecture and camera angle. Do not add people. Keep trees, shrubs, and foliage exactly as photographed. Do not repaint the lawn or invent grass. The standalone lawn add-on is a separate edit, not a substitute for this full polish.";
+const ICONIC_POLISH_INSTRUCTION = `Iconic Polish: ${ICONIC_POLISH_AI_TREATMENTS.join("; ")}. ${ICONIC_POLISH_LIMITS}`;
 const PHOTO_BASE = "Prepare this listing photo. Balance color, clear window glare, and replace a blown-out sky when the sky is visible. Keep the architecture, furnishings, and camera angle.";
 function asItems(value) {
   if (!Array.isArray(value)) return [];
@@ -15306,22 +15307,32 @@ function isShowcaseItem(id, name, catalogId) {
   const blob = `${id} ${name} ${catalogId || ""}`.toLowerCase();
   return blob.includes("listing-showcase") || blob.includes("the showcase");
 }
+function textHasGrassAddon(value) {
+  return /grass\s*replacement|\badd grass\b/i.test(value);
+}
 function collectTexts(input) {
   const texts = [];
   const packageNames = [];
   let polishFromOrder = false;
   let showcase = false;
+  let grassAddon = false;
   const items = [...asItems(input.lineItems), ...asItems(input.services)];
   for (const id of asIds(input.serviceIds)) items.push({ id, name: "" });
   for (const item of items) {
     if (item.name) texts.push(item.name);
+    const blob = `${item.id} ${item.name}`.toLowerCase();
+    if (blob.includes("grass-replacement") || blob.includes("grass replacement") || textHasGrassAddon(item.name)) {
+      grassAddon = true;
+    }
     const catalog = packageByIdOrName(item.id, item.name);
     if (catalog) {
       packageNames.push(catalog.name);
-      for (const feature of catalog.features || []) texts.push(feature);
+      for (const feature of catalog.features || []) {
+        texts.push(feature);
+        if (textHasGrassAddon(feature)) grassAddon = true;
+      }
     }
     if (isShowcaseItem(item.id, item.name, catalog?.id)) showcase = true;
-    const blob = `${item.id} ${item.name}`.toLowerCase();
     if (blob.includes("iconic finish") || blob.includes("iconic polish") || blob.includes("iconic-finish")) {
       polishFromOrder = true;
     }
@@ -15330,7 +15341,8 @@ function collectTexts(input) {
     texts,
     packageName: packageNames[0] || items.find((item) => item.name)?.name || "Custom order",
     polishFromOrder,
-    showcase
+    showcase,
+    grassAddon
   };
 }
 function planOrderEdits(input = {}) {
@@ -15393,6 +15405,7 @@ function planOrderEdits(input = {}) {
     packageName: collected.packageName,
     iconicPolish,
     polishFromOrder,
+    grassReplacement: iconicPolish || collected.grassAddon,
     photoPrompt: photoPrompt(iconicPolish),
     photoCount: photoFull ? null : photoCount,
     photoScope: photoFull ? "full" : photoCount != null ? "count" : "none",
@@ -15467,12 +15480,12 @@ function orderEditDrafts(plan, frames) {
   return drafts;
 }
 function photoSlot(storagePath) {
-  let hash = 2166136261;
+  let hash2 = 2166136261;
   for (const char of storagePath) {
-    hash ^= char.charCodeAt(0);
-    hash = Math.imul(hash, 16777619);
+    hash2 ^= char.charCodeAt(0);
+    hash2 = Math.imul(hash2, 16777619);
   }
-  return `photo_${(hash >>> 0).toString(16)}`;
+  return `photo_${(hash2 >>> 0).toString(16)}`;
 }
 function orderEditDocId(listingId, slot) {
   const clean2 = `${listingId}_${slot}`.replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 700);
@@ -16511,6 +16524,89 @@ async function saveListingMediaArrangement(listingId, raw) {
 function serializeDoc(id, data) {
   return jsonSafe({ id, ...data });
 }
+const GRASS_APPLIED_NOTE = "Replaced the lawn with a masked inpaint guided by Cadi's grass photo. Trees, house, sky, hardscape, and every other non-lawn pixel stay on the original photo.";
+const GRASS_INPAINT_PROMPT = [
+  "The first image is the listing photograph. The second image is a real lawn and is only a style reference for blade color and texture.",
+  "Replace only the transparent area of the mask, which is the lawn, including bare dirt and thin patches inside that lawn.",
+  "Paint photoreal turf that follows this photo's perspective: larger blades in the foreground, finer grass toward the horizon.",
+  "Match the existing light, cast shadows, and color temperature. Keep natural olive, straw, and green variation.",
+  "Do not use neon green, a flat fill, or a repeating stripe.",
+  "Do not change the house, trees, shrubs, flower beds, driveway, walkway, sky, people, or any pixel outside the mask."
+].join(" ");
+const GRASS_SKIPPED_NOTE = "No lawn detected. Grass was not added.";
+const GRASS_UNCHANGED_NOTE = "No lawn detected. Grass was not added. The photo is unchanged.";
+const GRASS_MASK_EMPTY_NOTE = "The lawn mask is empty. Grass was not added. The photo is unchanged.";
+const GRASS_REQUEST = /\b(add|replace|insert|paint)\s+grass\b|\bgrass replacement\b|\breplace the lawn\b|\badd a lawn\b|\bnew lawn\b/i;
+function promptRequestsGrass(prompt) {
+  return GRASS_REQUEST.test(prompt);
+}
+function stripGrassInstructions(prompt) {
+  const parts = prompt.split(/(?<=[.!?;])\s+/).map((part) => part.trim()).filter(Boolean).filter((part) => !GRASS_REQUEST.test(part));
+  return parts.join(" ").replace(/\s+/g, " ").trim();
+}
+function promptNeedsImageModel(prompt) {
+  return stripGrassInstructions(prompt).trim().length >= 3;
+}
+function editWantsGrass(prompt, plan) {
+  return promptRequestsGrass(prompt) || /iconic polish/i.test(prompt);
+}
+const GRASS_REFERENCE_PUBLIC_PATH = "/studio/grass-reference.jpg";
+const GRASS_REFERENCE_RELATIVE_PATH = "public/studio/grass-reference.jpg";
+const SCRATCH_MAX_BYTES = 4e6;
+const SCRATCH_PROMPT_MAX = 2e3;
+const SCRATCH_PROMPT_HEADER = "x-scratch-prompt";
+const SCRATCH_NAME_HEADER = "x-scratch-filename";
+const SCRATCH_ACTION_HEADER = "x-scratch-action";
+const SCRATCH_LAWN_MASK_HEADER = "x-scratch-lawn-mask";
+const SCRATCH_NOTE_HEADER = "x-scratch-note";
+const SCRATCH_ACTIONS = ["edit", "revise", "twilight", "grass"];
+const GRASS_REPLACE_PROMPT = "Replace only the lawn with Cadi's grass reference. Keep every non-lawn pixel on the original photo.";
+function splitScratchBody(body, masked) {
+  if (!masked) return { jpeg: body };
+  if (body.byteLength < 8) throw new Error("The lawn mask could not be read.");
+  const len = new DataView(body.buffer, body.byteOffset, body.byteLength).getUint32(0, false);
+  if (len < 32 || len > 2e6 || 4 + len >= body.byteLength) {
+    throw new Error("The lawn mask could not be read.");
+  }
+  const mask = body.subarray(4, 4 + len);
+  if (mask[0] !== 137 || mask[1] !== 80) throw new Error("The lawn mask must be a PNG.");
+  return { jpeg: body.subarray(4 + len), mask };
+}
+const GRASS_REFERENCE_MISSING_NOTE = "Grass reference is missing. Add Cadi's lawn JPEG at public/studio/grass-reference.jpg (or set STUDIO_GRASS_REFERENCE_PATH).";
+function decodeScratchHeader(value) {
+  if (!value) return "";
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+function parseScratchEdit(input) {
+  const type = input.contentType.split(";")[0].trim().toLowerCase();
+  if (type !== "image/jpeg") return { ok: false, error: "Scratch pad edits JPEGs. Drop a .jpg." };
+  if (!input.byteLength) return { ok: false, error: "That photo was empty." };
+  if (input.byteLength > SCRATCH_MAX_BYTES) {
+    return { ok: false, error: "That photo is too large for the scratch pad. Export a smaller JPEG." };
+  }
+  const action = input.action.trim().toLowerCase();
+  if (!SCRATCH_ACTIONS.includes(action)) {
+    return { ok: false, error: "Unknown scratch action." };
+  }
+  if (action === "twilight") {
+    return { ok: true, action: "twilight", prompt: orderExteriorTwilightPrompt(), attachGrass: false };
+  }
+  if (action === "grass") {
+    return { ok: true, action: "grass", prompt: GRASS_REPLACE_PROMPT, attachGrass: true };
+  }
+  const userPrompt = input.prompt.trim().replace(/\s+/g, " ").slice(0, SCRATCH_PROMPT_MAX);
+  if (userPrompt.length < 3) return { ok: false, error: "Describe the edit." };
+  return { ok: true, action, prompt: userPrompt, attachGrass: false };
+}
+function scratchDownloadName(fileName2) {
+  const baseName = fileName2.split(/[/\\]/).pop() || "scratch";
+  const base = baseName.replace(/\.[^.]+$/, "").replace(/[^\w.-]+/g, "-").replace(/^[-.]+|[-.]+$/g, "").slice(0, 80);
+  return `${base || "scratch"}-edit.jpg`;
+}
 const OPENAI_IMAGE_EDITS_URL = "https://api.openai.com/v1/images/edits";
 const OPENAI_IMAGE_EDIT_TIMEOUT_MS = 45e3;
 const OPENAI_CHAT_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions";
@@ -16624,6 +16720,78 @@ function openAiErrorNote(status2, body) {
   const detail = message.replace(/\s+/g, " ").slice(0, 180);
   if (detail) return `OpenAI could not edit this photo (${status2}). ${detail}`;
   return `OpenAI could not edit this photo (${status2}). Queue the edit again.`;
+}
+const GRASS_INPAINT_MAX_EDGE = 3840;
+const GRASS_INPAINT_MAX_PIXELS = 8294400;
+const GRASS_INPAINT_MIN_PIXELS = 655360;
+function grassInpaintSize(width, height) {
+  const safeW = Math.max(16, width || 1536);
+  const safeH = Math.max(16, height || 1024);
+  let scale = Math.min(1, GRASS_INPAINT_MAX_EDGE / Math.max(safeW, safeH));
+  if (safeW * safeH * scale * scale > GRASS_INPAINT_MAX_PIXELS) {
+    scale = Math.sqrt(GRASS_INPAINT_MAX_PIXELS / (safeW * safeH));
+  }
+  let tw = Math.max(16, Math.round(safeW * scale / 16) * 16);
+  let th = Math.max(16, Math.round(safeH * scale / 16) * 16);
+  if (tw / th > 3) th = Math.max(16, Math.round(tw / 3 / 16) * 16);
+  if (th / tw > 3) tw = Math.max(16, Math.round(th / 3 / 16) * 16);
+  while (tw * th > GRASS_INPAINT_MAX_PIXELS) {
+    if (tw >= th) tw -= 16;
+    else th -= 16;
+  }
+  while (tw * th < GRASS_INPAINT_MIN_PIXELS) {
+    tw += 16;
+    th += 16;
+  }
+  return { width: tw, height: th, size: `${tw}x${th}` };
+}
+async function inpaintMaskedPhoto(input) {
+  const apiKey = input.apiKey.trim();
+  if (!apiKey) throw new OpenAiEditError("OPENAI_API_KEY is not configured on the server, so this photo was not edited.");
+  const prompt = input.prompt.trim();
+  if (prompt.length < 3) throw new OpenAiEditError("Describe the AI edit.");
+  const photo = imagePart(input.image, "image/png", "listing.png");
+  const mask = imagePart(input.maskPng, "image/png", "lawn-mask.png");
+  const form = new FormData();
+  form.append("model", OPENAI_IMAGE_EDIT_MODEL);
+  form.append("prompt", prompt);
+  form.append("image[]", photo.blob, photo.filename);
+  if (input.reference?.length) {
+    const reference = imagePart(input.reference, "image/jpeg", "grass-reference.jpg");
+    form.append("image[]", reference.blob, reference.filename);
+  }
+  form.append("mask", mask.blob, mask.filename);
+  form.append("n", "1");
+  form.append("size", input.size);
+  form.append("quality", "high");
+  form.append("output_format", "png");
+  const fetchImpl = input.fetchImpl || fetch;
+  const timeoutMs = input.timeoutMs ?? 12e4;
+  let response;
+  try {
+    response = await fetchImpl(OPENAI_IMAGE_EDITS_URL, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}` },
+      body: form,
+      signal: AbortSignal.timeout(timeoutMs)
+    });
+  } catch (err) {
+    if (isTimeoutError(err)) throw new OpenAiEditError(AI_EDIT_TIMEOUT_NOTE);
+    throw new OpenAiEditError("Studio could not reach OpenAI. Queue the edit again.");
+  }
+  const body = await response.text();
+  if (!response.ok) throw new OpenAiEditError(openAiErrorNote(response.status, body), response.status);
+  let parsed;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    throw new OpenAiEditError("OpenAI returned an unreadable image edit.");
+  }
+  const encoded = parsed.data?.[0]?.b64_json || "";
+  if (!encoded) throw new OpenAiEditError("OpenAI returned no edited image.");
+  const bytes = Buffer.from(encoded, "base64");
+  if (bytes.length < 32) throw new OpenAiEditError("OpenAI returned an empty edited image.");
+  return { bytes, contentType: "image/png" };
 }
 async function editListingPhotoWithOpenAI(input) {
   const apiKey = input.apiKey.trim();
@@ -16780,6 +16948,812 @@ async function inspectFinishedListingJpeg(input) {
   }
   return parseDeliveryInspection(body) || deliveryInspection("flag", [INSPECTION_FAILED_NOTE]);
 }
+const ANALYSIS_LONG_EDGE = 512;
+const MIN_LAWN_FRACTION = 0.02;
+const MAX_LAWN_FRACTION = 0.78;
+async function compositeGrass(input) {
+  const photo = await decodeRgb(input.photo);
+  if (!photo) {
+    throw Object.assign(new Error("That photo could not be read."), { status: 400 });
+  }
+  const mask = input.mask?.length ? await maskFromOverride(input.mask, photo.width, photo.height) : await maskFromSegmentation(photo);
+  const coverage = mask ? coverageOf(mask) : 0;
+  if (!mask || coverage < MIN_LAWN_FRACTION) {
+    const emptyOverride = Boolean(input.mask?.length);
+    return {
+      bytes: input.photo,
+      applied: false,
+      note: emptyOverride ? GRASS_MASK_EMPTY_NOTE : GRASS_UNCHANGED_NOTE,
+      width: photo.width,
+      height: photo.height,
+      maskPng: mask ? await encodeMask(mask, photo.width, photo.height) : null
+    };
+  }
+  const usedModel = Boolean(input.apiKey || input.inpaint);
+  const painted = await fillMaskedLawn(photo, mask, input);
+  const jpeg = await sharp(Buffer.from(painted.raw), {
+    raw: { width: photo.width, height: photo.height, channels: 3 }
+  }).jpeg({ quality: 95, chromaSubsampling: "4:4:4", mozjpeg: true }).toBuffer();
+  return {
+    bytes: jpeg,
+    applied: true,
+    note: usedModel ? GRASS_APPLIED_NOTE : "Replaced the lawn with varied patches from Cadi's grass reference, seated in the original light. Trees, house, sky, and hardscape stay on the original photo.",
+    width: photo.width,
+    height: photo.height,
+    maskPng: await encodeMask(mask, photo.width, photo.height),
+    raw: input.retainRaw ? painted.raw : void 0,
+    alpha: input.retainRaw ? painted.alpha : void 0
+  };
+}
+async function lawnMaskPng(photo) {
+  const decoded = await decodeRgb(photo);
+  if (!decoded) throw Object.assign(new Error("That photo could not be read."), { status: 400 });
+  const mask = await maskFromSegmentation(decoded);
+  if (!mask || coverageOf(mask) < MIN_LAWN_FRACTION) {
+    return { png: null, width: decoded.width, height: decoded.height };
+  }
+  return { png: await encodeMask(mask, decoded.width, decoded.height), width: decoded.width, height: decoded.height };
+}
+async function decodeRgb(bytes) {
+  try {
+    const { data, info } = await sharp(bytes, { failOn: "none", limitInputPixels: 8e7 }).rotate().removeAlpha().toColorspace("srgb").raw().toBuffer({ resolveWithObject: true });
+    if (!info.width || !info.height || info.channels < 3) return null;
+    return { data: new Uint8Array(data), width: info.width, height: info.height };
+  } catch {
+    return null;
+  }
+}
+async function downscale(photo) {
+  const scale = ANALYSIS_LONG_EDGE / Math.max(photo.width, photo.height);
+  if (scale >= 1) return photo;
+  const width = Math.max(32, Math.round(photo.width * scale));
+  const height = Math.max(32, Math.round(photo.height * scale));
+  const { data, info } = await sharp(Buffer.from(photo.data), {
+    raw: { width: photo.width, height: photo.height, channels: 3 }
+  }).resize(width, height, { fit: "fill" }).raw().toBuffer({ resolveWithObject: true });
+  return { data: new Uint8Array(data), width: info.width, height: info.height };
+}
+function coverageOf(alpha) {
+  let strong = 0;
+  for (let i = 0; i < alpha.length; i += 1) if (alpha[i] >= 128) strong += 1;
+  return strong / alpha.length;
+}
+async function maskFromSegmentation(photo) {
+  const low = await downscale(photo);
+  const binary = segmentLawn(low.data, low.width, low.height);
+  if (!binary) return null;
+  return upsampleMask(binary, low.width, low.height, photo.width, photo.height);
+}
+async function maskFromOverride(mask, width, height) {
+  try {
+    const { data, info } = await sharp(mask, { failOn: "none", limitInputPixels: 4e7 }).rotate().resize(width, height, { fit: "fill" }).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+    const alpha = new Uint8Array(width * height);
+    const channels = info.channels || 3;
+    for (let i = 0; i < alpha.length; i += 1) {
+      const p = i * channels;
+      const luma = data[p] * 0.2126 + data[p + 1] * 0.7152 + data[p + 2] * 0.0722;
+      alpha[i] = luma >= 128 ? 255 : 0;
+    }
+    return softenMask(alpha, width, height);
+  } catch {
+    throw Object.assign(new Error("The lawn mask could not be read."), { status: 400 });
+  }
+}
+async function upsampleMask(binary, sw, sh, width, height) {
+  const blurred = boxBlur(binary, sw, sh, 1);
+  const resized = await grayFrom(
+    sharp(Buffer.from(blurred), { raw: { width: sw, height: sh, channels: 1 } }).resize(width, height, { fit: "fill", kernel: "lanczos3" }),
+    width,
+    height
+  );
+  for (let i = 0; i < resized.length; i += 1) if (resized[i] < 8) resized[i] = 0;
+  const sigma = clamp(Math.round(Math.min(width, height) * 0.01), 2, 16);
+  return softenMask(resized, width, height, sigma);
+}
+async function grayFrom(pipeline, width, height) {
+  const { data, info } = await pipeline.raw().toBuffer({ resolveWithObject: true });
+  const out = new Uint8Array(width * height);
+  const channels = Math.max(1, info.channels || 1);
+  for (let i = 0; i < out.length; i += 1) out[i] = data[i * channels] || 0;
+  return out;
+}
+async function softenMask(alpha, width, height, sigma = 0) {
+  let pipeline = sharp(Buffer.from(alpha), { raw: { width, height, channels: 1 } });
+  if (sigma > 0) pipeline = pipeline.blur(sigma);
+  const out = await grayFrom(pipeline, width, height);
+  for (let i = 0; i < out.length; i += 1) if (out[i] < 8) out[i] = 0;
+  return out;
+}
+async function encodeMask(alpha, width, height) {
+  return sharp(Buffer.from(alpha), { raw: { width, height, channels: 1 } }).png().toBuffer();
+}
+async function fillMaskedLawn(photo, alpha, input) {
+  const fill = input.apiKey || input.inpaint ? await inpaintFill(photo, alpha, input) : await patchFill(photo, alpha, input.reference);
+  return seatFill(photo, alpha, fill);
+}
+async function inpaintFill(photo, alpha, input) {
+  const target = grassInpaintSize(photo.width, photo.height);
+  const image = await sharp(Buffer.from(photo.data), {
+    raw: { width: photo.width, height: photo.height, channels: 3 }
+  }).resize(target.width, target.height, { fit: "fill" }).png().toBuffer();
+  const maskPng = await editMaskPng(alpha, photo.width, photo.height, target.width, target.height);
+  const reference = await sharp(input.reference, { failOn: "none" }).rotate().resize({ width: 1024, withoutEnlargement: true }).jpeg({ quality: 90 }).toBuffer();
+  const model = input.inpaint ? await input.inpaint({ image, maskPng, reference, size: target.size }) : (await inpaintMaskedPhoto({
+    apiKey: input.apiKey || "",
+    prompt: GRASS_INPAINT_PROMPT,
+    image,
+    maskPng,
+    reference,
+    size: target.size,
+    fetchImpl: input.fetchImpl
+  })).bytes;
+  const { data, info } = await sharp(model, { failOn: "none" }).rotate().resize(photo.width, photo.height, { fit: "fill", kernel: "lanczos3" }).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  return { data: new Uint8Array(data), width: info.width, height: info.height };
+}
+async function editMaskPng(alpha, srcW, srcH, dstW, dstH) {
+  const resized = await sharp(Buffer.from(alpha), { raw: { width: srcW, height: srcH, channels: 1 } }).resize(dstW, dstH, { fit: "fill" }).raw().toBuffer();
+  const rgba = Buffer.alloc(dstW * dstH * 4);
+  const channels = Math.max(1, Math.round(resized.length / (dstW * dstH)));
+  for (let i = 0; i < dstW * dstH; i += 1) {
+    const lawn = (resized[i * channels] || 0) >= 128;
+    const o = i * 4;
+    rgba[o] = 255;
+    rgba[o + 1] = 255;
+    rgba[o + 2] = 255;
+    rgba[o + 3] = lawn ? 0 : 255;
+  }
+  return sharp(rgba, { raw: { width: dstW, height: dstH, channels: 4 } }).png().toBuffer();
+}
+async function patchFill(photo, alpha, reference) {
+  const sources = await referencePatches(reference);
+  const { width, height } = photo;
+  const data = new Uint8Array(photo.data);
+  const cell2 = Math.max(36, Math.round(Math.min(width, height) * 0.07));
+  for (let y = 0; y < height; y += 1) {
+    const gy = Math.floor(y / cell2);
+    const fy = y % cell2 / cell2;
+    for (let x = 0; x < width; x += 1) {
+      const index = y * width + x;
+      if (alpha[index] === 0) continue;
+      const gx = Math.floor(x / cell2);
+      const fx = x % cell2 / cell2;
+      let r = 0;
+      let g = 0;
+      let b = 0;
+      let weight = 0;
+      for (let oy = 0; oy <= 1; oy += 1) {
+        for (let ox = 0; ox <= 1; ox += 1) {
+          const wx = ox === 0 ? 1 - fx : fx;
+          const wy = oy === 0 ? 1 - fy : fy;
+          const w = wx * wy;
+          if (w <= 0) continue;
+          const sample = patchSample(sources, gx + ox, gy + oy, x, y, width, height);
+          r += sample[0] * w;
+          g += sample[1] * w;
+          b += sample[2] * w;
+          weight += w;
+        }
+      }
+      const p = index * 3;
+      data[p] = clamp(r / weight, 0, 255);
+      data[p + 1] = clamp(g / weight, 0, 255);
+      data[p + 2] = clamp(b / weight, 0, 255);
+    }
+  }
+  return { data, width, height };
+}
+async function referencePatches(reference) {
+  const base = sharp(reference, { failOn: "none" }).rotate().resize({ width: 900, withoutEnlargement: true });
+  const patches = [];
+  for (const angle of [0, 90, 180, 270]) {
+    const { data, info } = await base.clone().rotate(angle).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+    patches.push({ data: new Uint8Array(data), width: info.width, height: info.height });
+  }
+  if (!patches.length) throw Object.assign(new Error("The grass reference could not be read."), { status: 503 });
+  return patches;
+}
+function patchSample(sources, cellX, cellY, x, y, width, height) {
+  const pick2 = hash(cellX * 73856093 ^ cellY * 19349663);
+  const source = sources[Math.floor(pick2 * sources.length) % sources.length];
+  const scale = 0.65 + hash(cellX * 83492791 ^ cellY * 2971215073) * 0.8;
+  const depth = 0.35 + 0.65 * (y / Math.max(1, height - 1));
+  const sx = Math.floor(mirror((x - width / 2) * scale * depth + hash(cellX + 17) * source.width, source.width));
+  const sy = Math.floor(mirror(y * scale * (0.45 + depth) + hash(cellY + 29) * source.height, source.height));
+  const i = (Math.min(source.height - 1, sy) * source.width + Math.min(source.width - 1, sx)) * 3;
+  return [source.data[i], source.data[i + 1], source.data[i + 2]];
+}
+function seatFill(photo, alpha, fill) {
+  const { data, width, height } = photo;
+  const raw = new Uint8Array(data);
+  const count2 = width * height;
+  const origY = new Float32Array(count2);
+  const fillY = new Float32Array(count2);
+  for (let i = 0; i < count2; i += 1) {
+    const p = i * 3;
+    origY[i] = yOf(data[p], data[p + 1], data[p + 2]);
+    const f = Math.min(fill.data.length - 3, p);
+    fillY[i] = yOf(fill.data[f], fill.data[f + 1], fill.data[f + 2]);
+  }
+  const lightRadius = clamp(Math.round(Math.min(width, height) * 0.04), 8, 56);
+  const detailRadius = clamp(Math.round(Math.min(width, height) * 0.012), 2, 10);
+  const origLight = boxBlurFloat(origY, width, height, lightRadius);
+  const fillDetail = boxBlurFloat(fillY, width, height, detailRadius);
+  let sceneChroma = 0;
+  let fillChroma = 0;
+  let samples = 0;
+  const step = Math.max(1, Math.floor(Math.sqrt(count2 / 6e3)));
+  for (let i = 0; i < count2; i += step) {
+    if (alpha[i] < 200) continue;
+    const p = i * 3;
+    sceneChroma += chromaOf(data[p], data[p + 1], data[p + 2]);
+    const f = Math.min(fill.data.length - 3, p);
+    fillChroma += chromaOf(fill.data[f], fill.data[f + 1], fill.data[f + 2]);
+    samples += 1;
+  }
+  const chromaScale = samples ? clamp(sceneChroma / samples * 1.15 / Math.max(8, fillChroma / samples), 0.4, 1.05) : 0.8;
+  for (let i = 0; i < count2; i += 1) {
+    const amount = alpha[i] / 255;
+    if (amount === 0) continue;
+    const p = i * 3;
+    const f = Math.min(fill.data.length - 3, p);
+    const y = origLight[i] + (fillY[i] - fillDetail[i]) * 0.72;
+    const [cb, cr] = cbcrOf(fill.data[f], fill.data[f + 1], fill.data[f + 2]);
+    const [r, g, b] = fromYCbCr(y, 128 + (cb - 128) * chromaScale, 128 + (cr - 128) * chromaScale);
+    raw[p] = clamp(data[p] * (1 - amount) + r * amount, 0, 255);
+    raw[p + 1] = clamp(data[p + 1] * (1 - amount) + g * amount, 0, 255);
+    raw[p + 2] = clamp(data[p + 2] * (1 - amount) + b * amount, 0, 255);
+  }
+  return { raw, alpha };
+}
+function yOf(r, g, b) {
+  return r * 0.2126 + g * 0.7152 + b * 0.0722;
+}
+function cbcrOf(r, g, b) {
+  return [
+    128 - 0.168736 * r - 0.331264 * g + 0.5 * b,
+    128 + 0.5 * r - 0.418688 * g - 0.081312 * b
+  ];
+}
+function chromaOf(r, g, b) {
+  const [cb, cr] = cbcrOf(r, g, b);
+  return Math.hypot(cb - 128, cr - 128);
+}
+function fromYCbCr(y, cb, cr) {
+  return [
+    clamp(y + 1.402 * (cr - 128), 0, 255),
+    clamp(y - 0.344136 * (cb - 128) - 0.714136 * (cr - 128), 0, 255),
+    clamp(y + 1.772 * (cb - 128), 0, 255)
+  ];
+}
+function hash(value) {
+  let x = value | 0;
+  x = Math.imul(x ^ x >>> 16, 2246822519);
+  x = Math.imul(x ^ x >>> 13, 3266489917);
+  return ((x ^ x >>> 16) >>> 0) / 4294967296;
+}
+function segmentLawn(rgb, width, height) {
+  const count2 = width * height;
+  const candidate = new Uint8Array(count2);
+  const bare = new Uint8Array(count2);
+  const blocked = new Uint8Array(count2);
+  const luma = new Float32Array(count2);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const i = y * width + x;
+      const p = i * 3;
+      const r = rgb[p];
+      const g = rgb[p + 1];
+      const b = rgb[p + 2];
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      const sat = max === 0 ? 0 : (max - min) / max;
+      const value = max / 255;
+      luma[i] = r * 0.2126 + g * 0.7152 + b * 0.0722;
+      const sky = b > r + 12 && b > g + 4 && value > 0.42 && y < height * 0.8 || value > 0.88 && sat < 0.16 && y < height * 0.62 || y < height * 0.48 && b > g + 6 && r > g && sat > 0.1 && value > 0.32;
+      const hard = sat < 0.12 && value > 0.46 && Math.abs(r - g) < 16 && Math.abs(g - b) < 20 && g < r + 12;
+      const mulch = value < 0.22 && r > g + 2 && r > b + 8 && sat > 0.18 && y > height * 0.18;
+      if (sky || hard || mulch) {
+        blocked[i] = 1;
+        continue;
+      }
+      const lawnGreen = g > r + 4 && g > b + 8 && g > 32 && g < 248 && sat > 0.1 && sat < 0.92 && value > 0.12 && value < 0.94;
+      if (lawnGreen) candidate[i] = 1;
+      const bareYard = y > height * 0.5 && r > 55 && g > 50 && b + 16 < g && r < g + 28 && g + 18 >= r && sat > 0.12 && sat < 0.62 && value > 0.16 && value < 0.72;
+      if (bareYard) bare[i] = 1;
+    }
+  }
+  suppressCanopy(candidate, luma, width, height);
+  const mask = floodLowerLawn(candidate, bare, blocked, width, height);
+  if (!mask) return null;
+  trimSpikes(mask, width, height);
+  smoothHorizon(mask, width, height);
+  fillInteriorGaps(mask, blocked, width, height);
+  extendBareGround(rgb, mask, blocked, width, height);
+  fillInteriorGaps(mask, blocked, width, height);
+  removePeople(rgb, mask, width, height);
+  if (!lawnIsPlausible(mask, width, height)) return null;
+  for (let i = 0; i < mask.length; i += 1) mask[i] = mask[i] ? 255 : 0;
+  return mask;
+}
+function suppressCanopy(candidate, luma, width, height) {
+  const variance = new Float32Array(width * height);
+  const radius = 2;
+  let bottomSum = 0;
+  let bottomCount = 0;
+  const yCut = Math.floor(height * 0.68);
+  for (let y = radius; y < height - radius; y += 1) {
+    for (let x = radius; x < width - radius; x += 1) {
+      const i = y * width + x;
+      if (!candidate[i]) continue;
+      let sum = 0;
+      let sq = 0;
+      let n = 0;
+      for (let dy = -radius; dy <= radius; dy += 1) {
+        for (let dx = -radius; dx <= radius; dx += 1) {
+          const value = luma[(y + dy) * width + x + dx];
+          sum += value;
+          sq += value * value;
+          n += 1;
+        }
+      }
+      const mean = sum / n;
+      variance[i] = sq / n - mean * mean;
+      if (y > yCut) {
+        bottomSum += variance[i];
+        bottomCount += 1;
+      }
+    }
+  }
+  const typical = bottomCount ? bottomSum / bottomCount : 80;
+  const limit = Math.max(220, typical * 2.6);
+  const canopyLine = Math.floor(height * 0.74);
+  for (let y = 0; y < canopyLine; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const i = y * width + x;
+      if (candidate[i] && variance[i] > limit) candidate[i] = 0;
+    }
+  }
+}
+function floodLowerLawn(candidate, bare, blocked, width, height) {
+  const mask = new Uint8Array(width * height);
+  const kept = keepComponents(candidate, blocked, width, height, mask, Math.floor(height * 0.46), width * height * 8e-3, height * 0.4);
+  if (kept >= width * height * MIN_LAWN_FRACTION) return mask;
+  const bareKept = keepComponents(bare, blocked, width, height, mask, Math.floor(height * 0.62), width * height * 0.04, height * 0.55);
+  return kept + bareKept > 0 ? mask : null;
+}
+function keepComponents(candidate, blocked, width, height, mask, seedY, minArea, minCentroid) {
+  const seen = new Uint8Array(width * height);
+  const queue = new Int32Array(width * height);
+  let kept = 0;
+  for (let y = seedY; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const start = y * width + x;
+      if (!candidate[start] || seen[start] || blocked[start]) continue;
+      let head = 0;
+      let tail = 0;
+      queue[tail] = start;
+      tail += 1;
+      seen[start] = 1;
+      const pixels = [];
+      let sumY = 0;
+      let touchesBottom = false;
+      while (head < tail) {
+        const p = queue[head];
+        head += 1;
+        pixels.push(p);
+        const px = p % width;
+        const py = Math.floor(p / width);
+        sumY += py;
+        if (py > height * 0.9) touchesBottom = true;
+        const neighbors = [p - 1, p + 1, p - width, p + width];
+        if (px === 0) neighbors[0] = -1;
+        if (px === width - 1) neighbors[1] = -1;
+        if (py === 0) neighbors[2] = -1;
+        if (py === height - 1) neighbors[3] = -1;
+        for (const next of neighbors) {
+          if (next < 0 || seen[next] || !candidate[next] || blocked[next]) continue;
+          seen[next] = 1;
+          queue[tail] = next;
+          tail += 1;
+        }
+      }
+      const centroid = sumY / pixels.length;
+      const bareNeedsGround = minArea > width * height * 0.02;
+      if (pixels.length >= minArea && centroid > minCentroid && (!bareNeedsGround || touchesBottom)) {
+        for (const p of pixels) mask[p] = 1;
+        kept += pixels.length;
+      }
+    }
+  }
+  return kept;
+}
+function smoothHorizon(mask, width, height) {
+  const tops = new Int16Array(width);
+  tops.fill(height);
+  for (let x = 0; x < width; x += 1) {
+    for (let y = 0; y < height; y += 1) {
+      if (mask[y * width + x]) {
+        tops[x] = y;
+        break;
+      }
+    }
+  }
+  const window = Math.max(9, Math.round(width * 0.08) | 1);
+  const half = Math.floor(window / 2);
+  for (let x = 0; x < width; x += 1) {
+    if (tops[x] >= height) continue;
+    const samples = [];
+    for (let i = x - half; i <= x + half; i += 1) {
+      const col = Math.max(0, Math.min(width - 1, i));
+      if (tops[col] < height) samples.push(tops[col]);
+    }
+    if (samples.length < 7) continue;
+    samples.sort((a, b) => a - b);
+    const smooth = samples[Math.floor(samples.length / 2)];
+    const cut = Math.min(tops[x] + Math.round(height * 0.035), smooth + Math.round(height * 8e-3));
+    if (cut <= tops[x]) continue;
+    for (let y = tops[x]; y < cut; y += 1) mask[y * width + x] = 0;
+  }
+}
+function trimSpikes(mask, width, height) {
+  const tops = new Int16Array(width);
+  tops.fill(height);
+  for (let x = 0; x < width; x += 1) {
+    for (let y = 0; y < height; y += 1) {
+      if (mask[y * width + x]) {
+        tops[x] = y;
+        break;
+      }
+    }
+  }
+  const window = Math.max(5, Math.round(width * 0.05) | 1);
+  const half = Math.floor(window / 2);
+  const margin = Math.max(2, Math.round(height * 0.018));
+  for (let x = 0; x < width; x += 1) {
+    if (tops[x] >= height) continue;
+    const samples = [];
+    for (let i = x - half; i <= x + half; i += 1) {
+      const col = Math.max(0, Math.min(width - 1, i));
+      if (tops[col] < height) samples.push(tops[col]);
+    }
+    if (samples.length < 5) continue;
+    samples.sort((a, b) => a - b);
+    const smooth = samples[Math.floor(samples.length / 2)];
+    if (tops[x] >= smooth - margin) continue;
+    const cut = smooth;
+    for (let y = 0; y < cut; y += 1) mask[y * width + x] = 0;
+  }
+}
+function fillInteriorGaps(mask, blocked, width, height) {
+  const top = new Int16Array(width);
+  const bottom = new Int16Array(width);
+  top.fill(-1);
+  bottom.fill(-1);
+  for (let x = 0; x < width; x += 1) {
+    for (let y = 0; y < height; y += 1) {
+      if (!mask[y * width + x]) continue;
+      if (top[x] < 0) top[x] = y;
+      bottom[x] = y;
+    }
+  }
+  for (let x = 0; x < width; x += 1) {
+    if (top[x] < 0) continue;
+    for (let y = top[x]; y <= bottom[x]; y += 1) {
+      const i = y * width + x;
+      if (mask[i] || blocked[i]) continue;
+      mask[i] = 1;
+    }
+  }
+  fillSmallHoles(mask, blocked, width, height);
+}
+function fillSmallHoles(mask, blocked, width, height) {
+  const seen = new Uint8Array(width * height);
+  const maxHole = width * height * 16e-4;
+  const queue = new Int32Array(width * height);
+  for (let start = 0; start < mask.length; start += 1) {
+    if (mask[start] || seen[start]) continue;
+    let head = 0;
+    let tail = 0;
+    queue[tail] = start;
+    tail += 1;
+    seen[start] = 1;
+    const pixels = [];
+    let touchesBorder = false;
+    let hard = 0;
+    while (head < tail) {
+      const p = queue[head];
+      head += 1;
+      pixels.push(p);
+      if (blocked[p]) hard += 1;
+      const x = p % width;
+      const y = Math.floor(p / width);
+      if (x === 0 || y === 0 || x === width - 1 || y === height - 1) touchesBorder = true;
+      const neighbors = [p - 1, p + 1, p - width, p + width];
+      if (x === 0) neighbors[0] = -1;
+      if (x === width - 1) neighbors[1] = -1;
+      if (y === 0) neighbors[2] = -1;
+      if (y === height - 1) neighbors[3] = -1;
+      for (const next of neighbors) {
+        if (next < 0 || seen[next] || mask[next]) continue;
+        seen[next] = 1;
+        queue[tail] = next;
+        tail += 1;
+      }
+      if (pixels.length > maxHole) break;
+    }
+    if (!touchesBorder && pixels.length <= maxHole && hard / pixels.length < 0.4) {
+      for (const p of pixels) mask[p] = 1;
+    }
+  }
+}
+function extendBareGround(rgb, mask, blocked, width, height) {
+  const maxGap = Math.round(height * 0.2);
+  for (let x = 0; x < width; x += 1) {
+    let top = -1;
+    let bottom = -1;
+    let lawn = 0;
+    for (let y = 0; y < height; y += 1) {
+      if (!mask[y * width + x]) continue;
+      lawn += 1;
+      if (top < 0) top = y;
+      bottom = y;
+    }
+    if (top < 0 || lawn < height * 0.05) continue;
+    let gap = 0;
+    for (let y = bottom; y < height && gap < maxGap; y += 1) {
+      const i = y * width + x;
+      if (blocked[i]) break;
+      if (mask[i]) continue;
+      const p = i * 3;
+      if (!isYardGround(rgb[p], rgb[p + 1], rgb[p + 2])) break;
+      mask[i] = 1;
+      gap += 1;
+    }
+  }
+}
+function removePeople(rgb, mask, width, height) {
+  const seen = new Uint8Array(width * height);
+  const maxWidth = Math.round(width * 0.22);
+  for (let start = 0; start < mask.length; start += 1) {
+    if (!mask[start] || seen[start]) continue;
+    const p0 = start * 3;
+    if (!isSkin(rgb[p0], rgb[p0 + 1], rgb[p0 + 2])) continue;
+    const queue = [start];
+    seen[start] = 1;
+    const pixels = [];
+    let minX = width;
+    let maxX = 0;
+    let minY = height;
+    let maxY = 0;
+    let head = 0;
+    while (head < queue.length && pixels.length < width * height * 0.08) {
+      const p = queue[head];
+      head += 1;
+      pixels.push(p);
+      const x = p % width;
+      const y = Math.floor(p / width);
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+      const neighbors = [p - 1, p + 1, p - width, p + width];
+      if (x === 0) neighbors[0] = -1;
+      if (x === width - 1) neighbors[1] = -1;
+      if (y === 0) neighbors[2] = -1;
+      if (y === height - 1) neighbors[3] = -1;
+      for (const next of neighbors) {
+        if (next < 0 || seen[next] || !mask[next]) continue;
+        const n = next * 3;
+        if (!isSkin(rgb[n], rgb[n + 1], rgb[n + 2])) continue;
+        seen[next] = 1;
+        queue.push(next);
+      }
+    }
+    const span = maxX - minX + 1;
+    const tall = maxY - minY + 1;
+    if (pixels.length > 40 && span <= maxWidth && tall > span * 1.35) {
+      for (const p of pixels) mask[p] = 0;
+    }
+  }
+}
+function isSkin(r, g, b) {
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const sat = max === 0 ? 0 : (max - min) / max;
+  const value = max / 255;
+  return r > 150 && g > 90 && b > 70 && r > g + 12 && r > b + 18 && g > b && g - b < 38 && sat > 0.14 && sat < 0.58 && value > 0.45 && value < 0.96;
+}
+function isYardGround(r, g, b) {
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const sat = max === 0 ? 0 : (max - min) / max;
+  const value = max / 255;
+  if (value < 0.08) return false;
+  const concrete = sat < 0.1 && value > 0.45 && Math.abs(r - g) < 14 && Math.abs(g - b) < 16;
+  if (concrete) return false;
+  const green = g + 2 >= r && g > b + 4 && g > 24;
+  const earth = b + 8 < Math.max(r, g) && r > 35 && g > 30 && sat > 0.05 && sat < 0.72 && value < 0.86 && r < g + 55;
+  return green || earth;
+}
+function lawnIsPlausible(mask, width, height) {
+  let total = 0;
+  let lower = 0;
+  let upper = 0;
+  const lowerY = Math.floor(height * 0.38);
+  const upperY = Math.floor(height * 0.16);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      if (!mask[y * width + x]) continue;
+      total += 1;
+      if (y >= lowerY) lower += 1;
+      if (y < upperY) upper += 1;
+    }
+  }
+  const fraction = total / (width * height);
+  if (fraction < MIN_LAWN_FRACTION || fraction > MAX_LAWN_FRACTION) return false;
+  if (lower / total < 0.62) return false;
+  if (upper / total > 0.04) return false;
+  return true;
+}
+function mirror(value, size) {
+  const period = size * 2;
+  let m = value % period;
+  if (m < 0) m += period;
+  return m >= size ? period - 1 - m : m;
+}
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+function boxBlur(src, width, height, radius) {
+  const floats = new Float32Array(src.length);
+  for (let i = 0; i < src.length; i += 1) floats[i] = src[i];
+  const blurred = boxBlurFloat(floats, width, height, radius);
+  const out = new Uint8Array(src.length);
+  for (let i = 0; i < out.length; i += 1) out[i] = clamp(Math.round(blurred[i]), 0, 255);
+  return out;
+}
+function boxBlurFloat(src, width, height, radius) {
+  const r = Math.max(1, radius);
+  const tmp = new Float32Array(src.length);
+  const out = new Float32Array(src.length);
+  const prefix = new Float32Array(Math.max(width, height) + 1);
+  for (let y = 0; y < height; y += 1) {
+    const row = y * width;
+    prefix[0] = 0;
+    for (let x = 0; x < width; x += 1) prefix[x + 1] = prefix[x] + src[row + x];
+    for (let x = 0; x < width; x += 1) {
+      const start = Math.max(0, x - r);
+      const end = Math.min(width - 1, x + r);
+      tmp[row + x] = (prefix[end + 1] - prefix[start]) / (end - start + 1);
+    }
+  }
+  for (let x = 0; x < width; x += 1) {
+    prefix[0] = 0;
+    for (let y = 0; y < height; y += 1) prefix[y + 1] = prefix[y] + tmp[y * width + x];
+    for (let y = 0; y < height; y += 1) {
+      const start = Math.max(0, y - r);
+      const end = Math.min(height - 1, y + r);
+      out[y * width + x] = (prefix[end + 1] - prefix[start]) / (end - start + 1);
+    }
+  }
+  return out;
+}
+function grassReferenceCandidates(env = process.env, cwd = process.cwd()) {
+  const override = typeof env.STUDIO_GRASS_REFERENCE_PATH === "string" ? env.STUDIO_GRASS_REFERENCE_PATH.trim() : "";
+  if (override) return [override];
+  return [
+    path.join(cwd, GRASS_REFERENCE_RELATIVE_PATH),
+    path.join(cwd, "dist/spa/studio/grass-reference.jpg")
+  ];
+}
+function isJpeg(bytes) {
+  return bytes.length > 32 && bytes[0] === 255 && bytes[1] === 216;
+}
+async function readGrassReference(env = process.env) {
+  for (const filePath2 of grassReferenceCandidates(env)) {
+    try {
+      const bytes = await fs.readFile(filePath2);
+      if (isJpeg(bytes)) return { bytes, contentType: "image/jpeg", path: filePath2 };
+    } catch {
+    }
+  }
+  throw new OpenAiEditError(GRASS_REFERENCE_MISSING_NOTE, 503);
+}
+async function grassReferenceStatus(env = process.env) {
+  try {
+    await readGrassReference(env);
+    return {
+      ready: true,
+      publicPath: GRASS_REFERENCE_PUBLIC_PATH,
+      note: "Using the lawn reference at /studio/grass-reference.jpg."
+    };
+  } catch (err) {
+    return {
+      ready: false,
+      publicPath: GRASS_REFERENCE_PUBLIC_PATH,
+      note: err instanceof Error ? err.message : GRASS_REFERENCE_MISSING_NOTE
+    };
+  }
+}
+function editError(err) {
+  if (err instanceof OpenAiEditError) return err;
+  const status2 = err && typeof err === "object" && "status" in err ? Number(err.status) : 400;
+  const message = err instanceof Error ? err.message : "The grass edit failed.";
+  return new OpenAiEditError(message, status2 || 400);
+}
+async function applyGrassToPhoto(photo, mask, env, readGrass, fetchImpl) {
+  const grass = readGrass ? await readGrass() : await readGrassReference(env);
+  try {
+    return await compositeGrass({
+      photo,
+      reference: grass.bytes,
+      mask,
+      apiKey: readOpenAiApiKey(env ?? process.env),
+      fetchImpl
+    });
+  } catch (err) {
+    throw editError(err);
+  }
+}
+async function previewLawnMask(photo, env) {
+  await readGrassReference(env);
+  try {
+    const mask = await lawnMaskPng(photo);
+    return {
+      png: mask.png,
+      note: mask.png ? "Automatic lawn. Paint to add or erase it, then apply." : "No lawn detected. Grass was not added. The photo is unchanged."
+    };
+  } catch (err) {
+    throw editError(err);
+  }
+}
+async function editScratchPhoto(input) {
+  const parsed = parseScratchEdit({
+    action: input.action,
+    prompt: input.prompt,
+    byteLength: input.bytes.length,
+    contentType: input.contentType
+  });
+  if (parsed.ok === false) throw new OpenAiEditError(parsed.error, 400);
+  const wantsGrass = parsed.action === "grass" || parsed.attachGrass || promptRequestsGrass(parsed.prompt);
+  let bytes = input.bytes;
+  let note = "";
+  if (parsed.action !== "grass" && promptNeedsImageModel(parsed.prompt)) {
+    const apiKey = readOpenAiApiKey(input.env ?? process.env);
+    if (!apiKey) throw new OpenAiEditError(AI_EDIT_MISSING_KEY_NOTE, 503);
+    const edited = await editListingPhotoWithOpenAI({
+      apiKey,
+      prompt: realEstateEditPrompt(stripGrassInstructions(parsed.prompt)),
+      bytes: input.bytes,
+      contentType: "image/jpeg",
+      fetchImpl: input.fetchImpl
+    });
+    bytes = edited.bytes;
+  } else if (!wantsGrass) {
+    const apiKey = readOpenAiApiKey(input.env ?? process.env);
+    if (!apiKey) throw new OpenAiEditError(AI_EDIT_MISSING_KEY_NOTE, 503);
+    throw new OpenAiEditError("Describe the AI edit.", 400);
+  }
+  if (wantsGrass) {
+    const grass = await applyGrassToPhoto(bytes, input.mask, input.env, input.readGrass, input.fetchImpl);
+    if (!grass.applied) {
+      return {
+        bytes,
+        contentType: "image/jpeg",
+        downloadName: scratchDownloadName(input.fileName || "scratch.jpg"),
+        note: bytes === input.bytes ? grass.note : "No lawn detected. Grass was not added."
+      };
+    }
+    bytes = grass.bytes;
+    note = grass.note;
+  }
+  return {
+    bytes,
+    contentType: "image/jpeg",
+    downloadName: scratchDownloadName(input.fileName || "scratch.jpg"),
+    note
+  };
+}
 const db$r = () => admin.firestore();
 const bucket$2 = () => admin.storage().bucket();
 function httpError$5(status2, message) {
@@ -16905,18 +17879,65 @@ async function downloadListingImage(listingId, sourcePath, fileName2, contentTyp
   return { bytes, contentType: resolved };
 }
 async function runOpenAiEdit(input) {
-  const apiKey = readOpenAiApiKey(process.env);
-  if (!apiKey) throw new OpenAiEditError(AI_EDIT_MISSING_KEY_NOTE);
   const source = await downloadListingImage(input.listingId, input.sourcePath, input.fileName, input.contentType);
-  const edited = await editListingPhotoWithOpenAI({
-    apiKey,
-    prompt: realEstateEditPrompt(input.prompt),
-    bytes: source.bytes,
-    contentType: source.contentType
-  });
+  const wantsGrass = input.grass === true || editWantsGrass(input.prompt);
+  const aiPrompt = stripGrassInstructions(input.prompt);
+  let bytes = source.bytes;
+  let contentType = source.contentType;
+  let ranModel = false;
+  const notes = [];
+  if (promptNeedsImageModel(aiPrompt)) {
+    const apiKey = readOpenAiApiKey(process.env);
+    if (!apiKey) throw new OpenAiEditError(AI_EDIT_MISSING_KEY_NOTE);
+    const edited = await editListingPhotoWithOpenAI({
+      apiKey,
+      prompt: realEstateEditPrompt(aiPrompt),
+      bytes: source.bytes,
+      contentType: source.contentType
+    });
+    bytes = edited.bytes;
+    contentType = edited.contentType;
+    ranModel = true;
+    notes.push(AI_EDIT_READY_NOTE);
+  } else if (!wantsGrass) {
+    const apiKey = readOpenAiApiKey(process.env);
+    if (!apiKey) throw new OpenAiEditError(AI_EDIT_MISSING_KEY_NOTE);
+    throw new OpenAiEditError("Describe the AI edit.");
+  }
+  let grassApplied = false;
+  if (wantsGrass) {
+    const grass = await applyGrassToPhoto(bytes);
+    if (grass.applied) {
+      bytes = grass.bytes;
+      contentType = "image/jpeg";
+      grassApplied = true;
+      notes.push(grass.note);
+    } else {
+      notes.push(ranModel ? GRASS_SKIPPED_NOTE : grass.note);
+    }
+  }
+  if (!ranModel && !grassApplied) {
+    return {
+      afterUrl: "",
+      resultPath: source ? input.sourcePath : "",
+      bytes: source.bytes,
+      contentType: source.contentType,
+      note: notes.join(" ") || GRASS_SKIPPED_NOTE,
+      unchanged: true,
+      grassApplied: false
+    };
+  }
   const base = input.fileName.replace(/\.\w+$/, "") || "edit";
-  const saved = await saveListingBytes(input.listingId, `${base}-ai.jpg`, "image/jpeg", "photos", edited.bytes);
-  return { afterUrl: saved.url, resultPath: saved.storagePath, bytes: edited.bytes };
+  const saved = await saveListingBytes(input.listingId, `${base}-ai.jpg`, contentType, "photos", bytes);
+  return {
+    afterUrl: saved.url,
+    resultPath: saved.storagePath,
+    bytes,
+    contentType,
+    note: notes.join(" ") || AI_EDIT_READY_NOTE,
+    unchanged: false,
+    grassApplied
+  };
 }
 async function inspectOrderEditJpeg(bytes) {
   try {
@@ -17098,19 +18119,21 @@ async function advanceOrderEditQueue(input) {
       sourcePath: String(data.sourcePath),
       fileName: fileName2,
       contentType: "",
-      prompt: String(data.prompt || prepared.plan.photoPrompt)
+      prompt: String(data.prompt || prepared.plan.photoPrompt),
+      grass: prepared.plan.grassReplacement
     });
     await next.ref.update({
       status: "review",
       beforeUrl,
-      afterUrl: saved.afterUrl,
-      resultPath: saved.resultPath,
+      afterUrl: saved.unchanged ? beforeUrl : saved.afterUrl,
+      resultPath: saved.unchanged ? String(data.sourcePath || "") : saved.resultPath,
       placeholder: false,
-      note: AI_EDIT_READY_NOTE,
+      grassApplied: saved.grassApplied,
+      note: saved.note,
       pipeline: ["pending", "processing", "review"],
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
-    const inspection = await inspectOrderEditJpeg(saved.bytes);
+    const inspection = saved.unchanged ? { status: "pass", notes: [] } : await inspectOrderEditJpeg(saved.bytes);
     try {
       await next.ref.update({
         inspection,
@@ -17132,10 +18155,10 @@ async function advanceOrderEditQueue(input) {
         slot: String(data.slot || ""),
         type: String(data.type || ""),
         beforeUrl,
-        afterUrl: saved.afterUrl,
-        resultPath: saved.resultPath,
+        afterUrl: saved.unchanged ? beforeUrl : saved.afterUrl,
+        resultPath: saved.unchanged ? String(data.sourcePath || "") : saved.resultPath,
         placeholder: false,
-        note: AI_EDIT_READY_NOTE,
+        note: saved.note,
         inspection
       }
     };
@@ -17218,14 +18241,16 @@ async function enqueueAiEdit(input) {
       sourcePath: input.sourcePath,
       fileName: frame.name,
       contentType: frame.contentType,
-      prompt: input.prompt
+      prompt: input.prompt,
+      grass: editWantsGrass(input.prompt)
     });
     await ref.update({
       status: "review",
-      afterUrl: saved.afterUrl,
-      resultPath: saved.resultPath,
+      afterUrl: saved.unchanged ? beforeUrl : saved.afterUrl,
+      resultPath: saved.unchanged ? input.sourcePath : saved.resultPath,
       placeholder: false,
-      note: AI_EDIT_READY_NOTE,
+      grassApplied: saved.grassApplied,
+      note: saved.note,
       pipeline: ["pending", "processing", "review"],
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
@@ -17234,10 +18259,10 @@ async function enqueueAiEdit(input) {
       status: "review",
       provider: "openai",
       beforeUrl,
-      afterUrl: saved.afterUrl,
-      resultPath: saved.resultPath,
+      afterUrl: saved.unchanged ? beforeUrl : saved.afterUrl,
+      resultPath: saved.unchanged ? input.sourcePath : saved.resultPath,
       placeholder: false,
-      note: AI_EDIT_READY_NOTE
+      note: saved.note
     };
   } catch (err) {
     const note = failureNote(err);
@@ -25126,14 +26151,14 @@ router$p.post("/mailchimp/sync", requireCoordinator, async (req, res) => {
     const errors = [];
     for (const client of clients) {
       const email = String(client.email).toLowerCase().trim();
-      const hash = crypto.createHash("md5").update(email).digest("hex");
+      const hash2 = crypto.createHash("md5").update(email).digest("hex");
       const mergeFields = {
         FNAME: client.firstName || "",
         LNAME: client.lastName || ""
       };
       const tags = ["Iconic Images", audience === "vip" ? "VIP" : "Client"].filter(Boolean);
       try {
-        await mailchimpRequest(`/lists/${listId}/members/${hash}`, {
+        await mailchimpRequest(`/lists/${listId}/members/${hash2}`, {
           method: "PUT",
           body: JSON.stringify({
             email_address: email,
@@ -25142,7 +26167,7 @@ router$p.post("/mailchimp/sync", requireCoordinator, async (req, res) => {
             merge_fields: mergeFields
           })
         });
-        await mailchimpRequest(`/lists/${listId}/members/${hash}/tags`, {
+        await mailchimpRequest(`/lists/${listId}/members/${hash2}/tags`, {
           method: "POST",
           body: JSON.stringify({
             tags: tags.map((name) => ({ name, status: "active" }))
@@ -29102,116 +30127,6 @@ router$i.get("/photographer-preview", requireAdmin, async (req, res) => {
     return res.status(500).json({ error: "Could not load that photographer." });
   }
 });
-const GRASS_REFERENCE_PUBLIC_PATH = "/studio/grass-reference.jpg";
-const GRASS_REFERENCE_RELATIVE_PATH = "public/studio/grass-reference.jpg";
-const SCRATCH_MAX_BYTES = 4e6;
-const SCRATCH_PROMPT_MAX = 2e3;
-const SCRATCH_PROMPT_HEADER = "x-scratch-prompt";
-const SCRATCH_NAME_HEADER = "x-scratch-filename";
-const SCRATCH_ACTION_HEADER = "x-scratch-action";
-const SCRATCH_ACTIONS = ["edit", "revise", "twilight", "grass"];
-const GRASS_REPLACE_PROMPT = "Replace the lawn in the first image with healthy, even grass that matches the second image, the grass reference. Keep the house, hardscape, trees, sky, lighting, and camera angle. Change only the lawn.";
-const GRASS_REFERENCE_MISSING_NOTE = "Grass reference is missing. Add Cadi's lawn JPEG at public/studio/grass-reference.jpg (or set STUDIO_GRASS_REFERENCE_PATH).";
-function decodeScratchHeader(value) {
-  if (!value) return "";
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return value;
-  }
-}
-function parseScratchEdit(input) {
-  const type = input.contentType.split(";")[0].trim().toLowerCase();
-  if (type !== "image/jpeg") return { ok: false, error: "Scratch pad edits JPEGs. Drop a .jpg." };
-  if (!input.byteLength) return { ok: false, error: "That photo was empty." };
-  if (input.byteLength > SCRATCH_MAX_BYTES) {
-    return { ok: false, error: "That photo is too large for the scratch pad. Export a smaller JPEG." };
-  }
-  const action = input.action.trim().toLowerCase();
-  if (!SCRATCH_ACTIONS.includes(action)) {
-    return { ok: false, error: "Unknown scratch action." };
-  }
-  if (action === "twilight") {
-    return { ok: true, action: "twilight", prompt: orderExteriorTwilightPrompt(), attachGrass: false };
-  }
-  if (action === "grass") {
-    return { ok: true, action: "grass", prompt: GRASS_REPLACE_PROMPT, attachGrass: true };
-  }
-  const userPrompt = input.prompt.trim().replace(/\s+/g, " ").slice(0, SCRATCH_PROMPT_MAX);
-  if (userPrompt.length < 3) return { ok: false, error: "Describe the edit." };
-  return { ok: true, action, prompt: userPrompt, attachGrass: false };
-}
-function scratchDownloadName(fileName2) {
-  const baseName = fileName2.split(/[/\\]/).pop() || "scratch";
-  const base = baseName.replace(/\.[^.]+$/, "").replace(/[^\w.-]+/g, "-").replace(/^[-.]+|[-.]+$/g, "").slice(0, 80);
-  return `${base || "scratch"}-edit.jpg`;
-}
-function grassReferenceCandidates(env = process.env, cwd = process.cwd()) {
-  const override = typeof env.STUDIO_GRASS_REFERENCE_PATH === "string" ? env.STUDIO_GRASS_REFERENCE_PATH.trim() : "";
-  if (override) return [override];
-  return [
-    path.join(cwd, GRASS_REFERENCE_RELATIVE_PATH),
-    path.join(cwd, "dist/spa/studio/grass-reference.jpg")
-  ];
-}
-function isJpeg(bytes) {
-  return bytes.length > 32 && bytes[0] === 255 && bytes[1] === 216;
-}
-async function readGrassReference(env = process.env) {
-  for (const filePath2 of grassReferenceCandidates(env)) {
-    try {
-      const bytes = await fs.readFile(filePath2);
-      if (isJpeg(bytes)) return { bytes, contentType: "image/jpeg", path: filePath2 };
-    } catch {
-    }
-  }
-  throw new OpenAiEditError(GRASS_REFERENCE_MISSING_NOTE, 503);
-}
-async function grassReferenceStatus(env = process.env) {
-  try {
-    await readGrassReference(env);
-    return {
-      ready: true,
-      publicPath: GRASS_REFERENCE_PUBLIC_PATH,
-      note: "Using the lawn reference at /studio/grass-reference.jpg."
-    };
-  } catch (err) {
-    return {
-      ready: false,
-      publicPath: GRASS_REFERENCE_PUBLIC_PATH,
-      note: err instanceof Error ? err.message : GRASS_REFERENCE_MISSING_NOTE
-    };
-  }
-}
-async function editScratchPhoto(input) {
-  const parsed = parseScratchEdit({
-    action: input.action,
-    prompt: input.prompt,
-    byteLength: input.bytes.length,
-    contentType: input.contentType
-  });
-  if (parsed.ok === false) throw new OpenAiEditError(parsed.error, 400);
-  let references;
-  if (parsed.attachGrass) {
-    const grass = input.readGrass ? await input.readGrass() : await readGrassReference(input.env);
-    references = [{ bytes: grass.bytes, contentType: grass.contentType, filename: "grass-reference.jpg" }];
-  }
-  const apiKey = readOpenAiApiKey(input.env ?? process.env);
-  if (!apiKey) throw new OpenAiEditError(AI_EDIT_MISSING_KEY_NOTE, 503);
-  const edited = await editListingPhotoWithOpenAI({
-    apiKey,
-    prompt: realEstateEditPrompt(parsed.prompt),
-    bytes: input.bytes,
-    contentType: "image/jpeg",
-    references,
-    fetchImpl: input.fetchImpl
-  });
-  return {
-    bytes: edited.bytes,
-    contentType: edited.contentType,
-    downloadName: scratchDownloadName(input.fileName || "scratch.jpg")
-  };
-}
 const router$h = Router();
 function headerValue(value) {
   if (Array.isArray(value)) return value[0] || "";
@@ -29222,22 +30137,55 @@ router$h.get("/", requireCoordinator, async (_req, res) => {
   return res.json({ grass, twilightPrompt: orderExteriorTwilightPrompt() });
 });
 router$h.post(
-  "/",
+  "/lawn-mask",
   requireCoordinator,
-  express.raw({ type: "image/jpeg", limit: "4mb" }),
+  express.raw({ type: "image/jpeg", limit: "6mb" }),
   async (req, res) => {
     try {
       const bytes = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+      const mask = await previewLawnMask(bytes);
+      res.setHeader("Cache-Control", "no-store");
+      res.setHeader(SCRATCH_NOTE_HEADER, mask.note);
+      if (!mask.png) return res.status(200).json({ note: mask.note || GRASS_UNCHANGED_NOTE, mask: null });
+      res.setHeader("Content-Type", "image/png");
+      return res.status(200).send(mask.png);
+    } catch (err) {
+      const status2 = err instanceof OpenAiEditError && err.status ? err.status : 502;
+      const message = err instanceof Error ? err.message : "The lawn mask failed.";
+      if (status2 >= 500) console.error("[Studio scratch]", message);
+      return res.status(status2).json({ error: message });
+    }
+  }
+);
+router$h.post(
+  "/",
+  requireCoordinator,
+  express.raw({ type: "image/jpeg", limit: "6mb" }),
+  async (req, res) => {
+    try {
+      const rawBody = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+      const masked = headerValue(req.headers[SCRATCH_LAWN_MASK_HEADER]) === "1";
+      let bytes = rawBody;
+      let mask;
+      try {
+        const parts = splitScratchBody(rawBody, masked);
+        bytes = Buffer.from(parts.jpeg);
+        mask = parts.mask ? Buffer.from(parts.mask) : void 0;
+      } catch (err) {
+        throw new OpenAiEditError(err instanceof Error ? err.message : "The lawn mask could not be read.", 400);
+      }
       const edited = await editScratchPhoto({
         action: headerValue(req.headers[SCRATCH_ACTION_HEADER]) || "edit",
         prompt: decodeScratchHeader(headerValue(req.headers[SCRATCH_PROMPT_HEADER])),
         fileName: decodeScratchHeader(headerValue(req.headers[SCRATCH_NAME_HEADER])),
         bytes,
-        contentType: headerValue(req.headers["content-type"]) || ""
+        mask,
+        contentType: "image/jpeg"
       });
       res.setHeader("Content-Type", edited.contentType);
       res.setHeader("Content-Disposition", `attachment; filename="${edited.downloadName}"`);
       res.setHeader("Cache-Control", "no-store");
+      if (edited.note) res.setHeader(SCRATCH_NOTE_HEADER, edited.note);
       return res.status(200).send(edited.bytes);
     } catch (err) {
       const status2 = err instanceof OpenAiEditError && err.status ? err.status : 502;
@@ -35255,8 +36203,8 @@ function bucketName() {
   return process.env.FIREBASE_STORAGE_BUCKET || process.env.VITE_FIREBASE_STORAGE_BUCKET || "";
 }
 async function optimizeImage(bytes) {
-  const sharp = (await import("sharp")).default;
-  const body = await sharp(bytes, { failOn: "none" }).rotate().resize({ width: 2e3, withoutEnlargement: true }).webp({ quality: 82 }).toBuffer();
+  const sharp2 = (await import("sharp")).default;
+  const body = await sharp2(bytes, { failOn: "none" }).rotate().resize({ width: 2e3, withoutEnlargement: true }).webp({ quality: 82 }).toBuffer();
   return { body, type: "image/webp", ext: "webp" };
 }
 async function saveObject(pageId, ext, body, type) {

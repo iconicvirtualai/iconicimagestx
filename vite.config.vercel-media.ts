@@ -3,7 +3,7 @@ import path from "path";
 
 /**
  * Display-image function. sharp stays external so the native binary is traced
- * only into api/media-display.mjs, never into api/index.mjs.
+ * with the function, the same way api/index.mjs traces it for lawn compositing.
  */
 export default defineConfig({
   publicDir: false,
