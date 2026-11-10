@@ -444,6 +444,14 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Orders desk: per-user KPI overrides, section order, and collapsed state.
+    // Coordinators write only their own document. Publish this file in the
+    // Firebase console. Vercel does not deploy rules.
+    // Nothing in this collection sends email or texts.
+    match /orderDeskPrefs/{uid} {
+      allow read, write: if isCoordinator() && request.auth.uid == uid;
+    }
+
     // ─── Catch-all: deny everything else ─────────────────────────────────────
     match /{document=**} {
       allow read, write: if false;
