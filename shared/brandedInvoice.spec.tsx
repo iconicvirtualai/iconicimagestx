@@ -114,7 +114,7 @@ describe("branded invoice pdf", () => {
     expect(pdf).toContain("/BaseFont /Inter-Bold");
     expect(pdf).not.toContain("/Helvetica");
     expect(pdf).toContain("/Subtype /Image");
-    expect(pdf).toContain("/Width 600");
+    expect(pdf).toContain("/Width 379");
     expect(pdf).toContain("/SMask");
     expect(bytes.length).toBeGreaterThan(1000);
     expect(pdf).toContain("INVOICE");
@@ -195,8 +195,10 @@ describe("client invoice page", () => {
   it("restyles /invoice/:id, adds Download PDF, and leaves checkout in place", () => {
     expect(clientInvoice).toContain("Download PDF");
     expect(clientInvoice).toContain("BrandedInvoiceShell");
-    expect(brandedInvoice).toContain("iconic-graffiti-logo.png");
-    expect(brandedInvoice).toContain("iconic-graffiti-logo.webp");
+    expect(brandedInvoice).toContain("iconic-camera-logo.png");
+    expect(brandedInvoice).toContain("ICONIC");
+    expect(brandedInvoice).not.toContain("iconic-graffiti-logo.png");
+    expect(brandedInvoice).not.toContain("logo-black-large.png");
     expect(brandedInvoice).toContain("data-testid=\"invoice-total-box\"");
     expect(clientInvoice).toContain("invoicePageInvoiceNumber");
     expect(clientInvoice).toContain("invoice.invoiceNumber");

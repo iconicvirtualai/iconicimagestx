@@ -212,7 +212,9 @@ describe("client home dashboard", () => {
     expect(open).toContain("$250.00");
     expect(open).toContain('data-slot="money"');
     expect(open).toContain("whitespace-nowrap");
-    expect(open).not.toContain("Pay");
+    expect(open).toContain("Payment information");
+    expect(open).not.toContain("Pay now");
+    expect(open).not.toContain("Pay at Close");
     expect(open).not.toContain("/invoice/");
     expect(open).not.toContain("checkout");
   });

@@ -1,22 +1,19 @@
 /**
- * PDF of the branded Iconic invoice.
- * Layout follows the owner template: black header, pill table, totals box, notes, black footer.
- * Inter Light, Regular, and Bold. Processing and the total are the stored invoice amounts.
+ * PDF of an Iconic invoice.
+ * Cream page, site teal, Inter, and the black site wordmark. Processing and the total are the stored invoice amounts.
  */
 
 import { BUSINESS_CONTACT, LEGAL_BUSINESS_NAME } from "./businessContact.ts";
 import { INVOICE_INTER_FONTS } from "./invoiceInterFonts.ts";
 import { INVOICE_CAMERA_IMAGE } from "./invoiceCameraImage.ts";
-import { INVOICE_LOGO_IMAGE } from "./invoiceLogoImage.ts";
+import { INVOICE_WORDMARK } from "./invoiceWordmarkImage.ts";
 import type { InvoiceFace, InvoiceFaceLine } from "./invoiceFace.ts";
 import {
   formatInvoiceAmount,
   formatInvoiceDisplayDate,
   formatInvoicePhone,
-  invoiceBlankRowCount,
   presentInvoiceMoney,
 } from "./invoiceProcessing.ts";
-import { INTER_CAP_RATIO, TEMPLATE_H, TEMPLATE_W, invoiceTemplate as T } from "./invoiceTemplate.ts";
 import { brandedInvoiceNumber } from "./orderProjectInvoice.ts";
 
 export interface BrandedInvoicePdfInput {
@@ -43,8 +40,8 @@ export function brandedInvoicePdf(input: BrandedInvoicePdfInput): Uint8Array {
   const content = layout(input);
   return pdfDocument(
     content,
-    decode64(INVOICE_LOGO_IMAGE.rgb),
-    decode64(INVOICE_LOGO_IMAGE.alpha),
+    decode64(INVOICE_WORDMARK.rgb),
+    decode64(INVOICE_WORDMARK.alpha),
     decode64(INVOICE_CAMERA_IMAGE.rgb),
     decode64(INVOICE_CAMERA_IMAGE.alpha),
   );
@@ -53,15 +50,11 @@ export function brandedInvoicePdf(input: BrandedInvoicePdfInput): Uint8Array {
 const PAGE_W = 612;
 const PAGE_H = 792;
 
-const BLACK: RGB = [0, 0, 0];
-const WHITE: RGB = [1, 1, 1];
-const YELLOW: RGB = [1, 0.831, 0];
-const TEAL: RGB = [0, 0.706, 0.776];
-const PINK: RGB = [1, 0.176, 0.471];
-const GREEN: RGB = [0, 0.651, 0.318];
-const GRAY: RGB = [0.953, 0.957, 0.965];
-const RULE: RGB = [0.42, 0.447, 0.502];
-const MUTED: RGB = [0.29, 0.29, 0.29];
+const BLACK: RGB = [0.04, 0.04, 0.04];
+const CREAM: RGB = [0.961, 0.949, 0.918];
+const TEAL: RGB = [13 / 255, 148 / 255, 136 / 255];
+const LINE: RGB = [0.86, 0.88, 0.87];
+const MUTED: RGB = [0.42, 0.46, 0.45];
 
 type RGB = readonly [number, number, number];
 
@@ -74,138 +67,101 @@ function layout(input: BrandedInvoicePdfInput): string {
   const presented = presentInvoiceMoney(input.face);
   const date = formatInvoiceDisplayDate(input.issuedAt);
   const ops: string[] = [];
-  const X = (x: number) => (x / TEMPLATE_W) * PAGE_W;
-  const capSize = (cap: number) => (cap / INTER_CAP_RATIO / TEMPLATE_W) * PAGE_W;
-  const base = (y: number, cap: number) => PAGE_H - ((y + cap) / TEMPLATE_H) * PAGE_H;
-  const track = (cap: number, em: number) => capSize(cap) * em;
 
-  const logoW = X(T.logo.w);
-  const logoH = (T.logo.h / TEMPLATE_H) * PAGE_H;
-  const logoX = X(T.logo.x);
-  const logoY = PAGE_H - ((T.logo.y / TEMPLATE_H) * PAGE_H) - logoH;
-  ops.push(fillRect(0, base(0, T.headerH), PAGE_W, (T.headerH / TEMPLATE_H) * PAGE_H, BLACK));
-  ops.push(`q\n${num(logoW)} 0 0 ${num(logoH)} ${num(logoX)} ${num(logoY)} cm\n/Im1 Do\nQ`);
-
-  const titleSize = capSize(T.title.cap);
-  ops.push(text(X(T.title.x), base(T.title.y, T.title.cap), titleSize, "F3", YELLOW, "INVOICE", track(T.title.cap, T.title.track)));
-  const metaSize = capSize(T.invoiceNo.cap);
-  ops.push(text(X(T.invoiceNo.x), base(T.invoiceNo.y, T.invoiceNo.cap), metaSize, "F3", WHITE, `INVOICE NO : ${clip(invoiceNumber, 36)}`, track(T.invoiceNo.cap, T.invoiceNo.track)));
-  if (date) ops.push(text(X(T.date.x), base(T.date.y, T.date.cap), metaSize, "F3", WHITE, date, track(T.date.cap, T.date.track)));
+  ops.push(fillRect(0, 0, PAGE_W, PAGE_H, CREAM));
+  const margin = 48;
+  const right = PAGE_W - margin;
+  const logoW = 196;
+  const logoH = logoW * (INVOICE_WORDMARK.height / INVOICE_WORDMARK.width);
+  const logoTop = PAGE_H - 42;
+  const logoY = logoTop - logoH;
+  ops.push(`q\n${num(logoW)} 0 0 ${num(logoH)} ${num(margin)} ${num(logoY)} cm\n/Im1 Do\nQ`);
+  ops.push(textRight(right, logoTop - 18, 20, "F3", TEAL, "Invoice"));
+  ops.push(textRight(right, logoTop - 36, 9, "F2", BLACK, `INVOICE NO : ${clip(invoiceNumber, 36)}`));
+  if (date) ops.push(textRight(right, logoTop - 50, 9, "F2", MUTED, date));
   const status = input.status.trim();
-  if (status) ops.push(text(X(T.date.x), base(T.date.y + 28, 12), capSize(12), "F2", WHITE, clip(status.toUpperCase(), 28), 0.4));
+  if (status) ops.push(textRight(right, logoTop - 64, 8, "F2", MUTED, clip(status.toUpperCase(), 28)));
 
-  const toSize = capSize(T.billTo.cap);
-  const addrSize = capSize(T.address.cap);
-  ops.push(textRight(X(T.billTo.right), base(T.billTo.y, T.billTo.cap), toSize, "F3", WHITE, "INVOICE TO :", track(T.billTo.cap, T.billTo.track)));
-  ops.push(textRight(X(T.clientName.right), base(T.clientName.y, T.clientName.cap), toSize, "F3", WHITE, clip((input.clientName || "Client").toUpperCase(), 32), track(T.clientName.cap, T.clientName.track)));
-  const addressLines = wrap(input.billToAddress, addrSize, "F2", X(420)).slice(0, 3);
-  addressLines.forEach((line, index) => {
-    const y = T.address.y + index * (T.address.cap + 6);
-    ops.push(textRight(X(T.address.right), base(y, T.address.cap), addrSize, "F2", WHITE, line));
+  let y = logoY - 26;
+  ops.push(strokeLine(margin, y, right, y, LINE, 0.6));
+  y -= 20;
+  ops.push(text(margin, y, 8, "F3", TEAL, "INVOICE TO :"));
+  y -= 16;
+  ops.push(text(margin, y, 12, "F3", BLACK, clip((input.clientName || "Client").toUpperCase(), 48)));
+  const addressLines = wrap(input.billToAddress, 9, "F2", 320).slice(0, 3);
+  addressLines.forEach((line) => {
+    y -= 13;
+    ops.push(text(margin, y, 9, "F2", MUTED, line));
   });
 
-  const grayTop = (T.gray.y / TEMPLATE_H) * PAGE_H;
-  const grayH = ((T.gray.bottom - T.gray.y) / TEMPLATE_H) * PAGE_H;
-  const grayY = PAGE_H - grayTop - grayH;
-  const grayX = X(T.gray.x);
-  const grayW = X(T.gray.right - T.gray.x);
-  ops.push(fillBottomRoundedRect(grayX, grayY, grayW, grayH, X(T.gray.radius), GRAY));
-
-  const pillX = X(T.pill.x);
-  const pillW = X(T.pill.right - T.pill.x);
-  const pillH = (T.pill.h / TEMPLATE_H) * PAGE_H;
-  const pillY = PAGE_H - ((T.pill.y / TEMPLATE_H) * PAGE_H) - pillH;
-  ops.push(fillRoundedRect(pillX, pillY, pillW, pillH, pillH / 2, BLACK));
-  const pillSize = capSize(T.pillLabel.cap);
-  const pillTrack = track(T.pillLabel.cap, T.pillLabel.track);
-  const labelY = base(T.pillLabel.y, T.pillLabel.cap);
-  ops.push(text(X(T.descLabelX), labelY, pillSize, "F1", WHITE, "DESCRIPTION", pillTrack));
-  ops.push(textCentered(X(T.qtyCenter), labelY, pillSize, "F1", WHITE, "QTY.", pillTrack));
-  ops.push(textRight(X(T.priceLabelRight), labelY, pillSize, "F1", WHITE, "PRICE", pillTrack));
-  ops.push(textRight(X(T.totalRight), labelY, pillSize, "F1", WHITE, "TOTAL", pillTrack));
+  y -= 22;
+  ops.push(strokeLine(margin, y, right, y, LINE, 0.7));
+  y -= 16;
+  ops.push(text(margin, y, 8, "F3", MUTED, "DESCRIPTION"));
+  ops.push(textCentered(330, y, 8, "F3", MUTED, "QTY."));
+  ops.push(textRight(470, y, 8, "F3", MUTED, "PRICE"));
+  ops.push(textRight(right, y, 8, "F3", MUTED, "TOTAL"));
+  y -= 8;
+  ops.push(strokeLine(margin, y, right, y, LINE, 0.4));
 
   const rows = tableRows(input.face.services);
-  const lineSize = capSize(T.lineCap);
-  const lineTrack = track(T.lineCap, T.lineTrack);
-  const descX = X(T.descX);
-  const nameMax = X(T.qtyCenter - T.descX - 28);
-  rows.forEach((row, index) => {
-    const ruleTop = T.ruleY + index * T.rowH;
-    const ruleY = PAGE_H - (ruleTop / TEMPLATE_H) * PAGE_H;
-    ops.push(strokeLine(grayX, ruleY, grayX + grayW, ruleY, RULE, 0.7));
-    if (row.blank) return;
-    const baseline = base(T.rowTextY + index * T.rowH, T.lineCap);
-    ops.push(text(descX, baseline, lineSize, "F3", TEAL, clipToWidth(row.name.toUpperCase(), lineSize, "F3", lineTrack, nameMax), lineTrack));
-    ops.push(textCentered(X(T.qtyCenter), baseline, lineSize, "F3", TEAL, row.qty, lineTrack * 0.4));
-    ops.push(textRight(X(T.priceRight), baseline, lineSize, "F3", TEAL, row.price));
-    ops.push(textRight(X(T.totalRight), baseline, lineSize, "F3", TEAL, row.total));
+  rows.forEach((row) => {
+    y -= 18;
+    if (!row.blank) {
+      ops.push(text(margin, y, 10, "F3", BLACK, clipToWidth(row.name.toUpperCase(), 10, "F3", 0, 240)));
+      ops.push(textCentered(330, y, 10, "F2", BLACK, row.qty));
+      ops.push(textRight(470, y, 10, "F2", BLACK, row.price));
+      ops.push(textRight(right, y, 10, "F2", BLACK, row.total));
+    }
+    y -= 8;
+    ops.push(strokeLine(margin, y, right, y, LINE, 0.35));
   });
 
-  const boxX = X(T.box.x);
-  const boxW = X(T.box.right - T.box.x);
-  const boxH = (T.box.h / TEMPLATE_H) * PAGE_H;
-  const boxY = PAGE_H - ((T.box.y / TEMPLATE_H) * PAGE_H) - boxH;
-  const boxBorder = X(T.box.border);
-  const boxInset = boxBorder / 2;
-  ops.push(strokeRoundedRect(boxX + boxInset, boxY + boxInset, boxW - boxBorder, boxH - boxBorder, Math.max(0, X(T.box.radius) - boxInset), BLACK, boxBorder));
-
-  const cells: Array<{ id: string; label: string; amount: string; x: number }> = [
-    { id: "subtotal", label: "SUB TOTAL", amount: formatInvoiceAmount(presented.subtotal), x: T.cells.subtotal },
-    { id: "processing", label: "PROCESSING", amount: explicitZero(presented.processing), x: T.cells.processing },
-    { id: "promotions", label: "PROMOTIONS", amount: promoAmount(presented.promotions), x: T.cells.promotions },
-    { id: "fees", label: "FEES", amount: explicitZero(presented.fees), x: T.cells.fees },
+  y -= 20;
+  const cells: Array<{ id: string; label: string; amount: string }> = [
+    { id: "subtotal", label: "SUB TOTAL", amount: formatInvoiceAmount(presented.subtotal) },
+    { id: "processing", label: "PROCESSING", amount: explicitZero(presented.processing) },
+    { id: "promotions", label: "PROMOTIONS", amount: promoAmount(presented.promotions) },
+    { id: "fees", label: "FEES", amount: explicitZero(presented.fees) },
   ];
-  if (presented.travel !== 0) cells.push({ id: "travel", label: "TRAVEL", amount: formatInvoiceAmount(presented.travel), x: 0 });
-  if (presented.tax !== 0) cells.push({ id: "tax", label: "TAX", amount: formatInvoiceAmount(presented.tax), x: 0 });
-  const extras = cells.some((cell) => cell.x === 0);
-  const totalsSize = capSize(T.cellCap);
-  const cellTrack = track(T.cellCap, T.cellTrack);
-  if (extras) {
-    const left = T.cells.subtotal;
-    const step = (T.grand.right - 90 - left) / cells.length;
-    cells.forEach((cell, index) => {
-      cell.x = left + step * index;
-    });
-  }
+  if (presented.travel !== 0) cells.push({ id: "travel", label: "TRAVEL", amount: formatInvoiceAmount(presented.travel) });
+  if (presented.tax !== 0) cells.push({ id: "tax", label: "TAX", amount: formatInvoiceAmount(presented.tax) });
+  const labelX = right - 170;
   cells.forEach((cell) => {
-    ops.push(text(X(cell.x), base(T.cellLabelY, T.cellCap), totalsSize, "F1", BLACK, cell.label, cellTrack));
-    ops.push(text(X(cell.x), base(T.cellAmountY, T.cellCap), totalsSize, "F3", BLACK, cell.amount));
+    ops.push(text(labelX, y, 9, "F2", MUTED, cell.label));
+    ops.push(textRight(right, y, 9, "F3", BLACK, cell.amount));
+    y -= 14;
   });
-  const grandSize = capSize(T.grand.cap);
+  ops.push(strokeLine(labelX, y + 8, right, y + 8, TEAL, 0.8));
   const totalAmount = formatInvoiceAmount(presented.total);
-  ops.push(textRight(X(T.grand.right), base(T.grand.labelY, T.grand.cap), grandSize, "F1", BLACK, "TOTAL", track(T.grand.cap, T.grand.track)));
-  ops.push(textRight(X(T.grand.right), base(T.grand.amountY, T.grand.cap), grandSize, "F3", BLACK, totalAmount));
+  ops.push(text(labelX, y - 6, 11, "F3", TEAL, "TOTAL"));
+  ops.push(textRight(right, y - 6, 11, "F3", BLACK, totalAmount));
+  y -= 28;
 
-  const notesSize = capSize(T.notes.cap);
-  ops.push(text(X(T.notes.x), base(T.notes.y, T.notes.cap), notesSize, "F3", PINK, "NOTES:", track(T.notes.cap, T.notes.track)));
-  const noteBody = (input.notes || "").trim();
-  const noteLines = noteBody ? wrap(noteBody, addrSize, "F2", X(TEMPLATE_W - T.notes.x - 80)).slice(0, 4) : [];
-  noteLines.forEach((line, index) => {
-    const y = T.notes.y + T.notes.cap + 10 + index * (T.address.cap + 6);
-    if (y > T.footerY - 8) return;
-    ops.push(text(X(T.notes.x), base(y, T.address.cap), addrSize, "F2", BLACK, line));
+  ops.push(text(margin, y, 8, "F3", TEAL, "NOTES:"));
+  const noteBody = (input.notes || "").trim() || "No notes on this invoice.";
+  const noteLines = wrap(noteBody, 9, "F2", right - margin).slice(0, 4);
+  noteLines.forEach((line) => {
+    y -= 13;
+    ops.push(text(margin, y, 9, "F2", BLACK, line));
   });
 
-  const footerH = ((TEMPLATE_H - T.footerY) / TEMPLATE_H) * PAGE_H;
-  if (presented.amountPaid > 0) {
-    ops.push(text(X(T.contact.x), footerH + 10, capSize(16), "F2", MUTED, `Amount paid ${formatInvoiceAmount(presented.amountPaid)}    Amount due ${formatInvoiceAmount(presented.amountDue)}`));
-  }
-  ops.push(fillRect(0, 0, PAGE_W, footerH, BLACK));
-  const paySize = capSize(T.payment.cap);
-  ops.push(text(X(T.payment.x), base(T.payment.y, T.payment.cap), paySize, "F3", GREEN, "PAYMENT INFORMATION:", track(T.payment.cap, T.payment.track)));
-  const contactSize = capSize(T.contact.cap);
-  ops.push(text(X(T.contact.x), base(T.contact.y, T.contact.cap), contactSize, "F2", WHITE, LEGAL_BUSINESS_NAME));
-  ops.push(text(X(T.contact.x), base(T.contact.y + T.contact.line, T.contact.cap), contactSize, "F2", WHITE, formatInvoicePhone(BUSINESS_CONTACT.phoneDisplay)));
-  ops.push(text(X(T.contact.x), base(T.emailY, T.contact.cap), contactSize, "F2", WHITE, BUSINESS_CONTACT.email));
-  ops.push(textRight(X(T.contact.right), base(T.contact.y, T.contact.cap), contactSize, "F2", WHITE, BUSINESS_CONTACT.streetAddress));
-  ops.push(textRight(X(T.contact.right), base(T.contact.y + T.contact.line, T.contact.cap), contactSize, "F2", WHITE, BUSINESS_CONTACT.addressLine2));
-  const thanksSize = capSize(T.thanks.cap);
-  ops.push(text(X(T.thanks.x), base(T.thanks.y, T.thanks.cap), thanksSize, "F3", TEAL, "THANK YOU FOR BEING ICONIC", track(T.thanks.cap, T.thanks.track)));
-  const cameraW = X(T.camera.w);
-  const cameraH = (T.camera.h / TEMPLATE_H) * PAGE_H;
-  const cameraX = X(T.camera.x);
-  const cameraY = PAGE_H - ((T.camera.y + T.camera.h) / TEMPLATE_H) * PAGE_H;
-  ops.push(`q\n${num(cameraW)} 0 0 ${num(cameraH)} ${num(cameraX)} ${num(cameraY)} cm\n/Im2 Do\nQ`);
+  y -= 16;
+  ops.push(strokeLine(margin, y, right, y, LINE, 0.7));
+  y -= 18;
+  ops.push(text(margin, y, 8, "F3", TEAL, "PAYMENT INFORMATION:"));
+  y -= 14;
+  ops.push(text(margin, y, 9, "F2", BLACK, LEGAL_BUSINESS_NAME));
+  ops.push(textRight(right, y, 9, "F2", BLACK, BUSINESS_CONTACT.streetAddress));
+  y -= 12;
+  ops.push(text(margin, y, 9, "F2", BLACK, formatInvoicePhone(BUSINESS_CONTACT.phoneDisplay)));
+  ops.push(textRight(right, y, 9, "F2", BLACK, BUSINESS_CONTACT.addressLine2));
+  y -= 12;
+  ops.push(text(margin, y, 9, "F2", BLACK, BUSINESS_CONTACT.email));
+  y -= 18;
+  ops.push(text(margin, y, 9, "F3", TEAL, "THANK YOU FOR BEING ICONIC"));
+  y -= 16;
+  ops.push(text(margin, y, 9, "F2", MUTED, `Amount paid ${formatInvoiceAmount(presented.amountPaid)}    Amount due ${formatInvoiceAmount(presented.amountDue)}`));
   return ops.filter(Boolean).join("\n");
 }
 
@@ -221,8 +177,6 @@ function tableRows(lines: InvoiceFaceLine[]): Array<{ name: string; qty: string;
       blank: false,
     };
   });
-  const blanks = invoiceBlankRowCount(filled.length);
-  for (let i = 0; i < blanks; i++) filled.push({ name: "", qty: "", price: "", total: "", blank: true });
   return filled.slice(0, 12);
 }
 
@@ -411,8 +365,8 @@ function pdfDocument(content: string, rgb: Uint8Array, alpha: Uint8Array, camera
   };
 
   const contentBytes = new TextEncoder().encode(content);
-  const width = INVOICE_LOGO_IMAGE.width;
-  const height = INVOICE_LOGO_IMAGE.height;
+  const width = INVOICE_WORDMARK.width;
+  const height = INVOICE_WORDMARK.height;
 
   const fonts = [INVOICE_INTER_FONTS.light, INVOICE_INTER_FONTS.regular, INVOICE_INTER_FONTS.bold] as const;
   const fontBytes = fonts.map((font) => decode64(font.data));

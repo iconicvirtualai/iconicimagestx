@@ -466,7 +466,7 @@ export default function AdminInvoiceEditor() {
         )}
       >
         <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-[#FFD700]">Bill to</p>
+          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-[#0d9488]">Bill to</p>
           <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <label className="block">
               <span className={labelCls}>Name</span>

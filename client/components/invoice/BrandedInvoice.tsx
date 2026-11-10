@@ -12,10 +12,10 @@ import {
 } from "@shared/invoiceProcessing";
 import { INTER_CAP_RATIO, TEMPLATE_H, TEMPLATE_W, invoiceTemplate as T } from "@shared/invoiceTemplate";
 
-const YELLOW = "#FFD400";
-const TEAL = "#00B4C6";
-const PINK = "#FF2D78";
-const GREEN = "#00A651";
+const TEAL = "#0d9488";
+const INK = "#0a0a0a";
+const CREAM = "#f5f2ea";
+const LINE = "#e6e9e7";
 const FONT = '"InvoiceInter", "Inter", Helvetica, Arial, sans-serif';
 const INVOICE_FONT_FACE = `
 @font-face{font-family:"InvoiceInter";src:url("/media/fonts/inter-300.ttf") format("truetype");font-weight:300;font-style:normal;font-display:block;}
@@ -58,7 +58,7 @@ export function BrandedInvoiceShell({
   const placed = templateFrame ? readInvoiceParts(children) : null;
   return (
     <article
-      className={templateFrame ? "bg-white text-black" : "flex min-h-[920px] flex-col overflow-hidden bg-white text-black sm:min-h-[1100px]"}
+      className={templateFrame ? "bg-[#f5f2ea] text-[#0a0a0a]" : "flex min-h-[920px] flex-col overflow-hidden bg-[#f5f2ea] text-[#0a0a0a] sm:min-h-[1100px]"}
       style={{ fontFamily: FONT, fontKerning: "none", fontVariantLigatures: "none", containerType: "inline-size" }}
       data-testid="branded-invoice"
     >
@@ -81,31 +81,25 @@ export function BrandedInvoiceShell({
         </>
       ) : null}
       <div className={templateFrame ? "invoice-template-narrow flex flex-col" : "contents"}>
-      <header className="bg-black px-5 py-6 text-white sm:px-8 sm:py-8">
-        <div className="flex items-stretch justify-between gap-3 sm:gap-8">
+      <header className="border-b px-5 py-6 sm:px-8 sm:py-8" style={{ borderColor: LINE, background: CREAM }}>
+        <div className="flex items-start justify-between gap-3 sm:gap-8">
           <div className="flex min-w-0 flex-1 flex-col">
-            <div>
-              <h1 className="whitespace-nowrap text-[1.35rem] font-extrabold leading-none tracking-[0.14em] sm:text-5xl sm:tracking-[0.18em]" style={{ color: YELLOW }}>
-                INVOICE
-              </h1>
-              <p className="mt-2 font-bold" style={type.meta}>INVOICE NO : {invoiceNumber}</p>
+            <span className="inline-flex items-center gap-2 text-[#0a0a0a]" aria-label="Iconic Images">
+              <img src="/media/logos/iconic-camera-logo.png" alt="" className="h-8 w-8 sm:h-9 sm:w-9" />
+              <span className="text-[15px] font-bold uppercase tracking-tight sm:text-base">ICONIC</span>
+            </span>
+            <div className="mt-6">
+              <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl" style={{ color: INK }}>Invoice</h1>
+              <p className="mt-2 font-medium" style={{ ...type.meta, color: TEAL }}>INVOICE NO : {invoiceNumber}</p>
             </div>
-            <div className="mt-auto pt-6 sm:pt-8">
-              {date ? <p className="font-bold" style={type.meta}>{date}</p> : null}
-              {status ? <p className="mt-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/75">{status}</p> : null}
+            <div className="mt-4">
+              {date ? <p className="font-medium text-neutral-500" style={type.meta}>{date}</p> : null}
+              {status ? <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-500">{status}</p> : null}
             </div>
           </div>
           <div className="flex w-[46%] max-w-[340px] shrink-0 flex-col items-end">
-            <picture className="block w-full">
-              <source srcSet="/media/logos/iconic-graffiti-logo.webp" type="image/webp" />
-              <img
-                src="/media/logos/iconic-graffiti-logo.png"
-                alt="Iconic Images"
-                className="ml-auto h-auto w-full max-h-24 sm:max-h-36"
-              />
-            </picture>
             {billTo ? (
-              <OnDarkContext.Provider value={true}>
+              <OnDarkContext.Provider value={false}>
                 <div className="mt-auto w-full pt-3 text-right sm:pt-6">{billTo}</div>
               </OnDarkContext.Provider>
             ) : null}
@@ -116,8 +110,7 @@ export function BrandedInvoiceShell({
         {rest}
         <InvoiceNotes notes={notes} />
       </div>
-      {amountPaid > 0 ? (
-        <div className="flex flex-wrap items-end justify-between gap-3 px-5 pb-2 sm:px-8" data-testid="invoice-balance">
+      <div className="flex flex-wrap items-end justify-between gap-3 px-5 pb-2 sm:px-8" data-testid="invoice-balance">
           <p>
             <span className="font-semibold uppercase tracking-[0.08em] text-neutral-500" style={type.contact}>Amount paid </span>
             <MoneyAmount className="min-w-0 font-bold" style={type.contact}>{formatInvoiceAmount(amountPaid)}</MoneyAmount>
@@ -126,16 +119,15 @@ export function BrandedInvoiceShell({
             <span className="font-semibold uppercase tracking-[0.08em] text-neutral-500" style={type.contact}>Amount due </span>
             <MoneyAmount className="min-w-0 font-black" style={type.contact}>{formatInvoiceAmount(amountDue)}</MoneyAmount>
           </p>
-        </div>
-      ) : null}
+      </div>
       {footer ? <div className="bg-white px-5 pb-6 pt-2 sm:px-8">{footer}</div> : null}
-      <footer className="mt-auto bg-black px-5 py-6 text-white sm:px-8">
-        <p className="font-bold" style={{ ...type.payment, color: GREEN }}>PAYMENT INFORMATION:</p>
-        <div className="mt-3 flex items-start justify-between gap-4" data-testid="invoice-business-footer">
+      <footer className="mt-auto border-t px-5 py-6 sm:px-8" style={{ borderColor: LINE, background: CREAM }}>
+        <p className="font-semibold" style={{ ...type.payment, color: TEAL }}>PAYMENT INFORMATION:</p>
+        <div className="mt-3 flex items-start justify-between gap-4 text-[#0a0a0a]" data-testid="invoice-business-footer">
           <div className="min-w-0 space-y-0.5 font-normal" style={type.contact}>
             <p>{LEGAL_BUSINESS_NAME}</p>
-            <p><a className="text-white" href={BUSINESS_CONTACT.phoneHref}>{formatInvoicePhone(BUSINESS_CONTACT.phoneDisplay)}</a></p>
-            <p><a className="text-white" href={BUSINESS_CONTACT.emailHref}>{BUSINESS_CONTACT.email}</a></p>
+            <p><a className="text-[#0a0a0a]" href={BUSINESS_CONTACT.phoneHref}>{formatInvoicePhone(BUSINESS_CONTACT.phoneDisplay)}</a></p>
+            <p><a className="text-[#0a0a0a]" href={BUSINESS_CONTACT.emailHref}>{BUSINESS_CONTACT.email}</a></p>
           </div>
           <div className="shrink-0 text-right font-normal" style={type.contact}>
             <p>{BUSINESS_CONTACT.streetAddress}</p>
@@ -181,58 +173,41 @@ export function InvoiceBillTo({
 }
 
 export function InvoiceLineTable({ lines }: { lines: InvoiceFaceLine[] }) {
-  const blanks = invoiceBlankRowCount(lines.length);
   return (
     <div data-testid="invoice-lines">
       <style>{NARROW_TABLE_CSS}</style>
       <div className="invoice-table-wide">
         <div
           data-testid="invoice-table-pill"
-          className="relative z-10 rounded-full bg-black text-white"
-          style={{ height: "clamp(36px, 5.8cqw, 52px)" }}
+          className="relative z-10 border-b text-[#3d4442]"
+          style={{ borderColor: LINE, height: "clamp(36px, 5.8cqw, 52px)" }}
         >
           <span className="absolute top-1/2 uppercase" style={{ ...type.pill, left: COL.desc, transform: "translateY(-50%)" }}>Description</span>
           <span className="absolute top-1/2 uppercase" style={{ ...type.pill, left: COL.qty, transform: "translate(-50%, -50%)" }}>Qty.</span>
           <span className="absolute top-1/2 uppercase" style={{ ...type.pill, left: COL.price, transform: "translate(-100%, -50%)" }}>Price</span>
           <span className="absolute top-1/2 uppercase" style={{ ...type.pill, left: COL.total, transform: "translate(-100%, -50%)" }}>Total</span>
         </div>
-        <div className="relative z-0" style={{ marginTop: "calc(clamp(36px, 5.8cqw, 52px) * -0.28)" }}>
-          <div
-            data-testid="invoice-table-body"
-            className="absolute inset-x-[2.6%] bottom-0 rounded-b-[18px] bg-[#f3f4f6]"
-            style={{ top: "calc(clamp(36px, 5.8cqw, 52px) * 0.28)" }}
-          />
-          <div className="relative" style={{ paddingTop: "calc(clamp(36px, 5.8cqw, 52px) * 0.28)" }}>
+        <div className="relative z-0">
+          <div className="relative">
             {lines.length === 0 ? <p className="px-[6%] py-3 text-neutral-500" style={type.address}>No line items yet.</p> : null}
             {lines.map((line, index) => (
               <LineRow key={`${line.name}-${index}`} line={line} />
-            ))}
-            {Array.from({ length: blanks }, (_, index) => (
-              <div key={`blank-${index}`} className="relative" style={{ height: ROW_H }} aria-hidden="true">
-                <div className="absolute inset-x-[2.6%] bottom-0 border-b border-[#6b7280]" />
-              </div>
             ))}
           </div>
         </div>
       </div>
       <div className="invoice-table-narrow">
-        <div className={`${NARROW_GRID} relative z-10 h-9 rounded-full bg-black text-white`}>
+        <div className={`${NARROW_GRID} relative z-10 h-9 border-b text-[#3d4442]`} style={{ borderColor: LINE }}>
           <span className={NARROW_LABEL} style={{ ...narrowPill }}>Description</span>
           <span className={`${NARROW_LABEL} text-center`} style={{ ...narrowPill }}>Qty.</span>
           <span className={`${NARROW_LABEL} text-right`} style={{ ...narrowPill }}>Price</span>
           <span className={`${NARROW_LABEL} text-right`} style={{ ...narrowPill }}>Total</span>
         </div>
-        <div className="relative z-0 -mt-2">
-          <div className="absolute inset-x-[2.6%] bottom-0 top-2 rounded-b-[18px] bg-[#f3f4f6]" />
-          <div className="relative pt-2">
+        <div className="relative z-0">
+          <div className="relative">
             {lines.length === 0 ? <p className="px-3 py-3 text-neutral-500" style={type.address}>No line items yet.</p> : null}
             {lines.map((line, index) => (
               <NarrowLineRow key={`${line.name}-${index}`} line={line} />
-            ))}
-            {Array.from({ length: blanks }, (_, index) => (
-              <div key={`blank-${index}`} className="relative" style={{ height: ROW_H }} aria-hidden="true">
-                <div className="absolute inset-x-[2.6%] bottom-0 border-b border-[#6b7280]" />
-              </div>
             ))}
           </div>
         </div>
@@ -247,9 +222,9 @@ function LineRow({ line }: { line: InvoiceFaceLine }) {
   const qtyLabel = Number.isInteger(qty) ? String(qty) : String(Math.round(qty * 100) / 100);
   return (
     <div className="relative" style={{ minHeight: ROW_H }}>
-      <div className="absolute inset-x-[2.6%] bottom-0 border-b border-[#6b7280]" />
+      <div className="absolute inset-x-[2.6%] bottom-0 border-b" style={{ borderColor: LINE }} />
       <div className="absolute top-1/2" style={{ left: COL.desc, width: "42%", transform: "translateY(-50%)" }}>
-        <p className="font-bold uppercase leading-snug" style={{ ...type.line, color: TEAL, ...itemNameWrap }}>
+        <p className="font-semibold leading-snug" style={{ ...type.line, color: INK, ...itemNameWrap }}>
           {line.name || "Service"}
         </p>
         {line.description ? (
@@ -258,9 +233,9 @@ function LineRow({ line }: { line: InvoiceFaceLine }) {
           </p>
         ) : null}
       </div>
-      <p className="absolute top-1/2 font-bold" style={{ ...type.line, color: TEAL, left: COL.qty, transform: "translate(-50%, -50%)" }}>{qtyLabel}</p>
-      <MoneyAmount className="absolute top-1/2 min-w-0 whitespace-nowrap font-bold" style={{ ...type.line, color: TEAL, left: COL.price, letterSpacing: 0, transform: "translate(-100%, -50%)", minWidth: 0 }}>{formatInvoiceAmount(unit)}</MoneyAmount>
-      <MoneyAmount className="absolute top-1/2 min-w-0 whitespace-nowrap font-bold" style={{ ...type.line, color: TEAL, left: COL.total, letterSpacing: 0, transform: "translate(-100%, -50%)", minWidth: 0 }}>{formatInvoiceAmount(line.price)}</MoneyAmount>
+      <p className="absolute top-1/2 font-medium" style={{ ...type.line, color: INK, left: COL.qty, transform: "translate(-50%, -50%)" }}>{qtyLabel}</p>
+      <MoneyAmount className="absolute top-1/2 min-w-0 whitespace-nowrap font-medium" style={{ ...type.line, color: INK, left: COL.price, letterSpacing: 0, transform: "translate(-100%, -50%)", minWidth: 0 }}>{formatInvoiceAmount(unit)}</MoneyAmount>
+      <MoneyAmount className="absolute top-1/2 min-w-0 whitespace-nowrap font-medium" style={{ ...type.line, color: INK, left: COL.total, letterSpacing: 0, transform: "translate(-100%, -50%)", minWidth: 0 }}>{formatInvoiceAmount(line.price)}</MoneyAmount>
     </div>
   );
 }
@@ -271,9 +246,9 @@ function NarrowLineRow({ line }: { line: InvoiceFaceLine }) {
   const qtyLabel = Number.isInteger(qty) ? String(qty) : String(Math.round(qty * 100) / 100);
   return (
     <div className={`${NARROW_GRID} relative`} style={{ minHeight: ROW_H }}>
-      <div className="absolute inset-x-[2.6%] bottom-0 border-b border-[#6b7280]" />
+      <div className="absolute inset-x-[2.6%] bottom-0 border-b" style={{ borderColor: LINE }} />
       <div className="min-w-0">
-        <p className="font-bold uppercase leading-snug" style={{ color: TEAL, fontSize: "12px", letterSpacing: "0.02em", ...itemNameWrap }}>
+        <p className="font-semibold leading-snug" style={{ color: INK, fontSize: "12px", letterSpacing: "0.02em", ...itemNameWrap }}>
           {line.name || "Service"}
         </p>
         {line.description ? (
@@ -282,9 +257,9 @@ function NarrowLineRow({ line }: { line: InvoiceFaceLine }) {
           </p>
         ) : null}
       </div>
-      <p className="whitespace-nowrap text-center font-bold" style={{ color: TEAL, fontSize: "11px" }}>{qtyLabel}</p>
-      <MoneyAmount className="min-w-0 justify-self-end whitespace-nowrap font-bold" style={{ color: TEAL, fontSize: "11px", letterSpacing: 0, minWidth: 0 }}>{formatInvoiceAmount(unit)}</MoneyAmount>
-      <MoneyAmount className="min-w-0 justify-self-end whitespace-nowrap font-bold" style={{ color: TEAL, fontSize: "11px", letterSpacing: 0, minWidth: 0 }}>{formatInvoiceAmount(line.price)}</MoneyAmount>
+      <p className="whitespace-nowrap text-center font-medium" style={{ color: INK, fontSize: "11px" }}>{qtyLabel}</p>
+      <MoneyAmount className="min-w-0 justify-self-end whitespace-nowrap font-medium" style={{ color: INK, fontSize: "11px", letterSpacing: 0, minWidth: 0 }}>{formatInvoiceAmount(unit)}</MoneyAmount>
+      <MoneyAmount className="min-w-0 justify-self-end whitespace-nowrap font-medium" style={{ color: INK, fontSize: "11px", letterSpacing: 0, minWidth: 0 }}>{formatInvoiceAmount(line.price)}</MoneyAmount>
     </div>
   );
 }
@@ -305,7 +280,7 @@ export function InvoiceFaceSummary({
   if (presented.tax !== 0) cells.push({ id: "tax", label: "Tax", amount: formatInvoiceAmount(presented.tax) });
   return (
     <div>
-      <div className="mx-[1.1%] rounded-[14px] border-2 border-black px-4 py-4 sm:px-5" data-testid="invoice-total-box">
+      <div className="mx-[1.1%] border-t px-1 py-4" style={{ borderColor: LINE }} data-testid="invoice-total-box">
         <div className="grid grid-cols-2 gap-x-4 gap-y-4 sm:flex sm:items-end sm:justify-between sm:gap-3">
           {cells.map((cell) => (
             <div key={cell.id} data-invoice-row={cell.id}>
@@ -325,22 +300,23 @@ export function InvoiceFaceSummary({
 
 export function InvoiceNotes({ notes }: { notes?: string | null }) {
   if (notes == null) return null;
+  const body = notes.trim() || "No notes on this invoice.";
   return (
     <section className="pt-2" data-testid="invoice-notes">
-      <h2 className="font-bold" style={{ ...type.notes, color: PINK }}>NOTES:</h2>
-      {notes.trim() ? <p className="mt-2 whitespace-pre-wrap text-sm text-black">{notes}</p> : null}
+      <h2 className="font-semibold" style={{ ...type.notes, color: TEAL }}>NOTES:</h2>
+      <p className="mt-2 whitespace-pre-wrap text-sm text-black">{body}</p>
     </section>
   );
 }
 
-export function InvoiceCameraIcon({ className = "h-11 w-14 shrink-0 text-white" }: { className?: string }) {
+export function InvoiceCameraIcon({ className = "h-8 w-8 shrink-0" }: { className?: string }) {
   return (
     <img
       data-testid="invoice-camera"
       src="/media/logos/iconic-camera-logo.png"
       alt=""
       className={className}
-      style={{ filter: "invert(1)", objectFit: "fill" }}
+      style={{ objectFit: "contain" }}
     />
   );
 }
@@ -376,7 +352,6 @@ export function BrandedInvoice({
       amountDue={presented.amountDue}
       notes={notes}
       footer={footer}
-      templateFrame
     >
       <InvoiceBillTo name={clientName} email={clientEmail} address={billToAddress} />
       <InvoiceLineTable lines={face.services} />
@@ -467,12 +442,12 @@ function TemplateFrame({
   const blanks = Math.max(0, rowCount - shown.length);
   return (
     <div className="invoice-template-wide" style={{ position: "relative", width: "100%", height: `${(TEMPLATE_H / TEMPLATE_W) * 100}cqw` }}>
-      <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: yp(T.headerH), background: "#000" }} />
-      <h1 style={placedText({ left: xp(T.title.x), top: yp(T.title.y), color: YELLOW, fontSize: capEm(T.title.cap), fontWeight: 700, letterSpacing: `${T.title.track}em` })}>INVOICE</h1>
+      <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: yp(T.headerH), background: CREAM, borderBottom: `1px solid ${LINE}` }} />
+      <h1 style={placedText({ left: xp(T.title.x), top: yp(T.title.y), color: INK, fontSize: capEm(T.title.cap), fontWeight: 600, letterSpacing: `${T.title.track}em` })}>Invoice</h1>
       <p style={placedText({ left: xp(T.invoiceNo.x), top: yp(T.invoiceNo.y), color: "#fff", fontSize: capEm(T.invoiceNo.cap), fontWeight: 700, letterSpacing: `${T.invoiceNo.track}em` })}>INVOICE NO : {invoiceNumber}</p>
       {date ? <p style={placedText({ left: xp(T.date.x), top: yp(T.date.y), color: "#fff", fontSize: capEm(T.date.cap), fontWeight: 700, letterSpacing: `${T.date.track}em` })}>{date}</p> : null}
       {status ? <p style={placedText({ left: xp(T.date.x), top: yp(T.date.y + 28), color: "rgba(255,255,255,0.75)", fontSize: capEm(12), fontWeight: 600, letterSpacing: "0.12em" })}>{status.toUpperCase()}</p> : null}
-      <img src="/media/logos/iconic-graffiti-logo.png" alt="Iconic Images" style={{ position: "absolute", left: xp(T.logo.x), top: yp(T.logo.y), width: xp(T.logo.w), height: yp(T.logo.h), objectFit: "contain" }} />
+      <img src="/media/logos/iconic-camera-logo.png" alt="Iconic Images" style={{ position: "absolute", left: xp(T.logo.x), top: yp(T.logo.y), width: yp(T.logo.h), height: yp(T.logo.h), objectFit: "contain" }} />
       <p style={placedText({ right: xp(TEMPLATE_W - T.billTo.right), top: yp(T.billTo.y), color: "#fff", fontSize: capEm(T.billTo.cap), fontWeight: 700, letterSpacing: `${T.billTo.track}em` })}>INVOICE TO :</p>
       <p style={placedText({ right: xp(TEMPLATE_W - T.clientName.right), top: yp(T.clientName.y), color: "#fff", fontSize: capEm(T.clientName.cap), fontWeight: 700, letterSpacing: `${T.clientName.track}em` })}>{(billTo?.name || "Client").toUpperCase()}</p>
       {addressLines.map((line, index) => (
@@ -512,7 +487,7 @@ function TemplateFrame({
       ))}
       <p style={placedText({ right: xp(TEMPLATE_W - T.grand.right), top: yp(T.grand.labelY), color: "#000", fontSize: capEm(T.grand.cap), fontWeight: 300, letterSpacing: `${T.grand.track}em` })}>TOTAL</p>
       <p data-invoice-row="total" style={placedText({ right: xp(TEMPLATE_W - T.grand.right), top: yp(T.grand.amountY), color: "#000", fontSize: capEm(T.grand.cap), fontWeight: 700 })}>{formatInvoiceAmount(presented.total)}</p>
-      {notes != null ? <h2 style={placedText({ left: xp(T.notes.x), top: yp(T.notes.y), color: PINK, fontSize: capEm(T.notes.cap), fontWeight: 700, letterSpacing: `${T.notes.track}em` })}>NOTES:</h2> : null}
+      {notes != null ? <h2 style={placedText({ left: xp(T.notes.x), top: yp(T.notes.y), color: TEAL, fontSize: capEm(T.notes.cap), fontWeight: 700, letterSpacing: `${T.notes.track}em` })}>NOTES:</h2> : null}
       {notes?.trim() ? <p style={{ position: "absolute", left: xp(T.notes.x), right: xp(80), top: yp(T.notes.y + T.notes.cap + 8), margin: 0, fontSize: capEm(T.address.cap), whiteSpace: "pre-wrap" }}>{notes}</p> : null}
       {amountPaid > 0 ? <p style={placedText({ left: xp(T.contact.x), top: yp(T.footerY - 28), color: "#4a4a4a", fontSize: capEm(16), fontWeight: 500 })}>Amount paid {formatInvoiceAmount(amountPaid)}    Amount due {formatInvoiceAmount(amountDue)}</p> : null}
       {footer ? <div className="invoice-pay-slot" style={{ position: "absolute", left: xp(80), right: xp(80), top: yp(1520) }}>{footer}</div> : null}
