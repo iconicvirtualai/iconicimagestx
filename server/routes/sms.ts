@@ -27,6 +27,7 @@ import { bookingDateLabel } from "../../shared/clientHome";
 import { clientNotifyBlockReason, clientNotifyLive } from "../../shared/clientNotify";
 import { refuseQaStaffPhone } from "../services/qaStaffAssign";
 import { bumpAdminUnreadChannel } from "../services/adminUnread";
+import { noteCampaignSmsInbound } from "../services/channelCampaignStore";
 
 const router = Router();
 const db = () => admin.firestore();
@@ -293,6 +294,10 @@ router.post("/webhook", express_raw_or_json, async (req: Request, res: Response)
       MessageSid,
     } = req.body;
 
+    if (Author && Body) {
+      try { await noteCampaignSmsInbound(String(Author), String(Body)); } catch { /* campaign index is optional */ }
+    }
+
     if (!ConversationSid || !Body) {
       return res.status(200).send("OK"); // Twilio expects 200
     }
@@ -423,7 +428,8 @@ router.post("/opt-out", async (req: Request, res: Response) => {
     if (!From) return res.status(200).send("");
 
     const keyword = (Body || "").trim().toUpperCase();
-    if (["STOP", "UNSUBSCRIBE", "CANCEL", "END", "QUIT"].includes(keyword)) {
+    if (["STOP", "STOPALL", "UNSUBSCRIBE", "CANCEL", "END", "QUIT"].includes(keyword)) {
+      try { await noteCampaignSmsInbound(String(From), String(Body || keyword)); } catch { /* campaign index is optional */ }
       // Find client by phone and mark opted out
       const snap = await db().collection("clients")
         .where("phone", "==", From)

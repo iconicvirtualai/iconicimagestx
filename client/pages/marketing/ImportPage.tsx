@@ -191,7 +191,7 @@ export default function ImportPage() {
         <section className={`${cardCls} mt-4 p-5`}>
           <h2 className="text-sm font-black uppercase tracking-widest text-gray-900">Import summary</h2>
           <p className="mt-2 text-sm text-gray-600">{summary.created} created, {summary.updated} updated, {summary.duplicatesInFile} duplicate rows collapsed, {summary.invalid.length} rows skipped.</p>
-          <Link className={`${ghostCls} mt-4`} to="/admin/communications/email/contacts">View contacts</Link>
+          <Link className={`${ghostCls} mt-4`} to="/admin/marketing/contacts">View contacts</Link>
         </section>
       ) : null}
     </MarketingFrame>

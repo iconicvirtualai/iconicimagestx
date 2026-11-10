@@ -324,6 +324,48 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ─── Multi-channel campaigns ─────────────────────────────────────────────
+    // Email, SMS, and social handoff. The Admin SDK writes these.
+    // Staff may read. Browsers cannot write. No client access.
+    // Publish this file in the Firebase console. Vercel does not deploy rules.
+    // Counts live on channelCampaignCounters so the list does not scan every campaign.
+    // Logs are a subcollection and are read one page at a time.
+
+    match /channelCampaigns/{campaignId} {
+      allow read: if isStaff();
+      allow write: if false;
+
+      match /logs/{logId} {
+        allow read: if isStaff();
+        allow write: if false;
+      }
+    }
+
+    match /channelCampaignCounters/{docId} {
+      allow read: if isStaff();
+      allow write: if false;
+    }
+
+    match /channelCampaignEvents/{eventId} {
+      allow read: if isStaff();
+      allow write: if false;
+    }
+
+    match /channelSmsIndex/{phone} {
+      allow read: if isStaff();
+      allow write: if false;
+    }
+
+    match /channelSmsStops/{phone} {
+      allow read: if isStaff();
+      allow write: if false;
+    }
+
+    match /socialHandoff/{itemId} {
+      allow read: if isStaff();
+      allow write: if false;
+    }
+
     // ─── Campaigns ───────────────────────────────────────────────────────────
 
     match /campaigns/{campaignId} {

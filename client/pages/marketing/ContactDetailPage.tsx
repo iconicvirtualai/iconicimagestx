@@ -71,7 +71,7 @@ export default function ContactDetailPage() {
 
   return (
     <MarketingFrame title={contact?.name || "Contact"} subtitle={email}>
-      <Link to="/admin/communications/email/contacts" className="mb-4 inline-block text-[10px] font-black uppercase tracking-widest text-[#0d9488]">Back to contacts</Link>
+      <Link to="/admin/marketing/contacts" className="mb-4 inline-block text-[10px] font-black uppercase tracking-widest text-[#0d9488]">Back to contacts</Link>
       {error ? <p className="mb-4 rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</p> : null}
       {contact ? (
         <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">

@@ -38,18 +38,18 @@ export default function EmailHome() {
   }, [user]);
 
   const stats = [
-    { label: "Contacts", value: data?.contacts ?? "—", href: "/admin/communications/email/contacts" },
-    { label: "Customers linked", value: data?.customers ?? "—", href: "/admin/communications/email/contacts" },
-    { label: "Never verified", value: data?.unverified ?? "—", href: "/admin/communications/email/import" },
-    { label: "Do not email", value: data?.suppressed ?? "—", href: "/admin/communications/email/suppression" },
-    { label: "Segments", value: data?.segments ?? "—", href: "/admin/communications/email/segments" },
+    { label: "Contacts", value: data?.contacts ?? "—", href: "/admin/marketing/contacts" },
+    { label: "Customers linked", value: data?.customers ?? "—", href: "/admin/marketing/contacts" },
+    { label: "Never verified", value: data?.unverified ?? "—", href: "/admin/marketing/import" },
+    { label: "Do not contact", value: data?.suppressed ?? "—", href: "/admin/marketing/suppression" },
+    { label: "Segments", value: data?.segments ?? "—", href: "/admin/marketing/segments" },
   ];
 
   return (
     <MarketingFrame
-      title="Email"
-      subtitle="Contacts, tags, and the do-not-email list for Iconic marketing. One person per email, including customers already in the client database."
-      action={<Link to="/admin/communications/email/campaigns/new" className={buttonCls}>New campaign</Link>}
+      title="Marketing"
+      subtitle="Announcements to many people live here. One-to-one conversations stay in Communications."
+      action={<Link to="/admin/marketing/campaigns" className={buttonCls}>Campaigns</Link>}
     >
       {error ? <p className="mb-4 rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</p> : null}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
@@ -60,15 +60,19 @@ export default function EmailHome() {
           </Link>
         ))}
       </div>
+      <p className="mt-4 text-sm text-gray-600">
+        A message to a list is a <Link to="/admin/marketing/campaigns" className="font-extrabold uppercase tracking-widest text-[#0d9488]">campaign</Link>.
+        Email-only sends still use GMass and its confirm step.
+      </p>
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
         <section className={`${cardCls} p-5`}>
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-sm font-black uppercase tracking-widest text-gray-900">Campaigns</h2>
-            <Link to="/admin/communications/email/campaigns" className="text-[10px] font-black uppercase tracking-widest text-[#0d9488]">View all</Link>
+            <Link to="/admin/marketing/campaigns" className="text-[10px] font-black uppercase tracking-widest text-[#0d9488]">View all</Link>
           </div>
           <div className="mt-3 space-y-2">
             {(data?.campaigns || []).slice(0, 4).map((campaign) => (
-              <Link key={campaign.id} to={`/admin/communications/email/campaigns/${campaign.id}/report`} className="flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2">
+              <Link key={campaign.id} to={`/admin/marketing/campaigns/email/${campaign.id}/report`} className="flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2">
                 <span>
                   <span className="block font-bold text-gray-900">{campaign.name}</span>
                   <span className="text-xs text-gray-500">{campaign.status}{campaign.sample ? " · sample, no email sent" : ""}</span>
@@ -89,7 +93,7 @@ export default function EmailHome() {
           <p className="mt-2 text-sm leading-relaxed text-gray-600">
             Every @thekinkteam.com address is blocked, along with Bruce Kink, Lisa Cagle, Haley Garcia, Shannon Cox, Melissa Franklin, and Justin McClung. Rebecca Nye and Jacki (Jacalyn) Henthorne are on a personal hold. Add their emails on the do-not-email list when you have them.
           </p>
-          <Link to="/admin/communications/email/suppression" className={`${buttonCls} mt-4`}>Review do not email</Link>
+          <Link to="/admin/marketing/suppression" className={`${buttonCls} mt-4`}>Review do not contact</Link>
         </section>
       </div>
     </MarketingFrame>

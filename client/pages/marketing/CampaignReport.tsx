@@ -73,7 +73,7 @@ export default function CampaignReport() {
 
   return (
     <MarketingFrame title={name} subtitle={`Status ${status || "draft"}. Numbers come from the GMass report cache.`}>
-      <Link to="/admin/communications/email/campaigns" className="mb-4 inline-block text-[10px] font-black uppercase tracking-widest text-[#0d9488]">All campaigns</Link>
+      <Link to="/admin/marketing/campaigns" className="mb-4 inline-block text-[10px] font-black uppercase tracking-widest text-[#0d9488]">All campaigns</Link>
       {error ? <p className="mb-4 rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</p> : null}
       {report?.sample ? <p className="mb-4 rounded-xl bg-gray-100 px-4 py-3 text-sm font-semibold text-gray-700">Sample report for layout. No email was sent.</p> : null}
       {stats?.pauseRecommended ? (

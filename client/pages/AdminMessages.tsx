@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { onSnapshot, collection, query, orderBy, limit, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import AdminLayout from "@/components/AdminLayout";
@@ -69,13 +69,6 @@ interface OrderThread {
   lastMessage?: Message;
   unreadCount: number;
   messages: Message[];
-}
-
-interface MailchimpList {
-  id: string;
-  name: string;
-  memberCount: number;
-  unsubscribeCount: number;
 }
 
 type Tab = CommunicationsTabId;
@@ -171,20 +164,6 @@ export default function AdminMessages() {
   const [newConvoClientName, setNewConvoClientName] = useState("");
   const [showNewConvo, setShowNewConvo] = useState(false);
 
-  // Campaign state
-  const [campaignName, setCampaignName] = useState("");
-  const [campaignBody, setCampaignBody] = useState("");
-  const [campaignAudience, setCampaignAudience] = useState("all");
-  const [launchingCampaign, setLaunchingCampaign] = useState(false);
-  const [mailchimpConnected, setMailchimpConnected] = useState(false);
-  const [mailchimpMessage, setMailchimpMessage] = useState("Mailchimp has not been checked yet.");
-  const [mailchimpAccount, setMailchimpAccount] = useState("");
-  const [mailchimpLists, setMailchimpLists] = useState<MailchimpList[]>([]);
-  const [mailchimpListId, setMailchimpListId] = useState("");
-  const [mailchimpAudience, setMailchimpAudience] = useState("all");
-  const [checkingMailchimp, setCheckingMailchimp] = useState(false);
-  const [syncingMailchimp, setSyncingMailchimp] = useState(false);
-
   async function authHeaders(extra: Record<string, string> = {}) {
     const token = await user?.getIdToken?.();
     return {
@@ -267,12 +246,6 @@ export default function AdminMessages() {
     return () => unsub();
   }, [tab]);
 
-  useEffect(() => {
-    if (tab === "campaigns") {
-      checkMailchimp();
-    }
-  }, [tab]);
-
   // ─── Send one-off SMS ─────────────────────────────────────────────────────
 
   async function sendCompose() {
@@ -325,99 +298,6 @@ export default function AdminMessages() {
       toast({ title: "Failed", description: String(err), variant: "destructive" });
     } finally {
       setSending(false);
-    }
-  }
-
-  // ─── Launch SMS campaign ──────────────────────────────────────────────────
-
-  async function launchCampaign() {
-    if (!campaignName || !campaignBody) return;
-    setLaunchingCampaign(true);
-    try {
-      // Create campaign
-      const createRes = await fetch("/api/campaigns", {
-        method: "POST",
-        headers: await authHeaders({ "Content-Type": "application/json" }),
-        credentials: "include",
-        body: JSON.stringify({
-          name: campaignName,
-          type: "sms",
-          body: campaignBody,
-          audience: campaignAudience,
-        }),
-      });
-      const { id } = await createRes.json();
-
-      // Send
-      const sendRes = await fetch(`/api/campaigns/${id}/send`, {
-        method: "POST",
-        headers: await authHeaders(),
-        credentials: "include",
-      });
-      const result = await sendRes.json();
-
-      toast({
-        title: "Campaign sent!",
-        description: `${result.sent} messages delivered.`,
-      });
-      setCampaignName("");
-      setCampaignBody("");
-    } catch (err) {
-      toast({ title: "Campaign failed", description: String(err), variant: "destructive" });
-    } finally {
-      setLaunchingCampaign(false);
-    }
-  }
-
-  async function checkMailchimp() {
-    setCheckingMailchimp(true);
-    try {
-      const res = await fetch("/api/campaigns/mailchimp/status", {
-        headers: await authHeaders(),
-        credentials: "include",
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Mailchimp check failed.");
-
-      setMailchimpConnected(Boolean(data.connected));
-      setMailchimpAccount(data.accountName || "");
-      setMailchimpLists(data.lists || []);
-      setMailchimpMessage(
-        data.connected
-          ? `Connected${data.accountName ? ` to ${data.accountName}` : ""}.`
-          : data.message || "Mailchimp is not configured."
-      );
-      if (!mailchimpListId && data.lists?.[0]?.id) setMailchimpListId(data.lists[0].id);
-    } catch (err) {
-      setMailchimpConnected(false);
-      setMailchimpMessage(err instanceof Error ? err.message : "Mailchimp check failed.");
-      toast({ title: "Mailchimp check failed", description: String(err), variant: "destructive" });
-    } finally {
-      setCheckingMailchimp(false);
-    }
-  }
-
-  async function syncMailchimp() {
-    if (!mailchimpListId) return;
-    setSyncingMailchimp(true);
-    try {
-      const res = await fetch("/api/campaigns/mailchimp/sync", {
-        method: "POST",
-        headers: await authHeaders({ "Content-Type": "application/json" }),
-        credentials: "include",
-        body: JSON.stringify({ listId: mailchimpListId, audience: mailchimpAudience }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Mailchimp sync failed.");
-
-      toast({
-        title: "Mailchimp sync complete",
-        description: `${data.synced} clients synced${data.failed ? `, ${data.failed} failed` : ""}.`,
-      });
-    } catch (err) {
-      toast({ title: "Mailchimp sync failed", description: String(err), variant: "destructive" });
-    } finally {
-      setSyncingMailchimp(false);
     }
   }
 
@@ -506,7 +386,7 @@ export default function AdminMessages() {
           )}
 
           {/* Compose / Campaigns / Sweep — no list needed */}
-          {(tab === "compose" || tab === "campaigns" || tab === "sweep") && (
+          {(tab === "compose" || tab === "sweep") && (
             <div className="flex-1 flex items-center justify-center p-4 text-gray-600 text-sm text-center">
               {tab === "sweep" ? "Automatic correspondence sweep overview →" : "Fill in the form on the right →"}
             </div>
@@ -535,16 +415,8 @@ export default function AdminMessages() {
                     One place for every conversation to and from Iconic.
                   </h2>
                   <p className="text-gray-400 text-sm mt-2 max-w-3xl">
-                    This center is the required home for team, client, email, text, portal, and social communications. AICON should sweep it automatically and flag anything unanswered, failed, urgent, or financially connected.
+                    This center is one-to-one and operations: team chat, client threads, texts, and site chats. An announcement to many people goes through Marketing.
                   </p>
-                  {isAdmin ? (
-                    <Link
-                      to="/admin/communications/email"
-                      className="mt-4 inline-flex items-center gap-2 rounded-lg bg-teal-600 px-4 py-2 text-xs font-bold uppercase tracking-widest text-white hover:bg-teal-500"
-                    >
-                      <Mail className="h-4 w-4" /> Email marketing
-                    </Link>
-                  ) : null}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -858,171 +730,6 @@ export default function AdminMessages() {
             </div>
           )}
 
-          {/* ── Campaigns tab ── */}
-          {tab === "campaigns" && (
-            <div className="flex-1 p-8 overflow-y-auto">
-              <div className="max-w-3xl mx-auto space-y-6">
-                <div>
-                  <h2 className="text-white text-2xl font-semibold mb-2">Marketing Campaigns</h2>
-                  <p className="text-gray-400 text-sm">
-                    Sync client audiences to Mailchimp and send compliant SMS campaigns from one control panel.
-                  </p>
-                </div>
-
-                <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6">
-                  <div className="flex items-start justify-between gap-4 mb-5">
-                    <div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <Mail className="w-5 h-5 text-teal-400" />
-                        <h3 className="text-white text-lg font-semibold">Mailchimp</h3>
-                        <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-full ${
-                          mailchimpConnected
-                            ? "bg-green-500/15 text-green-300"
-                            : "bg-yellow-500/15 text-yellow-300"
-                        }`}>
-                          {mailchimpConnected ? "Connected" : "Needs API Key"}
-                        </span>
-                      </div>
-                      <p className="text-gray-400 text-sm">{mailchimpMessage}</p>
-                      {mailchimpAccount && (
-                        <p className="text-gray-500 text-xs mt-1">Account: {mailchimpAccount}</p>
-                      )}
-                    </div>
-                    <button
-                      onClick={checkMailchimp}
-                      disabled={checkingMailchimp}
-                      className="px-3 py-2 bg-gray-800 hover:bg-gray-700 disabled:opacity-40 text-gray-200 rounded-lg text-xs font-bold uppercase tracking-widest flex items-center gap-2"
-                    >
-                      <RefreshCw className={`w-3.5 h-3.5 ${checkingMailchimp ? "animate-spin" : ""}`} />
-                      Check
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="md:col-span-2">
-                      <label className="block text-gray-300 text-sm mb-1">Mailchimp Audience/List</label>
-                      <select
-                        value={mailchimpListId}
-                        onChange={(e) => setMailchimpListId(e.target.value)}
-                        disabled={!mailchimpConnected || mailchimpLists.length === 0}
-                        className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-xl text-white focus:outline-none focus:border-teal-500 text-sm disabled:opacity-50"
-                      >
-                        {mailchimpLists.length === 0 ? (
-                          <option value="">No lists found</option>
-                        ) : (
-                          mailchimpLists.map((list) => (
-                            <option key={list.id} value={list.id}>
-                              {list.name} ({list.memberCount} contacts)
-                            </option>
-                          ))
-                        )}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-gray-300 text-sm mb-1">Sync Segment</label>
-                      <select
-                        value={mailchimpAudience}
-                        onChange={(e) => setMailchimpAudience(e.target.value)}
-                        className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-xl text-white focus:outline-none focus:border-teal-500 text-sm"
-                      >
-                        <option value="all">Active Clients</option>
-                        <option value="vip">VIP Clients</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="mt-5 flex flex-col md:flex-row md:items-center justify-between gap-3">
-                    <p className="text-xs text-gray-500">
-                      API key stays server-side in `MAILCHIMP_API_KEY`. The dashboard only shows status and audiences.
-                    </p>
-                    <button
-                      onClick={syncMailchimp}
-                      disabled={!mailchimpConnected || !mailchimpListId || syncingMailchimp}
-                      className="px-4 py-3 bg-teal-600 hover:bg-teal-500 disabled:opacity-40 text-white rounded-xl font-medium flex items-center justify-center gap-2 text-sm"
-                    >
-                      {syncingMailchimp ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
-                      {syncingMailchimp ? "Syncing…" : "Sync Clients to Mailchimp"}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6">
-                  <h3 className="text-white text-lg font-semibold mb-2">SMS Campaign</h3>
-                <p className="text-gray-400 text-sm mb-6">
-                  Send a bulk text to your client list. Opt-out is handled automatically.
-                </p>
-
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-gray-300 text-sm mb-1">Campaign Name</label>
-                    <input
-                      value={campaignName}
-                      onChange={(e) => setCampaignName(e.target.value)}
-                      placeholder="Spring Promo 2026"
-                      className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-teal-500 text-sm"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-gray-300 text-sm mb-1">Audience</label>
-                    <select
-                      value={campaignAudience}
-                      onChange={(e) => setCampaignAudience(e.target.value)}
-                      className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-xl text-white focus:outline-none focus:border-teal-500 text-sm"
-                    >
-                      <option value="all">All Clients (SMS opt-in)</option>
-                      <option value="vip">VIP Clients</option>
-                      <option value="past">Past Clients Only</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-gray-300 text-sm mb-1">
-                      Message <span className="text-gray-500">(use {"{{name}}"} for personalization)</span>
-                    </label>
-                    <textarea
-                      value={campaignBody}
-                      onChange={(e) => setCampaignBody(e.target.value)}
-                      placeholder="Hi {{name}}! 📸 Iconic Images has a spring special — book this month and get 10% off. Reply STOP to unsubscribe."
-                      rows={6}
-                      className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-teal-500 text-sm resize-none"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      {campaignBody.length}/1600 characters • Always include opt-out instructions
-                    </p>
-                  </div>
-
-                  <div className="bg-yellow-900/30 border border-yellow-700/50 rounded-xl p-4">
-                    <div className="flex gap-3">
-                      <AlertCircle className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
-                      <div className="text-yellow-300 text-sm">
-                        <p className="font-medium mb-1">Compliance reminder</p>
-                        <p className="text-yellow-400/80">
-                          Only send to clients who have opted in. TCPA requires consent for marketing texts.
-                          Always include "Reply STOP to unsubscribe."
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={launchCampaign}
-                    disabled={launchingCampaign || !campaignName || !campaignBody}
-                    className="w-full py-3 bg-teal-600 hover:bg-teal-500 disabled:opacity-40 text-white rounded-xl font-medium flex items-center justify-center gap-2"
-                  >
-                    {launchingCampaign ? (
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Megaphone className="w-4 h-4" />
-                    )}
-                    {launchingCampaign ? "Sending campaign…" : "Launch Campaign"}
-                  </button>
-                </div>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </AdminLayout>

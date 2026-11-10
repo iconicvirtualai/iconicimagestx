@@ -91,7 +91,11 @@ import ImportPage from "./pages/marketing/ImportPage";
 import ContactDetailPage from "./pages/marketing/ContactDetailPage";
 import SegmentsPage from "./pages/marketing/SegmentsPage";
 import SuppressionPage from "./pages/marketing/SuppressionPage";
-import CampaignsPage from "./pages/marketing/CampaignsPage";
+import CampaignListPage from "./pages/campaigns/CampaignListPage";
+import CampaignCalendarPage from "./pages/campaigns/CampaignCalendarPage";
+import CampaignDetailPage from "./pages/campaigns/CampaignDetailPage";
+import ReportsPage from "./pages/marketing/ReportsPage";
+import { marketingPathForLegacy } from "./lib/marketingRoutes";
 import CampaignBuilder from "./pages/marketing/CampaignBuilder";
 import CampaignReport from "./pages/marketing/CampaignReport";
 import AccountPage from "./pages/marketing/AccountPage";
@@ -119,6 +123,12 @@ import PortalSettings from "./pages/PortalSettings";
 import PortalOrder from "./pages/PortalOrder";
 
 const queryClient = new QueryClient();
+
+function LegacyMarketingRedirect() {
+  const location = useLocation();
+  const next = marketingPathForLegacy(location.pathname) || "/admin/marketing";
+  return <Navigate to={`${next}${location.search}`} replace />;
+}
 
 function PortalQueryRedirect({ to }: { to: string }) {
   const { search } = useLocation();
@@ -275,17 +285,24 @@ const App = () => (
             ) : null}
             <Route path="/admin/botroom" element={<ProtectedRoute requiredRole="admin"><AdminMessages /></ProtectedRoute>} />
             <Route path="/admin/botroom/connect" element={<ProtectedRoute requiredRole="admin"><AdminBotRoomConnect /></ProtectedRoute>} />
-            <Route path="/admin/communications/email" element={<ProtectedRoute requiredRole="admin"><EmailHome /></ProtectedRoute>} />
-            <Route path="/admin/communications/email/contacts" element={<ProtectedRoute requiredRole="admin"><ContactsPage /></ProtectedRoute>} />
-            <Route path="/admin/communications/email/contacts/view" element={<ProtectedRoute requiredRole="admin"><ContactDetailPage /></ProtectedRoute>} />
-            <Route path="/admin/communications/email/import" element={<ProtectedRoute requiredRole="admin"><ImportPage /></ProtectedRoute>} />
-            <Route path="/admin/communications/email/segments" element={<ProtectedRoute requiredRole="admin"><SegmentsPage /></ProtectedRoute>} />
-            <Route path="/admin/communications/email/suppression" element={<ProtectedRoute requiredRole="admin"><SuppressionPage /></ProtectedRoute>} />
-            <Route path="/admin/communications/email/campaigns/new" element={<ProtectedRoute requiredRole="admin"><CampaignBuilder /></ProtectedRoute>} />
-            <Route path="/admin/communications/email/campaigns/:id/report" element={<ProtectedRoute requiredRole="admin"><CampaignReport /></ProtectedRoute>} />
-            <Route path="/admin/communications/email/campaigns/:id" element={<ProtectedRoute requiredRole="admin"><CampaignBuilder /></ProtectedRoute>} />
-            <Route path="/admin/communications/email/campaigns" element={<ProtectedRoute requiredRole="admin"><CampaignsPage /></ProtectedRoute>} />
-            <Route path="/admin/communications/email/account" element={<ProtectedRoute requiredRole="admin"><AccountPage /></ProtectedRoute>} />
+            <Route path="/admin/marketing" element={<ProtectedRoute requiredRole="admin"><EmailHome /></ProtectedRoute>} />
+            <Route path="/admin/marketing/contacts" element={<ProtectedRoute requiredRole="admin"><ContactsPage /></ProtectedRoute>} />
+            <Route path="/admin/marketing/contacts/view" element={<ProtectedRoute requiredRole="admin"><ContactDetailPage /></ProtectedRoute>} />
+            <Route path="/admin/marketing/import" element={<ProtectedRoute requiredRole="admin"><ImportPage /></ProtectedRoute>} />
+            <Route path="/admin/marketing/segments" element={<ProtectedRoute requiredRole="admin"><SegmentsPage /></ProtectedRoute>} />
+            <Route path="/admin/marketing/suppression" element={<ProtectedRoute requiredRole="admin"><SuppressionPage /></ProtectedRoute>} />
+            <Route path="/admin/marketing/reports" element={<ProtectedRoute requiredRole="admin"><ReportsPage /></ProtectedRoute>} />
+            <Route path="/admin/marketing/account" element={<ProtectedRoute requiredRole="admin"><AccountPage /></ProtectedRoute>} />
+            <Route path="/admin/marketing/campaigns/email/new" element={<ProtectedRoute requiredRole="admin"><CampaignBuilder /></ProtectedRoute>} />
+            <Route path="/admin/marketing/campaigns/email/:id/report" element={<ProtectedRoute requiredRole="admin"><CampaignReport /></ProtectedRoute>} />
+            <Route path="/admin/marketing/campaigns/email/:id" element={<ProtectedRoute requiredRole="admin"><CampaignBuilder /></ProtectedRoute>} />
+            <Route path="/admin/marketing/campaigns/calendar" element={<ProtectedRoute requiredRole="staff"><CampaignCalendarPage /></ProtectedRoute>} />
+            <Route path="/admin/marketing/campaigns/:id" element={<ProtectedRoute requiredRole="staff"><CampaignDetailPage /></ProtectedRoute>} />
+            <Route path="/admin/marketing/campaigns" element={<ProtectedRoute requiredRole="staff"><CampaignListPage /></ProtectedRoute>} />
+            <Route path="/admin/communications/email/*" element={<LegacyMarketingRedirect />} />
+            <Route path="/admin/communications/email" element={<LegacyMarketingRedirect />} />
+            <Route path="/admin/campaigns/*" element={<LegacyMarketingRedirect />} />
+            <Route path="/admin/campaigns" element={<LegacyMarketingRedirect />} />
             <Route path="/admin/photographer" element={<ProtectedRoute requiredRole="photographer"><PhotographerHome /></ProtectedRoute>} />
             <Route path="/admin/upload" element={<ProtectedRoute requiredRole="photographer"><LegacyOpsRedirect /></ProtectedRoute>} />
             <Route path="/admin/editor" element={<ProtectedRoute requiredRole="editor"><AdminEditor /></ProtectedRoute>} />

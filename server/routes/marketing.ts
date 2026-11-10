@@ -7,6 +7,7 @@ import { applyTagChange, contactMatchesFilter, contactName, isValidEmail, normal
 import { buildImportPlan, mapTable, suggestMapping, type ColumnMapping } from "../../shared/emailMarketing/importContacts";
 import { buildSuppression, matchSuppression, reasonLabel } from "../../shared/emailMarketing/suppression";
 import { getMarketingStore, syncCustomerContacts } from "../services/marketingStore";
+import { recordCampaignUnsubscribe } from "../services/channelCampaignStore";
 import { parseTabularUpload } from "../services/spreadsheetParse";
 import { clientIp } from "../lib/clientIp";
 import { createRateLimiter } from "../lib/rateLimit";
@@ -292,6 +293,10 @@ router.post("/unsubscribe", async (req, res) => {
   await store.saveSuppression(entry);
   const contacts = await store.listContacts();
   const contact = contacts.find((item) => item.email === email);
+  const campaignId = String(req.body?.campaignId || "").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 80);
+  if (campaignId) {
+    try { await recordCampaignUnsubscribe(campaignId, email); } catch { /* campaign stats are optional */ }
+  }
   if (contact) {
     await store.addEvents([{
       id: crypto.randomUUID(),

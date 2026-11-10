@@ -135,6 +135,25 @@ export async function sendSMSCampaign(
   return results;
 }
 
+/**
+ * One campaign text. The caller checks CAMPAIGN_SEND_LIVE.
+ * This does not read CLIENT_NOTIFY_LIVE. STOP stays in the body the caller sends.
+ */
+export async function deliverCampaignSms(to: string, body: string): Promise<{ sid: string; status: string }> {
+  const client = getClient();
+  const sid = process.env.TWILIO_MESSAGING_SERVICE_SID;
+  const fromNumber = process.env.TWILIO_PHONE_NUMBER;
+  if (!sid && !fromNumber) {
+    throw new Error("Set TWILIO_MESSAGING_SERVICE_SID or TWILIO_PHONE_NUMBER.");
+  }
+  const message = await client.messages.create({
+    to: normalisePhone(to),
+    ...(sid ? { messagingServiceSid: sid } : { from: fromNumber }),
+    body,
+  });
+  return { sid: message.sid, status: message.status || "" };
+}
+
 // ─── Masked Conversations (Photographer ↔ Client) ─────────────────────────────
 //
 // Twilio Conversations API creates a virtual conversation where both parties
