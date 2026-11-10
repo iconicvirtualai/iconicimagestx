@@ -224,4 +224,22 @@ describe("channel campaigns", () => {
     expect(rules).toContain("match /socialHandoff/{itemId}");
     expect(rules).toContain("match /channelCampaignCounters/{docId}");
   });
+
+  it("shows an existing email campaign beside multi-channel campaigns without changing it", async () => {
+    const created = await api("/api/marketing/campaigns", {
+      method: "POST",
+      body: JSON.stringify({ name: "March client note", subject: "A note from Iconic", html: "<p>Hello {FirstName}</p>" }),
+    });
+    expect(created.response.status).toBe(201);
+    const id = created.data.campaign.id as string;
+    const list = await api("/api/channel-campaigns");
+    const row = (list.data.emailCampaigns as { id: string; kind: string; name: string }[]).find((item) => item.id === id);
+    expect(row?.kind).toBe("email");
+    expect(row?.name).toBe("March client note");
+    const again = await api(`/api/marketing/campaigns/${id}`);
+    expect(again.data.campaign.html).toBe(created.data.campaign.html);
+    expect(again.data.campaign.status).toBe(created.data.campaign.status);
+    expect(again.data.campaign.gmassCampaignId).toBe(created.data.campaign.gmassCampaignId);
+    expect(again.data.campaign.subject).toBe("A note from Iconic");
+  });
 });

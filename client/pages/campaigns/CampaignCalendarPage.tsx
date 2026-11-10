@@ -58,7 +58,7 @@ export default function CampaignCalendarPage() {
     <CampaignFrame
       title="Calendar"
       subtitle="Every scheduled email, text, and post across campaigns. Times are shown on the Chicago day."
-      action={<Link to="/admin/campaigns" className={ghostCls}>List</Link>}
+      action={<Link to="/admin/marketing/campaigns" className={ghostCls}>List</Link>}
     >
       {error ? <p className="mb-4 rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</p> : null}
       <div className={`${cardCls} p-4`} data-testid="campaign-calendar">
@@ -77,7 +77,7 @@ export default function CampaignCalendarPage() {
               {(byDate.get(cell.date) || []).map((item) => (
                 <Link
                   key={`${item.campaignId}-${item.channel}-${item.label}`}
-                  to={`/admin/campaigns/${item.campaignId}`}
+                  to={item.kind === "email" ? `/admin/marketing/campaigns/email/${item.campaignId}` : `/admin/marketing/campaigns/${item.campaignId}`}
                   className="mt-1 block truncate rounded-lg bg-[#0d9488] px-1 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-white"
                   title={`${item.campaignName} · ${item.label}`}
                 >

@@ -11,9 +11,8 @@ describe("admin nav highlight", () => {
     expect(mostSpecificNavHref("/admin/ops", hrefs)).toBe("/admin/ops");
     expect(mostSpecificNavHref("/admin/ops/preview", hrefs)).toBe("/admin/ops");
     expect(mostSpecificNavHref("/admin/communications", hrefs)).toBe("/admin/communications");
-    expect(mostSpecificNavHref("/admin/campaigns/calendar", hrefs)).toBe("/admin/campaigns");
-    expect(mostSpecificNavHref("/admin/communications/email/campaigns", hrefs)).toBe("/admin/communications/email");
-    expect(mostSpecificNavHref("/admin/communications/email/contacts", hrefs)).toBe("/admin/communications/email");
+    expect(mostSpecificNavHref("/admin/marketing/campaigns/calendar", hrefs)).toBe("/admin/marketing/campaigns");
+    expect(mostSpecificNavHref("/admin/marketing/contacts/view", hrefs)).toBe("/admin/marketing/contacts");
     expect(mostSpecificNavHref("/admin/botroom", hrefs)).toBe("/admin/botroom");
     expect(mostSpecificNavHref("/admin/botroom/connect", hrefs)).toBe("/admin/botroom");
   });
@@ -66,15 +65,26 @@ describe("studio nav", () => {
   });
 });
 
-describe("insights nav", () => {
-  it("keeps the creator and social queue under Operations for admins", () => {
+describe("marketing nav", () => {
+  it("keeps Insights and the social queue under Marketing", () => {
+    const marketing = navGroups.find((group) => group.label === "Marketing");
+    const insights = marketing?.items.find((item) => item.href === "/admin/insights");
+    const queue = marketing?.items.find((item) => item.href === "/admin/insights/social");
     const operations = navGroups.find((group) => group.label === "Operations");
-    const insights = operations?.items.find((item) => item.href === "/admin/insights");
-    const queue = operations?.items.find((item) => item.href === "/admin/insights/social");
     expect(insights?.label).toBe("Insights");
     expect(insights?.roles).toEqual(["admin"]);
     expect(queue?.label).toBe("Social queue");
     expect(queue?.roles).toEqual(["admin"]);
+    expect(operations?.items.some((item) => item.href === "/admin/insights")).toBe(false);
+    expect(operations?.items.some((item) => item.href === "/admin/communications/email")).toBe(false);
+    expect(marketing?.items.map((item) => item.label)).toEqual(expect.arrayContaining([
+      "Campaigns",
+      "Contacts",
+      "Segments",
+      "Do not contact",
+      "Reports",
+      "Account",
+    ]));
     expect(mostSpecificNavHref("/admin/insights", hrefs)).toBe("/admin/insights");
     expect(mostSpecificNavHref("/admin/insights/social", hrefs)).toBe("/admin/insights/social");
   });

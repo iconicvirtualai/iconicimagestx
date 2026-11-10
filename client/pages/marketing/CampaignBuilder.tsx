@@ -74,7 +74,7 @@ export default function CampaignBuilder() {
       setAccounts(rules.settings.sendingAccounts || []);
       if (!id || id === "new") {
         const created = await marketingApi<{ campaign: Campaign }>(token, "/api/marketing/campaigns", { method: "POST", body: JSON.stringify({ name: "Untitled campaign" }) });
-        if (!cancelled) navigate(`/admin/communications/email/campaigns/${created.campaign.id}`, { replace: true });
+        if (!cancelled) navigate(`/admin/marketing/campaigns/email/${created.campaign.id}`, { replace: true });
         return;
       }
       if (loadedId.current === id) return;
@@ -185,7 +185,7 @@ export default function CampaignBuilder() {
       }
       throw new Error(message);
     });
-    if (data.campaign) navigate(`/admin/communications/email/campaigns/${campaign.id}/report`);
+    if (data.campaign) navigate(`/admin/marketing/campaigns/email/${campaign.id}/report`);
   }
 
   async function sendTest() {
@@ -357,7 +357,7 @@ export default function CampaignBuilder() {
               </div>
             </div>
           ) : null}
-          <Link to="/admin/communications/email/campaigns" className="mt-6 inline-block text-[10px] font-black uppercase tracking-widest text-[#0d9488]">Back to campaigns</Link>
+          <Link to="/admin/marketing/campaigns" className="mt-6 inline-block text-[10px] font-black uppercase tracking-widest text-[#0d9488]">Back to campaigns</Link>
         </section>
       ) : null}
     </MarketingFrame>

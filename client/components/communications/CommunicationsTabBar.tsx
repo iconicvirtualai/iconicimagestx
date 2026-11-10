@@ -1,6 +1,5 @@
 import {
   Bot,
-  Megaphone,
   MessageCircle,
   MessageSquare,
   Send,
@@ -17,7 +16,6 @@ export type CommunicationsTabId =
   | "inbox"
   | "sms"
   | "compose"
-  | "campaigns"
   | "assistants"
   | "botroom";
 
@@ -27,7 +25,6 @@ const TABS: { id: CommunicationsTabId; label: string; icon: ElementType; adminOn
   { id: "inbox", label: "Inbox", icon: MessageSquare },
   { id: "sms", label: "SMS", icon: Smartphone },
   { id: "compose", label: "Compose", icon: Send },
-  { id: "campaigns", label: "Campaigns", icon: Megaphone },
   { id: "assistants", label: "Assistants", icon: Sparkles },
   { id: "botroom", label: "Bot Room", icon: Bot, adminOnly: true },
 ];

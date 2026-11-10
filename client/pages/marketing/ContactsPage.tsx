@@ -178,7 +178,7 @@ export default function ContactsPage() {
                   <input type="checkbox" checked={selected.includes(contact.email)} onChange={() => toggle(contact.email)} aria-label={`Select ${contact.email}`} />
                 </td>
                 <td className="px-4 py-3">
-                  <Link className="font-bold text-gray-900 hover:text-[#0d9488]" to={`/admin/communications/email/contacts/view?email=${encodeURIComponent(contact.email)}`}>
+                  <Link className="font-bold text-gray-900 hover:text-[#0d9488]" to={`/admin/marketing/contacts/view?email=${encodeURIComponent(contact.email)}`}>
                     {contact.name}
                   </Link>
                   <p className="text-xs text-gray-500">{contact.email}{contact.company ? ` · ${contact.company}` : ""}</p>

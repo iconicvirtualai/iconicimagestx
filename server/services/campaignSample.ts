@@ -1,5 +1,5 @@
 import { buildSuppression } from "../../shared/emailMarketing/suppression";
-import { EMPTY_SEGMENT_FILTER, type MarketingContact, type Segment } from "../../shared/emailMarketing/types";
+import { EMPTY_SEGMENT_FILTER, type MarketingCampaign, type MarketingContact, type Segment } from "../../shared/emailMarketing/types";
 import { normalizeCampaign, type ChannelCampaign } from "../../shared/channelCampaigns";
 import { isHostedDeployment, liveServerEnv } from "../../shared/tempAdmin";
 import { getMarketingStore } from "./marketingStore";
@@ -14,10 +14,38 @@ export async function ensureCampaignSample(): Promise<void> {
   if (!sampleSeedAllowed()) return;
   const store = getChannelCampaignStore();
   const existing = await store.get("spring-listing-refresh");
-  if (existing) return;
   const now = new Date().toISOString();
   const marketing = getMarketingStore();
   await marketing.ensureSeed();
+  const emailCampaigns = await marketing.listCampaigns();
+  if (emailCampaigns.length === 0) {
+    const emailCampaign: MarketingCampaign = {
+      id: "march-client-note",
+      name: "March client note",
+      status: "sent",
+      audienceMode: "all",
+      segmentId: "",
+      tags: [],
+      subject: "A note from Iconic",
+      preheader: "For the whole list",
+      fromName: "Iconic Images",
+      fromEmail: "hello@iconicimagestx.com",
+      replyTo: "hello@iconicimagestx.com",
+      html: "<p>Hello {FirstName}</p>",
+      templateId: "",
+      scheduledAt: "2026-11-12T15:00:00.000Z",
+      overlapOverride: false,
+      confirmation: null,
+      gmassDraftId: "sample-draft",
+      gmassCampaignId: "sample-4242",
+      recipientEmails: ["ada@example.com"],
+      sentAt: now,
+      createdAt: now,
+      updatedAt: now,
+    };
+    await marketing.saveCampaign(emailCampaign);
+  }
+  if (existing) return;
   const contacts = await marketing.listContacts();
   if (contacts.length === 0) {
     const people: MarketingContact[] = [

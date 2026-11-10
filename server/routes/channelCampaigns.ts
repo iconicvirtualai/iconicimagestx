@@ -31,6 +31,7 @@ import {
   calendarItems,
   campaignSendLive,
   campaignSmsBody,
+  chicagoDay,
   hasChannelSchedule,
   normalizeCampaign,
   personName,
@@ -59,6 +60,23 @@ function staffGate(req: AuthenticatedRequest, res: Parameters<typeof requireStaf
     }
     next();
   });
+}
+
+async function emailCampaignSummaries() {
+  const campaigns = await getMarketingStore().listCampaigns();
+  return campaigns
+    .map((campaign) => ({
+      id: campaign.id,
+      name: campaign.name,
+      purpose: campaign.subject || "",
+      status: campaign.status,
+      kind: "email" as const,
+      ownerName: campaign.fromName || "",
+      startsOn: campaign.scheduledAt ? chicagoDay(campaign.scheduledAt) : "",
+      endsOn: "",
+      updatedAt: campaign.updatedAt,
+    }))
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
 function delayMs(): number {
@@ -131,14 +149,26 @@ router.get("/", staffGate, async (req, res) => {
   await ensureCampaignSample();
   const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 25));
   const page = await getChannelCampaignStore().list(limit, String(req.query.cursor || ""));
-  res.json({ ...page, live: campaignSendLive() });
+  const emailCampaigns = await emailCampaignSummaries();
+  res.json({ ...page, emailCampaigns, live: campaignSendLive() });
 });
 
 router.get("/calendar", staffGate, async (req, res) => {
   await ensureCampaignSample();
   const month = String(req.query.month || "");
   const campaigns = await getChannelCampaignStore().listAll(200);
-  const items = calendarItems(campaigns).filter((item) => !month || item.date.startsWith(month));
+  const email = await emailCampaignSummaries();
+  const items = [
+    ...calendarItems(campaigns),
+    ...email.flatMap((campaign) => campaign.startsOn ? [{
+      date: campaign.startsOn,
+      campaignId: campaign.id,
+      campaignName: campaign.name,
+      channel: "email" as const,
+      label: "GMass email",
+      kind: "email" as const,
+    }] : []),
+  ].filter((item) => !month || item.date.startsWith(month));
   res.json({
     items,
     campaigns: campaigns.map((campaign) => ({

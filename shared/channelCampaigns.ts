@@ -479,6 +479,8 @@ export interface CalendarItem {
   campaignName: string;
   channel: "email" | "sms" | "post" | "window";
   label: string;
+  /** GMass email campaigns open their own editor. Omitted for multi-channel. */
+  kind?: "email";
 }
 
 export function chicagoDay(isoOrDay: string): string {

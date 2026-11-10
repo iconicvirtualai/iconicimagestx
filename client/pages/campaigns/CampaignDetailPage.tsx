@@ -233,7 +233,7 @@ export default function CampaignDetailPage() {
     <CampaignFrame
       title={campaign.name}
       subtitle={live ? "Live sending is on." : "Live sending is off. Send writes a dry-run log."}
-      action={<Link to="/admin/campaigns" className={ghostCls}>All campaigns</Link>}
+      action={<Link to="/admin/marketing/campaigns" className={ghostCls}>All campaigns</Link>}
     >
       <div data-testid="campaign-detail" className="space-y-4">
         {error ? <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</p> : null}

@@ -26,14 +26,14 @@ export default function CampaignsPage() {
 
   async function duplicate(id: string) {
     const data = await marketingApi<{ campaign: Campaign }>(() => user?.getIdToken(), `/api/marketing/campaigns/${id}/duplicate`, { method: "POST" });
-    navigate(`/admin/communications/email/campaigns/${data.campaign.id}`);
+    navigate(`/admin/marketing/campaigns/email/${data.campaign.id}`);
   }
 
   return (
     <MarketingFrame
       title="Campaigns"
       subtitle="Draft, duplicate, and send. Every send stops on a confirm step that shows who was removed."
-      action={<Link to="/admin/communications/email/campaigns/new" className={buttonCls}>New campaign</Link>}
+      action={<Link to="/admin/marketing/campaigns/email/new" className={buttonCls}>New campaign</Link>}
     >
       {error ? <p className="mb-4 rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</p> : null}
       <div className="grid gap-3">
@@ -44,8 +44,8 @@ export default function CampaignsPage() {
               <p className="text-sm text-gray-500">{campaign.subject || "No subject"} · {campaign.status}</p>
             </div>
             <div className="flex gap-2">
-              <Link className={ghostCls} to={`/admin/communications/email/campaigns/${campaign.id}`}>Edit</Link>
-              <Link className={ghostCls} to={`/admin/communications/email/campaigns/${campaign.id}/report`}>Report</Link>
+              <Link className={ghostCls} to={`/admin/marketing/campaigns/email/${campaign.id}`}>Edit</Link>
+              <Link className={ghostCls} to={`/admin/marketing/campaigns/email/${campaign.id}/report`}>Report</Link>
               <button type="button" className={ghostCls} onClick={() => duplicate(campaign.id).catch((err: unknown) => setError(err instanceof Error ? err.message : "Could not duplicate."))}>Duplicate</button>
             </div>
           </article>

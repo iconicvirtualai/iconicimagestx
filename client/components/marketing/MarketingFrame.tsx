@@ -3,13 +3,14 @@ import { Link, useLocation } from "react-router-dom";
 import AdminLayout from "@/components/AdminLayout";
 
 const LINKS = [
-  { href: "/admin/communications/email", label: "Overview" },
-  { href: "/admin/communications/email/contacts", label: "Contacts" },
-  { href: "/admin/communications/email/import", label: "Import" },
-  { href: "/admin/communications/email/segments", label: "Segments" },
-  { href: "/admin/communications/email/campaigns", label: "Campaigns" },
-  { href: "/admin/communications/email/suppression", label: "Do not email" },
-  { href: "/admin/communications/email/account", label: "GMass" },
+  { href: "/admin/marketing", label: "Overview" },
+  { href: "/admin/marketing/campaigns", label: "Campaigns" },
+  { href: "/admin/marketing/contacts", label: "Contacts" },
+  { href: "/admin/marketing/import", label: "Import" },
+  { href: "/admin/marketing/segments", label: "Segments" },
+  { href: "/admin/marketing/suppression", label: "Do not contact" },
+  { href: "/admin/marketing/reports", label: "Reports" },
+  { href: "/admin/marketing/account", label: "Account" },
 ];
 
 export default function MarketingFrame({
@@ -29,7 +30,7 @@ export default function MarketingFrame({
       <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6">
         <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#0d9488]">Communications · Email</p>
+            <p className="text-[10px] font-extrabold uppercase tracking-[0.22em] text-[#0d9488]">Marketing</p>
             <h1 className="mt-1 text-2xl font-black tracking-tight text-gray-900">{title}</h1>
             {subtitle ? <p className="mt-1 max-w-2xl text-sm text-gray-500">{subtitle}</p> : null}
           </div>
@@ -37,7 +38,7 @@ export default function MarketingFrame({
         </div>
         <nav className="mb-6 flex gap-1 overflow-x-auto rounded-2xl border border-gray-200 bg-white p-1 shadow-sm">
           {LINKS.map((link) => {
-            const active = link.href === "/admin/communications/email"
+            const active = link.href === "/admin/marketing"
               ? pathname === link.href
               : pathname === link.href || pathname.startsWith(`${link.href}/`);
             return (

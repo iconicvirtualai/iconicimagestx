@@ -3,8 +3,8 @@ import { Link, useLocation } from "react-router-dom";
 import AdminLayout from "@/components/AdminLayout";
 
 const LINKS = [
-  { href: "/admin/campaigns", label: "List" },
-  { href: "/admin/campaigns/calendar", label: "Calendar" },
+  { href: "/admin/marketing/campaigns", label: "List" },
+  { href: "/admin/marketing/campaigns/calendar", label: "Calendar" },
 ];
 
 export default function CampaignFrame({
@@ -33,7 +33,10 @@ export default function CampaignFrame({
           </div>
           <nav className="mb-6 flex gap-1 overflow-x-auto rounded-2xl border border-[#e8c872]/60 bg-white p-1 shadow-sm">
             {LINKS.map((link) => {
-              const active = link.href === "/admin/campaigns" ? pathname === link.href : pathname.startsWith(link.href);
+              const onCalendar = pathname.startsWith("/admin/marketing/campaigns/calendar");
+              const active = link.href.endsWith("/calendar")
+                ? onCalendar
+                : pathname === link.href || (pathname.startsWith(`${link.href}/`) && !onCalendar);
               return (
                 <Link
                   key={link.href}

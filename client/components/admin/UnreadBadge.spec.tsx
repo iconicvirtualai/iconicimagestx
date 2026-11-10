@@ -52,5 +52,7 @@ describe("unread badge", () => {
     expect(tabs).toContain(">1<");
     expect(tabs).toContain(">2<");
     expect(tabs).not.toContain('data-testid="communications-unread-sweep"');
+    expect(tabs).not.toContain("Campaigns");
+    expect(nav).not.toContain('data-testid="nav-unread-/admin/marketing"');
   });
 });

@@ -30461,10 +30461,38 @@ async function ensureCampaignSample() {
   if (!sampleSeedAllowed()) return;
   const store = getChannelCampaignStore();
   const existing = await store.get("spring-listing-refresh");
-  if (existing) return;
   const now = (/* @__PURE__ */ new Date()).toISOString();
   const marketing = getMarketingStore();
   await marketing.ensureSeed();
+  const emailCampaigns = await marketing.listCampaigns();
+  if (emailCampaigns.length === 0) {
+    const emailCampaign = {
+      id: "march-client-note",
+      name: "March client note",
+      status: "sent",
+      audienceMode: "all",
+      segmentId: "",
+      tags: [],
+      subject: "A note from Iconic",
+      preheader: "For the whole list",
+      fromName: "Iconic Images",
+      fromEmail: "hello@iconicimagestx.com",
+      replyTo: "hello@iconicimagestx.com",
+      html: "<p>Hello {FirstName}</p>",
+      templateId: "",
+      scheduledAt: "2026-11-12T15:00:00.000Z",
+      overlapOverride: false,
+      confirmation: null,
+      gmassDraftId: "sample-draft",
+      gmassCampaignId: "sample-4242",
+      recipientEmails: ["ada@example.com"],
+      sentAt: now,
+      createdAt: now,
+      updatedAt: now
+    };
+    await marketing.saveCampaign(emailCampaign);
+  }
+  if (existing) return;
   const contacts = await marketing.listContacts();
   if (contacts.length === 0) {
     const people = [
@@ -30612,6 +30640,20 @@ function staffGate(req, res, next) {
     next();
   });
 }
+async function emailCampaignSummaries() {
+  const campaigns = await getMarketingStore().listCampaigns();
+  return campaigns.map((campaign) => ({
+    id: campaign.id,
+    name: campaign.name,
+    purpose: campaign.subject || "",
+    status: campaign.status,
+    kind: "email",
+    ownerName: campaign.fromName || "",
+    startsOn: campaign.scheduledAt ? chicagoDay(campaign.scheduledAt) : "",
+    endsOn: "",
+    updatedAt: campaign.updatedAt
+  })).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+}
 function delayMs() {
   const raw = process.env.CAMPAIGN_SEND_DELAY_MS;
   if (raw === void 0 || raw === "") return 200;
@@ -30674,13 +30716,25 @@ router$n.get("/", staffGate, async (req, res) => {
   await ensureCampaignSample();
   const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 25));
   const page2 = await getChannelCampaignStore().list(limit, String(req.query.cursor || ""));
-  res.json({ ...page2, live: campaignSendLive() });
+  const emailCampaigns = await emailCampaignSummaries();
+  res.json({ ...page2, emailCampaigns, live: campaignSendLive() });
 });
 router$n.get("/calendar", staffGate, async (req, res) => {
   await ensureCampaignSample();
   const month = String(req.query.month || "");
   const campaigns = await getChannelCampaignStore().listAll(200);
-  const items = calendarItems(campaigns).filter((item) => !month || item.date.startsWith(month));
+  const email = await emailCampaignSummaries();
+  const items = [
+    ...calendarItems(campaigns),
+    ...email.flatMap((campaign) => campaign.startsOn ? [{
+      date: campaign.startsOn,
+      campaignId: campaign.id,
+      campaignName: campaign.name,
+      channel: "email",
+      label: "GMass email",
+      kind: "email"
+    }] : [])
+  ].filter((item) => !month || item.date.startsWith(month));
   res.json({
     items,
     campaigns: campaigns.map((campaign) => ({
