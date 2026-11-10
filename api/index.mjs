@@ -3297,6 +3297,23 @@ function base64Url(bytes) {
   if (!encode) throw new Error("base64 encoding is required to create a pay token.");
   return encode(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
+function formatOrderNumber(n) {
+  if (!Number.isInteger(n) || n < 1) throw new Error(`Invalid order number ${n}`);
+  return `#${String(n).padStart(3, "0")}`;
+}
+function orderCodeTail(id, salt = 0) {
+  const digits2 = id.replace(/\D/g, "");
+  if (salt === 0 && digits2.length >= 5) {
+    const last = digits2.slice(-5);
+    if (!/^0+$/.test(last)) return last;
+  }
+  let h = 2166136261 ^ salt;
+  for (let i = 0; i < id.length; i++) {
+    h ^= id.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return String(1e4 + (h >>> 0) % 9e4);
+}
 function nonEmptyId(value) {
   if (typeof value !== "string") return null;
   const id = value.trim();
@@ -3400,6 +3417,52 @@ function invoicePageInvoiceNumber(source, now = /* @__PURE__ */ new Date()) {
 }
 function orderHistoryInvoiceNumber(source, now = /* @__PURE__ */ new Date()) {
   return shownInvoiceNumber(source, now);
+}
+function sequentialOrderLabel(value) {
+  if (typeof value === "number" && Number.isInteger(value) && value >= 1) return formatOrderNumber(value);
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  const hashed = trimmed.match(/^#(\d+)$/);
+  const digits2 = hashed ? hashed[1] : /^\d+$/.test(trimmed) ? trimmed : "";
+  if (!digits2) return null;
+  const n = Number(digits2);
+  if (!Number.isInteger(n) || n < 1) return null;
+  return formatOrderNumber(n);
+}
+function portalOrderNumberLabel(record2) {
+  if (!record2) return "";
+  const sequential = sequentialOrderLabel(record2.orderNumber);
+  if (sequential) return sequential;
+  const explicit = [record2.orderCode, record2.displayId].map((value) => typeof value === "string" ? value.trim() : "").find((value) => value && !/^INV-/i.test(value) && !/EXAMPLE/i.test(value));
+  if (explicit) return explicit.toUpperCase();
+  const raw = typeof record2.orderNumber === "string" ? record2.orderNumber.trim() : "";
+  if (raw && !/^INV-/i.test(raw) && !/EXAMPLE/i.test(raw)) return raw.toUpperCase();
+  const id = typeof record2.id === "string" ? record2.id.trim() : "";
+  if (!id) return "";
+  const business2 = record2.projectType === "business";
+  return `ORD - ${business2 ? "B" : "L"} - ${orderCodeTail(id)}`;
+}
+function portalDisplayedInvoiceNumber(invoice, order, now = /* @__PURE__ */ new Date()) {
+  if (order && (typeof order.id === "string" && order.id.trim() || order.orderNumber != null || order.orderCode || order.displayId)) {
+    const label = portalOrderNumberLabel(order);
+    if (label) return label;
+  }
+  const linkedId = (typeof invoice.orderRequestId === "string" ? invoice.orderRequestId.trim() : "") || (typeof invoice.orderId === "string" ? invoice.orderId.trim() : "");
+  if (invoice.orderNumber != null || invoice.orderCode || invoice.displayId || linkedId) {
+    const label = portalOrderNumberLabel({
+      id: linkedId,
+      orderNumber: invoice.orderNumber,
+      orderCode: invoice.orderCode,
+      displayId: invoice.displayId,
+      projectType: invoice.projectType
+    });
+    if (label) return label;
+  }
+  return orderHistoryInvoiceNumber({
+    invoiceNumber: invoice.invoiceNumber,
+    id: invoice.id,
+    createdAt: invoice.createdAt
+  }, now);
 }
 function invoiceEmailNumber(source, now = /* @__PURE__ */ new Date()) {
   return shownInvoiceNumber(source, now);
@@ -4098,15 +4161,11 @@ function buildClientListing(id, data) {
     pool: amenities.pool
   };
 }
-function buildClientInvoice(id, data, now = /* @__PURE__ */ new Date()) {
+function buildClientInvoice(id, data, now = /* @__PURE__ */ new Date(), order) {
   const createdAt = isoStamp(data.createdAt);
   return {
     id,
-    invoiceNumber: orderHistoryInvoiceNumber({
-      invoiceNumber: data.invoiceNumber,
-      id,
-      createdAt: data.createdAt
-    }, now),
+    invoiceNumber: portalDisplayedInvoiceNumber({ ...data, id }, order, now),
     status: typeof data.status === "string" && data.status.trim() ? data.status.trim() : "",
     clientName: text$w(data.clientName),
     address: addressText(data.billToAddress || data.address || data.propertyAddress),
@@ -4127,8 +4186,8 @@ function buildClientInvoice(id, data, now = /* @__PURE__ */ new Date()) {
   };
 }
 function buildClientAppointment(id, data, orderRequest) {
-  const scheduledDate = firstDate$1(data.scheduledDate, data.appointmentDate);
-  const scheduledTime = firstTime(data.scheduledTime, data.appointmentTime, data.apptTime);
+  const scheduledDate = firstDate$1(data.scheduledDate, data.appointmentDate, data.shootDate, data.apptDate);
+  const scheduledTime = firstTime(data.scheduledTime, data.appointmentTime, data.apptTime, data.shootTime);
   let requestedDate = firstDate$1(data.requestedDate, data.originalScheduledDate, data.originalDate, orderRequest?.requestedDate, orderRequest?.originalScheduledDate);
   let requestedTime = firstTime(data.requestedTime, data.originalScheduledTime, data.originalTime, orderRequest?.requestedTime, orderRequest?.originalScheduledTime);
   const requestScheduledDate = firstDate$1(orderRequest?.scheduledDate, orderRequest?.appointmentDate);
@@ -4163,6 +4222,35 @@ function buildClientAppointment(id, data, orderRequest) {
     approved: hasStamp(data.clientConfirmedAt) || hasStamp(data.changeApprovedAt) || hasStamp(data.agentApprovedAt) || hasStamp(orderRequest?.clientConfirmedAt) || hasStamp(orderRequest?.changeApprovedAt),
     createdAt: isoStamp(data.createdAt)
   };
+}
+function mergeListingShoots(appointments, listings) {
+  const next = [...appointments];
+  for (const listing of listings) {
+    if (!listing.appointmentDate) continue;
+    const address = listing.address || listing.street || "Appointment";
+    const duplicate = next.some((item) => item.date === listing.appointmentDate && samePlace$1(item.address, address));
+    if (duplicate) continue;
+    const delivered = /deliver|paid|complete|archived/.test(statusKey$1(listing.status));
+    next.push({
+      id: `listing-${listing.id}`,
+      address,
+      status: delivered ? "completed" : "confirmed",
+      date: listing.appointmentDate,
+      time: "",
+      requestedDate: listing.appointmentDate,
+      requestedTime: "",
+      approved: true,
+      createdAt: listing.createdAt
+    });
+  }
+  return next;
+}
+function samePlace$1(left, right) {
+  const norm2 = (value) => value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const a = norm2(left);
+  const b = norm2(right);
+  if (!a || !b) return false;
+  return a === b || a.startsWith(b) || b.startsWith(a);
 }
 function storedLines(lineItems, services2) {
   const raw = Array.isArray(lineItems) ? lineItems : Array.isArray(services2) ? services2 : [];
@@ -5984,19 +6072,6 @@ function orderCode(kind, record2) {
   const id = text$r(record2.id);
   const prefix = kind === "listing" ? "L" : "B";
   return `ORD - ${prefix} - ${orderCodeTail(id)}`;
-}
-function orderCodeTail(id, salt = 0) {
-  const digits2 = id.replace(/\D/g, "");
-  if (salt === 0 && digits2.length >= 5) {
-    const last = digits2.slice(-5);
-    if (!/^0+$/.test(last)) return last;
-  }
-  let h = 2166136261 ^ salt;
-  for (let i = 0; i < id.length; i++) {
-    h ^= id.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return String(1e4 + (h >>> 0) % 9e4);
 }
 function heroFromRecord(record2) {
   const explicit = text$r(record2.heroUrl) || text$r(record2.coverUrl) || text$r(record2.coverImage);
@@ -8857,10 +8932,6 @@ function cardOnFileFromSquare(card, customerId) {
 }
 function teamInviteDelivery(env = process.env) {
   return clientNotifyLive(env) ? "send" : "paused";
-}
-function formatOrderNumber(n) {
-  if (!Number.isInteger(n) || n < 1) throw new Error(`Invalid order number ${n}`);
-  return `#${String(n).padStart(3, "0")}`;
 }
 async function nextOrderNumber() {
   const db2 = admin.firestore();
@@ -21441,7 +21512,7 @@ function buildPortalListingDetail(sources) {
   const socialAssets = collectClientUploads(listing, "social", savedOrder);
   const clientFiles = collectClientUploads(listing, "file", savedOrder);
   const website = readWebsite(listing.portalWebsite);
-  const invoices = readInvoices(sources.invoices || []);
+  const invoices = readInvoices(sources.invoices || [], sources);
   const activity = buildActivity(sources, photos, videos, floorplans, tours);
   const status2 = text$9(listing.status) || text$9(sources.order?.status) || text$9(sources.orderRequest?.status) || "open";
   return applyStoredPortalData({
@@ -22129,7 +22200,16 @@ function safeHttpUrl(value) {
     return "";
   }
 }
-function readInvoices(invoices) {
+function orderForInvoice(invoice, sources) {
+  const requestId = text$9(invoice.orderRequestId);
+  const orderId = text$9(invoice.orderId);
+  const request = sources.orderRequest || null;
+  const order = sources.order || null;
+  if (request && (!requestId || text$9(request.id) === requestId)) return request;
+  if (order && (!orderId || text$9(order.id) === orderId)) return order;
+  return null;
+}
+function readInvoices(invoices, sources) {
   const seen = /* @__PURE__ */ new Set();
   const summaries = [];
   for (const invoice of invoices) {
@@ -22139,11 +22219,7 @@ function readInvoices(invoices) {
     const total = money$1(invoice.total);
     summaries.push({
       id,
-      invoiceNumber: orderHistoryInvoiceNumber({
-        invoiceNumber: invoice.invoiceNumber,
-        id,
-        createdAt: invoice.createdAt
-      }),
+      invoiceNumber: portalDisplayedInvoiceNumber(invoice, orderForInvoice(invoice, sources)),
       status: text$9(invoice.status) || "draft",
       total,
       amountDue: invoice.amountDue == null ? total : money$1(invoice.amountDue)
@@ -22219,11 +22295,7 @@ function buildActivity(sources, photos, videos, floorplans, tours, invoices) {
   }
   for (const invoice of sources.invoices || []) {
     const id = text$9(invoice.id);
-    const number = orderHistoryInvoiceNumber({
-      invoiceNumber: invoice.invoiceNumber,
-      id,
-      createdAt: invoice.createdAt
-    });
+    const number = portalDisplayedInvoiceNumber(invoice, orderForInvoice(invoice, sources));
     const status2 = text$9(invoice.status) || "draft";
     const summary = status2 === "paid" ? `Payment recorded on ${number}` : `Invoice ${number} is ${status2.replace(/_/g, " ")}`;
     push(eventOf(`invoice-${id || number}`, invoice.paidAt || invoice.updatedAt || invoice.createdAt, "invoice", summary));
@@ -23239,7 +23311,7 @@ router$u.get("/me/home", requireAuth, async (req, res) => {
       console.error("[Clients] Listing ensure failed:", err);
     }
     const galleries = [];
-    const invoices = [];
+    const invoiceDocs = [];
     const projects = [];
     const appointmentDocs = [];
     let listingsTruncated = false;
@@ -23257,7 +23329,7 @@ router$u.get("/me/home", requireAuth, async (req, res) => {
     const pushInvoice = (entry2) => {
       if (seenInvoice.has(entry2.id)) return;
       seenInvoice.add(entry2.id);
-      invoices.push(buildClientInvoice(entry2.id, asRecord$3(jsonSafe(entry2.data()))));
+      invoiceDocs.push({ id: entry2.id, data: asRecord$3(jsonSafe(entry2.data())) });
     };
     const pushListing = (entry2) => {
       if (seenProject.has(entry2.id)) return;
@@ -23295,6 +23367,7 @@ router$u.get("/me/home", requireAuth, async (req, res) => {
       }
     }
     const orders = [];
+    const ordersById = /* @__PURE__ */ new Map();
     const seenOrder = /* @__PURE__ */ new Set();
     const pushOrder = (entry2) => {
       if (seenOrder.has(entry2.id)) return;
@@ -23304,12 +23377,15 @@ router$u.get("/me/home", requireAuth, async (req, res) => {
         { ids: identity.ids, email: identity.email }
       )) return;
       seenOrder.add(entry2.id);
+      const stored = asRecord$3(jsonSafe(data));
+      ordersById.set(entry2.id, { ...stored, id: entry2.id });
       const listingId = typeof data.listingId === "string" ? data.listingId : "";
       orders.push({
         id: entry2.id,
         address: addressText(data.address || data.shootLocation) || "Order",
         status: data.status || "new",
-        href: listingId ? `/studio/${listingId}` : ""
+        href: listingId ? `/studio/${listingId}` : "",
+        orderNumber: stored.orderNumber ?? null
       });
     };
     try {
@@ -23351,12 +23427,19 @@ router$u.get("/me/home", requireAuth, async (req, res) => {
     }
     const requestIds = appointmentDocs.map((entry2) => entry2.data().orderRequestId).filter((id) => typeof id === "string" && id.trim().length > 0);
     const orderRequests = await orderRequestsById(requestIds);
-    const appointments = appointmentDocs.map((entry2) => {
+    const storedAppointments = appointmentDocs.map((entry2) => {
       const data = asRecord$3(jsonSafe(entry2.data()));
       const orderRequestId = typeof data.orderRequestId === "string" ? data.orderRequestId : "";
       return buildClientAppointment(entry2.id, data, orderRequests.get(orderRequestId) || null);
     });
     const listings = sortNewestFirst(projects);
+    const appointments = mergeListingShoots(storedAppointments, listings);
+    const invoices = invoiceDocs.map((entry2) => {
+      const requestId = typeof entry2.data.orderRequestId === "string" ? entry2.data.orderRequestId : "";
+      const orderId = typeof entry2.data.orderId === "string" ? entry2.data.orderId : "";
+      const order = requestId && ordersById.get(requestId) || orderId && ordersById.get(orderId) || null;
+      return buildClientInvoice(entry2.id, entry2.data, /* @__PURE__ */ new Date(), order);
+    });
     const invoiceRows = sortNewestFirst(invoices);
     return res.json({
       profile: jsonSafe(identity.profile),
@@ -24049,7 +24132,13 @@ async function getBilling(actor2, requestedOwner = "") {
   const stored = await readDoc("billing", ownerClientId);
   const billing = billingFrom(stored);
   const invoiceRows = await queryEqual("invoices", "clientId", ownerClientId);
-  const invoices = invoiceRows.map((row) => buildClientInvoice(row.id, row.data));
+  const invoices = await Promise.all(invoiceRows.map(async (row) => {
+    const requestId = typeof row.data.orderRequestId === "string" ? row.data.orderRequestId : "";
+    const orderId = typeof row.data.orderId === "string" ? row.data.orderId : "";
+    const orderKey = requestId || orderId;
+    const stored2 = orderKey ? await readDoc("orders", orderKey) : null;
+    return buildClientInvoice(row.id, row.data, /* @__PURE__ */ new Date(), stored2 ? { ...stored2, id: orderKey } : null);
+  }));
   billing.balanceCents = accountBalanceCents(invoices, billing.balanceCents);
   const payments = invoices.filter((invoice) => (invoice.amountPaid || 0) > 0).map((invoice) => ({
     id: invoice.id,
