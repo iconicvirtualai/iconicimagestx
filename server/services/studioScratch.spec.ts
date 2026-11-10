@@ -1,10 +1,10 @@
 import fs from "fs/promises";
 import os from "os";
 import path from "path";
+import sharp from "sharp";
 import { describe, expect, it, vi } from "vitest";
 import { AI_EDIT_MISSING_KEY_NOTE, realEstateEditPrompt } from "../../shared/iconicStudio";
 import { orderExteriorTwilightPrompt } from "../../shared/orderEditPlan";
-import { GRASS_REPLACE_PROMPT } from "../../shared/studioScratch";
 import { OPENAI_IMAGE_EDIT_MODEL, OPENAI_IMAGE_EDITS_URL } from "./openaiImageEdit";
 import { editScratchPhoto, grassReferenceStatus } from "./studioScratch";
 
@@ -51,25 +51,38 @@ describe("scratch photo edit", () => {
     });
   });
 
-  it("attaches the configured grass reference as the second image", async () => {
-    const grass = Buffer.from([0xff, 0xd8, 0xff, ...Buffer.alloc(48, 7)]);
-    const fetchImpl = vi.fn(async (_url: string, init: RequestInit) => {
-      const form = init.body as FormData;
-      expect(form.get("prompt")).toBe(realEstateEditPrompt(GRASS_REPLACE_PROMPT));
-      const images = form.getAll("image[]");
-      expect(images).toHaveLength(2);
-      expect((images[1] as File).name).toBe("grass-reference.jpg");
-      return new Response(JSON.stringify({ data: [{ b64_json: jpeg.toString("base64") }] }), { status: 200 });
-    });
-    await editScratchPhoto({
+  it("composites the lawn from the reference and does not call the image model", async () => {
+    const width = 240;
+    const height = 180;
+    const raw = Buffer.alloc(width * height * 3);
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        const i = (y * width + x) * 3;
+        const sky = y < 70;
+        raw[i] = sky ? 90 : 40;
+        raw[i + 1] = sky ? 150 : 130;
+        raw[i + 2] = sky ? 220 : 50;
+      }
+    }
+    const photo = await sharp(raw, { raw: { width, height, channels: 3 } }).jpeg({ quality: 95 }).toBuffer();
+    const reference = await sharp({
+      create: { width: 48, height: 48, channels: 3, background: { r: 20, g: 140, b: 40 } },
+    }).jpeg().toBuffer();
+    const fetchImpl = vi.fn();
+    const result = await editScratchPhoto({
       action: "grass",
       prompt: "",
-      bytes: jpeg,
+      bytes: photo,
       contentType: "image/jpeg",
-      env: { OPENAI_API_KEY: "sk-test" },
+      env: {},
       fetchImpl: fetchImpl as unknown as typeof fetch,
-      readGrass: async () => ({ bytes: grass, contentType: "image/jpeg" }),
+      readGrass: async () => ({ bytes: reference, contentType: "image/jpeg" }),
     });
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(result.note).toMatch(/grass reference/i);
+    const meta = await sharp(result.bytes).metadata();
+    expect(meta.width).toBe(width);
+    expect(meta.height).toBe(height);
   });
 
   it("stops before OpenAI when the key or the lawn file is missing", async () => {

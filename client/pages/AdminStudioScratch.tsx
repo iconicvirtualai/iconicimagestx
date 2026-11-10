@@ -11,7 +11,7 @@ import { stagingApi, stagingGuidance } from "@/components/studio-scratch/scratch
 import { recordAddressText } from "@shared/addressText";
 import { useAuth } from "@/contexts/AuthContext";
 import { auth, storage } from "@/lib/firebase";
-import { fetchScratchStatus, postScratchEdit } from "@/lib/scratchApi";
+import { fetchScratchStatus, postScratchEdit, postScratchLawnMask } from "@/lib/scratchApi";
 import {
   drainOrderEditQueue,
   fetchStudioWorkspace,
@@ -484,7 +484,7 @@ export default function AdminStudioScratch() {
   const runSteps = async (
     targets: ScratchItem[],
     steps: ScratchEditStep[],
-    options: { fromOriginal: boolean; label?: string; emptyNote: string },
+    options: { fromOriginal: boolean; label?: string; emptyNote: string; lawnMask?: Blob; lawnMaskFrameId?: string },
   ) => {
     if (!targets.length) {
       toast.error(options.emptyNote);
@@ -536,7 +536,9 @@ export default function AdminStudioScratch() {
             action: step.action,
             prompt: step.prompt,
             fileName: job.name,
+            mask: step.action === "grass" && options.lawnMask && job.id === options.lawnMaskFrameId ? options.lawnMask : undefined,
           });
+          if (result.note) toast.message(`${job.name}: ${result.note}`);
           working = result.bytes;
           produced = true;
           downloadName = result.downloadName;
@@ -866,7 +868,15 @@ export default function AdminStudioScratch() {
             fromOriginal: request.fromOriginal,
             label: request.label,
             emptyNote: "Check a photo in the filmstrip.",
+            lawnMask: request.lawnMask,
+            lawnMaskFrameId: request.lawnMaskFrameId,
           });
+        }}
+        onPreviewLawn={async () => {
+          const item = items.find((entry) => entry.id === focusId);
+          if (!item?.editable) throw new Error("Choose a JPEG before previewing the lawn.");
+          const body = item.afterBytes ? bytesBlob(item.afterBytes, "image/jpeg") : item.source;
+          return postScratchLawnMask(getToken, body);
         }}
         onStage={(request) => {
           void runStaging(request);

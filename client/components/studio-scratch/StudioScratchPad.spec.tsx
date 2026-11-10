@@ -373,6 +373,38 @@ describe("scratch pad desk", () => {
     expect(floor).toContain("Grass reference is missing.");
   });
 
+  it("offers a lawn brush on the grass tool", () => {
+    const html = renderToString(
+      <StudioScratchPad
+        initialMode="studio"
+        initialStudioTool="grass"
+        frames={frames}
+        busy={false}
+        progress=""
+        grassReady
+        grassNote="Using the lawn reference at /studio/grass-reference.jpg."
+        onAddFiles={() => undefined}
+        onAddFloorplan={() => undefined}
+        onSelect={() => undefined}
+        onSelectAll={() => undefined}
+        onClearSelection={() => undefined}
+        onSort={() => undefined}
+        onProcess={() => undefined}
+        onStage={() => undefined}
+        onCommitJpeg={() => undefined}
+        onRevert={() => undefined}
+        onDownload={() => undefined}
+        onExport={() => undefined}
+        onRemove={() => undefined}
+      />,
+    );
+    expect(html).toContain('data-testid="scratch-lawn-add"');
+    expect(html).toContain('data-testid="scratch-lawn-erase"');
+    expect(html).toContain('data-testid="scratch-lawn-preview"');
+    expect(html).toContain('data-testid="scratch-lawn-clear"');
+    expect(html).toContain("stay on the original");
+  });
+
   it("shows the virtual staging desk and sends both note fields", () => {
     const html = render("staging");
     expect(html).toContain('data-testid="scratch-staging-setup"');

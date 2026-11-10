@@ -5,6 +5,7 @@
 
 import fs from "fs/promises";
 import path from "path";
+import { promptNeedsImageModel, promptRequestsGrass, stripGrassInstructions } from "../../shared/grassEdit";
 import { AI_EDIT_MISSING_KEY_NOTE, realEstateEditPrompt } from "../../shared/iconicStudio";
 import {
   GRASS_REFERENCE_MISSING_NOTE,
@@ -13,6 +14,7 @@ import {
   parseScratchEdit,
   scratchDownloadName,
 } from "../../shared/studioScratch";
+import { compositeGrass, lawnMaskPng, type GrassCompositeResult } from "./grassComposite";
 import { OpenAiEditError, editListingPhotoWithOpenAI, readOpenAiApiKey } from "./openaiImageEdit";
 
 export function grassReferenceCandidates(env: NodeJS.ProcessEnv = process.env, cwd = process.cwd()): string[] {
@@ -63,16 +65,53 @@ export async function grassReferenceStatus(env: NodeJS.ProcessEnv = process.env)
   }
 }
 
+function editError(err: unknown): OpenAiEditError {
+  if (err instanceof OpenAiEditError) return err;
+  const status = err && typeof err === "object" && "status" in err ? Number((err as { status?: number }).status) : 400;
+  const message = err instanceof Error ? err.message : "The grass edit failed.";
+  return new OpenAiEditError(message, status || 400);
+}
+
+export async function applyGrassToPhoto(
+  photo: Buffer,
+  mask?: Buffer,
+  env?: NodeJS.ProcessEnv,
+  readGrass?: () => Promise<{ bytes: Buffer; contentType: "image/jpeg" }>,
+): Promise<GrassCompositeResult> {
+  const grass = readGrass ? await readGrass() : await readGrassReference(env);
+  try {
+    return await compositeGrass({ photo, reference: grass.bytes, mask });
+  } catch (err) {
+    throw editError(err);
+  }
+}
+
+export async function previewLawnMask(photo: Buffer, env?: NodeJS.ProcessEnv): Promise<{ png: Buffer | null; note: string }> {
+  await readGrassReference(env);
+  try {
+    const mask = await lawnMaskPng(photo);
+    return {
+      png: mask.png,
+      note: mask.png
+        ? "Automatic lawn. Paint to add or erase it, then apply."
+        : "No lawn detected. Grass was not added. The photo is unchanged.",
+    };
+  } catch (err) {
+    throw editError(err);
+  }
+}
+
 export async function editScratchPhoto(input: {
   action: string;
   prompt: string;
   bytes: Buffer;
   contentType: string;
   fileName?: string;
+  mask?: Buffer;
   env?: NodeJS.ProcessEnv;
   fetchImpl?: typeof fetch;
   readGrass?: () => Promise<{ bytes: Buffer; contentType: "image/jpeg" }>;
-}): Promise<{ bytes: Buffer; contentType: "image/jpeg"; downloadName: string }> {
+}): Promise<{ bytes: Buffer; contentType: "image/jpeg"; downloadName: string; note: string }> {
   const parsed = parseScratchEdit({
     action: input.action,
     prompt: input.prompt,
@@ -81,26 +120,45 @@ export async function editScratchPhoto(input: {
   });
   if (parsed.ok === false) throw new OpenAiEditError(parsed.error, 400);
 
-  let references: Array<{ bytes: Buffer; contentType: string; filename: string }> | undefined;
-  if (parsed.attachGrass) {
-    const grass = input.readGrass ? await input.readGrass() : await readGrassReference(input.env);
-    references = [{ bytes: grass.bytes, contentType: grass.contentType, filename: "grass-reference.jpg" }];
+  const wantsGrass = parsed.action === "grass" || parsed.attachGrass || promptRequestsGrass(parsed.prompt);
+  let bytes = input.bytes;
+  let note = "";
+
+  if (parsed.action !== "grass" && promptNeedsImageModel(parsed.prompt)) {
+    const apiKey = readOpenAiApiKey(input.env ?? process.env);
+    if (!apiKey) throw new OpenAiEditError(AI_EDIT_MISSING_KEY_NOTE, 503);
+    const edited = await editListingPhotoWithOpenAI({
+      apiKey,
+      prompt: realEstateEditPrompt(stripGrassInstructions(parsed.prompt)),
+      bytes: input.bytes,
+      contentType: "image/jpeg",
+      fetchImpl: input.fetchImpl,
+    });
+    bytes = edited.bytes;
+  } else if (!wantsGrass) {
+    const apiKey = readOpenAiApiKey(input.env ?? process.env);
+    if (!apiKey) throw new OpenAiEditError(AI_EDIT_MISSING_KEY_NOTE, 503);
+    throw new OpenAiEditError("Describe the AI edit.", 400);
   }
 
-  const apiKey = readOpenAiApiKey(input.env ?? process.env);
-  if (!apiKey) throw new OpenAiEditError(AI_EDIT_MISSING_KEY_NOTE, 503);
+  if (wantsGrass) {
+    const grass = await applyGrassToPhoto(bytes, input.mask, input.env, input.readGrass);
+    if (!grass.applied) {
+      return {
+        bytes,
+        contentType: "image/jpeg",
+        downloadName: scratchDownloadName(input.fileName || "scratch.jpg"),
+        note: bytes === input.bytes ? grass.note : "No lawn detected. Grass was not added.",
+      };
+    }
+    bytes = grass.bytes;
+    note = grass.note;
+  }
 
-  const edited = await editListingPhotoWithOpenAI({
-    apiKey,
-    prompt: realEstateEditPrompt(parsed.prompt),
-    bytes: input.bytes,
-    contentType: "image/jpeg",
-    references,
-    fetchImpl: input.fetchImpl,
-  });
   return {
-    bytes: edited.bytes,
-    contentType: edited.contentType,
+    bytes,
+    contentType: "image/jpeg",
     downloadName: scratchDownloadName(input.fileName || "scratch.jpg"),
+    note,
   };
 }

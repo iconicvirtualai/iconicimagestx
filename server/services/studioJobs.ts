@@ -39,6 +39,8 @@ import { jsonSafe } from "../lib/firestoreJson";
 import { recordAddressText } from "../../shared/addressText";
 import { sequenceKeptShots, shotKey, type SequenceShot } from "../../shared/gallerySequence";
 import { firebaseDownloadUrl, registerListingPhoto, saveListingBytes } from "./listingMedia";
+import { editWantsGrass, GRASS_SKIPPED_NOTE, promptNeedsImageModel, stripGrassInstructions } from "../../shared/grassEdit";
+import { applyGrassToPhoto } from "./studioScratch";
 import {
   INSPECTION_FAILED_NOTE,
   OPENAI_IMAGE_EDIT_MODEL,
@@ -189,26 +191,81 @@ async function downloadListingImage(listingId: string, sourcePath: string, fileN
   return { bytes, contentType: resolved };
 }
 
-/** One real Images API edit. The prompt is already the order or staff instruction. */
+/**
+ * Order and staff edits. Grass is composited from Cadi's reference after any
+ * other image-model work, and it is never left as raw model output.
+ */
 async function runOpenAiEdit(input: {
   listingId: string;
   sourcePath: string;
   fileName: string;
   contentType: string;
   prompt: string;
+  grass?: boolean;
 }) {
-  const apiKey = readOpenAiApiKey(process.env);
-  if (!apiKey) throw new OpenAiEditError(AI_EDIT_MISSING_KEY_NOTE);
   const source = await downloadListingImage(input.listingId, input.sourcePath, input.fileName, input.contentType);
-  const edited = await editListingPhotoWithOpenAI({
-    apiKey,
-    prompt: realEstateEditPrompt(input.prompt),
-    bytes: source.bytes,
-    contentType: source.contentType,
-  });
+  const wantsGrass = input.grass === true || editWantsGrass(input.prompt);
+  const aiPrompt = stripGrassInstructions(input.prompt);
+  let bytes = source.bytes;
+  let contentType = source.contentType;
+  let ranModel = false;
+  const notes: string[] = [];
+
+  if (promptNeedsImageModel(aiPrompt)) {
+    const apiKey = readOpenAiApiKey(process.env);
+    if (!apiKey) throw new OpenAiEditError(AI_EDIT_MISSING_KEY_NOTE);
+    const edited = await editListingPhotoWithOpenAI({
+      apiKey,
+      prompt: realEstateEditPrompt(aiPrompt),
+      bytes: source.bytes,
+      contentType: source.contentType,
+    });
+    bytes = edited.bytes;
+    contentType = edited.contentType;
+    ranModel = true;
+    notes.push(AI_EDIT_READY_NOTE);
+  } else if (!wantsGrass) {
+    const apiKey = readOpenAiApiKey(process.env);
+    if (!apiKey) throw new OpenAiEditError(AI_EDIT_MISSING_KEY_NOTE);
+    throw new OpenAiEditError("Describe the AI edit.");
+  }
+
+  let grassApplied = false;
+  if (wantsGrass) {
+    const grass = await applyGrassToPhoto(bytes);
+    if (grass.applied) {
+      bytes = grass.bytes;
+      contentType = "image/jpeg";
+      grassApplied = true;
+      notes.push(grass.note);
+    } else {
+      notes.push(ranModel ? GRASS_SKIPPED_NOTE : grass.note);
+    }
+  }
+
+  if (!ranModel && !grassApplied) {
+    return {
+      afterUrl: "",
+      resultPath: source ? input.sourcePath : "",
+      bytes: source.bytes,
+      contentType: source.contentType,
+      note: notes.join(" ") || GRASS_SKIPPED_NOTE,
+      unchanged: true,
+      grassApplied: false,
+    };
+  }
+
   const base = input.fileName.replace(/\.\w+$/, "") || "edit";
-  const saved = await saveListingBytes(input.listingId, `${base}-ai.jpg`, "image/jpeg", "photos", edited.bytes);
-  return { afterUrl: saved.url, resultPath: saved.storagePath, bytes: edited.bytes };
+  const saved = await saveListingBytes(input.listingId, `${base}-ai.jpg`, contentType, "photos", bytes);
+  return {
+    afterUrl: saved.url,
+    resultPath: saved.storagePath,
+    bytes,
+    contentType,
+    note: notes.join(" ") || AI_EDIT_READY_NOTE,
+    unchanged: false,
+    grassApplied,
+  };
 }
 
 /** Inspection never fails the edit that already saved. */
@@ -417,18 +474,22 @@ export async function advanceOrderEditQueue(input: { listingId: string; createdB
       fileName,
       contentType: "",
       prompt: String(data.prompt || prepared.plan.photoPrompt),
+      grass: prepared.plan.grassReplacement,
     });
     await next.ref.update({
       status: "review",
       beforeUrl,
-      afterUrl: saved.afterUrl,
-      resultPath: saved.resultPath,
+      afterUrl: saved.unchanged ? beforeUrl : saved.afterUrl,
+      resultPath: saved.unchanged ? String(data.sourcePath || "") : saved.resultPath,
       placeholder: false,
-      note: AI_EDIT_READY_NOTE,
+      grassApplied: saved.grassApplied,
+      note: saved.note,
       pipeline: ["pending", "processing", "review"],
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
-    const inspection = await inspectOrderEditJpeg(saved.bytes);
+    const inspection = saved.unchanged
+      ? { status: "pass" as const, notes: [] as string[] }
+      : await inspectOrderEditJpeg(saved.bytes);
     try {
       await next.ref.update({
         inspection,
@@ -450,10 +511,10 @@ export async function advanceOrderEditQueue(input: { listingId: string; createdB
         slot: String(data.slot || ""),
         type: String(data.type || ""),
         beforeUrl,
-        afterUrl: saved.afterUrl,
-        resultPath: saved.resultPath,
+        afterUrl: saved.unchanged ? beforeUrl : saved.afterUrl,
+        resultPath: saved.unchanged ? String(data.sourcePath || "") : saved.resultPath,
         placeholder: false,
-        note: AI_EDIT_READY_NOTE,
+        note: saved.note,
         inspection,
       },
     };
@@ -547,13 +608,15 @@ export async function enqueueAiEdit(input: AiEditRequest & { createdBy: string }
       fileName: frame.name,
       contentType: frame.contentType,
       prompt: input.prompt,
+      grass: editWantsGrass(input.prompt),
     });
     await ref.update({
       status: "review",
-      afterUrl: saved.afterUrl,
-      resultPath: saved.resultPath,
+      afterUrl: saved.unchanged ? beforeUrl : saved.afterUrl,
+      resultPath: saved.unchanged ? input.sourcePath : saved.resultPath,
       placeholder: false,
-      note: AI_EDIT_READY_NOTE,
+      grassApplied: saved.grassApplied,
+      note: saved.note,
       pipeline: ["pending", "processing", "review"],
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
@@ -562,10 +625,10 @@ export async function enqueueAiEdit(input: AiEditRequest & { createdBy: string }
       status: "review" as const,
       provider: "openai" as const,
       beforeUrl,
-      afterUrl: saved.afterUrl,
-      resultPath: saved.resultPath,
+      afterUrl: saved.unchanged ? beforeUrl : saved.afterUrl,
+      resultPath: saved.unchanged ? input.sourcePath : saved.resultPath,
       placeholder: false,
-      note: AI_EDIT_READY_NOTE,
+      note: saved.note,
     };
   } catch (err) {
     const note = failureNote(err);

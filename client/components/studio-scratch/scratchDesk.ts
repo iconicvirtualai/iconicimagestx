@@ -1,3 +1,4 @@
+import { stripGrassInstructions } from "@shared/grassEdit";
 import { presetPrompt } from "@shared/iconicStudio";
 import { ICONIC_POLISH_INSTRUCTION } from "@shared/orderEditPlan";
 import type { ScratchAction } from "@shared/studioScratch";
@@ -105,13 +106,24 @@ function withNotes(prompt: string, notes: string): ScratchEditStep[] {
 
 export function preferenceSteps(id: ScratchPreference, notes: string): ScratchEditStep[] {
   const preference = PREFERENCES.find((item) => item.id === id) || PREFERENCES[1];
-  if (preference.action === "twilight" || preference.action === "grass") {
+  if (preference.action === "twilight") {
     const steps: ScratchEditStep[] = [{ action: preference.action, prompt: preference.prompt }];
     const extra = notes.trim();
     if (extra.length >= 3) steps.push({ action: "revise", prompt: extra });
     return steps;
   }
-  return withNotes(preference.prompt, notes);
+  if (preference.action === "grass") {
+    const steps: ScratchEditStep[] = [];
+    const extra = stripGrassInstructions(notes.trim());
+    if (extra.length >= 3) steps.push({ action: "edit", prompt: extra });
+    steps.push({ action: "grass", prompt: preference.prompt });
+    return steps;
+  }
+  const steps = withNotes(preference.prompt, notes);
+  if (id === "full-iconic" || id === "polish") {
+    steps.push({ action: "grass", prompt: "Replace the lawn." });
+  }
+  return steps;
 }
 
 export function editInstructionSteps(instruction: string): ScratchEditStep[] {
@@ -137,8 +149,11 @@ export function studioSteps(
     const name = SKY_PRESETS.find((item) => item.id === options.skyPreset)?.label || "Dramatic";
     prompt = `Replace the visible sky with a photoreal ${name.toLowerCase()} sky. Keep the blend soft around the roofline. Strength about ${options.intensity} of 100, feather about ${options.blend}. Keep the house and camera angle.`;
   } else if (id === "grass") {
-    action = "grass";
-    prompt = "Replace the lawn.";
+    const steps: ScratchEditStep[] = [];
+    const extra = stripGrassInstructions(options.instruction.trim());
+    if (extra.length >= 3) steps.push({ action: "edit", prompt: extra });
+    steps.push({ action: "grass", prompt: "Replace the lawn." });
+    return steps;
   } else if (id === "staging") {
     prompt = presetPrompt("virtual_stage");
   } else if (id === "twilight") {
@@ -147,7 +162,7 @@ export function studioSteps(
   } else if (id === "object") {
     prompt = "Remove the distracting object or person the editor is pointing at. Rebuild only that area. Do not add anyone. Keep the architecture and camera angle.";
   }
-  if (action === "twilight" || action === "grass") {
+  if (action === "twilight") {
     const steps: ScratchEditStep[] = [{ action, prompt }];
     const extra = options.instruction.trim();
     if (extra.length >= 3) steps.push({ action: "revise", prompt: extra });

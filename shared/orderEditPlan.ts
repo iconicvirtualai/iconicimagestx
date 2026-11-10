@@ -26,8 +26,10 @@ export const SHOWCASE_PHOTO_COUNT = 30;
 
 /**
  * Iconic Polish treatments Cadi confirmed from the pricing card.
- * "Add grass" is part of this full polish. Standalone grass replacement
- * stays a separate $25 classic-package add-on and is not a substitute for it.
+ * "Add grass" stays on the checklist, but it is not sent to the image model.
+ * The lawn composite fills that part from Cadi's grass reference.
+ * Standalone grass replacement stays a separate $25 classic-package add-on
+ * and uses the same composite. It is not a substitute for the full polish.
  */
 export const ICONIC_POLISH_TREATMENTS = [
   "Remove dirt and debris",
@@ -40,10 +42,24 @@ export const ICONIC_POLISH_TREATMENTS = [
   "Firepits and fireplaces",
 ] as const;
 
-export const ICONIC_POLISH_LIMITS =
-  "Keep the architecture and camera angle. Do not add people. Standalone grass replacement is a separate edit, not a substitute for this full polish.";
+export const ICONIC_POLISH_CURB_APPEAL =
+  "Add curb appeal. Keep trees, shrubs, foliage, and existing landscaping unchanged. Do not add, remove, move, or restyle plants.";
 
-export const ICONIC_POLISH_INSTRUCTION = `Iconic Polish: ${ICONIC_POLISH_TREATMENTS.join("; ")}. ${ICONIC_POLISH_LIMITS}`;
+/** Whole-image model text. Grass is intentionally absent. */
+export const ICONIC_POLISH_AI_TREATMENTS = [
+  "Remove dirt and debris",
+  "Remove harsh shadows and reflections",
+  "Remove cords and powerlines",
+  "Clean driveways",
+  ICONIC_POLISH_CURB_APPEAL,
+  "Add TVs and screens",
+  "Firepits and fireplaces",
+] as const;
+
+export const ICONIC_POLISH_LIMITS =
+  "Keep the architecture and camera angle. Do not add people. Keep trees, shrubs, and foliage exactly as photographed. Do not repaint the lawn or invent grass. The standalone lawn add-on is a separate edit, not a substitute for this full polish.";
+
+export const ICONIC_POLISH_INSTRUCTION = `Iconic Polish: ${ICONIC_POLISH_AI_TREATMENTS.join("; ")}. ${ICONIC_POLISH_LIMITS}`;
 
 const PHOTO_BASE =
   "Prepare this listing photo. Balance color, clear window glare, and replace a blown-out sky when the sky is visible. Keep the architecture, furnishings, and camera angle.";
@@ -71,6 +87,8 @@ export interface OrderEditPlan {
   iconicPolish: boolean;
   /** True when the order itself includes Iconic Finish or Iconic Polish. */
   polishFromOrder: boolean;
+  /** Lawn composite. Iconic Polish and the $25 grass add-on both turn this on. */
+  grassReplacement: boolean;
   photoPrompt: string;
   /** Package still count. Null when the scope is "full" or "none". */
   photoCount: number | null;
@@ -176,23 +194,34 @@ function isShowcaseItem(id: string, name: string, catalogId?: string): boolean {
   return blob.includes("listing-showcase") || blob.includes("the showcase");
 }
 
-function collectTexts(input: OrderEditInput): { texts: string[]; packageName: string; polishFromOrder: boolean; showcase: boolean } {
+function textHasGrassAddon(value: string): boolean {
+  return /grass\s*replacement|\badd grass\b/i.test(value);
+}
+
+function collectTexts(input: OrderEditInput): { texts: string[]; packageName: string; polishFromOrder: boolean; showcase: boolean; grassAddon: boolean } {
   const texts: string[] = [];
   const packageNames: string[] = [];
   let polishFromOrder = false;
   let showcase = false;
+  let grassAddon = false;
   const items = [...asItems(input.lineItems), ...asItems(input.services)];
   for (const id of asIds(input.serviceIds)) items.push({ id, name: "" });
 
   for (const item of items) {
     if (item.name) texts.push(item.name);
+    const blob = `${item.id} ${item.name}`.toLowerCase();
+    if (blob.includes("grass-replacement") || blob.includes("grass replacement") || textHasGrassAddon(item.name)) {
+      grassAddon = true;
+    }
     const catalog = packageByIdOrName(item.id, item.name);
     if (catalog) {
       packageNames.push(catalog.name);
-      for (const feature of catalog.features || []) texts.push(feature);
+      for (const feature of catalog.features || []) {
+        texts.push(feature);
+        if (textHasGrassAddon(feature)) grassAddon = true;
+      }
     }
     if (isShowcaseItem(item.id, item.name, catalog?.id)) showcase = true;
-    const blob = `${item.id} ${item.name}`.toLowerCase();
     if (blob.includes("iconic finish") || blob.includes("iconic polish") || blob.includes("iconic-finish")) {
       polishFromOrder = true;
     }
@@ -202,6 +231,7 @@ function collectTexts(input: OrderEditInput): { texts: string[]; packageName: st
     packageName: packageNames[0] || items.find((item) => item.name)?.name || "Custom order",
     polishFromOrder,
     showcase,
+    grassAddon,
   };
 }
 
@@ -270,6 +300,7 @@ export function planOrderEdits(input: OrderEditInput = {}): OrderEditPlan {
     packageName: collected.packageName,
     iconicPolish,
     polishFromOrder,
+    grassReplacement: iconicPolish || collected.grassAddon,
     photoPrompt: photoPrompt(iconicPolish),
     photoCount: photoFull ? null : photoCount,
     photoScope: photoFull ? "full" : photoCount != null ? "count" : "none",

@@ -4,6 +4,7 @@ import { ICONIC_POLISH_TREATMENTS } from "@shared/orderEditPlan";
 import type { StudioOrderTrayJob } from "@shared/studioOrderTray";
 import { SCRATCH_SORT_DEFAULT, type ScratchSortMode } from "@/lib/scratchSort";
 import { bakeMarkup, bakeStrokes, type MarkupPoint, type ScratchStroke } from "@/lib/scratchBrush";
+import { dataUrlToBlob, rasterLawnMask, type LawnStroke } from "@/lib/lawnMask";
 import { brandFloorplan } from "@/lib/floorplanBrand";
 import { loadScratchImage } from "@/lib/scratchPhoto";
 import { lookCss, lookIsNeutral, NEUTRAL_LOOK, renderScratchLook, type ScratchLook } from "@/lib/scratchLook";
@@ -111,6 +112,7 @@ export default function StudioScratchPad({
   onClearSelection,
   onSort,
   onProcess,
+  onPreviewLawn,
   onStage,
   onCommitJpeg,
   onRevert,
@@ -141,7 +143,8 @@ export default function StudioScratchPad({
   onSelectAll: () => void;
   onClearSelection: () => void;
   onSort: (mode: ScratchSortMode) => void;
-  onProcess: (request: { steps: ScratchEditStep[]; fromOriginal: boolean; label?: string }) => void;
+  onProcess: (request: { steps: ScratchEditStep[]; fromOriginal: boolean; label?: string; lawnMask?: Blob; lawnMaskFrameId?: string }) => void;
+  onPreviewLawn?: () => Promise<{ maskUrl: string | null; note: string }>;
   onStage: (request: StagingRequest) => void;
   onCommitJpeg: (dataUrl: string, frameId: string, label: string) => void;
   onRevert: () => void;
@@ -182,7 +185,12 @@ export default function StudioScratchPad({
   const [stageNotes, setStageNotes] = useState("");
   const [stageAiNotes, setStageAiNotes] = useState("");
   const [compare, setCompare] = useState(50);
+  const [lawnBrush, setLawnBrush] = useState<"add" | "erase">("add");
+  const [lawnStrokes, setLawnStrokes] = useState<LawnStroke[]>([]);
+  const [autoMaskUrl, setAutoMaskUrl] = useState<string | null>(null);
+  const [lawnHint, setLawnHint] = useState("");
   const drawing = useRef(false);
+  const lawnCanvasRef = useRef<HTMLCanvasElement>(null);
 
   const focus = frames.find((frame) => frame.focused) || frames[0] || null;
   const expanded = mode === "upload" ? frames.find((frame) => frame.id === expandedId) || null : null;
@@ -239,10 +247,103 @@ export default function StudioScratchPad({
     if (files.length) onAddFiles(files);
   };
 
-  const sendProcess = (steps: ScratchEditStep[] | null, fromOriginal: boolean, label?: string) => {
+  const grassBrushOn = mode === "studio" && studioTool === "grass" && Boolean(focus);
+
+  useEffect(() => {
+    setLawnStrokes([]);
+    setAutoMaskUrl((current) => {
+      if (current) URL.revokeObjectURL(current);
+      return null;
+    });
+    setLawnHint("");
+  }, [focus?.id, studioTool]);
+
+  useEffect(() => {
+    const canvas = lawnCanvasRef.current;
+    if (!canvas || !grassBrushOn) return;
+    const rect = canvas.getBoundingClientRect();
+    const width = Math.max(1, Math.round(rect.width));
+    const height = Math.max(1, Math.round(rect.height));
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.clearRect(0, 0, width, height);
+    let cancelled = false;
+    const paint = (base?: CanvasImageSource) => {
+      if (cancelled) return;
+      ctx.clearRect(0, 0, width, height);
+      if (base) {
+        ctx.drawImage(base, 0, 0, width, height);
+        const frame = ctx.getImageData(0, 0, width, height);
+        const pixels = frame.data;
+        for (let i = 0; i < pixels.length; i += 4) {
+          const lawn = pixels[i];
+          pixels[i] = 16;
+          pixels[i + 1] = 185;
+          pixels[i + 2] = 129;
+          pixels[i + 3] = lawn > 12 ? Math.round(lawn * 0.5) : 0;
+        }
+        ctx.putImageData(frame, 0, 0);
+      }
+      const radius = Math.max(8, Math.round(Math.min(width, height) * 0.035));
+      ctx.lineWidth = radius * 2;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      for (const stroke of lawnStrokes) {
+        ctx.strokeStyle = stroke.mode === "erase" ? "rgba(0,0,0,0.55)" : "rgba(16, 185, 129, 0.55)";
+        ctx.fillStyle = ctx.strokeStyle;
+        ctx.beginPath();
+        stroke.points.forEach((point, index) => {
+          const x = point.x * width;
+          const y = point.y * height;
+          if (index === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        if (stroke.points.length > 1) ctx.stroke();
+        for (const point of stroke.points) {
+          ctx.beginPath();
+          ctx.arc(point.x * width, point.y * height, radius, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    };
+    if (!autoMaskUrl) {
+      paint();
+      return;
+    }
+    const image = new Image();
+    image.onload = () => paint(image);
+    image.src = autoMaskUrl;
+    return () => {
+      cancelled = true;
+    };
+  }, [autoMaskUrl, grassBrushOn, lawnStrokes, displayUrl, zoom]);
+
+  const sendProcess = async (steps: ScratchEditStep[] | null, fromOriginal: boolean, label?: string) => {
     if (!steps?.length) return;
     if (steps.some((step) => step.action === "grass") && !grassReady) return;
-    onProcess({ steps, fromOriginal, label });
+    let lawnMask: Blob | undefined;
+    if (steps.some((step) => step.action === "grass") && lawnStrokes.length && focus && displayUrl) {
+      const image = await loadScratchImage(displayUrl);
+      const base = autoMaskUrl ? await loadScratchImage(autoMaskUrl) : null;
+      lawnMask = dataUrlToBlob(rasterLawnMask(image.width, image.height, lawnStrokes, base));
+    }
+    onProcess({ steps, fromOriginal, label, lawnMask, lawnMaskFrameId: focus?.id });
+  };
+
+  const loadAutomaticLawn = async () => {
+    if (!onPreviewLawn) return;
+    try {
+      const result = await onPreviewLawn();
+      setAutoMaskUrl((current) => {
+        if (current) URL.revokeObjectURL(current);
+        return result.maskUrl;
+      });
+      setLawnHint(result.note);
+    } catch (err) {
+      setLawnHint(err instanceof Error ? err.message : "The lawn mask failed.");
+    }
   };
 
   const commitFocused = async (dataUrl: string, label: string) => {
@@ -279,7 +380,34 @@ export default function StudioScratchPad({
       setMarks([]);
       return;
     }
-    sendProcess(studioSteps(studioTool, { skyPreset, intensity, blend, instruction }), false, studioTool);
+    void sendProcess(studioSteps(studioTool, { skyPreset, intensity, blend, instruction }), false, studioTool);
+  };
+
+  const onLawnPointer = (event: React.PointerEvent<HTMLDivElement>) => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    if (!bounds.width || !bounds.height) return;
+    const point = {
+      x: Math.min(1, Math.max(0, (event.clientX - bounds.left) / bounds.width)),
+      y: Math.min(1, Math.max(0, (event.clientY - bounds.top) / bounds.height)),
+    };
+    if (event.type === "pointerdown") {
+      drawing.current = true;
+      event.currentTarget.setPointerCapture(event.pointerId);
+      setLawnStrokes((current) => [...current, { mode: lawnBrush, points: [point] }]);
+      return;
+    }
+    if (!drawing.current) return;
+    if (event.type === "pointerup" || event.type === "pointerleave" || event.type === "pointercancel") {
+      drawing.current = false;
+      return;
+    }
+    setLawnStrokes((current) => {
+      const next = current.slice();
+      const last = next[next.length - 1];
+      if (!last) return current;
+      next[next.length - 1] = { ...last, points: [...last.points, point] };
+      return next;
+    });
   };
 
   const onCanvasPointer = (event: React.PointerEvent<HTMLDivElement>, kind: "stroke" | "mark") => {
@@ -565,15 +693,27 @@ export default function StudioScratchPad({
                 {mode === "studio" && studioTool === "floorplan" ? (
                   <FloorplanStage url={brandedFloor || floorplanUrl} branded={Boolean(brandedFloor)} onBrowse={() => floorInput.current?.click()} />
                 ) : focus ? (
-                  <img
-                    src={displayUrl}
-                    alt={focus.name}
-                    className={zoom === "fit" ? "max-h-full max-w-full object-contain" : "max-w-none object-contain"}
-                    style={{
-                      filter: mode === "edit" && surface === "whole" ? lookCss(look) : undefined,
-                      width: zoom === "100" ? "100%" : zoom === "200" ? "200%" : undefined,
-                    }}
-                  />
+                  <div
+                    className="relative inline-flex max-h-full max-w-full"
+                    onPointerDown={grassBrushOn ? onLawnPointer : undefined}
+                    onPointerMove={grassBrushOn ? onLawnPointer : undefined}
+                    onPointerUp={grassBrushOn ? onLawnPointer : undefined}
+                    onPointerLeave={grassBrushOn ? onLawnPointer : undefined}
+                  >
+                    <img
+                      src={displayUrl}
+                      alt={focus.name}
+                      draggable={false}
+                      className={zoom === "fit" ? "max-h-full max-w-full object-contain" : "max-w-none object-contain"}
+                      style={{
+                        filter: mode === "edit" && surface === "whole" ? lookCss(look) : undefined,
+                        width: zoom === "100" ? "100%" : zoom === "200" ? "200%" : undefined,
+                      }}
+                    />
+                    {grassBrushOn ? (
+                      <canvas ref={lawnCanvasRef} data-testid="scratch-lawn-overlay" className="pointer-events-none absolute inset-0 h-full w-full" />
+                    ) : null}
+                  </div>
                 ) : (
                   <button type="button" onClick={() => photoInput.current?.click()} className="text-sm font-black uppercase tracking-widest text-gray-400">Drop JPEGs here</button>
                 )}
@@ -642,6 +782,18 @@ export default function StudioScratchPad({
                 onReplaceFooter={setReplaceFooter}
                 onLogoBar={setLogoBar}
                 onAutoLabel={setAutoLabel}
+                lawnBrush={lawnBrush}
+                lawnHint={lawnHint}
+                onLawnBrush={setLawnBrush}
+                onLawnClear={() => {
+                  setLawnStrokes([]);
+                  setAutoMaskUrl((current) => {
+                    if (current) URL.revokeObjectURL(current);
+                    return null;
+                  });
+                  setLawnHint("");
+                }}
+                onLawnPreview={() => { void loadAutomaticLawn(); }}
                 onApply={() => { void applyStudio(); }}
                 onProcess={() => {
                   const steps = studioSteps(studioTool, { skyPreset, intensity, blend, instruction });
@@ -1091,7 +1243,7 @@ function UploadPrefs({
           {ICONIC_POLISH_TREATMENTS.map((treatment) => (
             <li key={treatment} className="text-[10px] text-gray-400">{treatment}</li>
           ))}
-          <li className="text-[10px] leading-snug text-gray-500">Does not add anyone or move the camera. Grass replacement is a separate $25 add-on, included only on classic packages. It is not this polish.</li>
+          <li className="text-[10px] leading-snug text-gray-500">Does not add anyone or move the camera. Add grass uses Cadi&apos;s lawn photo and does not redraw the house or trees. The $25 grass add-on is included only on classic packages and is not a substitute for this full polish.</li>
         </ul>
       ) : null}
       {!grassReady ? <p data-testid="scratch-grass-note" className="mt-2 text-[11px] text-gray-400">{grassNote}</p> : null}
@@ -1213,6 +1365,11 @@ function StudioOptions(props: {
   onReplaceFooter: (value: boolean) => void;
   onLogoBar: (value: boolean) => void;
   onAutoLabel: (value: boolean) => void;
+  lawnBrush: "add" | "erase";
+  lawnHint: string;
+  onLawnBrush: (mode: "add" | "erase") => void;
+  onLawnClear: () => void;
+  onLawnPreview: () => void;
   onApply: () => void;
   onProcess: () => void;
   onExport: (destination: ScratchExportDestination) => void;
@@ -1254,7 +1411,19 @@ function StudioOptions(props: {
         </div>
       ) : null}
       {props.tool === "grass" && !props.grassReady ? <p data-testid="scratch-grass-note" className="mt-2 text-[11px] text-gray-400">{props.grassNote}</p> : null}
-      {props.tool === "grass" ? <p className="mt-2 text-[11px] leading-snug text-gray-500">$25 add-on, included only on classic packages. Not Iconic Polish. The lawn file stays on the server.</p> : null}
+      {props.tool === "grass" ? (
+        <div data-testid="scratch-lawn-tools" className="mt-3 space-y-2">
+          <p className="text-[11px] leading-snug text-gray-400">Only the lawn is replaced, using Cadi&apos;s lawn photo. Trees, the house, and hardscape stay on the original. Paint to override the automatic lawn.</p>
+          <div className="grid grid-cols-2 gap-2">
+            <button type="button" data-testid="scratch-lawn-add" aria-pressed={props.lawnBrush === "add"} onClick={() => props.onLawnBrush("add")} className={`rounded-full px-2 py-2 text-[10px] font-black uppercase tracking-widest ${props.lawnBrush === "add" ? "text-white" : "bg-white/5 text-gray-300"}`} style={props.lawnBrush === "add" ? { backgroundColor: teal } : undefined}>Paint lawn</button>
+            <button type="button" data-testid="scratch-lawn-erase" aria-pressed={props.lawnBrush === "erase"} onClick={() => props.onLawnBrush("erase")} className={`rounded-full px-2 py-2 text-[10px] font-black uppercase tracking-widest ${props.lawnBrush === "erase" ? "text-white" : "bg-white/5 text-gray-300"}`} style={props.lawnBrush === "erase" ? { backgroundColor: teal } : undefined}>Erase</button>
+            <button type="button" data-testid="scratch-lawn-preview" onClick={props.onLawnPreview} className="rounded-full bg-white/5 px-2 py-2 text-[10px] font-black uppercase tracking-widest text-gray-200">Show lawn</button>
+            <button type="button" data-testid="scratch-lawn-clear" onClick={props.onLawnClear} className="rounded-full bg-white/5 px-2 py-2 text-[10px] font-black uppercase tracking-widest text-gray-200">Clear mask</button>
+          </div>
+          {props.lawnHint ? <p data-testid="scratch-lawn-hint" className="text-[11px] leading-snug text-gray-400">{props.lawnHint}</p> : null}
+          <p className="text-[11px] leading-snug text-gray-500">$25 add-on, included only on classic packages. Not a substitute for Iconic Polish. The lawn file stays on the server.</p>
+        </div>
+      ) : null}
       </div>
       <div className="shrink-0 border-t border-white/10 p-3">
       <label className="block">
