@@ -34,8 +34,11 @@
     "optimize:senior-living": "tsx scripts/optimize-senior-living.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1165.0",
+    "@aws-sdk/s3-request-presigner": "^3.1165.0",
     "dotenv": "^17.2.1",
     "express": "^5.1.0",
+    "fflate": "^0.8.3",
     "firebase": "^10.14.0",
     "firebase-admin": "^13.7.0",
     "firebase-functions": "^7.1.1",
