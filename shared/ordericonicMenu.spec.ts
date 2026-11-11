@@ -37,7 +37,7 @@ describe("ordericonic is the shared price list", () => {
       ["18 Photos", 139],
       ["25 Photos", 169],
       ["40 Photos", 199],
-      ["Aerial Only", 99],
+      ["Aerial Only", 200],
     ]);
     expect(basicsList.map((item) => item.id)).toEqual(expect.arrayContaining(["photos-20", "photos-35", "photos-50"]));
     expect(photoOnlyPackages.map((item) => item.id)).not.toEqual(expect.arrayContaining(["photos-20", "photos-35", "photos-50"]));
