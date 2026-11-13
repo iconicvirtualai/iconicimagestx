@@ -60,14 +60,14 @@ describe("booking total contract", () => {
     const submitted = sumLineItemPrices(lineItems);
     const label = orderTotalLabel(submitted);
 
-    expect(sidebar).toBe(1102);
+    expect(sidebar).toBe(1203);
     expect(submitted).toBe(sidebar);
-    expect(label).toBe("$1102.00");
+    expect(label).toBe("$1203.00");
     expect(orderTotalLabel(sidebar)).toBe(label);
     expect(lineItems.map((item) => [item.name, item.price])).toEqual([
       ["The Showcase", 549],
       ["35 Photos", 150],
-      ["Aerial Drone Stills", 99],
+      ["Aerial Drone Stills", 200],
       ["Same-Day Delivery", 50],
       ["Agent intro/outro", 59],
       ["Iconic Finish (Premium Upgrade)", 75],
@@ -107,7 +107,7 @@ describe("booking total contract", () => {
       tier: "campaign",
     })));
     expect(sumLineItemPrices(normalized)).toBe(sumLineItemPrices(items));
-    expect(orderTotalLabel(sumLineItemPrices(normalized))).toBe("$1102.00");
+    expect(orderTotalLabel(sumLineItemPrices(normalized))).toBe("$1203.00");
     expect(normalized[0]).toMatchObject({
       description: "Staff note",
       category: "photography",
@@ -218,7 +218,7 @@ describe("booking catalog parity", () => {
     expect(sumLineItemPrices(buildSubmittedLineItems({
       selectedBasics: ["aerial-drone"],
       selectedAddOns: ["aerial-drone"],
-    }))).toBe(99);
+    }))).toBe(200);
   });
 
   it("lets staff add a package the booking form can select", () => {
@@ -296,7 +296,7 @@ describe("booking catalog parity", () => {
     });
     expect(fromLines.selectedAddOns).toEqual(["aerial-drone"]);
     expect(fromLines.virtualStagingCredits).toBe(3);
-    expect(fromLines.total).toBe(99 + 105);
+    expect(fromLines.total).toBe(200 + 105);
     expect(bookingEmbedAvailability().status).toBe("deferred");
     expect(catalogPage).toContain("packagesForStaffEditor");
     expect(catalogPage).toContain("catalogPackageSaveData");
@@ -489,7 +489,7 @@ describe("booking catalog parity", () => {
       ["Hollywood — $199", 199],
       ["Hall of Fame — $299", 299],
       ["Red Carpet — $599", 599],
-      ["Aerial Only", 99],
+      ["Aerial Only", 200],
       ["photos-20", 99],
     ] as const) {
       const resolved = resolveSubmittedBooking({ selectedService: label, total: price });

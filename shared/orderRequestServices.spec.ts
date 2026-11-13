@@ -45,7 +45,7 @@ describe("order request catalog choices", () => {
       packageId: "listing-essentials",
     });
     expect(photos).toMatchObject({ group: "basic", price: 150 });
-    expect(drone).toMatchObject({ group: "addon", price: 99 });
+    expect(drone).toMatchObject({ group: "addon", price: 200 });
     expect(choices.some((choice) => choice.name === "Skipped")).toBe(false);
   });
 
@@ -120,7 +120,7 @@ describe("order request service save", () => {
     expect(patch.selectedService).toBe("listing-essentials");
     expect(patch.selectedBasics).toEqual(["photos-20"]);
     expect(patch.selectedAddOns).toEqual(["aerial-drone"]);
-    expect(patch.subtotal).toBe(598 + 99 + 99);
+    expect(patch.subtotal).toBe(598 + 99 + 200);
     expect(patch.processing).toBe(processingFee(patch.subtotal));
   });
 
