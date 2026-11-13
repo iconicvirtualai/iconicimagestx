@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { doc, onSnapshot } from "firebase/firestore";
+import { Link } from "react-router-dom";
 import { Copy, Download } from "lucide-react";
 import { toast } from "sonner";
 import { db } from "@/lib/firebase";
@@ -9,8 +10,11 @@ import {
   GALLERY_PICKS_COLLECTION,
   GALLERY_PICKS_DOC,
   moneyLabel,
+  resolvedExtraPrice,
+  selectionCountLabel,
   selectionNoun,
   selectionQuote,
+  type SelectionBilling,
   type SelectionMode,
   type SelectionSettings,
 } from "@shared/gallerySelections";
@@ -53,21 +57,29 @@ export function AdminClientSelectionsView({
   onCopy: () => void;
   onCsv: () => void;
 }) {
+  const [enabled, setEnabled] = useState(view.settings.open);
+  const [billing, setBilling] = useState<SelectionBilling>(view.settings.billing);
   const [mode, setMode] = useState<SelectionMode>(view.settings.mode);
   const [allowance, setAllowance] = useState(view.settings.allowance == null ? "" : String(view.settings.allowance));
-  const [price, setPrice] = useState(view.settings.extraPhotoPrice == null ? "" : String(view.settings.extraPhotoPrice));
+  const [override, setOverride] = useState(view.settings.extraPriceOverride == null ? "" : String(view.settings.extraPriceOverride));
   const [show, setShow] = useState<"all" | "selected" | "unselected">("selected");
-  const settings = {
-    open: true,
+  const allowanceCount = allowance.trim() === "" ? null : Number(allowance);
+  const typedOverride = override.trim() === "" ? null : Number(override);
+  const extraPriceOverride = typedOverride != null && Number.isFinite(typedOverride) && typedOverride >= 0 ? typedOverride : null;
+  const settings: SelectionSettings = {
+    open: enabled,
     mode,
-    allowance: allowance.trim() === "" ? null : Number(allowance),
-    extraPhotoPrice: price.trim() === "" ? null : Number(price),
+    billing,
+    allowance: Number.isInteger(allowanceCount) ? allowanceCount : null,
+    extraPriceOverride,
+    catalogExtraPrice: view.settings.catalogExtraPrice,
+    catalogPackageId: view.settings.catalogPackageId,
+    catalogPackageName: view.settings.catalogPackageName,
+    extraPhotoPrice: billing === "charge"
+      ? resolvedExtraPrice(extraPriceOverride, view.settings.catalogExtraPrice)
+      : null,
   };
-  const quote = selectionQuote(selectedIds.length, {
-    ...settings,
-    allowance: Number.isInteger(settings.allowance) ? settings.allowance : null,
-    extraPhotoPrice: price.trim() === "" || !Number.isFinite(settings.extraPhotoPrice) ? null : settings.extraPhotoPrice,
-  });
+  const quote = selectionQuote(selectedIds.length, { ...settings, open: true });
   const names = view.photos.filter((photo) => selectedIds.includes(photo.id)).map((photo) => photo.fileName);
   const rows = view.photos.filter((photo) => {
     if (show === "selected") return selectedIds.includes(photo.id);
@@ -77,55 +89,108 @@ export function AdminClientSelectionsView({
 
   return (
     <section data-testid="admin-client-selections" className="mb-6 rounded-xl border border-gray-100 bg-gray-50 p-4">
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <h3 className="text-sm font-black text-black">Client selections</h3>
-        {view.reviewPending ? <UnreadBadge count={1} testId="admin-selection-badge" /> : null}
-        <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">
-          {view.status === "submitted" ? "Submitted" : view.settings.open ? "Open" : "Closed"}
-        </span>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="text-sm font-black text-black">Photo selections</h3>
+          {view.reviewPending ? <UnreadBadge count={1} testId="admin-selection-badge" /> : null}
+          <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+            {enabled ? (view.status === "submitted" ? "Submitted" : "On") : "Off"}
+          </span>
+        </div>
+        <label className="inline-flex items-center gap-2 text-xs font-bold text-black">
+          <input
+            type="checkbox"
+            role="switch"
+            aria-label="Photo selections"
+            data-testid="admin-selection-toggle"
+            checked={enabled}
+            onChange={(event) => setEnabled(event.target.checked)}
+          />
+          {enabled ? "On" : "Off"}
+        </label>
       </div>
       <p className="mb-4 text-xs text-gray-500">
-        Hearts save on their own and show up here. Nothing is emailed or texted to the client, and no card is charged.
+        {enabled
+          ? "Hearts save on their own and show up here. Nothing is emailed or texted to the client, and no card is charged."
+          : "Off. This gallery stays as it is today: no hearts, filters, or submit button."}
       </p>
-      <div className="mb-4 grid grid-cols-1 gap-2 md:grid-cols-4">
-        <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">
-          Mode
-          <select aria-label="Selection mode" value={mode} onChange={(event) => setMode(event.target.value === "headshots" ? "headshots" : "listing")} className={`${inputCls} mt-1`}>
-            <option value="listing">Listing photos</option>
-            <option value="headshots">Headshot proofs</option>
-          </select>
-        </label>
-        <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">
-          Included
-          <input aria-label="Included count" value={allowance} onChange={(event) => setAllowance(event.target.value)} inputMode="numeric" placeholder="18" className={`${inputCls} mt-1`} />
-        </label>
-        <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">
-          Extra price
-          <input aria-label="Extra photo price" value={price} onChange={(event) => setPrice(event.target.value)} inputMode="decimal" placeholder="Blank — extras not allowed" className={`${inputCls} mt-1`} />
-        </label>
-        <div className="flex items-end">
+      {enabled ? (
+      <div className="mb-4 grid grid-cols-1 gap-3">
+        <fieldset className="space-y-2">
+          <legend className="text-[10px] font-black uppercase tracking-widest text-gray-400">Mode</legend>
+          <label className="flex items-center gap-2 text-sm font-bold text-black">
+            <input type="radio" name="selection-billing" checked={billing === "charge"} onChange={() => setBilling("charge")} />
+            Charge per additional photo
+          </label>
+          <label className="flex items-center gap-2 text-sm font-bold text-black">
+            <input type="radio" name="selection-billing" checked={billing === "selections"} onChange={() => setBilling("selections")} />
+            No charge, just selections needed
+          </label>
+        </fieldset>
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+          <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+            What they pick
+            <select aria-label="What they pick" value={mode} onChange={(event) => setMode(event.target.value === "headshots" ? "headshots" : "listing")} className={`${inputCls} mt-1`}>
+              <option value="listing">Listing photos</option>
+              <option value="headshots">Headshot finals</option>
+            </select>
+          </label>
+          <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+            Included
+            <input aria-label="Included count" value={allowance} onChange={(event) => setAllowance(event.target.value)} inputMode="numeric" placeholder="Blank" className={`${inputCls} mt-1`} />
+          </label>
+          {billing === "charge" ? (
+            <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+              Override this gallery
+              <input aria-label="Gallery price override" value={override} onChange={(event) => setOverride(event.target.value)} inputMode="decimal" placeholder="Blank — use the price list" className={`${inputCls} mt-1`} />
+            </label>
+          ) : null}
+        </div>
+        {billing === "charge" ? (
+          <p data-testid="admin-selection-catalog" className="text-xs text-gray-500">
+            {settings.extraPriceOverride != null
+              ? `This gallery uses ${moneyLabel(settings.extraPriceOverride)} per extra ${selectionNoun(mode, 1)}.`
+              : settings.catalogExtraPrice != null
+                ? `${settings.catalogPackageName || "This package"} is ${moneyLabel(settings.catalogExtraPrice)} per extra ${selectionNoun(mode, 1)} on the price list.`
+                : "No extra price is saved on this package yet."}
+            {" "}
+            <Link to="/admin/pricing" className="font-bold text-black underline">Edit the price list</Link>
+          </p>
+        ) : null}
+        <div>
           <Button
             type="button"
             disabled={saving}
             onClick={() => onSave({
+              open: true,
+              billing,
               mode,
               allowance: allowance.trim() === "" ? null : Number(allowance),
-              extraPhotoPrice: price.trim() === "" ? null : Number(price),
-              open: true,
+              extraPriceOverride: override.trim() === "" ? null : Number(override),
             })}
-            className="w-full rounded-xl bg-black text-xs font-bold text-white hover:bg-gray-900"
+            className="rounded-xl bg-black text-xs font-bold text-white hover:bg-gray-900"
           >
-            Save and open
+            Save
           </Button>
         </div>
       </div>
+      ) : (
+        <div className="mb-4">
+          <Button
+            type="button"
+            disabled={saving}
+            onClick={() => onSave({ open: false })}
+            className="rounded-xl bg-black text-xs font-bold text-white hover:bg-gray-900"
+          >
+            Save
+          </Button>
+        </div>
+      )}
 
       <p data-testid="admin-selection-count" className="text-sm font-bold text-black">
-        {quote.selectedCount} selected
-        {quote.allowance == null ? "" : ` · ${quote.allowance} included`}
-        {quote.extraCount > 0 ? ` · ${quote.extraCount} extra ${selectionNoun(mode, quote.extraCount)}` : ""}
-        {quote.extraTotal > 0 ? ` · ${moneyLabel(quote.extraTotal)} added` : ""}
-        {quote.overAllowance && !quote.extrasAllowed ? " · extras not allowed" : ""}
+        {selectionCountLabel(quote.selectedCount, quote.allowance)}
+        {billing === "charge" && quote.extraCount > 0 ? ` · ${quote.extraCount} extra ${selectionNoun(mode, quote.extraCount)}` : ""}
+        {billing === "charge" && quote.extraTotal > 0 ? ` · ${moneyLabel(quote.extraTotal)} added` : ""}
       </p>
       {view.recordedOnOrder && quote.extraTotal > 0 ? (
         <p className="mt-1 text-xs text-gray-500">The extra amount is on the order. It has not been charged.</p>

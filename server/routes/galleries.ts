@@ -105,7 +105,7 @@ async function downloadGateForGallery(gallery: Record<string, unknown>): Promise
 function clientGalleryPayload(id: string, gallery: Record<string, unknown>, gate: GalleryDownloadGate & { invoice: Record<string, unknown> | null }) {
   const unlocked = clientGalleryDownloadsUnlocked(gate);
   const invoice = gate.invoice;
-  const selectionVisible = gallery.selectionOpen === true || gallery.selectionStatus === "submitted";
+  const selectionVisible = gallery.selectionEnabled === true;
   const showMedia = ["delivered", "approved"].includes(String(gallery.status || "")) || selectionVisible;
   const visibleItems = [
     ...(Array.isArray(gallery.mediaItems) ? gallery.mediaItems : []),

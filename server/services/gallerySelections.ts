@@ -22,8 +22,12 @@ import {
   selectionFileList,
   selectionMode,
   selectionPhotos,
+  catalogExtraPriceFor,
+  packageIdsOnOrder,
+  selectionBilling,
   selectionQuote,
   settingsFromGallery,
+  withCatalogExtraPrice,
   type SelectionMode,
   type SelectionSettings,
   type SelectionStatus,
@@ -49,6 +53,7 @@ export interface GallerySelectionStore {
   getInvoice(id: string): Promise<{ id: string; data: Record<string, unknown> } | null>;
   updateInvoice(id: string, patch: Record<string, unknown>): Promise<void>;
   findInvoiceByOrder(orderId: string): Promise<{ id: string; data: Record<string, unknown> } | null>;
+  getPackage(id: string): Promise<Record<string, unknown> | null>;
   bumpStaffOrders(): Promise<void>;
 }
 
@@ -65,6 +70,7 @@ export interface GallerySelectionService {
 export interface PublicSelectionState {
   open: boolean;
   mode: SelectionMode;
+  billing: SelectionSettings["billing"];
   status: SelectionStatus;
   allowance: number | null;
   extraPhotoPrice: number | null;
@@ -102,7 +108,7 @@ function text(value: unknown): string {
 
 function statusOf(gallery: Record<string, unknown>): SelectionStatus | "closed" {
   if (gallery.selectionStatus === "submitted") return "submitted";
-  if (gallery.selectionOpen === true) return "open";
+  if (gallery.selectionEnabled === true) return "open";
   return "closed";
 }
 
@@ -128,19 +134,31 @@ async function invoiceFor(store: GallerySelectionStore, gallery: Record<string, 
   return linked ? store.getInvoice(linked) : null;
 }
 
+async function pricedSettings(store: GallerySelectionStore, gallery: Record<string, unknown>): Promise<SelectionSettings> {
+  const orderId = text(gallery.orderId);
+  const order = orderId ? await store.getOrder(orderId) : null;
+  const ids = packageIdsOnOrder(order);
+  const packages = (await Promise.all(ids.map(async (id) => {
+    const doc = await store.getPackage(id);
+    return doc ? { id, ...doc } : null;
+  }))).filter((item): item is { id: string; name?: string; extraPhotoPrice?: unknown } => item != null);
+  return withCatalogExtraPrice(settingsFromGallery(gallery), catalogExtraPriceFor(packages, ids));
+}
+
 function publicState(
   gallery: Record<string, unknown>,
   picks: Record<string, unknown> | null,
+  settings: SelectionSettings,
 ): PublicSelectionState | null {
-  const settings = settingsFromGallery(gallery);
-  if (!settings.open && gallery.selectionStatus !== "submitted") return null;
+  if (!settings.open) return null;
   const photos = activeSelectionPhotos(gallery.mediaItems);
   const selectedIds = normalizePickIds(pickIdsFromDoc(picks), photos);
-  const quote = selectionQuote(selectedIds.length, settings);
+  const quote = selectionQuote(selectedIds.length, { ...settings, open: true });
   const status: SelectionStatus = gallery.selectionStatus === "submitted" ? "submitted" : "open";
   return {
     open: settings.open && status !== "submitted",
     mode: settings.mode,
+    billing: settings.billing,
     status,
     allowance: settings.allowance,
     extraPhotoPrice: settings.extraPhotoPrice,
@@ -155,7 +173,7 @@ async function staffState(store: GallerySelectionStore, galleryId: string): Prom
   const gallery = await store.getGallery(galleryId);
   if (!gallery) throw new SelectionError(404, "Gallery not found.");
   const picks = await store.getPicks(galleryId);
-  const settings = settingsFromGallery(gallery);
+  const settings = await pricedSettings(store, gallery);
   const photos = selectionPhotos(gallery.mediaItems);
   const active = photos.filter((photo) => !photo.archived);
   const selectedIds = normalizePickIds(pickIdsFromDoc(picks), active);
@@ -192,33 +210,42 @@ function settingsPatch(current: SelectionSettings, body: Record<string, unknown>
     }
     next.mode = selectionMode(body.mode);
   }
+  if ("billing" in body) {
+    if (body.billing !== "charge" && body.billing !== "selections") {
+      throw new SelectionError(400, "Choose charge per additional photo, or no charge.");
+    }
+    next.billing = selectionBilling(body.billing);
+  }
   if ("allowance" in body) {
     const blank = body.allowance == null || (typeof body.allowance === "string" && body.allowance.trim() === "");
     const allowance = parseAllowance(body.allowance);
     if (!blank && allowance == null) throw new SelectionError(400, "Allowance has to be a whole number.");
     next.allowance = allowance;
   }
-  if ("extraPhotoPrice" in body) {
-    const blank = body.extraPhotoPrice == null || (typeof body.extraPhotoPrice === "string" && body.extraPhotoPrice.trim() === "");
-    const price = parseExtraPhotoPrice(body.extraPhotoPrice);
-    if (!blank && price == null) throw new SelectionError(400, "Enter a dollar amount, or leave the extra price blank.");
-    next.extraPhotoPrice = price;
+  if ("extraPriceOverride" in body) {
+    const blank = body.extraPriceOverride == null || (typeof body.extraPriceOverride === "string" && body.extraPriceOverride.trim() === "");
+    const price = parseExtraPhotoPrice(body.extraPriceOverride);
+    if (!blank && price == null) throw new SelectionError(400, "Enter a dollar amount, or leave the override blank.");
+    next.extraPriceOverride = price;
   }
   if (body.open === true || body.open === false) next.open = body.open === true;
 
   const patch: Record<string, unknown> = {
-    selectionOpen: next.open,
+    selectionEnabled: next.open,
     selectionMode: next.mode,
+    selectionBilling: next.billing,
     selectionAllowance: next.allowance,
-    selectionExtraPrice: next.extraPhotoPrice,
+    selectionExtraOverride: next.extraPriceOverride,
   };
   if (body.reopen === true) {
-    patch.selectionOpen = true;
+    patch.selectionEnabled = true;
     patch.selectionStatus = "open";
     patch.selectionReviewPending = false;
     next.open = true;
   } else if (next.open && gallery.selectionStatus !== "submitted") {
     patch.selectionStatus = "open";
+  } else if (!next.open) {
+    patch.selectionStatus = gallery.selectionStatus === "submitted" ? "submitted" : "closed";
   }
   return patch;
 }
@@ -226,7 +253,7 @@ function settingsPatch(current: SelectionSettings, body: Record<string, unknown>
 async function requireOpenGallery(store: GallerySelectionStore, galleryId: string) {
   const gallery = await store.getGallery(galleryId);
   if (!gallery) throw new SelectionError(404, "Gallery not found.");
-  const settings = settingsFromGallery(gallery);
+  const settings = await pricedSettings(store, gallery);
   if (!settings.open || gallery.selectionStatus === "submitted") {
     throw new SelectionError(409, "These selections are closed.");
   }
@@ -238,7 +265,8 @@ export function createGallerySelectionService(store: GallerySelectionStore): Gal
     async publicState(galleryId) {
       const gallery = await store.getGallery(galleryId);
       if (!gallery) return null;
-      return publicState(gallery, await store.getPicks(galleryId));
+      const settings = await pricedSettings(store, gallery);
+      return publicState(gallery, await store.getPicks(galleryId), settings);
     },
 
     staffState(galleryId) {
@@ -259,15 +287,18 @@ export function createGallerySelectionService(store: GallerySelectionStore): Gal
         await store.updateGallery(galleryId, { selectionActivityNotified: true });
         await store.bumpStaffOrders();
       }
-      return publicState({ ...gallery, selectionOpen: true, selectionStatus: "open" }, { mediaIds: selectedIds })
-        || emptyPublic(settings, selectedIds);
+      return publicState(
+        { ...gallery, selectionEnabled: true, selectionStatus: "open" },
+        { mediaIds: selectedIds },
+        { ...settings, open: true },
+      ) || emptyPublic(settings, selectedIds);
     },
 
     async submit(galleryId, mediaIds, now = new Date()) {
       const { gallery, settings } = await requireOpenGallery(store, galleryId);
       const photos = activeSelectionPhotos(gallery.mediaItems);
       const selectedIds = normalizePickIds(mediaIds, photos);
-      const quote = selectionQuote(selectedIds.length, settings);
+      const quote = selectionQuote(selectedIds.length, { ...settings, open: true });
       if (!quote.canSubmit) throw new SelectionError(400, quote.blockReason || "These selections cannot be submitted.");
 
       const orderId = text(gallery.orderId);
@@ -299,7 +330,7 @@ export function createGallerySelectionService(store: GallerySelectionStore): Gal
       });
       await store.updateGallery(galleryId, {
         selectionStatus: "submitted",
-        selectionOpen: false,
+        selectionEnabled: true,
         selectionSubmittedAt: at,
         selectionSelectedCount: quote.selectedCount,
         selectionExtraCount: quote.extraCount,
@@ -311,9 +342,9 @@ export function createGallerySelectionService(store: GallerySelectionStore): Gal
 
       return publicState({
         ...gallery,
-        selectionOpen: false,
+        selectionEnabled: true,
         selectionStatus: "submitted",
-      }, { mediaIds: selectedIds }) || emptyPublic(settings, selectedIds);
+      }, { mediaIds: selectedIds }, settings) || emptyPublic(settings, selectedIds);
     },
 
     async saveSettings(galleryId, body) {
@@ -351,7 +382,7 @@ export function createGallerySelectionService(store: GallerySelectionStore): Gal
 
 function historyDetails(mode: SelectionMode, quote: ReturnType<typeof selectionQuote>): string {
   const included = quote.allowance == null ? "no allowance saved" : `${quote.allowance} included`;
-  if (quote.extraCount > 0) {
+  if (quote.extraTotal > 0) {
     const label = mode === "headshots" ? "extra finals" : "extra photos";
     return `${quote.selectedCount} selected. ${included}. ${quote.extraCount} ${label} add $${quote.extraTotal.toFixed(2)}. Recorded on the order. Not charged.`;
   }
@@ -363,6 +394,7 @@ function emptyPublic(settings: SelectionSettings, selectedIds: string[]): Public
   return {
     open: settings.open,
     mode: settings.mode,
+    billing: settings.billing,
     status: "open",
     allowance: settings.allowance,
     extraPhotoPrice: settings.extraPhotoPrice,
@@ -429,6 +461,10 @@ function firestoreSelectionStore(): GallerySelectionStore {
       const snap = await db().collection("invoices").where("orderId", "==", orderId).limit(1).get();
       if (snap.empty) return null;
       return this.getInvoice(snap.docs[0].id);
+    },
+    async getPackage(id) {
+      const snap = await db().collection("packages").doc(id).get();
+      return snap.exists ? { id: snap.id, ...(snap.data() || {}) } : null;
     },
     async bumpStaffOrders() {
       await bumpAdminUnreadChannel("orders");

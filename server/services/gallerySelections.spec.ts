@@ -10,6 +10,7 @@ function memoryStore(seed?: {
   gallery?: Record<string, unknown>;
   order?: Record<string, unknown>;
   invoice?: Record<string, unknown>;
+  packages?: Record<string, Record<string, unknown>>;
 }): GallerySelectionStore & { bumps: number; gallery: Record<string, unknown>; picks: Record<string, unknown> | null; order: Record<string, unknown> | null; invoice: Record<string, unknown> | null } {
   const state = {
     bumps: 0,
@@ -17,6 +18,7 @@ function memoryStore(seed?: {
     picks: null as Record<string, unknown> | null,
     order: seed?.order || null,
     invoice: seed?.invoice || null,
+    packages: seed?.packages || {},
   };
   const store: GallerySelectionStore = {
     async getGallery() { return { ...state.gallery }; },
@@ -29,6 +31,7 @@ function memoryStore(seed?: {
     async getInvoice() { return state.invoice ? { id: "inv-1", data: { ...state.invoice } } : null; },
     async updateInvoice(_id, patch) { state.invoice = { ...(state.invoice || {}), ...patch }; },
     async findInvoiceByOrder() { return state.invoice ? { id: "inv-1", data: { ...state.invoice } } : null; },
+    async getPackage(id) { return state.packages[id] ? { ...state.packages[id] } : null; },
     async bumpStaffOrders() { state.bumps += 1; },
   };
   return Object.defineProperties(store, {
@@ -60,7 +63,8 @@ function openGallery(extra?: Record<string, unknown>) {
     clientId: "client-1",
     orderId: "order-1",
     invoiceId: "inv-1",
-    selectionOpen: true,
+    selectionEnabled: true,
+    selectionBilling: "charge",
     selectionMode: "listing",
     selectionAllowance: 2,
     selectionStatus: "open",
@@ -82,8 +86,18 @@ describe("gallery selection service", () => {
     expect(store.picks?.mediaIds).toEqual(["p1", "p2"]);
   });
 
-  it("blocks a submit past the allowance when the extra price is blank", async () => {
-    const store = memoryStore({ gallery: openGallery({ selectionExtraPrice: null }) });
+  it("stays hidden until photo selections are turned on", async () => {
+    const store = memoryStore({ gallery: openGallery({ selectionEnabled: false }) });
+    const service = createGallerySelectionService(store);
+    expect(await service.publicState("gal-1")).toBeNull();
+  });
+
+  it("blocks a charge past the allowance when the price list and the override are blank", async () => {
+    const store = memoryStore({
+      gallery: openGallery(),
+      order: { lineItems: [{ id: "pkg", name: "Listing", price: 100 }] },
+      packages: { pkg: { name: "Listing" } },
+    });
     const service = createGallerySelectionService(store);
     await expect(service.submit("gal-1", ["p1", "p2", "p3"])).rejects.toMatchObject({ status: 400 });
     expect(store.gallery.selectionStatus).toBe("open");
@@ -92,7 +106,7 @@ describe("gallery selection service", () => {
 
   it("records the extra-photo line on the order and invoice without a payment", async () => {
     const store = memoryStore({
-      gallery: openGallery({ selectionExtraPrice: 25, selectionAllowance: 1 }),
+      gallery: openGallery({ selectionAllowance: 1 }),
       order: {
         lineItems: [{ id: "pkg", name: "Listing", qty: 1, unitPrice: 100, price: 100 }],
         processing: 0,
@@ -100,6 +114,7 @@ describe("gallery selection service", () => {
         history: [],
       },
       invoice: { amountPaid: 0, tax: 0, processing: 0, clientName: "Ada Client" },
+      packages: { pkg: { name: "Listing", extraPhotoPrice: 25 } },
     });
     const service = createGallerySelectionService(store);
     const result = await service.submit("gal-1", ["p1", "p2"]);
@@ -115,6 +130,28 @@ describe("gallery selection service", () => {
     expect(store.gallery.selectionReviewPending).toBe(true);
     expect(store.bumps).toBe(1);
     expect(JSON.stringify({ invoice: store.invoice, order: store.order })).not.toMatch(/squarePayment|paymentIntent/);
+  });
+
+  it("submits a no-charge list without a price banner or an extra line", async () => {
+    const store = memoryStore({
+      gallery: openGallery({ selectionBilling: "selections" }),
+      order: {
+        lineItems: [{ id: "pkg", name: "Listing", qty: 1, unitPrice: 100, price: 100 }],
+        processing: 0,
+        clientName: "Ada Client",
+        history: [],
+      },
+      invoice: { amountPaid: 0, tax: 0, processing: 0, clientName: "Ada Client" },
+      packages: { pkg: { name: "Listing", extraPhotoPrice: 25 } },
+    });
+    const service = createGallerySelectionService(store);
+    const result = await service.submit("gal-1", ["p1", "p2", "p3"]);
+    expect(result.submitted).toBe(true);
+    expect(result.quote.extraTotal).toBe(0);
+    expect(result.extraPhotoPrice).toBeNull();
+    const lines = store.invoice?.lineItems as Array<{ id?: string }>;
+    expect(lines.some((line) => line.id === EXTRA_PHOTO_LINE_ID)).toBe(false);
+    expect(store.invoice?.total).toBe(100);
   });
 
   it("archives unselected photos and keeps every file on the gallery", async () => {

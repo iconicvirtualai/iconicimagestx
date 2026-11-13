@@ -11,8 +11,11 @@ export const GALLERY_PICKS_COLLECTION = "clientPicks";
 export const GALLERY_PICKS_DOC = "current";
 export const EXTRA_PHOTO_LINE_ID = "gallery-extra-photos";
 export const SELECTION_MODES = ["listing", "headshots"] as const;
+export const SELECTION_BILLING = ["charge", "selections"] as const;
 
 export type SelectionMode = (typeof SELECTION_MODES)[number];
+/** Charge per additional photo, or collect the list with no extra charge. */
+export type SelectionBilling = (typeof SELECTION_BILLING)[number];
 export type SelectionStatus = "open" | "submitted";
 export type SelectionFilter = "all" | "selected" | "unselected";
 
@@ -31,11 +34,19 @@ const SKIP_TYPES = new Set([
 ]);
 
 export interface SelectionSettings {
+  /** Photo selections toggle. Off until staff turn it on. */
   open: boolean;
   mode: SelectionMode;
+  billing: SelectionBilling;
   /** Included photos or finals. Null until staff types a count. */
   allowance: number | null;
-  /** Dollars per photo past the allowance. Null means extras are not offered. */
+  /** Per-gallery override. Null uses the package price list. */
+  extraPriceOverride: number | null;
+  /** Price on the order's package. Null until that package has one saved. */
+  catalogExtraPrice: number | null;
+  catalogPackageId: string | null;
+  catalogPackageName: string | null;
+  /** Price a charge-mode gallery would use. Null when there is nothing to charge. */
   extraPhotoPrice: number | null;
 }
 
@@ -59,6 +70,52 @@ export interface SelectionPhoto {
 
 export function selectionMode(value: unknown): SelectionMode {
   return value === "headshots" ? "headshots" : "listing";
+}
+
+export function selectionBilling(value: unknown): SelectionBilling {
+  return value === "charge" ? "charge" : "selections";
+}
+
+/** A typed gallery amount wins. Otherwise the package list. Blank stays blank. */
+export function resolvedExtraPrice(override: number | null, catalog: number | null): number | null {
+  return override != null ? override : catalog;
+}
+
+export function selectionCountLabel(selected: number, allowance: number | null): string {
+  if (allowance == null) return `${selected} selected`;
+  return `${selected} selected of ${allowance} included`;
+}
+
+export function packageIdsOnOrder(order: Record<string, unknown> | null | undefined): string[] {
+  const items = Array.isArray(order?.lineItems) ? order.lineItems : [];
+  const ids: string[] = [];
+  for (const item of items) {
+    const data = row(item);
+    const id = text(data.catalogId) || text(data.id);
+    if (!id || id === EXTRA_PHOTO_LINE_ID || id.startsWith("promo-") || id.startsWith("adjustment-")) continue;
+    if (!ids.includes(id)) ids.push(id);
+  }
+  return ids;
+}
+
+export function catalogExtraPriceFor(
+  packages: ReadonlyArray<{ id?: string; name?: string; extraPhotoPrice?: unknown }>,
+  packageIds: readonly string[],
+): { price: number | null; packageId: string | null; packageName: string | null } {
+  const byId = new Map(packages.filter((item) => item.id).map((item) => [String(item.id), item]));
+  for (const id of packageIds) {
+    const item = byId.get(id);
+    const price = item ? parseExtraPhotoPrice(item.extraPhotoPrice) : null;
+    if (item && price != null) {
+      return { price, packageId: id, packageName: text(item.name) || id };
+    }
+  }
+  const first = packageIds.map((id) => byId.get(id)).find((item) => item);
+  return {
+    price: null,
+    packageId: first?.id ? String(first.id) : null,
+    packageName: first ? text(first.name) || String(first.id) : null,
+  };
 }
 
 export function selectionNoun(mode: SelectionMode, count = 2): string {
@@ -91,11 +148,35 @@ export function parseAllowance(value: unknown): number | null {
 
 export function settingsFromGallery(gallery: Record<string, unknown> | null | undefined): SelectionSettings {
   const data = gallery || {};
+  const billing = selectionBilling(data.selectionBilling);
+  const extraPriceOverride = parseExtraPhotoPrice(data.selectionExtraOverride);
   return {
-    open: data.selectionOpen === true,
+    open: data.selectionEnabled === true,
     mode: selectionMode(data.selectionMode),
+    billing,
     allowance: parseAllowance(data.selectionAllowance),
-    extraPhotoPrice: parseExtraPhotoPrice(data.selectionExtraPrice),
+    extraPriceOverride,
+    catalogExtraPrice: null,
+    catalogPackageId: null,
+    catalogPackageName: null,
+    extraPhotoPrice: billing === "charge" ? extraPriceOverride : null,
+  };
+}
+
+/** Fill the package price after the gallery settings are read. */
+export function withCatalogExtraPrice(
+  settings: SelectionSettings,
+  catalog: { price: number | null; packageId: string | null; packageName: string | null },
+): SelectionSettings {
+  const extraPhotoPrice = settings.billing === "charge"
+    ? resolvedExtraPrice(settings.extraPriceOverride, catalog.price)
+    : null;
+  return {
+    ...settings,
+    catalogExtraPrice: catalog.price,
+    catalogPackageId: catalog.packageId,
+    catalogPackageName: catalog.packageName,
+    extraPhotoPrice,
   };
 }
 
@@ -166,18 +247,17 @@ export function pickIdsFromDoc(data: Record<string, unknown> | null | undefined)
 export function selectionQuote(selectedCount: number, settings: SelectionSettings): SelectionQuote {
   const count = Math.max(0, Math.floor(selectedCount));
   const allowance = settings.allowance;
-  const price = settings.extraPhotoPrice;
+  const charging = settings.billing === "charge";
+  const price = charging ? settings.extraPhotoPrice : null;
   const extrasAllowed = price != null;
   const overAllowance = allowance != null && count > allowance;
   const extraCount = overAllowance && allowance != null ? count - allowance : 0;
   const extraTotal = extrasAllowed && extraCount > 0 ? roundMoney(extraCount * price) : 0;
   let blockReason: string | null = null;
   if (!settings.open) blockReason = "Selections are not open on this gallery.";
-  else if (allowance == null) blockReason = "Iconic has not set how many photos are included yet.";
-  else if (overAllowance && !extrasAllowed) {
-    const extra = extraCount;
-    const noun = selectionNoun(settings.mode, extra);
-    blockReason = `This gallery includes ${allowance}. Extra ${selectionNoun(settings.mode)} are not offered. Remove ${extra} ${noun} to submit.`;
+  else if (charging && overAllowance && !extrasAllowed) {
+    const noun = selectionNoun(settings.mode, extraCount);
+    blockReason = `The extra ${selectionNoun(settings.mode, 1)} price is not on the price list yet. Remove ${extraCount} ${noun} to submit.`;
   }
   return {
     selectedCount: count,
@@ -308,8 +388,7 @@ export function moneyLabel(amount: number): string {
 }
 
 export function overAllowanceCopy(settings: SelectionSettings, quote: SelectionQuote): string | null {
-  if (!quote.overAllowance || quote.allowance == null) return null;
-  if (!quote.extrasAllowed || quote.extraPhotoPrice == null) return quote.blockReason;
+  if (settings.billing !== "charge" || !quote.overAllowance || quote.extraPhotoPrice == null) return null;
   const noun = selectionNoun(settings.mode, quote.extraCount);
   const verb = quote.extraCount === 1 ? "adds" : "add";
   return `${moneyLabel(quote.extraPhotoPrice)} per extra ${selectionNoun(settings.mode, 1)}. ${quote.extraCount} extra ${noun} ${verb} ${moneyLabel(quote.extraTotal)}.`;

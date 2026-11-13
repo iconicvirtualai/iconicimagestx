@@ -13,7 +13,7 @@ import { ClientGalleryBoard } from "@/components/gallery/ClientGalleryMedia";
 import { GallerySelectionPanel } from "@/components/gallery/GallerySelectionPanel";
 import type { ClientGalleryItem } from "@/components/gallery/clientGalleryMedia";
 import { clientPortalEnabled } from "@shared/clientPortal";
-import { isSelectableGalleryPhoto, type SelectionMode } from "@shared/gallerySelections";
+import { isSelectableGalleryPhoto, type SelectionBilling, type SelectionMode } from "@shared/gallerySelections";
 
 export interface PublicGalleryModel {
   address?: unknown;
@@ -30,6 +30,7 @@ export interface PublicGalleryModel {
   selection?: {
     open: boolean;
     mode: SelectionMode;
+    billing?: SelectionBilling;
     allowance: number | null;
     extraPhotoPrice: number | null;
     selectedIds: string[];
@@ -120,6 +121,7 @@ export function PublicGalleryView({
         {selection ? (
           <GallerySelectionPanel
             mode={selection.mode}
+            billing={selection.billing === "charge" ? "charge" : "selections"}
             allowance={selection.allowance}
             extraPhotoPrice={selection.extraPhotoPrice}
             submitted={selection.submitted}
