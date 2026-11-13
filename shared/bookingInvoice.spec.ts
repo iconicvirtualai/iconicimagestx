@@ -41,7 +41,7 @@ describe("booking invoice draft", () => {
       promoDiscount: 35,
     });
 
-    expect(total).toBe(763);
+    expect(total).toBe(864);
     expect(draft.total).toBe(total);
     expect(draft.amountDue).toBe(total);
     expect(draft.status).toBe("draft");
@@ -50,7 +50,7 @@ describe("booking invoice draft", () => {
     expect(draft.clientId).toBe("client-1");
     expect(draft.promoDiscount).toBe(35);
     expect(sumLineItemPrices(draft.lineItems)).toBe(total);
-    expect(orderTotalLabel(draft.total)).toBe("$763.00");
+    expect(orderTotalLabel(draft.total)).toBe("$864.00");
     expect(draft.lineItems.some((item) => /life of the listing/i.test(item.name))).toBe(false);
   });
 

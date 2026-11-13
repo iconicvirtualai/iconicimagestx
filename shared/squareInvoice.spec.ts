@@ -68,10 +68,10 @@ describe("Square order pricing matches the emailed total", () => {
     const emailed = orderTotalLabel(total);
     const pricing = buildSquareOrderPricing(lineItems, total, squarePaymentNote("inv_booking_1", "INV-2026-0001"));
 
-    expect(total).toBe(763);
-    expect(emailed).toBe("$763.00");
+    expect(total).toBe(864);
+    expect(emailed).toBe("$864.00");
     expect(pricing).not.toBeNull();
-    expect(pricing?.amountCents).toBe(76300);
+    expect(pricing?.amountCents).toBe(86400);
     expect(orderTotalLabel(pricing!.amountCents / 100)).toBe(emailed);
     expect(pricing?.lineItems.some((line) => line.base_price_money.amount < 0)).toBe(false);
     expect(pricing?.discounts.map((discount) => discount.amount_money.amount)).toEqual([3500]);
@@ -98,7 +98,7 @@ describe("Square invoice sync", () => {
 
     expect(result).toEqual({ ok: false, error: "upstream down" });
     expect(orderTotalLabel(source.total)).toBe(emailed);
-    expect(emailed).toBe("$763.00");
+    expect(emailed).toBe("$864.00");
   });
 
   it("skips Square when squareInvoiceId is already set", async () => {

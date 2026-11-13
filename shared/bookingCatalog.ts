@@ -140,7 +140,7 @@ export const basicsList: CatalogItem[] = [
   {
     id: "aerial-only",
     name: "Aerial Only",
-    price: 99,
+    price: 200,
     description: "Aerial photos without a photo package.",
     features: ["5 aerial photos"],
   },
@@ -213,7 +213,7 @@ export const addOns: Array<{ category: string; items: CatalogItem[] }> = [
       {
         id: "aerial-drone",
         name: "Aerial Drone Stills",
-        price: 99,
+        price: 200,
         description: "Capture the property and its surroundings from a unique perspective.",
         features: ["5 High-Res Aerial Photos", "Neighborhood Context Shots", "Professional Color Grading"],
       },

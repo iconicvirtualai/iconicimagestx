@@ -564,7 +564,7 @@ const basicsList = [
   {
     id: "aerial-only",
     name: "Aerial Only",
-    price: 99,
+    price: 200,
     description: "Aerial photos without a photo package.",
     features: ["5 aerial photos"]
   },
