@@ -645,6 +645,11 @@ export interface StaffCatalogPackage {
   durationMinutes?: number;
   /** Optional priced versions. Absent on the seed list. */
   variants?: CatalogVariant[];
+  /**
+   * Dollars for one photo past a gallery allowance.
+   * Absent until someone saves it on the price list. The seed does not set it.
+   */
+  extraPhotoPrice?: number;
 }
 
 const PACKAGE_CATEGORIES = new Set<string>(BOOKING_PACKAGE_CATEGORY_ORDER);
@@ -713,6 +718,9 @@ function withCatalogNotes(item: StaffCatalogPackage, doc: Record<string, unknown
   const variants = Object.prototype.hasOwnProperty.call(doc, "variants")
     ? catalogVariants(doc.variants)
     : current?.variants;
+  const extraPhotoPrice = Object.prototype.hasOwnProperty.call(doc, "extraPhotoPrice")
+    ? readStoredExtraPhotoPrice(doc.extraPhotoPrice)
+    : current?.extraPhotoPrice;
   return {
     ...item,
     ...(appointmentLimit ? { appointmentLimit } : {}),
@@ -725,7 +733,16 @@ function withCatalogNotes(item: StaffCatalogPackage, doc: Record<string, unknown
     ...(rules?.length ? { rules } : {}),
     ...(durationMinutes != null && durationMinutes > 0 ? { durationMinutes: Math.round(durationMinutes) } : {}),
     ...(variants?.length ? { variants } : {}),
+    ...(extraPhotoPrice != null ? { extraPhotoPrice } : {}),
   };
+}
+
+/** Blank stays off the package. A saved number, including zero, is the list price. */
+export function readStoredExtraPhotoPrice(value: unknown): number | undefined {
+  if (value == null || value === "") return undefined;
+  const amount = typeof value === "number" ? value : Number(String(value).trim());
+  if (!Number.isFinite(amount) || amount < 0 || amount > 10000) return undefined;
+  return Math.round(amount * 100) / 100;
 }
 
 /**
@@ -993,6 +1010,8 @@ export interface CatalogPackageEdits {
   description: string;
   isActive: boolean;
   sortOrder: number;
+  /** Null clears the list price. Omit to leave a previously stored price alone. */
+  extraPhotoPrice?: number | null;
 }
 
 export interface CatalogPackageDraft {
@@ -1043,6 +1062,14 @@ export function catalogPackageSaveData(item: StaffCatalogPackage, edits: Catalog
   if (item.cardTitle) data.cardTitle = item.cardTitle;
   if (item.kicker) data.kicker = item.kicker;
   if (item.aside) data.aside = item.aside;
+  if ("extraPhotoPrice" in edits) {
+    if (edits.extraPhotoPrice == null) data.extraPhotoPrice = null;
+    else {
+      const extra = readStoredExtraPhotoPrice(edits.extraPhotoPrice);
+      if (extra == null) return { ok: false, error: "Extra photo price must be zero or more, or left blank." };
+      data.extraPhotoPrice = extra;
+    }
+  }
   return { ok: true, id: item.id, data };
 }
 

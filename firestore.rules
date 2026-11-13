@@ -185,6 +185,28 @@ service cloud.firestore {
           resource.data.downloadEnabled == true);
       allow create, update: if isPhotographer();
       allow delete: if isAdmin();
+
+      // One pick list per gallery. Staff, or the client stored on that gallery.
+      // The public gallery link writes through the server. Browsers do not
+      // listen to the galleries collection. Publish this file in the Firebase
+      // console. Vercel does not deploy rules.
+      match /clientPicks/{pickId} {
+        function galleryClient() {
+          return isAuthenticated() &&
+            get(/databases/$(database)/documents/galleries/$(galleryId)).data.clientId == request.auth.uid;
+        }
+        allow read: if isStaff() || galleryClient();
+        allow create, update: if isCoordinator() || (
+          galleryClient() &&
+          pickId == 'current' &&
+          request.resource.data.clientId == request.auth.uid &&
+          request.resource.data.status == 'draft' &&
+          request.resource.data.mediaIds is list &&
+          request.resource.data.mediaIds.size() <= 400 &&
+          request.resource.data.keys().hasOnly(['clientId', 'mediaIds', 'status', 'updatedAt'])
+        );
+        allow delete: if isCoordinator();
+      }
     }
 
     // ─── Invoices ────────────────────────────────────────────────────────────
