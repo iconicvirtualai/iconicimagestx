@@ -10,8 +10,10 @@ import { ICONIC_DOWNLOAD_LOCK } from "@shared/paymentAccess";
 import { GalleryDownloadLockNotice } from "@/components/GalleryDownloadLock";
 import { DoorsOpenDeliveryNote } from "@/components/DoorsOpenTour";
 import { ClientGalleryBoard } from "@/components/gallery/ClientGalleryMedia";
+import { GallerySelectionPanel } from "@/components/gallery/GallerySelectionPanel";
 import type { ClientGalleryItem } from "@/components/gallery/clientGalleryMedia";
 import { clientPortalEnabled } from "@shared/clientPortal";
+import { isSelectableGalleryPhoto, type SelectionMode } from "@shared/gallerySelections";
 
 export interface PublicGalleryModel {
   address?: unknown;
@@ -25,6 +27,20 @@ export interface PublicGalleryModel {
   /** Absolute tokenized pay link from the public site. A legacy auto-id falls back to /invoice/{id}. */
   invoicePayPath?: string | null;
   mediaItems?: ClientGalleryItem[];
+  selection?: {
+    open: boolean;
+    mode: SelectionMode;
+    allowance: number | null;
+    extraPhotoPrice: number | null;
+    selectedIds: string[];
+    submitted: boolean;
+  } | null;
+}
+
+function responseError(payload: unknown, fallback: string): string {
+  if (!payload || typeof payload !== "object") return fallback;
+  const message = (payload as { error?: unknown }).error;
+  return typeof message === "string" && message.trim() ? message : fallback;
 }
 
 function publicInvoiceHref(gallery: PublicGalleryModel): string {
@@ -38,15 +54,27 @@ export function PublicGalleryView({
   gallery,
   galleryId,
   onCopyLink,
+  selectedIds,
+  savingSelection,
+  onToggleSelection,
+  onSubmitSelection,
 }: {
   gallery: PublicGalleryModel;
   galleryId?: string;
   onCopyLink?: (url: string) => void;
+  selectedIds?: string[];
+  savingSelection?: boolean;
+  onToggleSelection?: (id: string) => void;
+  onSubmitSelection?: () => void;
 }) {
   const media = Array.isArray(gallery.mediaItems) ? gallery.mediaItems : [];
   const needsPayment = Boolean(gallery.paymentRequired);
   const released =
     gallery.status === "delivered" || gallery.status === "approved";
+  const selection = gallery.selection || null;
+  const picks = selectedIds || selection?.selectedIds || [];
+  const choosable = media.filter((item) => isSelectableGalleryPhoto(item));
+  const otherMedia = media.filter((item) => !isSelectableGalleryPhoto(item));
 
   return (
     <div className="iframe-safe-page overflow-x-hidden bg-white">
@@ -89,7 +117,21 @@ export function PublicGalleryView({
           />
         )}
 
-        {!released ? (
+        {selection ? (
+          <GallerySelectionPanel
+            mode={selection.mode}
+            allowance={selection.allowance}
+            extraPhotoPrice={selection.extraPhotoPrice}
+            submitted={selection.submitted}
+            items={choosable}
+            selectedIds={picks}
+            saving={savingSelection}
+            onToggle={onToggleSelection}
+            onSubmit={onSubmitSelection}
+          />
+        ) : null}
+
+        {!released && !selection ? (
           <div className="py-20 text-center">
             <Image className="mx-auto mb-4 h-16 w-16 text-gray-200" />
             <h2 className="mb-2 text-xl font-black">Media Is Being Prepared</h2>
@@ -98,6 +140,23 @@ export function PublicGalleryView({
               released yet.
             </p>
           </div>
+        ) : selection ? (
+          <>
+            {released && otherMedia.length > 0 ? (
+              <ClientGalleryBoard items={otherMedia} onCopyLink={onCopyLink} />
+            ) : null}
+            {released && galleryId && !needsPayment ? (
+              <div className="mt-6 flex justify-end">
+                <a
+                  href={`/api/galleries/public/${encodeURIComponent(galleryId)}/photos.zip`}
+                  data-testid="gallery-download-zip"
+                  className="inline-flex min-h-11 items-center rounded-xl bg-black px-4 text-[10px] font-black uppercase tracking-widest text-white"
+                >
+                  Download all
+                </a>
+              </div>
+            ) : null}
+          </>
         ) : media.length === 0 ? (
           <div className="py-20 text-center">
             <Image className="mx-auto mb-4 h-16 w-16 text-gray-200" />
@@ -157,6 +216,9 @@ export default function PublicGallery() {
   const [gallery, setGallery] = React.useState<PublicGalleryModel | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [unavailable, setUnavailable] = React.useState(false);
+  const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
+  const [savingSelection, setSavingSelection] = React.useState(false);
+  const saveTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   React.useEffect(() => {
     if (!galleryId) {
@@ -176,6 +238,10 @@ export default function PublicGallery() {
         if (cancelled) return;
         if (res.ok && data && typeof data === "object") {
           setGallery(data);
+          const picks = data.selection && Array.isArray(data.selection.selectedIds)
+            ? data.selection.selectedIds.filter((id: unknown) => typeof id === "string")
+            : [];
+          setSelectedIds(picks);
           return;
         }
         // A project id shared on /gallery/:id can still open its studio or delivery gallery.
@@ -215,7 +281,66 @@ export default function PublicGallery() {
 
   if (loading) return <div className="iframe-safe-page bg-white flex items-center justify-center"><div className="w-8 h-8 border-4 border-[#0d9488] border-t-transparent rounded-full animate-spin" /></div>;
 
+  const savePicks = (ids: string[]) => {
+    if (!galleryId || gallery?.selection?.submitted) return;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      void fetch(`/api/galleries/public/${encodeURIComponent(galleryId)}/selections`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mediaIds: ids }),
+      }).then(async (res) => {
+        if (!res.ok) {
+          const data = await res.json().catch(() => null);
+          toast.error(responseError(data, "Could not save your selections."));
+        }
+      }).catch(() => toast.error("Could not save your selections."));
+    }, 400);
+  };
+
+  const toggleSelection = (id: string) => {
+    setSelectedIds((current) => {
+      const next = current.includes(id) ? current.filter((item) => item !== id) : [...current, id];
+      savePicks(next);
+      return next;
+    });
+  };
+
+  const submitSelection = async () => {
+    if (!galleryId) return;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    setSavingSelection(true);
+    try {
+      const res = await fetch(`/api/galleries/public/${encodeURIComponent(galleryId)}/selections/submit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mediaIds: selectedIds }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(responseError(data, "Could not submit your selections."));
+      setGallery((current) => current?.selection ? {
+        ...current,
+        selection: { ...current.selection, submitted: true, open: false, selectedIds },
+      } : current);
+      toast.success("Selections submitted.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not submit your selections.");
+    } finally {
+      setSavingSelection(false);
+    }
+  };
+
   if (unavailable || !gallery) return <PublicGalleryMissing />;
 
-  return <PublicGalleryView gallery={gallery} galleryId={galleryId} onCopyLink={copyLink} />;
+  return (
+    <PublicGalleryView
+      gallery={gallery}
+      galleryId={galleryId}
+      onCopyLink={copyLink}
+      selectedIds={selectedIds}
+      savingSelection={savingSelection}
+      onToggleSelection={toggleSelection}
+      onSubmitSelection={() => { void submitSelection(); }}
+    />
+  );
 }

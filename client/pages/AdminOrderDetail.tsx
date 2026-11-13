@@ -33,6 +33,8 @@ import { OrderServicesFields } from "@/components/OrderServicesFields";
 import { syncOrderBillingToInvoice } from "@/lib/staffInvoice";
 import { orderBillingFromServicePatch, type OrderServiceSavePatch } from "@shared/orderRequestServices";
 import { recordCountsTowardRevenue } from "@shared/revenueCount";
+import { UnreadBadge } from "@/components/admin/UnreadBadge";
+import { AdminClientSelections } from "@/components/gallery/AdminClientSelections";
 
 // ─── Status system ────────────────────────────────────────────────────────────
 const ORDER_STATUSES = [
@@ -84,6 +86,8 @@ export default function AdminOrderDetail() {
   const [revenueSaving, setRevenueSaving] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState<"details"|"invoice"|"gallery"|"history">("details");
   const [release, setRelease] = React.useState<GalleryReleaseReport | null>(null);
+  const [selectionSeen, setSelectionSeen] = React.useState(false);
+  React.useEffect(() => { setSelectionSeen(false); }, [id]);
   const [linkedRequest, setLinkedRequest] = React.useState<Record<string, unknown> | null>(null);
   const [sourceCollection, setSourceCollection] = React.useState<"orders" | "orderRequests">("orders");
 
@@ -513,7 +517,14 @@ export default function AdminOrderDetail() {
         {(["details","invoice","gallery","history"] as const).map(t => (
           <button key={t} onClick={() => setActiveTab(t)}
             className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === t ? "bg-white text-black shadow-sm" : "text-gray-400 hover:text-gray-700"}`}
-          >{t}</button>
+          >
+            <span className="inline-flex items-center gap-1.5">
+              {t}
+              {t === "gallery" && !selectionSeen && order?.gallery?.selectionReviewPending === true ? (
+                <UnreadBadge count={1} testId="gallery-tab-selection-badge" />
+              ) : null}
+            </span>
+          </button>
         ))}
       </div>
 
@@ -825,6 +836,14 @@ export default function AdminOrderDetail() {
       {activeTab === "gallery" && (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
           <h3 className={`${labelCls} mb-4`}>Gallery & Deliverables</h3>
+          {order.gallery?.id ? (
+            <AdminClientSelections
+              galleryId={String(order.gallery.id)}
+              getToken={getToken}
+              reviewPending={!selectionSeen && order.gallery.selectionReviewPending === true}
+              onPending={(pending) => { if (!pending) setSelectionSeen(true); }}
+            />
+          ) : null}
           {release && (
             <div className={`mb-4 rounded-xl border p-4 ${release.complete ? "border-teal-200 bg-teal-50" : "border-amber-200 bg-amber-50"}`}>
               <p className={`text-sm font-bold ${release.complete ? "text-teal-900" : "text-amber-900"}`}>{release.message}</p>

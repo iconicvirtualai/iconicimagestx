@@ -33,6 +33,21 @@ describe("task board firestore rules", () => {
   });
 });
 
+describe("gallery selection firestore rules", () => {
+  const rules = readFileSync("firestore.rules", "utf8");
+
+  it("lets staff and that gallery's client read one pick list", () => {
+    const start = rules.indexOf("match /clientPicks/{pickId}");
+    const block = start === -1 ? "" : rules.slice(start, start + 900);
+    expect(start).toBeGreaterThan(rules.indexOf("match /galleries/{galleryId}"));
+    expect(block).toContain("allow read: if isStaff() || galleryClient()");
+    expect(block).toContain("data.clientId == request.auth.uid");
+    expect(block).toContain("request.resource.data.status == 'draft'");
+    expect(block).toContain("pickId == 'current'");
+    expect(block).not.toContain("allow read: if true");
+  });
+});
+
 describe("communications firestore rules", () => {
   const rules = readFileSync("firestore.rules", "utf8");
 
