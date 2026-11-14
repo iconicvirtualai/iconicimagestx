@@ -42,4 +42,15 @@ describe("communications firestore rules", () => {
     expect(rules).toContain("request.auth.uid in resource.data.participantIds");
     expect(rules).toMatch(/match \/contactThreads\/\{threadId\}[\s\S]*allow read, write: if false/);
   });
+
+  it("keeps group delivery on the member list and lets a lead admin read", () => {
+    expect(rules).toContain("match /peopleGroups/{groupId}");
+    expect(rules).toContain("match /inboxThreads/{threadId}");
+    expect(rules).toContain("request.auth.uid in group.canMessageUids");
+    expect(rules).toContain("group.memberUids.hasAll(request.resource.data.notifyUids)");
+    expect(rules).toContain("request.resource.data.notifyUids.hasAll(group.memberUids)");
+    expect(rules).toContain("isAdmin() && resource.data.kind == 'group'");
+    expect(rules).toContain("explicitlyDenied('messages.view')");
+    expect(rules).toContain("profileSettings");
+  });
 });

@@ -28,6 +28,7 @@ import {
 } from "@shared/clientHome";
 import { ListingPackageCard } from "@/components/listing-card/ListingPackageCard";
 import { PortalMessages } from "@/components/communications/PortalMessages";
+import { PeopleInbox } from "@/components/people/PeopleInbox";
 import { OrderNumberMark } from "@/components/OrderNumberMark";
 import { PortalListingsHome } from "@/components/client-home/PortalListingsHome";
 
@@ -138,8 +139,19 @@ export function ClientHomeView({
             <OrderHistory invoices={invoices} truncated={invoicesTruncated} filterable exampleOpen={example} />
           )
         ) : section === "messages" ? (
-          <div id="messages-jump">
+          <div id="messages-jump" className="space-y-6">
             <PortalMessages example={example} />
+            <PeopleInbox
+              tone="light"
+              exampleViewer={example ? {
+                uid: "sample-jane",
+                email: "jane.doe@example.com",
+                kind: "client",
+                role: "client",
+                leadAdmin: false,
+                permissions: null,
+              } : null}
+            />
           </div>
         ) : (
           <div id="schedule-jump">

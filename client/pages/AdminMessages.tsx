@@ -33,6 +33,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { UnifiedThreads } from "@/components/communications/UnifiedThreads";
 import { AssistantPanes } from "@/components/communications/AssistantPanes";
 import { CommunicationsTabBar, type CommunicationsTabId } from "@/components/communications/CommunicationsTabBar";
+import { PeopleInbox } from "@/components/people/PeopleInbox";
 import { useAdminUnread } from "@/components/admin/AdminUnreadProvider";
 import { communicationTabUnreadKey } from "@shared/adminUnread";
 
@@ -136,6 +137,7 @@ function initialCommunicationsTab(pathname: string, search: string): Tab {
   const requested = params.get("tab");
   if (pathname.startsWith("/admin/botroom") || requested === "botroom") return "botroom";
   if (requested === "contact") return "contact";
+  if (requested === "direct") return "direct";
   return "sweep";
 }
 
@@ -321,6 +323,12 @@ export default function AdminMessages() {
             </p>
           )}
 
+          {tab === "direct" && (
+            <p className="p-4 text-sm leading-relaxed text-gray-400">
+              One person or one group. A message to a group reaches only that group's members. Mass sends stay under Marketing, then Campaigns.
+            </p>
+          )}
+
           {tab === "assistants" && (
             <p className="p-4 text-sm leading-relaxed text-gray-400">
               Grok and OpenAI stay on the server. Owner and admin only.
@@ -488,6 +496,14 @@ export default function AdminMessages() {
           )}
 
           {tab === "inbox" && <UnifiedThreads />}
+
+          {tab === "direct" && (
+            <PeopleInbox
+              tone="dark"
+              leadAdmin={isAdmin}
+              initialCompose={new URLSearchParams(location.search).get("compose") === "1"}
+            />
+          )}
 
           {tab === "assistants" && <AssistantPanes />}
 

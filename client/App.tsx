@@ -106,6 +106,11 @@ import LegacyOpsRedirect from "./components/ops/LegacyOpsRedirect";
 import PhotographerHome from "./components/ops/PhotographerHome";
 import AdminEditor from "./pages/AdminEditor";
 import AdminTeam from "./pages/AdminTeam";
+import AdminPeople from "./pages/AdminPeople";
+import AdminPersonProfile from "./pages/AdminPersonProfile";
+import AdminPermissions from "./pages/AdminPermissions";
+import AdminPeopleGroup from "./pages/AdminPeopleGroup";
+import PortalPerson from "./pages/PortalPerson";
 import AdminStudioHome from "./pages/AdminStudioHome";
 import AdminStudioProjects from "./pages/AdminStudioProjects";
 import AdminStudioMarketing from "./pages/AdminStudioMarketing";
@@ -242,6 +247,7 @@ const App = () => (
             <Route path="/change-password" element={<ChangePassword />} />
             <Route path="/portal" element={<ClientPortalSurface><Login /></ClientPortalSurface>} />
             <Route path="/portal/home" element={<ClientPortalSurface><ClientPortal /></ClientPortalSurface>} />
+            <Route path="/portal/people/:kind/:id" element={<ClientPortalSurface><PortalPerson /></ClientPortalSurface>} />
             <Route path="/portal/order" element={<ClientPortalSurface><PortalOrder /></ClientPortalSurface>} />
             <Route path="/portal/orders" element={<ClientPortalSurface><PortalQueryRedirect to="/portal/settings/billing" /></ClientPortalSurface>} />
             <Route path="/portal/order-history" element={<ClientPortalSurface><PortalQueryRedirect to="/portal/settings/billing" /></ClientPortalSurface>} />
@@ -307,6 +313,11 @@ const App = () => (
             <Route path="/admin/upload" element={<ProtectedRoute requiredRole="photographer"><LegacyOpsRedirect /></ProtectedRoute>} />
             <Route path="/admin/editor" element={<ProtectedRoute requiredRole="editor"><AdminEditor /></ProtectedRoute>} />
             <Route path="/admin/team" element={<ProtectedRoute requiredRole="admin"><AdminTeam /></ProtectedRoute>} />
+            <Route path="/admin/people" element={<ProtectedRoute requiredRole="staff"><AdminPeople /></ProtectedRoute>} />
+            <Route path="/admin/people/:kind/:id" element={<ProtectedRoute requiredRole="staff"><AdminPersonProfile /></ProtectedRoute>} />
+            <Route path="/admin/groups" element={<ProtectedRoute requiredRole="coordinator"><AdminPeopleGroup /></ProtectedRoute>} />
+            <Route path="/admin/groups/:id" element={<ProtectedRoute requiredRole="coordinator"><AdminPeopleGroup /></ProtectedRoute>} />
+            <Route path="/admin/permissions" element={<ProtectedRoute requiredRole="admin"><AdminPermissions /></ProtectedRoute>} />
             <Route path="/admin/edit-site" element={<ProtectedRoute requiredRole="staff"><AdminSiteEditor /></ProtectedRoute>} />
             <Route path="/admin/email-templates" element={<ProtectedRoute requiredRole="admin"><AdminEmailTemplates /></ProtectedRoute>} />
             <Route path="/admin/current-pricing" element={<Navigate to="/admin/pricing" replace />} />
