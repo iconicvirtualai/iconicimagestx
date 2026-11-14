@@ -66,6 +66,7 @@ function sample(look: ListingCardLook): ClientListingCard {
     baths: "",
     garage: "",
     pool: "",
+    orderNumber: "#012",
     ...AMENITIES[look],
   };
 }

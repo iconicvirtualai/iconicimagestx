@@ -6,7 +6,7 @@
 import { Router } from "express";
 import admin from "firebase-admin";
 import { contactsToCsv, containsRawCard, parseContactsCsv, sanitizeBilling } from "../../shared/clientHubSettings";
-import { requireAuth, type AuthenticatedRequest } from "../middleware/auth";
+import { requireAuth, requireCoordinator, type AuthenticatedRequest } from "../middleware/auth";
 import { saveSquareCardOnFile } from "../services/clientHubCard";
 import {
   HubError,
@@ -14,6 +14,7 @@ import {
   deleteContact,
   getBilling,
   getProfile,
+  getStaffBilling,
   getTeam,
   importContacts,
   listContacts,
@@ -24,6 +25,8 @@ import {
   saveContact,
   saveProfile,
   saveProfileAsset,
+  saveStaffCard,
+  saveStaffProfileAsset,
   saveTeam,
   sendTeamInvite,
   updateTeamMember,
@@ -175,6 +178,44 @@ router.post("/me/hub/billing/card", guard(async (req, res) => {
   });
   if ("error" in saved) throw new HubError(502, saved.error);
   res.json(await saveCard(actor, owner, saved.card));
+}));
+
+function clientIdParam(value: unknown): string {
+  const id = typeof value === "string" ? value.trim() : "";
+  if (!/^[A-Za-z0-9_-]{4,128}$/.test(id)) throw new HubError(400, "Client not found.");
+  return id;
+}
+
+router.get("/:id/hub/profile", requireCoordinator, guard(async (req, res) => {
+  const billing = await getStaffBilling(clientIdParam(req.params.id));
+  res.json({ profile: billing.profile });
+}));
+
+router.post("/:id/hub/profile/asset", requireCoordinator, guard(async (req, res) => {
+  const kind = typeof req.body?.kind === "string" ? req.body.kind : "";
+  const dataUrl = typeof req.body?.dataUrl === "string" ? req.body.dataUrl : "";
+  res.json(await saveStaffProfileAsset(clientIdParam(req.params.id), kind, dataUrl));
+}));
+
+router.get("/:id/hub/billing", requireCoordinator, guard(async (req, res) => {
+  res.json(await getStaffBilling(clientIdParam(req.params.id)));
+}));
+
+router.post("/:id/hub/billing/card", requireCoordinator, guard(async (req, res) => {
+  if (containsRawCard(req.body)) throw new HubError(400, "Card numbers are not stored. Use the Square card form.");
+  const clientId = clientIdParam(req.params.id);
+  const sourceId = typeof req.body?.sourceId === "string" ? req.body.sourceId : "";
+  const current = await getStaffBilling(clientId);
+  const saved = await saveSquareCardOnFile({
+    sourceId,
+    customerId: "",
+    email: current.billing.email || current.profile.email,
+    name: `${current.profile.firstName} ${current.profile.lastName}`.trim(),
+    phone: current.billing.phone || current.profile.phone,
+    billing: sanitizeBilling(current.billing),
+  });
+  if ("error" in saved) throw new HubError(502, saved.error);
+  res.json(await saveStaffCard(clientId, saved.card));
 }));
 
 router.use((req, res, next) => {

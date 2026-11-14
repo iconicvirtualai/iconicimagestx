@@ -1,4 +1,5 @@
 import type { ContactThreadView } from "../contactThread.ts";
+import { shortOrderNumber } from "../orderProjectInvoice.ts";
 
 export type ThreadAudience = "clients" | "leads" | "photographers" | "socials";
 
@@ -27,6 +28,8 @@ export interface UnifiedThread {
   email: string;
   phone: string;
   orderId: string;
+  /** Short order number such as #003, when this thread is tied to an order. */
+  orderNumber?: string;
   clientId: string;
   photographerId: string;
   photographerPhone: string;
@@ -49,6 +52,8 @@ export interface PortalScope {
   uid: string;
   email: string;
   phone: string;
+  /** Staff auto-id plus the auth uid, when the home identity lookup found both. */
+  clientIds?: string[];
 }
 
 const SOCIALS: { id: string; title: string; detail: string }[] = [
@@ -140,6 +145,7 @@ function threadShell(partial: Partial<UnifiedThread> & Pick<UnifiedThread, "id" 
     email: "",
     phone: "",
     orderId: "",
+    orderNumber: "",
     clientId: "",
     photographerId: "",
     photographerPhone: "",
@@ -167,6 +173,7 @@ export function buildUnifiedThreads(snapshot: CommunicationsSnapshot): UnifiedTh
     if (!current.clientId && thread.clientId) current.clientId = thread.clientId;
     if (!current.photographerId && thread.photographerId) current.photographerId = thread.photographerId;
     if (!current.orderId && thread.orderId) current.orderId = thread.orderId;
+    if (!current.orderNumber && thread.orderNumber) current.orderNumber = thread.orderNumber;
     for (const id of thread.participantIds) {
       if (id && !current.participantIds.includes(id)) current.participantIds.push(id);
     }
@@ -177,6 +184,7 @@ export function buildUnifiedThreads(snapshot: CommunicationsSnapshot): UnifiedTh
     const message = messageFrom(raw, index);
     if (!message.body && !message.senderName) continue;
     const orderId = text(raw.orderId);
+    const orderNumber = shortOrderNumber(raw.orderNumber);
     const explicit = text(raw.threadId);
     const id = explicit || (orderId ? `order:${orderId}` : `message:${message.id}`);
     const senderType = message.senderType;
@@ -197,7 +205,8 @@ export function buildUnifiedThreads(snapshot: CommunicationsSnapshot): UnifiedTh
       audiences,
       source: "messages",
       title: text(raw.clientName) || message.senderName || "Conversation",
-      subtitle: orderId ? `Order ${orderId.slice(0, 8)}` : text(raw.channel) || "Message",
+      subtitle: orderNumber ? `Order ${orderNumber}` : text(raw.channel) || "Message",
+      orderNumber,
       email: emailOf(text(raw.email) || text(raw.recipient)),
       phone: text(raw.phone),
       orderId,
@@ -351,9 +360,22 @@ export function threadVisibleTo(thread: UnifiedThread, scope: PortalScope): bool
   );
   if (scope.kind === "client") {
     if (scope.uid && ids.has(scope.uid)) return true;
+    if (scope.clientIds?.some((id) => id && ids.has(id))) return true;
     return Boolean(scope.email && thread.email && thread.email.toLowerCase() === scope.email.toLowerCase());
   }
   if (scope.uid && (thread.photographerId === scope.uid || thread.participantIds.includes(scope.uid))) return true;
   if (scope.uid && ids.has(scope.uid) && thread.audiences.includes("photographers")) return true;
   return Boolean(scope.phone && thread.photographerPhone && phonesMatch(scope.phone, thread.photographerPhone));
+}
+
+/** Threads whose latest message is from the desk, not the client. */
+export function portalUnreadCount(threads: UnifiedThread[]): number {
+  let count = 0;
+  for (const thread of threads) {
+    const latest = thread.messages[thread.messages.length - 1];
+    if (!latest || latest.delivery === "read") continue;
+    const fromClient = latest.senderType === "client" || latest.senderType === "lead";
+    if (!fromClient) count += 1;
+  }
+  return count;
 }

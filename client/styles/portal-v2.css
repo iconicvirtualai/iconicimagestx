@@ -536,8 +536,44 @@
 .portal-v2 .ltabs button[aria-selected="true"] { color: var(--teal); border-bottom-color: var(--teal); }
 .portal-v2 .th { width: 100%; background: none; border: 0; text-align: left; cursor: pointer; }
 @media (max-width: 500px) {
-  .portal-v2 .phone-menu { display: inline-flex; align-items: center; height: 36px; padding: 0 12px; border-radius: 999px; border: 1.5px solid #e6e9e7; background: #fff; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+  .portal-v2 .phone-menu { display: inline-flex; align-items: center; height: 36px; padding: 0 12px; border-radius: 999px; border: 1.5px solid #e6e9e7; background: #fff; font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; flex: 0 0 auto; }
 }
 @media (min-width: 501px) { .portal-v2 .phone-menu { display: none; } }
+.portal-v2 .stage,
+.portal-v2 .page,
+.portal-v2 .page-w { max-width: 100%; min-width: 0; }
+.portal-v2 .stage { overflow-x: clip; }
+.portal-v2 .portal-booking,
+.portal-v2 .portal-booking .booking-columns,
+.portal-v2 .portal-order-intro { width: 100%; max-width: 100%; min-width: 0; }
+.portal-v2 .portal-tailwind { container-type: inline-size; container-name: portal-order; }
+.portal-v2 .portal-booking h2,
+.portal-v2 .portal-booking p,
+.portal-v2 .portal-order-intro,
+.portal-v2 .portal-order-intro p { max-width: 100%; overflow-wrap: anywhere; }
+.portal-v2 .portal-tailwind button[data-selected="true"] { background: #000; color: #fff; }
+.portal-v2 .portal-tailwind button[data-selected="false"] { background: transparent; color: #3d4442; }
+.portal-v2 .portal-order-intro > div { padding: 24px 16px 0; }
+.portal-v2 .tier-scroll { display: flex; flex-wrap: wrap; width: 100%; max-width: 100%; gap: 8px; }
+.portal-v2 .tier-scroll button { flex: 1 1 140px; white-space: normal; text-align: center; padding: 10px 12px; line-height: 1.25; border-radius: 999px; }
+.portal-v2 .portal-booking button.package-card { padding: 16px; }
+.portal-v2 .portal-booking .tier-grid { display: grid !important; grid-template-columns: minmax(0, 1fr) !important; width: 100%; min-width: 0; }
+@container portal-order (min-width: 720px) {
+  .portal-v2 .portal-booking .tier-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}
+@container portal-order (min-width: 1100px) {
+  .portal-v2 .portal-booking .tier-grid.wide { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
+}
+.portal-v2 .order-number span { display: block; font-size: 10px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.portal-v2 .order-number strong { display: block; font-size: 28px; font-weight: 900; letter-spacing: -.03em; line-height: 1; }
+@media (max-width: 500px) {
+  .portal-v2 .stabs, .portal-v2 .ltabs { max-width: 100%; overflow-x: auto; }
+  .portal-v2 .stabs a, .portal-v2 .ltabs button, .portal-v2 .ltabs a { padding-left: 12px; padding-right: 12px; letter-spacing: .06em; }
+  .portal-v2 .doc { padding: 16px; }
+  .portal-v2 .totals { width: 100%; margin-left: 0; }
+}
+.portal-v2 .portal-foot { background: var(--paper); color: var(--ink-3); border-top: 1px solid var(--line); padding: 22px 28px 28px; }
+.portal-v2 .portal-foot a { color: var(--teal-mid); }
+.portal-v2 .portal-foot .foot-meta { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 8px; font-size: 13px; }
 .portal-v2 .doc-brand { flex: 0 0 auto; }
 .portal-v2 .doc-brand span { white-space: nowrap; }
