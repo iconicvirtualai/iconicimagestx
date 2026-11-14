@@ -28,6 +28,7 @@ import {
 } from "@shared/clientHome";
 import { ListingPackageCard } from "@/components/listing-card/ListingPackageCard";
 import { PortalMessages } from "@/components/communications/PortalMessages";
+import { OrderNumberMark } from "@/components/OrderNumberMark";
 import { PortalListingsHome } from "@/components/client-home/PortalListingsHome";
 
 export type ClientHomeSection = PortalHomeSection;
@@ -277,6 +278,7 @@ export function OrderHistory({
                 className="w-full flex items-center justify-between gap-4 px-5 py-4 text-left hover:bg-gray-50"
               >
                 <div className="min-w-0">
+                  <OrderNumberMark value={invoice.orderNumber || invoice.invoiceNumber} />
                   <p className="font-black truncate">{invoice.invoiceNumber}</p>
                   <p className="text-xs text-gray-500 mt-1 uppercase tracking-widest">
                     {[invoice.issuedOn, invoice.status ? humanStatus(invoice.status) : "Status not stored"].filter(Boolean).join(" · ")}
@@ -307,6 +309,7 @@ function InvoiceDetail({ invoice }: { invoice: ClientInvoiceStatement }) {
     <div className="doc">
       <div className="doc-top">
         <div>
+          <OrderNumberMark value={invoice.orderNumber || invoice.invoiceNumber} />
           <div className="kicker">Invoice</div>
           <h2 style={{ fontSize: 28, fontWeight: 900, letterSpacing: "-0.03em" }}>{invoice.invoiceNumber}</h2>
           <p className="ink3">{[invoice.issuedOn, invoice.status ? humanStatus(invoice.status) : ""].filter(Boolean).join(" · ")}</p>

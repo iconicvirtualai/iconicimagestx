@@ -25,6 +25,7 @@ function listing(overrides: Partial<ClientListingCard> = {}): ClientListingCard 
     baths: "",
     garage: "",
     pool: "",
+    orderNumber: "",
     ...overrides,
   };
 }

@@ -9,7 +9,7 @@
 import { addressText } from "./addressText.ts";
 import { listingKitFieldShown } from "./galleryUpload.ts";
 import { arrangementActive, isHiddenFromClientGallery, isHiddenFromListingSites, readMediaArrangement } from "./mediaArrangement.ts";
-import { portalDisplayedInvoiceNumber } from "./orderProjectInvoice.ts";
+import { portalDisplayedInvoiceNumber, shortOrderNumber } from "./orderProjectInvoice.ts";
 import type { ListingCardLook } from "./packageSkins.ts";
 import { readPhotoEditRequests, type PhotoEditRequest } from "./photoEditRequest";
 
@@ -151,6 +151,7 @@ export interface PortalInvoiceSummary {
   status: string;
   total: number;
   amountDue: number;
+  orderNumber?: string;
 }
 
 export interface PortalActivityEvent {
@@ -171,6 +172,8 @@ export interface PortalListingDetail {
   id: string;
   title: string;
   status: string;
+  /** Short order number such as #003. Empty when none is stored. */
+  orderNumber: string;
   address: PortalAddress;
   facts: PortalFact[];
   photos: PortalMediaItem[];
@@ -418,10 +421,15 @@ export function buildPortalListingDetail(sources: PortalListingSources): PortalL
   const activity = buildActivity(sources, photos, videos, floorplans, tours, invoices);
   const status = text(listing.status) || text(sources.order?.status) || text(sources.orderRequest?.status) || "open";
 
+  const orderNumber = shortOrderNumber(listing.orderNumber)
+    || shortOrderNumber(sources.order?.orderNumber)
+    || shortOrderNumber(sources.orderRequest?.orderNumber)
+    || shortOrderNumber((sources.invoices || []).map((invoice) => invoice.orderNumber).find(Boolean));
   return applyStoredPortalData({
     id,
     title: address.formatted || "Listing",
     status,
+    orderNumber,
     address,
     facts: FACT_DEFS.map((fact) => {
       const value = factText(readFact(records, fact.keys));
@@ -1258,6 +1266,7 @@ function readInvoices(invoices: Array<Record<string, unknown>>, sources: PortalL
     summaries.push({
       id,
       invoiceNumber: portalDisplayedInvoiceNumber(invoice, orderForInvoice(invoice, sources)),
+      orderNumber: shortOrderNumber(invoice.orderNumber) || shortOrderNumber(orderForInvoice(invoice, sources)?.orderNumber),
       status: text(invoice.status) || "draft",
       total,
       amountDue: invoice.amountDue == null ? total : money(invoice.amountDue),

@@ -29,6 +29,7 @@ export function exampleListing(): ClientListingCard {
     baths: "3",
     garage: "2",
     pool: "",
+    orderNumber: "#001",
   };
 }
 
@@ -41,6 +42,7 @@ function sampleCard(partial: Partial<ClientListingCard> & Pick<ClientListingCard
     appointmentDate: null,
     href: "/portal/listings/example-listing?example=1",
     look: null,
+    orderNumber: "#001",
     street: partial.address,
     locality: "",
     shootDateLabel: "",
@@ -69,6 +71,7 @@ export function exampleListings(): ClientListingCard[] {
     exampleListing(),
     sampleCard({
       id: "sample-windsong",
+      orderNumber: "#002",
       address: "Windsong Place",
       coverUrl: `${PORTRAIT}/deliver-angle.jpg`,
       createdAt: "2026-11-07T00:00:00.000Z",
@@ -77,6 +80,7 @@ export function exampleListings(): ClientListingCard[] {
     }),
     sampleCard({
       id: "sample-forest",
+      orderNumber: "#003",
       address: "Forest Heights",
       coverUrl: `${PORTRAIT}/card-forest.jpg`,
       createdAt: "2026-11-06T00:00:00.000Z",
@@ -84,6 +88,7 @@ export function exampleListings(): ClientListingCard[] {
     }),
     sampleCard({
       id: "sample-estate",
+      orderNumber: "#004",
       address: "Wooded estate",
       coverUrl: `${PORTRAIT}/card-estate.jpg`,
       createdAt: "2026-11-05T00:00:00.000Z",
@@ -91,6 +96,7 @@ export function exampleListings(): ClientListingCard[] {
     }),
     sampleCard({
       id: "sample-grogan",
+      orderNumber: "#005",
       address: "Grogan’s Mill oaks",
       coverUrl: `${PORTRAIT}/card-grove.jpg`,
       status: "in_progress",
@@ -228,6 +234,7 @@ export function exampleThreads(): UnifiedThread[] {
       participantIds: [],
       unread: 1,
       connectorNeeded: false,
+      orderNumber: "#002",
       messages: [
         threadMessage("m1", "inbound", "Mike Luna", "Jordan — Thursday is looking clear. I’ll be at Hunter Creek for 5:30. Please have every light on by 5:15, cars off the drive, bins out of sight. The gate can stay unlocked; I already have the code.", "2026-11-10T15:00:00.000Z"),
         threadMessage("m2", "outbound", "Jordan Hale", "Thank you, Mike. We’ll have the house ready. See you Thursday.", "2026-11-10T16:00:00.000Z"),
@@ -262,6 +269,7 @@ export function exampleInvoice(): ClientInvoiceStatement {
   return {
     id: "example-invoice",
     invoiceNumber: "#001",
+    orderNumber: "#001",
     status: "partial",
     clientName: "Example Agent",
     address: "100 Example Street, Suite 200, Spring, TX 77373",

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { exampleThreads } from "@/lib/exampleHub";
 import type { UnifiedThread } from "@shared/communications/threads";
+import { OrderNumberMark } from "@/components/OrderNumberMark";
 
 async function authHeaders(user: { getIdToken?: () => Promise<string> } | null, extra: Record<string, string> = {}) {
   const token = await user?.getIdToken?.();
@@ -125,6 +126,7 @@ export function PortalMessages({ example = false }: { example?: boolean; appeara
                   <span className="av" style={{ width: 40, height: 40, fontSize: 12 }}>{initials(thread.title)}</span>
                 )}
                 <span>
+                  <OrderNumberMark value={thread.orderNumber} />
                   <span className="tn">{thread.title}</span>
                   <span className="tp">{thread.preview || thread.subtitle}</span>
                 </span>
@@ -142,6 +144,7 @@ export function PortalMessages({ example = false }: { example?: boolean; appeara
                     <span className="av" style={{ width: 40, height: 40 }}>{initials(selected.title)}</span>
                   )}
                   <div>
+                    <OrderNumberMark value={selected.orderNumber} />
                     <div className="tn">{selected.title}</div>
                     <div className="muted" style={{ fontSize: 12 }}>{selected.subtitle}</div>
                   </div>

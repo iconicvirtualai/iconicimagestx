@@ -60,8 +60,8 @@ export default function PortalOrder() {
         active="order"
         onSignOut={() => void signOutUser().then(() => { window.location.assign(example ? "/portal?example=1" : "/portal"); })}
       >
-        <div className="bg-white rounded-2xl border border-gray-100">
-          <div className="px-4 pt-6 sm:px-6">
+        <div className="portal-tailwind portal-order-intro bg-white rounded-2xl border border-gray-100 min-w-0 max-w-full overflow-x-clip">
+          <div className="px-4 pt-6 sm:px-6 min-w-0">
             <h2 className="text-2xl font-black">Place an order</h2>
             <p className="text-sm text-gray-500 mt-1">Packages, add-ons, and appointment times are the same as the public order form.</p>
             {prefill ? (
