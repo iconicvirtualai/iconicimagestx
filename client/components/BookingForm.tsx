@@ -405,9 +405,12 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
     };
   }, [step, bookingAddress, formData.photographerId, formData.selectedService, formData.selectedBasics]);
 
-  // The site header is fixed. Keep the active step below it, or the scheduling
+  // The public site header is fixed. Keep the active step below it, or the scheduling
   // row stays under the nav (desktop) or above the viewport (phone) after Next.
+  // Inside the portal the sticky topbar is not the public header, and scrolling
+  // the step up pulls the "Ordering as" line under that bar.
   useEffect(() => {
+    if (source === "portal") return;
     const frame = window.requestAnimationFrame(() => {
       const card = document.querySelector<HTMLElement>("[data-testid='booking-step']");
       if (!card || typeof window.scrollTo !== "function") return;
@@ -416,7 +419,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
       window.scrollTo({ top: Math.max(0, top) });
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [step]);
+  }, [step, source]);
 
   // Check for pre-filled service from pricing page or props
   useEffect(() => {
@@ -993,29 +996,39 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
             exit={{ opacity: 0, y: -15 }}
             className="space-y-8"
           >
-            <div className="text-center space-y-3">
-              <h2 className="text-xl sm:text-2xl font-black text-black tracking-tight uppercase [overflow-wrap:normal] [word-break:normal]">Select your Campaign Tier</h2>
-              <p className="text-[11px] text-gray-400 font-bold uppercase tracking-wide sm:tracking-widest [overflow-wrap:normal] [word-break:normal]">Choose the level of impact for your presence</p>
+            <div className="text-center space-y-3 min-w-0 max-w-full">
+              <h2 className="text-xl sm:text-2xl font-black text-black uppercase max-w-full" style={{ overflowWrap: "anywhere", letterSpacing: "0.01em" }}>Select your Campaign Tier</h2>
+              <p className="text-[11px] text-gray-400 font-bold uppercase tracking-wide max-w-full" style={{ overflowWrap: "anywhere" }}>Choose the level of impact for your presence</p>
             </div>
 
             {/* Basics Toggle */}
-            <div className="flex flex-col items-center gap-3">
-              <div className="flex w-full max-w-full flex-col items-stretch justify-center gap-2 rounded-3xl bg-gray-50 p-1.5 border border-gray-100 sm:w-auto sm:flex-row sm:flex-nowrap sm:rounded-full sm:gap-3">
-                 <button 
+            <div className="flex flex-col items-stretch gap-3 min-w-0 max-w-full">
+              <div className="tier-scroll rounded-3xl bg-gray-50 p-1.5 border border-gray-100" role="tablist" aria-label="Package type">
+                 <button
+                  type="button"
+                  role="tab"
+                  data-selected={!showBasics ? "true" : "false"}
+                  aria-selected={!showBasics}
                   onClick={() => setShowBasics(false)}
-                  className={`max-w-full px-4 sm:px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-wide sm:tracking-widest transition-all whitespace-normal sm:whitespace-nowrap [overflow-wrap:normal] [word-break:normal] ${!showBasics ? 'bg-black text-white' : 'text-gray-400 hover:text-black'}`}
+                  className="px-4 py-2 rounded-full text-[11px] font-black uppercase tracking-wide"
+                  style={!showBasics ? { background: "#000", color: "#fff" } : { background: "transparent", color: "#3d4442" }}
                  >
                    Campaign Tiers
                  </button>
-                 <button 
+                 <button
+                  type="button"
+                  role="tab"
+                  data-selected={showBasics ? "true" : "false"}
+                  aria-selected={showBasics}
                   onClick={() => setShowBasics(true)}
-                  className={`max-w-full px-4 sm:px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-wide sm:tracking-widest transition-all whitespace-normal sm:whitespace-nowrap [overflow-wrap:normal] [word-break:normal] ${showBasics ? 'bg-black text-white' : 'text-gray-400 hover:text-black'}`}
+                  className="px-4 py-2 rounded-full text-[11px] font-black uppercase tracking-wide"
+                  style={showBasics ? { background: "#000", color: "#fff" } : { background: "transparent", color: "#3d4442" }}
                  >
                    The Basics (Photos-Only)
                  </button>
               </div>
-              <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">
-                Looking for the Essentials? <span className="text-primary cursor-pointer hover:underline" style={{ color: settings.global.primaryColor }} onClick={() => setShowBasics(true)}>Click here for The Basics</span>
+              <p className="text-[11px] text-gray-500 font-bold uppercase tracking-wide text-center max-w-full" style={{ overflowWrap: "anywhere" }}>
+                Looking for the Essentials? <span className="cursor-pointer hover:underline" style={{ color: settings.global.primaryColor }} onClick={() => setShowBasics(true)}>Click here for The Basics</span>
               </p>
             </div>
 
@@ -1064,7 +1077,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
                           exit={{ height: 0, opacity: 0 }}
                           className="overflow-hidden"
                         >
-                          <div className={cat === "listings" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 px-1 pb-1 pt-4" : cat === "studio" ? "grid grid-cols-1 items-stretch gap-3 px-1 pb-1 pt-4 md:grid-cols-3" : "space-y-2 px-1 pb-1 pt-4"}>
+                          <div className={cat === "listings" ? "tier-grid wide grid grid-cols-1 gap-3 px-1 pb-1 pt-4" : cat === "studio" ? "tier-grid grid grid-cols-1 items-stretch gap-3 px-1 pb-1 pt-4" : "space-y-2 px-1 pb-1 pt-4 min-w-0"}>
                             {cat === "business" && (
                               <div className="w-full">
                                 <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-2 px-1">Phase 1: Establishing Foundation</p>
@@ -1083,14 +1096,14 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
                                 )}
                                 <button
                                   onClick={() => toggleService(s.id)}
-                                  className={`relative rounded-2xl border-2 px-4 pb-4 text-left transition-all flex flex-col justify-between group h-full ${s.isPopular ? "pt-7" : "pt-4"} ${
-                                    formData.selectedService === s.id ? 'border-black bg-white scale-[1.01] shadow-lg' : 'border-gray-100 bg-white hover:border-gray-200'
+                                  className={`package-card relative min-w-0 rounded-2xl border-2 text-left transition-all flex flex-col justify-between group h-full ${
+                                    formData.selectedService === s.id ? 'border-black bg-white shadow-lg' : 'border-gray-100 bg-white hover:border-gray-200'
                                   } ${s.highlights ? 'border-teal-300' : ''}`}
                                 >
                                   {s.isPopular && (
-                                    <div className="absolute top-2 left-1/2 z-10 -translate-x-1/2 bg-red-500 text-white text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest whitespace-nowrap shadow-lg">
+                                    <span className="inline-flex max-w-full self-start rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-white" style={{ marginBottom: 8, color: "#fff" }}>
                                       Best Value
-                                    </div>
+                                    </span>
                                   )}
                                   {cat === "business" && socialOffLabel ? (
                                     <span className="absolute right-3 top-2 z-10 whitespace-nowrap rounded-full bg-[#FFD700] px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-black shadow">
@@ -1140,7 +1153,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
                           type="button"
                           onClick={() => toggleBasic(b.id)}
                           aria-pressed={formData.selectedBasics.includes(b.id)}
-                          className={`p-6 rounded-2xl border-2 transition-all text-left bg-white relative ${
+                          className={`package-card rounded-2xl border-2 transition-all text-left bg-white relative ${
                             formData.selectedBasics.includes(b.id) ? 'border-black bg-white scale-[1.01] shadow-lg' : 'border-gray-100 bg-white hover:border-gray-200'
                           }`}
                         >
@@ -1991,9 +2004,15 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
     );
   }
 
+  const portal = source === "portal";
   return (
-    <div className="max-w-[1300px] mx-auto min-w-0 overflow-x-hidden px-0 py-4 text-neutral-950 sm:px-4 sm:py-8">
-      <div className="flex flex-col lg:flex-row gap-8">
+    <div
+      data-portal-booking={portal ? "true" : undefined}
+      className={portal
+        ? "portal-booking portal-tailwind w-full max-w-full min-w-0 overflow-x-clip px-0 py-4 text-neutral-950"
+        : "max-w-[1300px] mx-auto min-w-0 overflow-x-hidden px-0 py-4 text-neutral-950 sm:px-4 sm:py-8"}
+    >
+      <div className={portal ? "booking-columns flex min-w-0 flex-col gap-8" : "flex flex-col lg:flex-row gap-8"}>
         {/* Main Form Area */}
         <div className="flex-1 space-y-8">
            {/* Progress Steps */}
@@ -2075,7 +2094,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
         </div>
 
         {/* Sidebar Summary Area */}
-        <div className="w-full lg:w-[380px]">
+        <div className={portal ? "w-full min-w-0" : "w-full lg:w-[380px]"}>
            <div className="flex flex-col gap-6 lg:sticky lg:top-32">
            <NewServiceAlert
               to="/pay-at-close"

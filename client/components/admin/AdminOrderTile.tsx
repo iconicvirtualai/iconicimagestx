@@ -175,7 +175,7 @@ export function AdminOrderTile({
         ) : null}
 
         <div className="mt-0.5 flex items-center justify-between gap-3 border-t border-[#e2e8f0] pt-3">
-          <span data-slot="order-code" className="text-[10px] font-bold tabular-nums tracking-[0.06em] text-[#64748b]">
+          <span data-slot="order-code" className="text-2xl font-black tabular-nums tracking-tight text-black">
             {order.orderCode}
           </span>
           <span data-slot="channel" className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-[#334155]">

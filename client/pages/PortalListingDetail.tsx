@@ -43,6 +43,7 @@ import { PortalTemplatePicker } from "@/components/portal/PortalTemplatePicker";
 import { uploadPortalClientFile } from "@/lib/portalClientUpload";
 import type { PortalUploadKind } from "@shared/portalClientUpload";
 import { ArrowLeft, Download, Eye, EyeOff, MapPin } from "lucide-react";
+import { OrderNumberMark } from "@/components/OrderNumberMark";
 import { toast } from "sonner";
 import NotFound from "./NotFound";
 import { marketingMaterialFromProfile, type ClientHubProfile, type HubAgentBranding } from "@shared/clientHubSettings";
@@ -112,6 +113,7 @@ export function PortalListingDetailView({
             <p className="kicker">Iconic Images</p>
           )}
           <p className="kicker">Listing file</p>
+          <OrderNumberMark value={detail.orderNumber} />
           <h1>{detail.title}</h1>
           <p className="sub">{detail.status.replace(/_/g, " ")}{example ? <span className="sample">Sample</span> : null}</p>
         </div>
@@ -1067,7 +1069,7 @@ function ExampleListingExperience({
   const saved = defaultPortalWebsite();
   const [website, setWebsite] = useState<PortalWebsiteSettings>({ ...saved, design: "premiere" });
   const branded = marketingMaterialFromProfile(exampleProfile());
-  const agent = branded ? { ...branded, headshotUrl: "" } : null;
+  const agent = branded;
   const profile = samplePortalProfile();
   return (
     <PortalListingDetailView
@@ -1109,6 +1111,7 @@ function OrdersTab({ detail }: { detail: PortalListingDetailModel }) {
         <div className="grid gap-3">
           {detail.invoices.map((invoice) => (
             <article key={invoice.id} className="bg-white rounded-2xl border border-gray-100 p-5" data-testid={`invoice-${invoice.id}`}>
+              <OrderNumberMark value={invoice.orderNumber || detail.orderNumber} />
               <div className="flex items-center justify-between gap-3">
                 <p className="font-black">{invoice.invoiceNumber}</p>
                 <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">{invoice.status.replace(/_/g, " ")}</p>

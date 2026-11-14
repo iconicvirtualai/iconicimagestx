@@ -231,6 +231,35 @@ export function hubImageUrl(value: unknown): string {
   return hubHttpUrl(raw, 500);
 }
 
+/**
+ * The staff desk opens an auto-id client. Portal sign-in also has clients/{auth uid}.
+ * Prefer an explicit link, then the non-uid record that already looks like the desk file.
+ */
+export function pickCanonicalClientId(
+  uid: string,
+  docs: Array<{ id: string; data: Record<string, unknown> }>,
+): string {
+  const byId = new Map(docs.map((doc) => [doc.id, doc.data]));
+  const uidDoc = byId.get(uid);
+  const linked = typeof uidDoc?.linkedClientId === "string" ? uidDoc.linkedClientId : "";
+  const redirect = typeof uidDoc?._redirect === "string" ? uidDoc._redirect : "";
+  if (linked && linked !== uid && byId.has(linked)) return linked;
+  if (redirect && redirect !== uid && byId.has(redirect)) return redirect;
+  const others = docs.filter((doc) => doc.id !== uid);
+  if (others.length === 0) return uid;
+  const score = (doc: { id: string; data: Record<string, unknown> }) => {
+    let value = 0;
+    if (doc.data.hubProfile && typeof doc.data.hubProfile === "object") value += 3;
+    if (typeof doc.data.firstName === "string" && doc.data.firstName.trim()) value += 2;
+    if (typeof doc.data.company === "string" && doc.data.company.trim()) value += 1;
+    if (typeof doc.data.notes === "string" && doc.data.notes.trim()) value += 1;
+    if (typeof doc.data.totalOrders === "number" && doc.data.totalOrders > 0) value += 2;
+    if (typeof doc.data._redirect === "string" && doc.data._redirect) value -= 4;
+    return value;
+  };
+  return [...others].sort((left, right) => score(right) - score(left) || left.id.localeCompare(right.id))[0].id;
+}
+
 export function profileFromClient(data: Record<string, unknown> | null | undefined): ClientHubProfile {
   const source = record(data);
   const stored = record(source.hubProfile);

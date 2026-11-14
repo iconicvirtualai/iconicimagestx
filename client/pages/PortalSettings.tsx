@@ -80,21 +80,10 @@ export default function PortalSettings() {
             <Link key={id} to={portalHref(`/portal/settings/${id}`, example)} className={active === id ? "active" : undefined}>{id}</Link>
           ))}
         </nav>
-        {example ? (
-          <div className="settings-stack">
-            <ProfileRoute example />
-            <TeamRoute example />
-            <ClientsRoute example />
-            <BillingRoute example />
-          </div>
-        ) : (
-          <>
-            {active === "profile" ? <ProfileRoute example={false} /> : null}
-            {active === "team" ? <TeamRoute example={false} /> : null}
-            {active === "clients" ? <ClientsRoute example={false} /> : null}
-            {active === "billing" ? <BillingRoute example={false} /> : null}
-          </>
-        )}
+        {active === "profile" ? <ProfileRoute example={example} /> : null}
+        {active === "team" ? <TeamRoute example={example} /> : null}
+        {active === "clients" ? <ClientsRoute example={example} /> : null}
+        {active === "billing" ? <BillingRoute example={example} /> : null}
       </PortalShell>
     </div>
   );

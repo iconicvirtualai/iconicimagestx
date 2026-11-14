@@ -237,6 +237,11 @@ export function orderHistoryInvoiceNumber(source: InvoiceNumberSource, now = new
   return shownInvoiceNumber(source, now);
 }
 
+/** #003 style only. Long ids and the word EXAMPLE are not an order number. */
+export function shortOrderNumber(value: unknown): string {
+  return sequentialOrderLabel(value) || "";
+}
+
 function sequentialOrderLabel(value: unknown): string | null {
   if (typeof value === "number" && Number.isInteger(value) && value >= 1) return formatOrderNumber(value);
   if (typeof value !== "string") return null;

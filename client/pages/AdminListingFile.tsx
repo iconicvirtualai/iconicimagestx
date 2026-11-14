@@ -18,6 +18,7 @@ import {
   projectInvoiceButtonLabel,
 } from "@shared/orderProjectInvoice";
 import { ensureLinkedInvoice } from "@/lib/orderProjectInvoice";
+import { OrderNumberMark } from "@/components/OrderNumberMark";
 import { OrderServicesFields } from "@/components/OrderServicesFields";
 import { syncOrderBillingToInvoice } from "@/lib/staffInvoice";
 import { orderBillingFromServicePatch, type OrderServiceSavePatch } from "@shared/orderRequestServices";
@@ -525,7 +526,7 @@ export default function AdminListingFile({
         <div className={`relative p-8 ${!coverPhoto ? "bg-black" : ""}`}>
           <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
             <div>
-              <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 font-mono">{project.id}</p>
+              <OrderNumberMark value={project.orderNumber} light />
               <h1 className="text-2xl font-black uppercase tracking-tight mb-1 leading-tight text-white">{location}</h1>
               <p className="text-gray-400 flex items-center gap-1.5 text-sm mb-1">
                 <User className="w-3.5 h-3.5 flex-shrink-0" /> {project.clientName || "—"}

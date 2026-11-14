@@ -36,7 +36,10 @@ service cloud.firestore {
     }
 
     function isClientOwner(clientId) {
-      return isAuthenticated() && request.auth.uid == clientId;
+      return isAuthenticated() && (
+        request.auth.uid == clientId ||
+        (resource != null && resource.data.firebaseUid == request.auth.uid)
+      );
     }
 
     function isOrderClient(orderId) {

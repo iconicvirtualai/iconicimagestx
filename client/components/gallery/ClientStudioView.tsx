@@ -6,6 +6,7 @@ import {
   ChevronLeft, ChevronRight, X, Layers, Zap,
 } from "lucide-react";
 import { addressText } from "@shared/addressText";
+import { OrderNumberMark } from "@/components/OrderNumberMark";
 import { zipStored } from "@shared/zipStore";
 import { formatChicagoDate } from "@shared/clientHome";
 import { clientGalleryDownloadsUnlocked, studioOffersDownloads } from "@shared/paymentAccess";
@@ -190,6 +191,7 @@ export function ClientStudioView({
             </div>
             <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500">Iconic Images</span>
           </div>
+          <OrderNumberMark value={project.orderNumber} light />
           <h1 className="text-2xl sm:text-3xl font-black uppercase tracking-tight">{address || "Your Gallery"}</h1>
           {owner && listingId && (
             <Link to={`/portal/listings/${listingId}`} className="inline-block mt-3 text-[10px] font-black uppercase tracking-widest text-[#0d9488]">

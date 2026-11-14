@@ -18,6 +18,7 @@ import { usd } from "@shared/clientHome";
 import { OrderHistory } from "@/components/client-home/ClientHomeDashboard";
 import { MoneyAmount } from "@/components/MoneyAmount";
 import { MarketingAgentCard } from "@/components/client-hub/MarketingAgentCard";
+import { prepareProfileImage } from "@/lib/profileImage";
 
 const fieldClass = "h-11 w-full min-w-0 max-w-full rounded-xl border border-gray-200 bg-white px-3 text-sm";
 
@@ -30,17 +31,8 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function readImage(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ""));
-    reader.onerror = () => reject(new Error("Could not read that image."));
-    reader.readAsDataURL(file);
-  });
-}
-
 async function uploadAsset(kind: string, file: File, example: boolean): Promise<string> {
-  const dataUrl = await readImage(file);
+  const dataUrl = await prepareProfileImage(file);
   if (example) return dataUrl;
   const token = await tokenFor();
   const response = await fetch("/api/clients/me/hub/profile/asset", {
@@ -78,6 +70,7 @@ export function ProfileSettings({
   async function onFile(kind: "headshot" | "companyLogo" | "brokerageLogo", file: File | undefined) {
     if (!file) return;
     setMessage("");
+    setSaving(true);
     try {
       const url = await uploadAsset(kind, file, example);
       setDraft((current) => ({
@@ -86,8 +79,12 @@ export function ProfileSettings({
         companyLogoUrl: kind === "companyLogo" ? url : current.companyLogoUrl,
         brokerageLogoUrl: kind === "brokerageLogo" ? url : current.brokerageLogoUrl,
       }));
+      const label = kind === "headshot" ? "Headshot" : kind === "companyLogo" ? "Company logo" : "Brokerage logo";
+      setMessage(example ? `Sample preview — the ${label.toLowerCase()} stays on this page.` : `${label} saved.`);
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Could not upload that image.");
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -118,7 +115,7 @@ export function ProfileSettings({
         <Field label="Email"><input className={fieldClass} type="email" value={draft.email} onChange={(event) => setDraft({ ...draft, email: event.target.value })} /></Field>
         <Field label="Brokerage"><input className={fieldClass} value={draft.brokerage} onChange={(event) => setDraft({ ...draft, brokerage: event.target.value })} /></Field>
         <Field label="Website"><input className={fieldClass} value={draft.website} onChange={(event) => setDraft({ ...draft, website: event.target.value })} inputMode="url" placeholder="https://" /></Field>
-        <ImageField label="Headshot" url={draft.headshotUrl} monogram={`${draft.firstName[0] || ""}${draft.lastName[0] || ""}`.toUpperCase()} onFile={(file) => void onFile("headshot", file)} />
+        <ImageField label="Headshot" hint="The photo saves as soon as the upload finishes." url={draft.headshotUrl} monogram={`${draft.firstName[0] || ""}${draft.lastName[0] || ""}`.toUpperCase()} onFile={(file) => void onFile("headshot", file)} />
         <ImageField label="Company logo" url={draft.companyLogoUrl} onFile={(file) => void onFile("companyLogo", file)} />
         <ImageField label="Brokerage logo" url={draft.brokerageLogoUrl} onFile={(file) => void onFile("brokerageLogo", file)} />
       </div>
@@ -178,15 +175,18 @@ export function ProfileSettings({
   }
 }
 
-function ImageField({ label, url, onFile, monogram = "" }: { label: string; url: string; onFile: (file: File | undefined) => void; monogram?: string }) {
+function ImageField({ label, url, onFile, monogram = "", hint = "" }: { label: string; url: string; onFile: (file: File | undefined) => void; monogram?: string; hint?: string }) {
   return (
     <Field label={label}>
       <div className="flex items-center gap-3 min-w-0">
         {url ? <img src={url} alt="" className="h-14 w-14 shrink-0 rounded-full object-cover bg-gray-100" /> : <div className="av" style={{ width: 56, height: 56 }}>{monogram || " "}</div>}
-        <label className="inline-flex min-h-11 min-w-0 items-center rounded-xl border border-gray-200 px-3 text-[10px] font-black uppercase tracking-widest">
-          Upload
-          <input type="file" accept="image/jpeg,image/png,image/webp" aria-label={label} className="sr-only" onChange={(event) => onFile(event.target.files?.[0])} />
-        </label>
+        <div className="min-w-0">
+          <label className="inline-flex min-h-11 min-w-0 items-center rounded-xl border border-gray-200 px-3 text-[10px] font-black uppercase tracking-widest">
+            Upload
+            <input type="file" accept="image/jpeg,image/png,image/webp" aria-label={label} className="sr-only" onChange={(event) => onFile(event.target.files?.[0])} />
+          </label>
+          {hint ? <p className="mt-1 text-xs text-gray-500">{hint}</p> : null}
+        </div>
       </div>
     </Field>
   );
@@ -522,23 +522,11 @@ export function BillingSettings({
         <p className="text-sm text-gray-500 sm:col-span-2">Invoices and checkout use {billingAddressLine(draft) || "the billing address you save here"}.</p>
         <button type="submit" className="min-h-12 rounded-2xl bg-black text-white px-5 text-xs font-black uppercase tracking-widest w-fit">Save billing</button>
       </form>
-      <section className="panel card-on-file">
-        <h3>Card on file</h3>
-        <p>{cardLabel(billing.card) || "No card on file"}</p>
-        <p>Square keeps the card. Iconic stores only the brand and last four digits, never the full number.</p>
-        {billing.square?.applicationId ? (
-          <SquareCard
-            applicationId={billing.square.applicationId}
-            locationId={billing.square.locationId}
-            environment={billing.square.environment}
-            onToken={(token) => void onCard(token).then(() => setMessage("Card saved with Square.")).catch((err: Error) => setMessage(err.message))}
-          />
-        ) : (
-          <button type="button" className="btn btn-ink btn-md" onClick={() => setMessage(example ? "Sample preview — Square checkout is not opened." : "Update card opens Square checkout. Iconic never asks for the full number on this page.")}>
-            Update card
-          </button>
-        )}
-      </section>
+      <CardOnFileControl
+        square={billing.square}
+        example={example}
+        onToken={(token) => void onCard(token).then(() => setMessage(example ? "Sample preview — the card was not sent to Square." : "Card saved with Square.")).catch((err: Error) => setMessage(err.message))}
+      />
       <section>
         <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-3">Credits</h3>
         {billing.credits.length === 0 ? <p className="text-sm text-gray-500">No credits on this account.</p> : (
@@ -580,6 +568,47 @@ function Summary({ label, value }: { label: string; value: string }) {
   );
 }
 
+export function CardOnFileControl({
+  square,
+  example = false,
+  onToken,
+}: {
+  square?: { applicationId?: string; locationId?: string; environment?: string; missing?: string[] };
+  example?: boolean;
+  onToken: (token: string) => void;
+}) {
+  const applicationId = square?.applicationId || "";
+  const locationId = square?.locationId || "";
+  const missing = square?.missing?.length
+    ? square.missing
+    : [applicationId ? "" : "SQUARE_APPLICATION_ID", locationId ? "" : "SQUARE_LOCATION_ID"].filter(Boolean);
+  if (!applicationId || !locationId) {
+    return (
+      <section className="panel card-on-file">
+        <h3>Card on file</h3>
+        <p role="alert" data-testid="square-config-error" className="text-sm font-bold text-red-800">
+          {example ? "Sample preview. " : ""}
+          Card on file cannot be saved until an admin sets {missing.join(" and ")} for this deployment.
+          Add this site’s hostname to the Square application’s allowed domains as well.
+          Iconic never stores the full card number.
+        </p>
+      </section>
+    );
+  }
+  return (
+    <section className="panel card-on-file">
+      <h3>Card on file</h3>
+      <p>Square keeps the card. Iconic stores only the brand and last four digits, never the full number.</p>
+      <SquareCard
+        applicationId={applicationId}
+        locationId={locationId}
+        environment={square?.environment || "production"}
+        onToken={onToken}
+      />
+    </section>
+  );
+}
+
 function SquareCard({
   applicationId,
   locationId,
@@ -612,7 +641,7 @@ function SquareCard({
         (window as unknown as { iconicSquareCard?: typeof card }).iconicSquareCard = card;
         if (!cancelled) setReady(true);
       }).catch(() => {
-        if (!cancelled) setError("Square checkout did not load.");
+        if (!cancelled) setError("Square could not open the card form. Confirm this site is on the Square application’s allowed domains.");
       });
     };
     if (!existing) document.head.appendChild(script);
@@ -639,7 +668,7 @@ function SquareCard({
           });
         }}
       >
-        Save card with Square
+        Update card
       </button>
     </div>
   );

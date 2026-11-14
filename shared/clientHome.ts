@@ -8,7 +8,7 @@ import { brandedInvoicePdf, brandedInvoicePdfFilename, type BrandedInvoicePdfInp
 import { iconicBusinessFooterLines } from "./iconicBusiness.ts";
 import { invoiceFaceFromStored } from "./invoiceFace.ts";
 import { invoicePayLinkFor } from "./invoicePayLink.ts";
-import { portalDisplayedInvoiceNumber } from "./orderProjectInvoice.ts";
+import { portalDisplayedInvoiceNumber, shortOrderNumber } from "./orderProjectInvoice.ts";
 import { addressText } from "./addressText.ts";
 import {
   formatShootDateLabel,
@@ -81,6 +81,8 @@ export interface ClientListingCard {
   baths: string;
   garage: string;
   pool: string;
+  /** Short order number such as #003. Empty when the listing has no sequential number. */
+  orderNumber: string;
 }
 
 export interface ClientInvoiceLine {
@@ -114,6 +116,8 @@ export interface ClientInvoiceStatement {
   amountDue: number | null;
   /** Tokenized /invoice/{id}?t= path. Absent when the invoice has no pay token. */
   payPath?: string | null;
+  /** Short order number such as #003. Empty when this invoice is not tied to one. */
+  orderNumber?: string;
   /** Empty means the invoice preview and PDF say there are no notes. */
   notes?: string | null;
 }
@@ -296,6 +300,7 @@ export function buildClientListing(id: string, data: Record<string, unknown>): C
     baths: amenities.baths,
     garage: amenities.garage,
     pool: amenities.pool,
+    orderNumber: shortOrderNumber(data.orderNumber),
   };
 }
 
@@ -326,6 +331,7 @@ export function buildClientInvoice(
     amountPaid: storedAmount(data.amountPaid),
     amountDue: storedAmount(data.amountDue),
     payPath: invoicePayLinkFor({ id, payToken: data.payToken, status: data.status }),
+    orderNumber: shortOrderNumber(order?.orderNumber) || shortOrderNumber(data.orderNumber),
   };
 }
 
