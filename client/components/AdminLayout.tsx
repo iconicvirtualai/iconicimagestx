@@ -135,11 +135,11 @@ function AdminShell({
         <div className="relative border-t border-gray-800 p-4 space-y-3">
           <div className="px-3 py-3 bg-[#111] rounded-lg">
             <div className="flex items-center justify-between mb-1">
-              <p className="text-[9px] font-black text-gray-600 uppercase tracking-widest">
+              <Link to={`/admin/people/staff/${user?.uid || "me"}`} className="min-w-0 truncate text-[9px] font-black uppercase tracking-widest text-gray-300 hover:text-white">
                 {staffProfile?.firstName
                   ? `${staffProfile.firstName} ${staffProfile.lastName}`
                   : user?.email}
-              </p>
+              </Link>
               <span className={`text-[9px] font-black uppercase tracking-wide px-2 py-0.5 rounded-full ${badge.color}`}>
                 {badge.label}
               </span>

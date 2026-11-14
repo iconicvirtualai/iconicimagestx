@@ -42,6 +42,7 @@ const TAB_KEYS: Record<string, AdminUnreadKey | null> = {
   inbox: "inbox",
   sms: "sms",
   compose: null,
+  direct: null,
   campaigns: null,
   assistants: null,
   botroom: "botroom",
