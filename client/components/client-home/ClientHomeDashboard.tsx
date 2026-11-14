@@ -365,12 +365,8 @@ function InvoiceDetail({ invoice }: { invoice: ClientInvoiceStatement }) {
       </div>
       <p style={{ marginTop: 8, fontWeight: 800 }}>Thank you for being Iconic.</p>
       <div className="actions-inline">
-        {due > 0 ? (
-          invoice.payPath ? (
-            <Link className="btn btn-teal btn-md" to={invoice.payPath}>Pay {usd(due)}</Link>
-          ) : (
-            <button type="button" className="btn btn-teal btn-md">Pay {usd(due)}</button>
-          )
+        {due > 0 && invoice.payPath ? (
+          <Link className="btn btn-teal btn-md" to={invoice.payPath}>Pay {usd(due)}</Link>
         ) : null}
         {due > 0 ? <Link className="btn btn-outline btn-md" to="/pay-at-close">Pay at Close</Link> : null}
         {invoice.payPath ? <Link className="btn btn-ghost btn-md" to={invoice.payPath}>View invoice</Link> : <span className="btn btn-ghost btn-md">View invoice</span>}

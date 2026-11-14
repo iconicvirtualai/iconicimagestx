@@ -405,9 +405,12 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
     };
   }, [step, bookingAddress, formData.photographerId, formData.selectedService, formData.selectedBasics]);
 
-  // The site header is fixed. Keep the active step below it, or the scheduling
+  // The public site header is fixed. Keep the active step below it, or the scheduling
   // row stays under the nav (desktop) or above the viewport (phone) after Next.
+  // Inside the portal the sticky topbar is not the public header, and scrolling
+  // the step up pulls the "Ordering as" line under that bar.
   useEffect(() => {
+    if (source === "portal") return;
     const frame = window.requestAnimationFrame(() => {
       const card = document.querySelector<HTMLElement>("[data-testid='booking-step']");
       if (!card || typeof window.scrollTo !== "function") return;
@@ -416,7 +419,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
       window.scrollTo({ top: Math.max(0, top) });
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [step]);
+  }, [step, source]);
 
   // Check for pre-filled service from pricing page or props
   useEffect(() => {
@@ -1991,9 +1994,15 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
     );
   }
 
+  const portal = source === "portal";
   return (
-    <div className="max-w-[1300px] mx-auto min-w-0 overflow-x-hidden px-0 py-4 text-neutral-950 sm:px-4 sm:py-8">
-      <div className="flex flex-col lg:flex-row gap-8">
+    <div
+      data-portal-booking={portal ? "true" : undefined}
+      className={portal
+        ? "portal-booking w-full max-w-full min-w-0 overflow-x-hidden px-0 py-4 text-neutral-950"
+        : "max-w-[1300px] mx-auto min-w-0 overflow-x-hidden px-0 py-4 text-neutral-950 sm:px-4 sm:py-8"}
+    >
+      <div className={portal ? "booking-columns flex min-w-0 flex-col gap-8" : "flex flex-col lg:flex-row gap-8"}>
         {/* Main Form Area */}
         <div className="flex-1 space-y-8">
            {/* Progress Steps */}
@@ -2075,7 +2084,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
         </div>
 
         {/* Sidebar Summary Area */}
-        <div className="w-full lg:w-[380px]">
+        <div className={portal ? "w-full min-w-0" : "w-full lg:w-[380px]"}>
            <div className="flex flex-col gap-6 lg:sticky lg:top-32">
            <NewServiceAlert
               to="/pay-at-close"

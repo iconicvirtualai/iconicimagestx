@@ -1067,7 +1067,7 @@ function ExampleListingExperience({
   const saved = defaultPortalWebsite();
   const [website, setWebsite] = useState<PortalWebsiteSettings>({ ...saved, design: "premiere" });
   const branded = marketingMaterialFromProfile(exampleProfile());
-  const agent = branded ? { ...branded, headshotUrl: "" } : null;
+  const agent = branded;
   const profile = samplePortalProfile();
   return (
     <PortalListingDetailView

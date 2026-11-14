@@ -49,6 +49,8 @@ export interface PortalScope {
   uid: string;
   email: string;
   phone: string;
+  /** Staff auto-id plus the auth uid, when the home identity lookup found both. */
+  clientIds?: string[];
 }
 
 const SOCIALS: { id: string; title: string; detail: string }[] = [
@@ -351,9 +353,22 @@ export function threadVisibleTo(thread: UnifiedThread, scope: PortalScope): bool
   );
   if (scope.kind === "client") {
     if (scope.uid && ids.has(scope.uid)) return true;
+    if (scope.clientIds?.some((id) => id && ids.has(id))) return true;
     return Boolean(scope.email && thread.email && thread.email.toLowerCase() === scope.email.toLowerCase());
   }
   if (scope.uid && (thread.photographerId === scope.uid || thread.participantIds.includes(scope.uid))) return true;
   if (scope.uid && ids.has(scope.uid) && thread.audiences.includes("photographers")) return true;
   return Boolean(scope.phone && thread.photographerPhone && phonesMatch(scope.phone, thread.photographerPhone));
+}
+
+/** Threads whose latest message is from the desk, not the client. */
+export function portalUnreadCount(threads: UnifiedThread[]): number {
+  let count = 0;
+  for (const thread of threads) {
+    const latest = thread.messages[thread.messages.length - 1];
+    if (!latest || latest.delivery === "read") continue;
+    const fromClient = latest.senderType === "client" || latest.senderType === "lead";
+    if (!fromClient) count += 1;
+  }
+  return count;
 }

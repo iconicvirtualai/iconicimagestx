@@ -65,7 +65,7 @@ export default function PortalOrder() {
             <h2 className="text-2xl font-black">Place an order</h2>
             <p className="text-sm text-gray-500 mt-1">Packages, add-ons, and appointment times are the same as the public order form.</p>
             {prefill ? (
-              <p className="text-sm text-gray-700 mt-3 break-words">
+              <p className="mt-3 max-w-full break-words text-sm text-gray-700" data-testid="portal-order-who">
                 Ordering as {prefill.firstName} {prefill.lastName} · {prefill.email}
                 {prefill.billingEmail ? ` · Billing ${prefill.billingEmail}` : ""}
                 {prefill.billToAddress ? ` · ${prefill.billToAddress}` : ""}

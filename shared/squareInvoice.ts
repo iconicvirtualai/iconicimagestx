@@ -93,6 +93,31 @@ export function squareConfigured(env: Record<string, string | undefined>): boole
   return Boolean(env.SQUARE_ACCESS_TOKEN && env.SQUARE_LOCATION_ID);
 }
 
+/**
+ * Public values the browser needs to mount Square's Web Payments card form.
+ * SQUARE_APPLICATION_ID is preferred. VITE_SQUARE_APPLICATION_ID is only a fallback.
+ * Neither value is a secret. SQUARE_ACCESS_TOKEN stays on the server and is not returned.
+ * The Square application must allow the site domain or the card form will not attach.
+ */
+export function squareWebPaymentsConfig(env: Record<string, string | undefined> = {}): {
+  applicationId: string;
+  locationId: string;
+  environment: "sandbox" | "production";
+  missing: string[];
+} {
+  const applicationId = (env.SQUARE_APPLICATION_ID || env.VITE_SQUARE_APPLICATION_ID || "").trim();
+  const locationId = (env.SQUARE_LOCATION_ID || "").trim();
+  const missing: string[] = [];
+  if (!applicationId) missing.push("SQUARE_APPLICATION_ID");
+  if (!locationId) missing.push("SQUARE_LOCATION_ID");
+  return {
+    applicationId,
+    locationId,
+    environment: env.SQUARE_ENVIRONMENT === "sandbox" ? "sandbox" : "production",
+    missing,
+  };
+}
+
 /** Book and schedule, then shoot, then bill. Square customer, order, invoice, and publish wait. */
 export type SquareInvoiceSyncPhase = "booking" | "confirm" | "post-shoot";
 

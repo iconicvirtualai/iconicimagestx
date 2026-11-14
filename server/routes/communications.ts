@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { canUseAssistants } from "../../shared/communications/access";
 import { ownerAllowlist } from "../../shared/ownerAccess";
-import { filterThreads, threadVisibleTo, type PortalScope, type ThreadAudience } from "../../shared/communications/threads";
+import { filterThreads, portalUnreadCount, threadVisibleTo, type PortalScope, type ThreadAudience } from "../../shared/communications/threads";
+import { resolveClientIdentity } from "../services/clientAccounts";
 import { requireAuth, requireCoordinator, requireStaff, type AuthenticatedRequest } from "../middleware/auth";
 import { assistantStatus, completeAssistant, parseAssistantTurns } from "../services/assistants";
 import { logCommunicationMessage } from "../services/communicationLog";
@@ -50,11 +51,19 @@ async function portalScope(req: AuthenticatedRequest): Promise<PortalScope> {
     }
     const clientDoc = await admin.firestore().collection("clients").doc(uid).get();
     const client = clientDoc.exists ? clientDoc.data() || {} : {};
+    let clientIds = [uid];
+    try {
+      const identity = await resolveClientIdentity(uid, email || (typeof client.email === "string" ? client.email : ""));
+      if (identity.ids.length) clientIds = identity.ids;
+    } catch (identityError) {
+      console.warn("[Communications] Client identity lookup failed.", identityError);
+    }
     return {
       kind: "client",
       uid,
       email: email || (typeof client.email === "string" ? client.email.trim().toLowerCase() : ""),
       phone: typeof client.phone === "string" ? client.phone : "",
+      clientIds,
     };
   } catch (error) {
     console.warn("[Communications] Portal scope lookup failed.", error);
@@ -81,7 +90,7 @@ router.get("/mine", requireAuth, async (req: AuthenticatedRequest, res) => {
   try {
     const scope = await portalScope(req);
     const threads = threadsForPortal(await listUnifiedThreads(), scope);
-    return res.json({ threads });
+    return res.json({ threads, unreadCount: portalUnreadCount(threads) });
   } catch (error) {
     console.error("[Communications] Portal threads failed.", error);
     return res.status(500).json({ error: "Couldn't load your messages." });

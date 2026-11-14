@@ -17,6 +17,7 @@ import { MoneyAmount } from "@/components/MoneyAmount";
 import { staffInvoicePath } from "@shared/staffInvoice";
 import { billingListInvoiceNumber, clientBillingInvoiceNumber } from "@shared/orderProjectInvoice";
 import { publicClientUrl } from "@shared/publicSiteUrl";
+import { AdminClientCard, AdminClientHeadshot } from "@/components/admin/AdminClientHub";
 
 const labelCls = "block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1";
 const inputCls = "w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#0d9488]/30";
@@ -144,6 +145,7 @@ export default function AdminClientAccount() {
         <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">{client.company || client.group || "Client"}</p>
         <h2 className="mt-1 text-2xl font-black uppercase tracking-tight">{clientName(client)}</h2>
         <p className="mt-2 text-sm text-gray-400">{client.email || "No email"}{client.phone ? ` · ${client.phone}` : ""}</p>
+        <AdminClientHeadshot client={client} />
         <div className="mt-3 flex flex-wrap gap-2">
           <span className="rounded-full bg-white/10 px-3 py-1 text-[9px] font-black uppercase tracking-widest">{client.status || "active"}</span>
           {client.group && <span className="rounded-full bg-[#0d9488] px-3 py-1 text-[9px] font-black uppercase tracking-widest">{client.group}</span>}
@@ -172,7 +174,8 @@ export default function AdminClientAccount() {
 
       <div className="min-w-0 rounded-[1.5rem] border border-gray-100 bg-white p-6 shadow-sm">
         {section === "billing" && (
-          <Section title="Billing & payments" hint="Amounts already stored on this client's orders and projects. Payment collection stays in Billing.">
+          <Section title="Billing & payments" hint="Amounts already stored on this client's orders and projects. The card on file is saved with Square.">
+            <AdminClientCard clientId={client.id} summary={client.cardOnFile} />
             {billed.length === 0 ? <Empty text="No billing amounts are stored for this client yet." /> : (
               <div className="space-y-2">
                 {history.map((order) => {

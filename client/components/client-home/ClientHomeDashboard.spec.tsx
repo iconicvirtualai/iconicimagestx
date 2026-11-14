@@ -219,6 +219,21 @@ describe("client home dashboard", () => {
     expect(open).not.toContain("checkout");
   });
 
+  it("hides Pay when money is due and the invoice has no pay link", () => {
+    const html = renderToString(
+      <MemoryRouter>
+        <OrderHistory
+          invoices={[invoice({ status: "partial", amountDue: 128, amountPaid: 122, payPath: null })]}
+          openId="inv-1"
+          onToggle={() => undefined}
+        />
+      </MemoryRouter>,
+    );
+    expect(html).toContain("Pay at Close");
+    expect(html).toContain("View invoice");
+    expect(html).not.toContain(">Pay $128.00<");
+  });
+
   it("links order history to the tokenized invoice when a pay token is stored", () => {
     const html = renderToString(
       <MemoryRouter>
