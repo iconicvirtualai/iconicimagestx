@@ -43,6 +43,7 @@ import apprenticeshipRouter from "./routes/apprenticeship";
 import liveChatRouter from "./routes/liveChat";
 import contactThreadsRouter from "./routes/contactThreads";
 import communicationsRouter from "./routes/communications";
+import peopleRouter from "./routes/people";
 import { listCalendarScheduleEvents, verifyCalendarWriteAccess } from "./services/calendar";
 import { photographerCalendarRoster } from "./services/photographerRoster";
 import { clientNotifyLive } from "../shared/clientNotify";
@@ -274,6 +275,7 @@ export function createServer() {
   app.use("/api/vsai", vsaiRouter);
   app.use("/api/messages", messagingRouter);
   app.use("/api/communications", communicationsRouter);
+  app.use("/api/people", peopleRouter);
   app.use("/api/clients", clientHubRouter);
   app.use("/api/clients", clientsRouter);
   app.get("/api/portal/listings/:id", handleGetPublicPortalListing);

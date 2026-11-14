@@ -44,6 +44,59 @@ service cloud.firestore {
         get(/databases/$(database)/documents/orders/$(orderId)).data.clientId == request.auth.uid;
     }
 
+    // Missing permissions keep the role default. An explicit false is a deny.
+    // Publish this file in the Firebase console. Vercel does not deploy rules.
+    function explicitlyDenied(key) {
+      return isStaff() &&
+        staffData().keys().hasAny(['permissions']) &&
+        staffData().permissions is map &&
+        staffData().permissions.keys().hasAny([key]) &&
+        staffData().permissions[key] == false;
+    }
+
+    // Client teams share orders, listings, and billing when both sides list the group.
+    function clientSharesGroup(data) {
+      return isAuthenticated() &&
+        data.keys().hasAny(['groupIds']) &&
+        data.groupIds is list &&
+        exists(/databases/$(database)/documents/clients/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/clients/$(request.auth.uid)).data.keys().hasAny(['groupIds']) &&
+        get(/databases/$(database)/documents/clients/$(request.auth.uid)).data.groupIds is list &&
+        get(/databases/$(database)/documents/clients/$(request.auth.uid)).data.groupIds.hasAny(data.groupIds);
+    }
+
+    function directInboxOk() {
+      return request.resource.data.kind == 'direct' &&
+        request.resource.data.participantUids is list &&
+        request.resource.data.notifyUids is list &&
+        request.resource.data.participantUids.size() >= 1 &&
+        request.resource.data.participantUids.size() <= 20 &&
+        request.resource.data.notifyUids.size() <= 20 &&
+        request.auth.uid in request.resource.data.participantUids &&
+        request.resource.data.participantUids.hasAll(request.resource.data.notifyUids) &&
+        !(request.auth.uid in request.resource.data.notifyUids);
+    }
+
+    // Group delivery is the member list. A lead admin is not added here.
+    function groupMessageTargetsOk() {
+      return request.resource.data.kind == 'group' &&
+        request.resource.data.groupId is string &&
+        exists(/databases/$(database)/documents/peopleGroups/$(request.resource.data.groupId)) &&
+        groupMessageMembersOk();
+    }
+
+    function groupMessageMembersOk() {
+      let group = get(/databases/$(database)/documents/peopleGroups/$(request.resource.data.groupId)).data;
+      return request.auth.uid in group.canMessageUids &&
+        group.memberUids is list &&
+        request.resource.data.notifyUids is list &&
+        request.resource.data.participantUids is list &&
+        group.memberUids.hasAll(request.resource.data.notifyUids) &&
+        request.resource.data.notifyUids.hasAll(group.memberUids) &&
+        request.resource.data.participantUids.hasAll(group.memberUids) &&
+        group.memberUids.hasAll(request.resource.data.participantUids.removeAll([request.auth.uid]));
+    }
+
     // ─── Public Write Collections ────────────────────────────────────────────
 
     // Order requests: anyone can submit (booking form — no login required)
@@ -65,7 +118,7 @@ service cloud.firestore {
       allow update: if isCoordinator() || (
         isClientOwner(clientId) &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'firstName', 'lastName', 'phone', 'company', 'hubProfile', 'updatedAt'
+          'firstName', 'lastName', 'phone', 'company', 'hubProfile', 'profileSettings', 'updatedAt'
         ])
       );
       allow delete: if isAdmin();
@@ -132,7 +185,7 @@ service cloud.firestore {
     }
 
     match /clientBilling/{clientId} {
-      allow read: if isCoordinator() || isClientOwner(clientId) || hubReader(resource.data);
+      allow read: if isCoordinator() || isClientOwner(clientId) || hubReader(resource.data) || clientSharesGroup(resource.data);
       allow write: if false;
     }
 
@@ -149,15 +202,23 @@ service cloud.firestore {
       // Own record is readable by that Auth user so login can tell a missing
       // or inactive staff doc from an active one. Everyone else's records
       // stay limited to active staff.
+      // A person may save profile settings on their own document.
+      // Role and permissions stay with an admin.
       allow read: if (isAuthenticated() && staffId == request.auth.uid) || isStaff();
-      allow create, update: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin() || (
+        isAuthenticated() &&
+        staffId == request.auth.uid &&
+        request.resource.data.role == resource.data.role &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['profileSettings', 'updatedAt'])
+      );
       allow delete: if isAdmin();
     }
 
     // ─── Orders ──────────────────────────────────────────────────────────────
 
     match /orders/{orderId} {
-      allow read: if isStaff() || isOrderClient(orderId);
+      allow read: if (isStaff() && !explicitlyDenied('orders.view')) || isOrderClient(orderId) || clientSharesGroup(resource.data);
       allow create, update: if isCoordinator();
       allow delete: if isAdmin();
     }
@@ -211,7 +272,7 @@ service cloud.firestore {
     match /messages/{messageId} {
       // Staff read the hub. A client or photographer reads only threads they are on.
       // Publish this file in the Firebase console. Vercel does not deploy rules.
-      allow read: if isStaff() ||
+      allow read: if (isStaff() && !explicitlyDenied('messages.view')) ||
         (isAuthenticated() && resource.data.senderId == request.auth.uid) ||
         (isAuthenticated() && resource.data.clientId == request.auth.uid) ||
         (isAuthenticated() && resource.data.photographerId == request.auth.uid) ||
@@ -425,11 +486,13 @@ service cloud.firestore {
       // Each or-branch is separate so a photographer query
       // (photographerIds array-contains uid) is provable. Coordinators and
       // editors can still read the whole collection.
-      allow read: if isCoordinator() || isEditor()
+      allow read: if (isCoordinator() && !explicitlyDenied('listings.view'))
+        || (isEditor() && !explicitlyDenied('listings.view'))
         || (isAuthenticated() && resource.data.clientId == request.auth.uid)
-        || (isPhotographer() && resource.data.photographerUid == request.auth.uid)
-        || (isPhotographer() && resource.data.photographerIds is list
-            && request.auth.uid in resource.data.photographerIds);
+        || (isPhotographer() && !explicitlyDenied('listings.view') && resource.data.photographerUid == request.auth.uid)
+        || (isPhotographer() && !explicitlyDenied('listings.view') && resource.data.photographerIds is list
+            && request.auth.uid in resource.data.photographerIds)
+        || clientSharesGroup(resource.data);
       allow create: if isCoordinator();
       allow update: if isCoordinator() || isEditor();
       allow delete: if isAdmin();
@@ -463,7 +526,7 @@ service cloud.firestore {
     // Publish this file in the Firebase console. Vercel does not deploy rules.
     // Nothing in this collection sends email or texts.
     match /taskBoardItems/{itemId} {
-      allow read: if isCoordinator();
+      allow read: if isCoordinator() && !explicitlyDenied('tasks.view');
       allow create: if isAdmin() || (
         isCoordinator() &&
         request.resource.data.eventId is string &&
@@ -514,6 +577,42 @@ service cloud.firestore {
         && request.resource.data.seen is map
         && request.resource.data.seen.keys().hasOnly(['chat', 'inbox', 'sms', 'botroom', 'orders', 'events', 'tasks']);
       allow delete: if false;
+    }
+
+    // ─── People groups and direct inbox ──────────────────────────────────────
+    // Groups point at staff and client ids. They do not copy contact records.
+    // A group message may be created only when notifyUids is exactly the
+    // member list and the sender is in canMessageUids. Lead admins can read
+    // a sent group thread without being members. They are not added to
+    // notifyUids. Publish this file in the Firebase console.
+    // Vercel does not deploy firestore.rules.
+    match /peopleGroups/{groupId} {
+      allow read: if isAdmin() || (
+        isAuthenticated() &&
+        resource.data.memberUids is list &&
+        request.auth.uid in resource.data.memberUids
+      ) || (
+        isAuthenticated() &&
+        resource.data.canMessageUids is list &&
+        request.auth.uid in resource.data.canMessageUids
+      );
+      allow create, update: if isAdmin() && !explicitlyDenied('groups.manage');
+      allow delete: if isAdmin();
+    }
+
+    match /inboxThreads/{threadId} {
+      allow read: if isAuthenticated() && (
+        (resource.data.status == 'draft' && resource.data.ownerUid == request.auth.uid) ||
+        (resource.data.status == 'sent' && (
+          request.auth.uid in resource.data.participantUids ||
+          (isAdmin() && resource.data.kind == 'group')
+        ))
+      );
+      allow create: if isAuthenticated() &&
+        request.resource.data.senderUid == request.auth.uid &&
+        request.resource.data.ownerUid == request.auth.uid &&
+        (directInboxOk() || groupMessageTargetsOk());
+      allow update, delete: if false;
     }
 
     // ─── Catch-all: deny everything else ─────────────────────────────────────

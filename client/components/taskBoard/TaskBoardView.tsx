@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { GripVertical, Plus, Search, Trash2, X } from "lucide-react";
 import { DragGhost, dragDropClass, type DragGhostModel } from "@/components/drag/DragGhost";
 import { UnreadBadge } from "@/components/admin/UnreadBadge";
+import { PersonChip } from "@/components/people/PersonChip";
 import {
   TASK_PRIORITIES,
   TASK_PRIORITY_LABEL,
@@ -658,7 +659,12 @@ function TaskBoard({
                       </Link>
                     ) : null}
                     <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] font-semibold">
-                      <span data-testid="task-assignee" className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">{shortName(task.assigneeName) || "Unassigned"}</span>
+                      <PersonChip
+                        testId="task-assignee"
+                        name={shortName(task.assigneeName) || "Unassigned"}
+                        kind={task.assigneeId ? "staff" : null}
+                        sourceId={task.assigneeId}
+                      />
                       <span className={priorityClass(task.priority)}>{TASK_PRIORITY_LABEL[task.priority]}</span>
                       <span className={isOverdue(task, today) ? "text-red-600" : "text-slate-400"}>{dueLabel(task.dueOn, task.status, today)}</span>
                     </div>

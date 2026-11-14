@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Mail, Smartphone } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { filterThreads, type ThreadAudience, type UnifiedThread } from "@shared/communications/threads";
+import { PersonChip } from "@/components/people/PersonChip";
 
 const FILTERS: { id: ThreadAudience; label: string }[] = [
   { id: "clients", label: "Clients" },
@@ -132,7 +133,15 @@ export function UnifiedThreads() {
               {selected.messages.length === 0 ? <p className="text-sm text-gray-500">{selected.connectorNeeded ? "No messages until a connector is added." : "No messages in this thread yet."}</p> : null}
               {selected.messages.map((message) => (
                 <div key={message.id} className={`max-w-full rounded-2xl px-3 py-2 text-sm text-white sm:max-w-md ${message.direction === "outbound" ? "ml-auto bg-teal-700" : "bg-gray-800"}`}>
-                  <p className="text-[10px] uppercase tracking-wide text-white/70">{message.senderName} · {message.channel}{message.delivery === "suppressed" ? " · not sent" : ""}</p>
+                  <p className="text-[10px] uppercase tracking-wide text-white/70">
+                    <PersonChip
+                      tone="dark"
+                      name={message.senderName || "Sender"}
+                      kind={message.senderType === "client" ? "client" : message.senderId ? "staff" : null}
+                      sourceId={message.senderId || null}
+                    />
+                    {" · "}{message.channel}{message.delivery === "suppressed" ? " · not sent" : ""}
+                  </p>
                   <p className="whitespace-pre-wrap break-words">{message.body}</p>
                 </div>
               ))}

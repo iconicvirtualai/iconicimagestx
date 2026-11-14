@@ -28,6 +28,7 @@ import type { GalleryReleaseReport } from "@shared/galleryRelease";
 import { publicClientUrl } from "@shared/publicSiteUrl";
 import { filterAssignableStaff, recordAllowsQaStaff } from "@shared/qaStaff";
 import { DotOptInBadge } from "@/components/DoorsOpenTour";
+import { PersonChip } from "@/components/people/PersonChip";
 import { cancelOrderRequest } from "@/lib/cancelOrderRequest";
 import { OrderServicesFields } from "@/components/OrderServicesFields";
 import { syncOrderBillingToInvoice } from "@/lib/staffInvoice";
@@ -681,7 +682,7 @@ export default function AdminOrderDetail() {
                     <div key={i} className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg">
                       <Camera className="w-4 h-4 text-gray-400" />
                       <div>
-                        <p className="text-xs font-bold">{p.name}</p>
+                        <PersonChip name={p.name || "Shooter"} kind={p.providerId ? "staff" : null} sourceId={p.providerId || null} className="text-xs font-bold" />
                         <p className="text-[10px] text-gray-400 capitalize">{p.role}</p>
                       </div>
                     </div>

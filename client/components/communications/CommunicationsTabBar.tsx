@@ -3,6 +3,7 @@ import {
   MessageCircle,
   MessageSquare,
   Send,
+  Users,
   Smartphone,
   Sparkles,
 } from "lucide-react";
@@ -14,6 +15,7 @@ export type CommunicationsTabId =
   | "sweep"
   | "contact"
   | "inbox"
+  | "direct"
   | "sms"
   | "compose"
   | "assistants"
@@ -23,6 +25,7 @@ const TABS: { id: CommunicationsTabId; label: string; icon: ElementType; adminOn
   { id: "sweep", label: "Sweep", icon: Bot },
   { id: "contact", label: "Chat", icon: MessageCircle },
   { id: "inbox", label: "Inbox", icon: MessageSquare },
+  { id: "direct", label: "Direct", icon: Users },
   { id: "sms", label: "SMS", icon: Smartphone },
   { id: "compose", label: "Compose", icon: Send },
   { id: "assistants", label: "Assistants", icon: Sparkles },

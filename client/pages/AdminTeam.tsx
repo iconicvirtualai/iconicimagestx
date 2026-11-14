@@ -24,6 +24,7 @@ import { normalizeSiteEditorFlags, type SiteEditorFlags } from "@shared/siteEdit
 import { useAuth } from "@/contexts/AuthContext";
 import { PasswordField } from "@/components/PasswordField";
 import { passwordPolicyError } from "@shared/passwordAccount";
+import { PersonChip } from "@/components/people/PersonChip";
 
 type Role = "admin" | "coordinator" | "photographer" | "editor";
 
@@ -353,7 +354,7 @@ function TeamMemberRow({
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-3 mb-0.5">
-          <p className="font-black text-sm text-black">{member.firstName} {member.lastName}</p>
+          <PersonChip name={`${member.firstName} ${member.lastName}`.trim()} kind="staff" sourceId={member.uid} className="font-black text-sm text-black" />
           <span className={`text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full ${ROLE_BADGE[member.role]}`}>
             {ROLE_LABEL[member.role]}
           </span>
