@@ -17,14 +17,15 @@ export default function NewServiceAlert({ title, body, cta, to, eyebrow }: NewSe
     <Link
       to={to}
       data-testid="new-service-alert"
-      className="block rounded-[2rem] bg-[#1c140c] p-6 text-[#fff7ed] shadow-xl ring-2 ring-[#0d9488]"
+      className="box-border block w-full max-w-full min-w-0 overflow-hidden rounded-[2rem] bg-[#1c140c] p-6 text-[#fff7ed] shadow-xl ring-2 ring-[#0d9488]"
+      style={{ color: "#fff7ed", padding: 24, overflowWrap: "anywhere" }}
     >
       {eyebrow ? (
-        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#0d9488]">{eyebrow}</p>
+        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#0d9488]" style={{ color: "#0d9488" }}>{eyebrow}</p>
       ) : null}
-      <h3 className="mt-2 text-2xl font-black leading-none text-white">{title}</h3>
-      <p className="mt-3 text-sm font-semibold leading-snug text-[#fff7ed]">{body}</p>
-      <span className="mt-4 inline-block text-sm font-black text-[#0d9488]">{cta}</span>
+      <h3 className="mt-2 text-2xl font-black leading-tight text-white" style={{ color: "#fff" }}>{title}</h3>
+      <p className="mt-3 text-sm font-semibold leading-snug text-[#fff7ed]" style={{ color: "#fff7ed" }}>{body}</p>
+      <span className="mt-4 inline-block max-w-full text-sm font-black text-[#0d9488]" style={{ color: "#0d9488" }}>{cta}</span>
     </Link>
   );
 }

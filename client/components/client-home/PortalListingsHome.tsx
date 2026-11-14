@@ -11,6 +11,7 @@ import {
   type ClientListingCard,
 } from "@shared/clientHome";
 import { ListingPackageCard } from "@/components/listing-card/ListingPackageCard";
+import { OrderNumberMark } from "@/components/OrderNumberMark";
 
 const MEDIA = "/media/portal-v2";
 
@@ -321,6 +322,7 @@ export function ListingRow({ listing, example }: { listing: ClientListingCard; e
           {kind ? <span className="tag">{kind}</span> : null}
           <span className={face?.soft ? "tag soft" : "tag ok"}>{badge}</span>
         </div>
+        <OrderNumberMark value={listing.orderNumber} />
         <h4>{listing.address}</h4>
         <div className="meta">
           {face ? face.meta : [photos, dateLabel].filter(Boolean).join(" · ")}

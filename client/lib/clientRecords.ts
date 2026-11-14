@@ -37,6 +37,8 @@ export interface ClientRecord {
   conciergeNotes?: string;
   presentation?: ClientPresentation;
   taxNotes?: string;
+  hubProfile?: { headshotUrl?: string };
+  cardOnFile?: { brand?: string; last4?: string; expMonth?: number; expYear?: number };
 }
 
 export function clientName(client: Pick<ClientRecord, "firstName" | "lastName" | "email">): string {

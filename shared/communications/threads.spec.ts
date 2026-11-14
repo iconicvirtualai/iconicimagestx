@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { canUseAssistants } from "./access";
-import { buildUnifiedThreads, filterThreads, threadVisibleTo, type PortalScope } from "./threads";
+import { buildUnifiedThreads, filterThreads, portalUnreadCount, threadVisibleTo, type PortalScope } from "./threads";
 
 const clientScope = (uid: string, email = ""): PortalScope => ({ kind: "client", uid, email, phone: "" });
 const photographerScope = (uid: string, phone = ""): PortalScope => ({ kind: "photographer", uid, email: "", phone });
@@ -95,6 +95,14 @@ describe("unified communications threads", () => {
   it("does not duplicate an SMS that is already on the order thread", () => {
     const order = threads.find((thread) => thread.id === "order:order-1");
     expect(order?.messages.filter((message) => message.body === "Where is the gallery?")).toHaveLength(1);
+  });
+
+  it("counts a latest desk reply toward the client badge", () => {
+    const ada = threads.filter((thread) => threadVisibleTo(thread, clientScope("client-a", "ada@example.com")));
+    expect(portalUnreadCount(ada)).toBeGreaterThan(0);
+    expect(portalUnreadCount([])).toBe(0);
+    const linked = { kind: "client" as const, uid: "auth-uid", email: "", phone: "", clientIds: ["client-a"] };
+    expect(threads.some((thread) => threadVisibleTo(thread, linked))).toBe(true);
   });
 
   it("shows a client only their own threads", () => {

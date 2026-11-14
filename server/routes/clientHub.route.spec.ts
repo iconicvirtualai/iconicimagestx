@@ -1,7 +1,7 @@
 import type { Server } from "node:http";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { setEmailDeliveryOverride } from "../services/email";
-import { resetClientHubMemory, seedClientHubMemory } from "../services/clientHubStore";
+import { readClientHubMemory, resetClientHubMemory, seedClientHubMemory } from "../services/clientHubStore";
 import { createServer } from "../index";
 
 let server: Server;
@@ -158,5 +158,69 @@ describe("client hub permission checks", () => {
     expect(sent).toEqual([]);
     expect(process.env.CLIENT_NOTIFY_LIVE).toBeUndefined();
     expect(process.env.BOOKING_NOTIFY_LIVE).toBeUndefined();
+  });
+
+  it("saves a headshot onto the staff client record, not only the auth uid", async () => {
+    seedClientHubMemory("clients", "auth-marty", {
+      firstName: "Portal",
+      lastName: "Stub",
+      email: "marty@example.com",
+      firebaseUid: "auth-marty",
+    });
+    seedClientHubMemory("clients", "auto-marty", {
+      firstName: "Marty",
+      lastName: "Byrd",
+      email: "marty@example.com",
+    });
+    seedClientHubMemory("listings", "listing-marty", { clientId: "auto-marty", address: "10 Marty Lane" });
+    const png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+    const saved = await fetch(`${baseUrl}/api/clients/me/hub/profile/asset`, {
+      method: "POST",
+      headers: headers("auth-marty", "marty@example.com"),
+      body: JSON.stringify({ kind: "headshot", dataUrl: png }),
+    });
+    expect(saved.status).toBe(200);
+    const body = await saved.json() as { url: string; profile: { firstName: string; headshotUrl: string } };
+    expect(body.profile.firstName).toBe("Marty");
+    expect(body.url).toContain("auto-marty");
+    expect(body.profile.headshotUrl).toBe(body.url);
+    const staff = readClientHubMemory("clients", "auto-marty");
+    const stub = readClientHubMemory("clients", "auth-marty");
+    expect(staff?.hubProfile).toMatchObject({ headshotUrl: body.url, firstName: "Marty" });
+    expect(stub?.hubProfile).toMatchObject({ headshotUrl: body.url });
+    expect(readClientHubMemory("listings", "listing-marty")?.agent).toMatchObject({ headshotUrl: body.url });
+
+    const rejected = await fetch(`${baseUrl}/api/clients/me/hub/profile/asset`, {
+      method: "POST",
+      headers: headers("auth-marty", "marty@example.com"),
+      body: JSON.stringify({ kind: "headshot", dataUrl: "data:image/gif;base64,R0lGODlhAQABAAAAACw=" }),
+    });
+    expect(rejected.status).toBe(400);
+    const error = await rejected.json() as { error: string };
+    expect(error.error).toContain("JPEG, PNG, or WebP");
+  });
+
+  it("reports the Square env names the card form needs", async () => {
+    const previousApp = process.env.SQUARE_APPLICATION_ID;
+    const previousVite = process.env.VITE_SQUARE_APPLICATION_ID;
+    const previousLocation = process.env.SQUARE_LOCATION_ID;
+    delete process.env.SQUARE_APPLICATION_ID;
+    delete process.env.VITE_SQUARE_APPLICATION_ID;
+    process.env.SQUARE_LOCATION_ID = "LOC-example";
+    try {
+      const response = await fetch(`${baseUrl}/api/clients/me/hub/billing`, { headers: headers("owner-1", "owner@example.com") });
+      expect(response.status).toBe(200);
+      const body = await response.json() as { billing: { square: { applicationId: string; locationId: string; missing: string[] } } };
+      expect(body.billing.square.applicationId).toBe("");
+      expect(body.billing.square.locationId).toBe("LOC-example");
+      expect(body.billing.square.missing).toEqual(["SQUARE_APPLICATION_ID"]);
+    } finally {
+      if (previousApp === undefined) delete process.env.SQUARE_APPLICATION_ID;
+      else process.env.SQUARE_APPLICATION_ID = previousApp;
+      if (previousVite === undefined) delete process.env.VITE_SQUARE_APPLICATION_ID;
+      else process.env.VITE_SQUARE_APPLICATION_ID = previousVite;
+      if (previousLocation === undefined) delete process.env.SQUARE_LOCATION_ID;
+      else process.env.SQUARE_LOCATION_ID = previousLocation;
+    }
   });
 });

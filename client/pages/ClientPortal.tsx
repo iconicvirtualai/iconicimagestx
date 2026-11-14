@@ -30,6 +30,7 @@ export default function ClientPortal() {
   const [home, setHome] = useState<PortalHome | null>(null);
   const [error, setError] = useState("");
   const [fetching, setFetching] = useState(!example);
+  const [messageCount, setMessageCount] = useState(0);
   function onSection(next: ClientHomeSection) {
     const nextParams = new URLSearchParams(params);
     if (example) nextParams.set("example", "1");
@@ -45,12 +46,17 @@ export default function ClientPortal() {
     (async () => {
       try {
         const token = await user.getIdToken();
-        const res = await fetch("/api/clients/me/home", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const headers = { Authorization: `Bearer ${token}` };
+        const res = await fetch("/api/clients/me/home", { headers });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.error || "Could not load your portal.");
         if (!cancelled) setHome(data);
+        const messages = await fetch("/api/communications/mine", { headers, cache: "no-store" });
+        if (messages.ok && !cancelled) {
+          const body = await messages.json().catch(() => ({}));
+          const count = Number(body.unreadCount);
+          setMessageCount(Number.isFinite(count) ? count : 0);
+        }
       } catch (err: unknown) {
         if (!cancelled) setError(err instanceof Error ? err.message : "Could not load your portal.");
       } finally {
@@ -125,7 +131,7 @@ export default function ClientPortal() {
           loading={fetching}
           error={error}
           example={example}
-          messageCount={example ? exampleThreads().length : 0}
+          messageCount={example ? exampleThreads().length : messageCount}
         />
       )}
     </div>

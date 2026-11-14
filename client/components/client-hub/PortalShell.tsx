@@ -230,10 +230,12 @@ export function PortalShell({
                   {onSignOut ? <button type="button" onClick={onSignOut}>Sign out</button> : null}
                 </div>
               ) : null}
-              <div className="acct-menu phone-only" aria-label="Account">
-                <Link to={example ? portalHref(CHANGE_PASSWORD_PATH, true) : CHANGE_PASSWORD_PATH}>Change password</Link>
-                {onSignOut ? <button type="button" onClick={onSignOut}>Sign out</button> : null}
-              </div>
+              {accountOpen ? (
+                <div className="acct-menu phone-only" aria-label="Account">
+                  <Link to={example ? portalHref(CHANGE_PASSWORD_PATH, true) : CHANGE_PASSWORD_PATH}>Change password</Link>
+                  {onSignOut ? <button type="button" onClick={onSignOut}>Sign out</button> : null}
+                </div>
+              ) : null}
             </div>
           </header>
           <main className="page">

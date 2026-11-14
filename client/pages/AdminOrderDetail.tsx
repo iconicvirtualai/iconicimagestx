@@ -17,6 +17,8 @@ import {
   LIFE_OF_THE_LISTING_CARE_SUMMARY_LABEL,
 } from "@shared/lifeOfTheListingCare";
 import { addressText, recordAddressText } from "@shared/addressText";
+import { shortOrderNumber } from "@shared/orderProjectInvoice";
+import { OrderNumberMark } from "@/components/OrderNumberMark";
 import { StaffSuggestedTimes } from "@/components/SuggestedAppointments";
 import type { BookingSlotChoice } from "@/components/BookingSlotPicker";
 import { BUSINESS_CONTACT, LEGAL_BUSINESS_NAME } from "@shared/businessContact";
@@ -458,7 +460,7 @@ export default function AdminOrderDetail() {
   const invoice = order.invoice || {};
 
   return (
-    <AdminLayout title={`Order ${order.orderNumber || order.id?.substring(0,8)}`}>
+    <AdminLayout title={`Order ${shortOrderNumber(order.orderNumber) || "file"}`}>
       {/* Back + Status */}
       <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
         <button onClick={() => navigate("/admin/orders")} className="flex items-center gap-1.5 text-gray-400 hover:text-black text-xs font-bold uppercase tracking-widest">
@@ -467,7 +469,7 @@ export default function AdminOrderDetail() {
         <div className="flex items-center gap-3">
           <span className={`px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest ${statusBadge.color}`}>{statusBadge.label}</span>
           <DotOptInBadge value={typeof order.dotOptIn === "boolean" ? order.dotOptIn : linkedRequest?.dotOptIn} />
-          <span className="text-[10px] font-mono text-gray-400">{order.orderNumber || order.id}</span>
+          <OrderNumberMark value={order.orderNumber} />
         </div>
       </div>
 

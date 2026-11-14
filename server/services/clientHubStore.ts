@@ -16,6 +16,7 @@ import {
   hubEmail,
   hubImageUrl,
   normalizePermissions,
+  pickCanonicalClientId,
   profileDisplayName,
   profileFromClient,
   sanitizeBilling,
@@ -32,6 +33,7 @@ import {
   type HubGrant,
   type TeamMemberRecord,
 } from "../../shared/clientHubSettings";
+import { squareWebPaymentsConfig } from "../../shared/squareInvoice";
 import { sendEmail } from "./email";
 
 export class HubError extends Error {
@@ -46,7 +48,10 @@ export class HubError extends Error {
 export interface HubActor {
   uid: string;
   email: string;
+  /** Desk record the portal writes. This is the auto-id when a staff client matches the login. */
   clientId: string;
+  /** Every client id resolveClientIdentity would collect for this login. */
+  clientIds: string[];
   client: Record<string, unknown>;
   profile: ClientHubProfile;
   ownedTeam: CustomerTeamRecord | null;
@@ -82,6 +87,11 @@ export function resetClientHubMemory() {
 
 export function seedClientHubMemory(collection: keyof Memory, id: string, data: Record<string, unknown>) {
   memory[collection].set(id, { ...data });
+}
+
+export function readClientHubMemory(collection: keyof Memory, id: string): Record<string, unknown> | null {
+  const row = memory[collection].get(id);
+  return row ? { ...row } : null;
 }
 
 function useMemory(): boolean {
@@ -208,17 +218,83 @@ function billingFrom(data: Record<string, unknown> | null): BillingProfile {
   };
 }
 
+const PROFILE_IMAGE_FIELDS: Record<string, keyof ClientHubProfile> = {
+  headshot: "headshotUrl",
+  companyLogo: "companyLogoUrl",
+  brokerageLogo: "brokerageLogoUrl",
+};
+
+const MAX_PROFILE_IMAGE_BYTES = 2_000_000;
+
+async function clientDocsForLogin(uid: string, email: string): Promise<Array<{ id: string; data: Record<string, unknown> }>> {
+  const ids = new Set<string>([uid]);
+  const direct = await readDoc("clients", uid);
+  const redirectId = typeof direct?._redirect === "string" ? direct._redirect : "";
+  const linkedId = typeof direct?.linkedClientId === "string" ? direct.linkedClientId : "";
+  if (redirectId) ids.add(redirectId);
+  if (linkedId) ids.add(linkedId);
+  const normalized = hubEmail(email || direct?.email);
+  if (normalized) {
+    const matches = await queryEqual("clients", "email", normalized);
+    matches.slice(0, 10).forEach((row) => ids.add(row.id));
+  }
+  const docs: Array<{ id: string; data: Record<string, unknown> }> = [];
+  for (const id of [...ids].slice(0, 10)) {
+    const data = id === uid ? direct : await readDoc("clients", id);
+    if (data) docs.push({ id, data });
+  }
+  return docs;
+}
+
+function mergedProfile(docs: Array<{ id: string; data: Record<string, unknown> }>, canonicalId: string, email: string): ClientHubProfile {
+  const canonical = docs.find((doc) => doc.id === canonicalId);
+  const profile = profileFromClient(canonical?.data || null);
+  if (!profile.email) profile.email = email;
+  for (const doc of docs) {
+    const other = profileFromClient(doc.data);
+    if (!profile.firstName && other.firstName) profile.firstName = other.firstName;
+    if (!profile.lastName && other.lastName) profile.lastName = other.lastName;
+    if (!profile.phone && other.phone) profile.phone = other.phone;
+    if (!profile.email && other.email) profile.email = other.email;
+    if (!profile.headshotUrl && other.headshotUrl) profile.headshotUrl = other.headshotUrl;
+    if (!profile.companyLogoUrl && other.companyLogoUrl) profile.companyLogoUrl = other.companyLogoUrl;
+    if (!profile.brokerage && other.brokerage) profile.brokerage = other.brokerage;
+    if (!profile.brokerageLogoUrl && other.brokerageLogoUrl) profile.brokerageLogoUrl = other.brokerageLogoUrl;
+    if (!profile.website && other.website) profile.website = other.website;
+  }
+  return profile;
+}
+
+function ownsClient(actor: HubActor, ownerClientId: string): boolean {
+  return ownerClientId === actor.uid || ownerClientId === actor.clientId || actor.clientIds.includes(ownerClientId);
+}
+
 export async function loadActor(uid: string, email: string): Promise<HubActor> {
-  const clientId = uid;
-  const stored = await readDoc("clients", clientId);
-  const client = stored || { firstName: "", lastName: "", email: hubEmail(email) };
-  const profile = profileFromClient(client);
-  if (!profile.email) profile.email = hubEmail(email);
-  const ownedRows = await queryEqual("teams", "ownerClientId", clientId);
-  const ownedTeam = ownedRows[0] ? teamFrom(ownedRows[0].id, ownedRows[0].data) : null;
-  const byUid = await queryEqual("members", "linkedClientId", clientId);
+  const loginEmail = hubEmail(email);
+  const docs = await clientDocsForLogin(uid, loginEmail);
+  const clientId = pickCanonicalClientId(uid, docs);
+  const clientIds = [...new Set([clientId, ...docs.map((doc) => doc.id)])].filter(Boolean).slice(0, 10);
+  const client = docs.find((doc) => doc.id === clientId)?.data || { firstName: "", lastName: "", email: loginEmail };
+  const profile = mergedProfile(docs, clientId, loginEmail);
+  if (!profile.email) profile.email = loginEmail;
+  let ownedTeam: CustomerTeamRecord | null = null;
+  for (const id of clientIds) {
+    const ownedRows = await queryEqual("teams", "ownerClientId", id);
+    if (ownedRows[0]) {
+      ownedTeam = teamFrom(ownedRows[0].id, ownedRows[0].data);
+      break;
+    }
+  }
+  let memberRow: { id: string; data: Record<string, unknown> } | null = null;
+  for (const id of clientIds) {
+    const byId = await queryEqual("members", "linkedClientId", id);
+    if (byId[0]) {
+      memberRow = byId[0];
+      break;
+    }
+  }
   const byEmail = profile.email ? await queryEqual("members", "email", profile.email) : [];
-  const memberRow = byUid[0] || byEmail.find((row) => row.data.ownerClientId !== clientId) || null;
+  memberRow = memberRow || byEmail.find((row) => !clientIds.includes(String(row.data.ownerClientId || ""))) || null;
   let membership = memberRow ? memberFrom(memberRow.id, memberRow.data) : null;
   if (membership && !membership.linkedClientId) {
     membership = { ...membership, linkedClientId: clientId, status: "active" };
@@ -229,7 +305,7 @@ export async function loadActor(uid: string, email: string): Promise<HubActor> {
     const members = await queryEqual("members", "teamId", membership.teamId);
     grant = grantFromMembers(membership.ownerClientId, membership.teamId, members.map((row) => memberFrom(row.id, row.data)));
   }
-  return { uid, email: hubEmail(email) || profile.email, clientId, client, profile, ownedTeam, membership, grant };
+  return { uid, email: loginEmail || profile.email, clientId, clientIds, client, profile, ownedTeam, membership, grant };
 }
 
 function assert(ok: boolean, status: number, message: string) {
@@ -268,20 +344,33 @@ export async function saveProfile(actor: HubActor, input: unknown) {
   if (containsRawCard(input)) throw new HubError(400, "Card numbers are not stored on the profile.");
   const profile = sanitizeProfilePatch(input, actor.email || actor.profile.email);
   if (!profile.firstName) throw new HubError(400, "First name is required.");
-  await writeDoc("clients", actor.clientId, {
-    firebaseUid: actor.uid,
-    firstName: profile.firstName,
-    lastName: profile.lastName,
-    phone: profile.phone,
-    email: actor.email || actor.profile.email || profile.email,
-    company: profile.brokerage,
-    hubProfile: profile,
-    portalAccess: true,
-    status: actor.client.status || "active",
-    updatedAt: nowStamp(),
-  });
-  await stampOwnedListings(actor.clientId, profile);
+  await writeProfileToMatches(actor, profile);
   return { profile };
+}
+
+async function writeProfileToMatches(actor: HubActor, profile: ClientHubProfile) {
+  const email = actor.email || actor.profile.email || profile.email;
+  for (const id of actor.clientIds) {
+    const canonical = id === actor.clientId;
+    await writeDoc("clients", id, {
+      ...(canonical ? {
+        firebaseUid: actor.uid,
+        firstName: profile.firstName,
+        lastName: profile.lastName,
+        phone: profile.phone,
+        email,
+        company: profile.brokerage,
+        portalAccess: true,
+        status: actor.client.status || "active",
+      } : {
+        firebaseUid: actor.uid,
+        linkedClientId: actor.clientId,
+      }),
+      hubProfile: profile,
+      updatedAt: nowStamp(),
+    });
+    await stampOwnedListings(id, profile);
+  }
 }
 
 async function stampOwnedListings(clientId: string, profile: ClientHubProfile) {
@@ -292,31 +381,74 @@ async function stampOwnedListings(clientId: string, profile: ClientHubProfile) {
     if (!listing.data.agentPhone && profile.phone) patch.agentPhone = profile.phone;
     if (!listing.data.agentEmail && profile.email) patch.agentEmail = profile.email;
     if (!listing.data.brokerage && !listing.data.brokerageName && profile.brokerage) patch.brokerage = profile.brokerage;
+    const agent = listing.data.agent;
+    const agentRecord = agent && typeof agent === "object" && !Array.isArray(agent) ? agent as Record<string, unknown> : null;
+    if ((agent == null || agentRecord) && (profile.headshotUrl || profile.companyLogoUrl || profile.brokerageLogoUrl)) {
+      patch.agent = {
+        ...(agentRecord || {}),
+        ...(profile.headshotUrl ? { headshotUrl: profile.headshotUrl } : {}),
+        ...(profile.companyLogoUrl ? { companyLogoUrl: profile.companyLogoUrl } : {}),
+        ...(profile.brokerageLogoUrl ? { brokerageLogoUrl: profile.brokerageLogoUrl } : {}),
+      };
+    }
     await writeDoc("listings", listing.id, patch);
   }
 }
 
-export async function saveProfileAsset(actor: HubActor, kind: string, dataUrl: string): Promise<{ url: string }> {
+export async function saveProfileAsset(actor: HubActor, kind: string, dataUrl: string): Promise<{ url: string; profile: ClientHubProfile }> {
   const allowed = new Set(["headshot", "companyLogo", "brokerageLogo", "teamLogo", "memberLogo"]);
   if (!allowed.has(kind)) throw new HubError(400, "That image is not a profile asset.");
   const parsed = parseImage(dataUrl);
-  if (!parsed) throw new HubError(400, "Upload a JPEG, PNG, or WebP image under 700 KB.");
   const url = await storeImage(actor.clientId, kind, parsed);
-  return { url };
+  const field = PROFILE_IMAGE_FIELDS[kind];
+  if (!field) return { url, profile: actor.profile };
+  const profile = { ...actor.profile, [field]: url };
+  await writeProfileToMatches(actor, profile);
+  return { url, profile };
 }
 
-function parseImage(dataUrl: string): { mime: string; bytes: Buffer } | null {
+export async function saveStaffProfileAsset(clientId: string, kind: string, dataUrl: string): Promise<{ url: string; profile: ClientHubProfile }> {
+  const start = await readDoc("clients", clientId);
+  if (!start) throw new HubError(404, "Client not found.");
+  const email = hubEmail(start.email);
+  const uid = typeof start.firebaseUid === "string" && start.firebaseUid ? start.firebaseUid : clientId;
+  const docs = await clientDocsForLogin(uid, email);
+  if (!docs.some((doc) => doc.id === clientId)) docs.push({ id: clientId, data: start });
+  const profile = { ...mergedProfile(docs, clientId, email) };
+  const parsed = parseImage(dataUrl);
+  const url = await storeImage(clientId, kind, parsed);
+  const field = PROFILE_IMAGE_FIELDS[kind];
+  if (!field) return { url, profile };
+  const next = { ...profile, [field]: url };
+  await writeProfileToMatches({
+    uid,
+    email,
+    clientId,
+    clientIds: [...new Set([clientId, ...docs.map((doc) => doc.id)])].slice(0, 10),
+    client: start,
+    profile: next,
+    ownedTeam: null,
+    membership: null,
+    grant: null,
+  }, next);
+  return { url, profile: next };
+}
+
+function parseImage(dataUrl: string): { mime: string; bytes: Buffer } {
   const match = /^data:(image\/(?:jpeg|png|webp));base64,([a-z0-9+/=\s]+)$/i.exec(dataUrl.trim());
-  if (!match) return null;
+  if (!match) throw new HubError(400, "Upload a JPEG, PNG, or WebP image.");
   const bytes = Buffer.from(match[2].replace(/\s/g, ""), "base64");
-  if (!bytes.length || bytes.length > 700_000) return null;
+  if (!bytes.length) throw new HubError(400, "That image was empty. Choose a JPEG, PNG, or WebP photo.");
+  if (bytes.length > MAX_PROFILE_IMAGE_BYTES) {
+    throw new HubError(400, "That image is still over 2 MB. Choose a smaller photo, or let the page resize it and try again.");
+  }
   return { mime: match[1].toLowerCase(), bytes };
 }
 
 async function storeImage(clientId: string, kind: string, image: { mime: string; bytes: Buffer }): Promise<string> {
   const ext = image.mime === "image/png" ? "png" : image.mime === "image/webp" ? "webp" : "jpg";
   const path = `client-hub/${clientId}/${kind}-${Date.now()}.${ext}`;
-  if (useMemory()) return `data:${image.mime};base64,${image.bytes.toString("base64")}`;
+  if (useMemory()) return `https://cdn.example.test/client-hub/${encodeURIComponent(clientId)}/${kind}.${ext}`;
   try {
     const bucket = admin.storage().bucket();
     const token = randomBytes(16).toString("hex");
@@ -363,7 +495,7 @@ async function teamBoard(team: CustomerTeamRecord) {
 export async function getTeam(actor: HubActor) {
   if (actor.ownedTeam) return { ...(await teamBoard(actor.ownedTeam)), access: accessFor(actor) };
   if (!actor.membership || !actor.grant) return { team: null, members: [], listings: [], orders: [], access: accessFor(actor) };
-  assert(hubAllows({ uid: actor.uid, action: "read", section: "team", ownerClientId: actor.membership.ownerClientId, grant: actor.grant }), 403, "You do not have access to this team.");
+  assert(ownsClient(actor, actor.membership.ownerClientId) || hubAllows({ uid: actor.uid, action: "read", section: "team", ownerClientId: actor.membership.ownerClientId, grant: actor.grant }), 403, "You do not have access to this team.");
   const stored = await readDoc("teams", actor.membership.teamId);
   if (!stored) return { team: null, members: [], listings: [], orders: [], access: accessFor(actor) };
   return { ...(await teamBoard(teamFrom(actor.membership.teamId, stored))), access: accessFor(actor) };
@@ -374,7 +506,7 @@ function teamOwnerId(actor: HubActor): string {
 }
 
 function requireTeamAdmin(actor: HubActor, ownerClientId: string) {
-  if (actor.clientId === ownerClientId) return;
+  if (ownsClient(actor, ownerClientId)) return;
   assert(Boolean(actor.grant && hubAllows({ uid: actor.uid, action: "write", section: "team", ownerClientId, grant: actor.grant })), 403, "You do not have permission to edit this team.");
 }
 
@@ -534,7 +666,7 @@ function crmOwner(actor: HubActor): { ownerClientId: string; teamId: string; gra
 
 function assertCrm(actor: HubActor, action: "read" | "write") {
   const scope = crmOwner(actor);
-  assert(hubAllows({
+  assert(ownsClient(actor, scope.ownerClientId) || hubAllows({
     uid: actor.uid,
     action,
     section: "clients",
@@ -596,7 +728,7 @@ export async function importContacts(actor: HubActor, contacts: Array<Omit<Agent
 
 function billingOwner(actor: HubActor, requested: string): string {
   const ownerClientId = requested || actor.clientId;
-  if (ownerClientId === actor.clientId) return ownerClientId;
+  if (ownsClient(actor, ownerClientId)) return ownerClientId;
   assert(hubAllows({
     uid: actor.uid,
     action: "read",
@@ -607,10 +739,31 @@ function billingOwner(actor: HubActor, requested: string): string {
   return ownerClientId;
 }
 
+function assertBillingWrite(actor: HubActor, ownerClientId: string) {
+  if (ownsClient(actor, ownerClientId)) return;
+  assert(hubAllows({
+    uid: actor.uid,
+    action: "write",
+    section: "billing",
+    ownerClientId,
+    grant: actor.grant,
+  }), 403, "You do not have billing permission for that account.");
+}
+
 export async function getBilling(actor: HubActor, requestedOwner = "") {
   const ownerClientId = billingOwner(actor, requestedOwner);
   const stored = await readDoc("billing", ownerClientId);
   const billing = billingFrom(stored);
+  if (!billing.card && ownsClient(actor, ownerClientId)) {
+    for (const id of actor.clientIds) {
+      if (id === ownerClientId) continue;
+      const other = billingFrom(await readDoc("billing", id));
+      if (other.card) {
+        billing.card = other.card;
+        break;
+      }
+    }
+  }
   const invoiceRows = await queryEqual("invoices", "clientId", ownerClientId);
   const invoices = await Promise.all(invoiceRows.map(async (row) => {
     const requestId = typeof row.data.orderRequestId === "string" ? row.data.orderRequestId : "";
@@ -647,46 +800,20 @@ function publicBillingShape(billing: BillingProfile) {
       expMonth: billing.card.expMonth,
       expYear: billing.card.expYear,
     } : null,
-    square: {
-      applicationId: process.env.SQUARE_APPLICATION_ID || process.env.VITE_SQUARE_APPLICATION_ID || "",
-      locationId: process.env.SQUARE_LOCATION_ID || "",
-      environment: process.env.SQUARE_ENVIRONMENT === "sandbox" ? "sandbox" : "production",
-    },
+    square: squareWebPaymentsConfig(process.env),
   };
 }
 
-export async function saveBilling(actor: HubActor, requestedOwner: string, input: unknown) {
-  const ownerClientId = requestedOwner || actor.clientId;
-  assert(hubAllows({
-    uid: actor.uid,
-    action: "write",
-    section: "billing",
-    ownerClientId,
-    grant: ownerClientId === actor.clientId ? null : actor.grant,
-  }), 403, "You do not have billing permission for that account.");
-  if (containsRawCard(input)) throw new HubError(400, "Card numbers are not stored. Use the Square card form.");
-  const contact = sanitizeBilling(input);
-  const existing = billingFrom(await readDoc("billing", ownerClientId));
-  const grant = ownerClientId === actor.clientId ? null : actor.grant;
-  const readerUids = [...new Set([ownerClientId, ...(grant?.billingUids || []), ...(grant?.adminUids || [])])];
-  await writeDoc("billing", ownerClientId, {
-    ownerClientId,
-    ...contact,
-    readerUids,
-    updatedAt: nowStamp(),
-  });
-  return getBilling(actor, ownerClientId === actor.clientId ? "" : ownerClientId);
+function publicCard(card: CardOnFile) {
+  return {
+    brand: card.brand,
+    last4: card.last4,
+    expMonth: card.expMonth,
+    expYear: card.expYear,
+  };
 }
 
-export async function saveCard(actor: HubActor, requestedOwner: string, card: CardOnFile) {
-  const ownerClientId = requestedOwner || actor.clientId;
-  assert(hubAllows({
-    uid: actor.uid,
-    action: "write",
-    section: "billing",
-    ownerClientId,
-    grant: ownerClientId === actor.clientId ? null : actor.grant,
-  }), 403, "You do not have billing permission for that account.");
+async function writeCard(ownerClientId: string, card: CardOnFile, alsoClientIds: string[] = []) {
   const existing = await readDoc("billing", ownerClientId);
   await writeDoc("billing", ownerClientId, {
     ownerClientId,
@@ -702,6 +829,53 @@ export async function saveCard(actor: HubActor, requestedOwner: string, card: Ca
     squareCustomerId: card.squareCustomerId,
     updatedAt: nowStamp(),
   });
+  const summary = publicCard(card);
+  for (const id of [...new Set([ownerClientId, ...alsoClientIds])]) {
+    await writeDoc("clients", id, { cardOnFile: summary, updatedAt: nowStamp() });
+  }
+}
+
+export async function getStaffBilling(clientId: string) {
+  const client = await readDoc("clients", clientId);
+  if (!client) throw new HubError(404, "Client not found.");
+  return {
+    billing: publicBillingShape(billingFrom(await readDoc("billing", clientId))),
+    profile: profileFromClient(client),
+    ownerClientId: clientId,
+  };
+}
+
+export async function saveStaffCard(clientId: string, card: CardOnFile) {
+  const client = await readDoc("clients", clientId);
+  if (!client) throw new HubError(404, "Client not found.");
+  const email = hubEmail(client.email);
+  const uid = typeof client.firebaseUid === "string" && client.firebaseUid ? client.firebaseUid : clientId;
+  const docs = await clientDocsForLogin(uid, email);
+  const ids = [...new Set([clientId, ...docs.map((doc) => doc.id)])];
+  await writeCard(clientId, card, ids);
+  return getStaffBilling(clientId);
+}
+
+export async function saveBilling(actor: HubActor, requestedOwner: string, input: unknown) {
+  const ownerClientId = requestedOwner || actor.clientId;
+  assertBillingWrite(actor, ownerClientId);
+  if (containsRawCard(input)) throw new HubError(400, "Card numbers are not stored. Use the Square card form.");
+  const contact = sanitizeBilling(input);
+  const grant = ownsClient(actor, ownerClientId) ? null : actor.grant;
+  const readerUids = [...new Set([ownerClientId, ...(grant?.billingUids || []), ...(grant?.adminUids || [])])];
+  await writeDoc("billing", ownerClientId, {
+    ownerClientId,
+    ...contact,
+    readerUids,
+    updatedAt: nowStamp(),
+  });
+  return getBilling(actor, ownerClientId === actor.clientId ? "" : ownerClientId);
+}
+
+export async function saveCard(actor: HubActor, requestedOwner: string, card: CardOnFile) {
+  const ownerClientId = requestedOwner || actor.clientId;
+  assertBillingWrite(actor, ownerClientId);
+  await writeCard(ownerClientId, card, actor.clientIds);
   return getBilling(actor, ownerClientId === actor.clientId ? "" : ownerClientId);
 }
 

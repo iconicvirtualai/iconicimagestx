@@ -4,6 +4,7 @@ import { clientListingPath, type ClientListingCard } from "@shared/clientHome";
 import { packageSkin, type PackageChip, type PackageSkin } from "@shared/packageSkins";
 import { cn } from "@/lib/utils";
 import { skinTheme, type SkinTheme } from "./skinTheme";
+import { OrderNumberMark } from "@/components/OrderNumberMark";
 
 const TIGHT = "[overflow-wrap:normal] [word-break:normal]";
 const FONT = "Inter, system-ui, sans-serif";
@@ -39,6 +40,7 @@ export function ListingPackageCard({ listing, example = false }: { listing: Clie
       >
         <Hero listing={listing} theme={theme} badge={skin.badge} />
         <div className={cn("flex flex-1 flex-col px-[18px] pb-4 pt-4", theme.panelClass)}>
+          <OrderNumberMark value={listing.orderNumber} />
           <PackageTitle skin={skin} theme={theme} />
           <p className={cn("mt-2 text-[12px] leading-[1.4]", theme.featuresClass)}>{skin.features}</p>
           {skin.category === "listing" && (street || city) ? (

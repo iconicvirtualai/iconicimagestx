@@ -264,7 +264,7 @@
   white-space: nowrap; min-width: 168px;
 }
 .orders-desk .t-main{ flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 10px; }
-.orders-desk .t-main .oid{ font-weight: 750; font-variant-numeric: tabular-nums; font-size: 13px; }
+.orders-desk .t-main .oid{ font-weight: 900; font-variant-numeric: tabular-nums; font-size: 22px; letter-spacing: -0.03em; color: #0a0a0a; }
 .orders-desk .t-main .who{ font-weight: 600; font-size: 13px; }
 .orders-desk .t-main .where{ color: var(--muted); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .orders-desk .t-when{ color: var(--muted); font-size: 12px; font-weight: 550; white-space: nowrap; min-width: 110px; text-align: right; }
@@ -304,9 +304,10 @@
 .orders-desk table.orders tbody tr{ transition: background .12s ease; }
 .orders-desk table.orders tbody tr:hover{ background: #f7faf8; }
 .orders-desk .oid{
-  font-weight: 750; font-variant-numeric: tabular-nums;
+  font-weight: 900; font-variant-numeric: tabular-nums;
   color: var(--ink);
-  font-size: 13.5px;
+  font-size: 22px;
+  letter-spacing: -0.03em;
 }
 .orders-desk .client{ display: flex; align-items: center; gap: 10px; min-width: 180px; }
 .orders-desk .av{
