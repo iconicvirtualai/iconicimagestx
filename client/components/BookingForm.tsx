@@ -1096,7 +1096,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
                                 )}
                                 <button
                                   onClick={() => toggleService(s.id)}
-                                  className={`relative min-w-0 rounded-2xl border-2 px-4 py-4 text-left transition-all flex flex-col justify-between group h-full ${
+                                  className={`package-card relative min-w-0 rounded-2xl border-2 text-left transition-all flex flex-col justify-between group h-full ${
                                     formData.selectedService === s.id ? 'border-black bg-white shadow-lg' : 'border-gray-100 bg-white hover:border-gray-200'
                                   } ${s.highlights ? 'border-teal-300' : ''}`}
                                 >
@@ -1153,7 +1153,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
                           type="button"
                           onClick={() => toggleBasic(b.id)}
                           aria-pressed={formData.selectedBasics.includes(b.id)}
-                          className={`p-6 rounded-2xl border-2 transition-all text-left bg-white relative ${
+                          className={`package-card rounded-2xl border-2 transition-all text-left bg-white relative ${
                             formData.selectedBasics.includes(b.id) ? 'border-black bg-white scale-[1.01] shadow-lg' : 'border-gray-100 bg-white hover:border-gray-200'
                           }`}
                         >
