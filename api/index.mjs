@@ -3447,6 +3447,9 @@ function invoicePageInvoiceNumber(source, now = /* @__PURE__ */ new Date()) {
 function orderHistoryInvoiceNumber(source, now = /* @__PURE__ */ new Date()) {
   return shownInvoiceNumber(source, now);
 }
+function shortOrderNumber(value) {
+  return sequentialOrderLabel(value) || "";
+}
 function sequentialOrderLabel(value) {
   if (typeof value === "number" && Number.isInteger(value) && value >= 1) return formatOrderNumber(value);
   if (typeof value !== "string") return null;
@@ -4187,7 +4190,8 @@ function buildClientListing(id, data) {
     beds: amenities.beds,
     baths: amenities.baths,
     garage: amenities.garage,
-    pool: amenities.pool
+    pool: amenities.pool,
+    orderNumber: shortOrderNumber(data.orderNumber)
   };
 }
 function buildClientInvoice(id, data, now = /* @__PURE__ */ new Date(), order) {
@@ -4211,7 +4215,8 @@ function buildClientInvoice(id, data, now = /* @__PURE__ */ new Date(), order) {
     total: storedAmount(data.total),
     amountPaid: storedAmount(data.amountPaid),
     amountDue: storedAmount(data.amountDue),
-    payPath: invoicePayLinkFor({ id, payToken: data.payToken, status: data.status })
+    payPath: invoicePayLinkFor({ id, payToken: data.payToken, status: data.status }),
+    orderNumber: shortOrderNumber(order?.orderNumber) || shortOrderNumber(data.orderNumber)
   };
 }
 function buildClientAppointment(id, data, orderRequest) {
@@ -7396,6 +7401,19 @@ function squareApiBaseUrl(environment) {
 function squareConfigured(env) {
   return Boolean(env.SQUARE_ACCESS_TOKEN && env.SQUARE_LOCATION_ID);
 }
+function squareWebPaymentsConfig(env = {}) {
+  const applicationId = (env.SQUARE_APPLICATION_ID || env.VITE_SQUARE_APPLICATION_ID || "").trim();
+  const locationId = (env.SQUARE_LOCATION_ID || "").trim();
+  const missing = [];
+  if (!applicationId) missing.push("SQUARE_APPLICATION_ID");
+  if (!locationId) missing.push("SQUARE_LOCATION_ID");
+  return {
+    applicationId,
+    locationId,
+    environment: env.SQUARE_ENVIRONMENT === "sandbox" ? "sandbox" : "production",
+    missing
+  };
+}
 function preferredSquareCheckoutUrl(invoice) {
   if (typeof invoice.squareInvoiceUrl !== "string") return null;
   const url = invoice.squareInvoiceUrl.trim();
@@ -8617,6 +8635,27 @@ function hubImageUrl(value) {
   if (!raw) return "";
   if (raw.startsWith("data:image/")) return "";
   return hubHttpUrl(raw, 500);
+}
+function pickCanonicalClientId(uid, docs) {
+  const byId = new Map(docs.map((doc) => [doc.id, doc.data]));
+  const uidDoc = byId.get(uid);
+  const linked = typeof uidDoc?.linkedClientId === "string" ? uidDoc.linkedClientId : "";
+  const redirect = typeof uidDoc?._redirect === "string" ? uidDoc._redirect : "";
+  if (linked && linked !== uid && byId.has(linked)) return linked;
+  if (redirect && redirect !== uid && byId.has(redirect)) return redirect;
+  const others = docs.filter((doc) => doc.id !== uid);
+  if (others.length === 0) return uid;
+  const score = (doc) => {
+    let value = 0;
+    if (doc.data.hubProfile && typeof doc.data.hubProfile === "object") value += 3;
+    if (typeof doc.data.firstName === "string" && doc.data.firstName.trim()) value += 2;
+    if (typeof doc.data.company === "string" && doc.data.company.trim()) value += 1;
+    if (typeof doc.data.notes === "string" && doc.data.notes.trim()) value += 1;
+    if (typeof doc.data.totalOrders === "number" && doc.data.totalOrders > 0) value += 2;
+    if (typeof doc.data._redirect === "string" && doc.data._redirect) value -= 4;
+    return value;
+  };
+  return [...others].sort((left, right) => score(right) - score(left) || left.id.localeCompare(right.id))[0].id;
 }
 function profileFromClient(data) {
   const source = record$2(data);
@@ -21544,10 +21583,12 @@ function buildPortalListingDetail(sources) {
   const invoices = readInvoices(sources.invoices || [], sources);
   const activity = buildActivity(sources, photos, videos, floorplans, tours);
   const status2 = text$9(listing.status) || text$9(sources.order?.status) || text$9(sources.orderRequest?.status) || "open";
+  const orderNumber2 = shortOrderNumber(listing.orderNumber) || shortOrderNumber(sources.order?.orderNumber) || shortOrderNumber(sources.orderRequest?.orderNumber) || shortOrderNumber((sources.invoices || []).map((invoice) => invoice.orderNumber).find(Boolean));
   return applyStoredPortalData({
     id,
     title: address.formatted || "Listing",
     status: status2,
+    orderNumber: orderNumber2,
     address,
     facts: FACT_DEFS.map((fact) => {
       const value = factText(readFact(records, fact.keys));
@@ -22249,6 +22290,7 @@ function readInvoices(invoices, sources) {
     summaries.push({
       id,
       invoiceNumber: portalDisplayedInvoiceNumber(invoice, orderForInvoice(invoice, sources)),
+      orderNumber: shortOrderNumber(invoice.orderNumber) || shortOrderNumber(orderForInvoice(invoice, sources)?.orderNumber),
       status: text$9(invoice.status) || "draft",
       total,
       amountDue: invoice.amountDue == null ? total : money$1(invoice.amountDue)
@@ -23792,17 +23834,78 @@ function billingFrom(data) {
     credits
   };
 }
+const PROFILE_IMAGE_FIELDS = {
+  headshot: "headshotUrl",
+  companyLogo: "companyLogoUrl",
+  brokerageLogo: "brokerageLogoUrl"
+};
+const MAX_PROFILE_IMAGE_BYTES = 2e6;
+async function clientDocsForLogin(uid, email) {
+  const ids = /* @__PURE__ */ new Set([uid]);
+  const direct = await readDoc("clients", uid);
+  const redirectId = typeof direct?._redirect === "string" ? direct._redirect : "";
+  const linkedId = typeof direct?.linkedClientId === "string" ? direct.linkedClientId : "";
+  if (redirectId) ids.add(redirectId);
+  if (linkedId) ids.add(linkedId);
+  const normalized = hubEmail(email || direct?.email);
+  if (normalized) {
+    const matches = await queryEqual("clients", "email", normalized);
+    matches.slice(0, 10).forEach((row) => ids.add(row.id));
+  }
+  const docs = [];
+  for (const id of [...ids].slice(0, 10)) {
+    const data = id === uid ? direct : await readDoc("clients", id);
+    if (data) docs.push({ id, data });
+  }
+  return docs;
+}
+function mergedProfile(docs, canonicalId, email) {
+  const canonical = docs.find((doc) => doc.id === canonicalId);
+  const profile = profileFromClient(canonical?.data || null);
+  if (!profile.email) profile.email = email;
+  for (const doc of docs) {
+    const other = profileFromClient(doc.data);
+    if (!profile.firstName && other.firstName) profile.firstName = other.firstName;
+    if (!profile.lastName && other.lastName) profile.lastName = other.lastName;
+    if (!profile.phone && other.phone) profile.phone = other.phone;
+    if (!profile.email && other.email) profile.email = other.email;
+    if (!profile.headshotUrl && other.headshotUrl) profile.headshotUrl = other.headshotUrl;
+    if (!profile.companyLogoUrl && other.companyLogoUrl) profile.companyLogoUrl = other.companyLogoUrl;
+    if (!profile.brokerage && other.brokerage) profile.brokerage = other.brokerage;
+    if (!profile.brokerageLogoUrl && other.brokerageLogoUrl) profile.brokerageLogoUrl = other.brokerageLogoUrl;
+    if (!profile.website && other.website) profile.website = other.website;
+  }
+  return profile;
+}
+function ownsClient(actor2, ownerClientId) {
+  return ownerClientId === actor2.uid || ownerClientId === actor2.clientId || actor2.clientIds.includes(ownerClientId);
+}
 async function loadActor(uid, email) {
-  const clientId2 = uid;
-  const stored = await readDoc("clients", clientId2);
-  const client = stored || { firstName: "", lastName: "", email: hubEmail(email) };
-  const profile = profileFromClient(client);
-  if (!profile.email) profile.email = hubEmail(email);
-  const ownedRows = await queryEqual("teams", "ownerClientId", clientId2);
-  const ownedTeam = ownedRows[0] ? teamFrom(ownedRows[0].id, ownedRows[0].data) : null;
-  const byUid = await queryEqual("members", "linkedClientId", clientId2);
+  const loginEmail = hubEmail(email);
+  const docs = await clientDocsForLogin(uid, loginEmail);
+  const clientId2 = pickCanonicalClientId(uid, docs);
+  const clientIds = [.../* @__PURE__ */ new Set([clientId2, ...docs.map((doc) => doc.id)])].filter(Boolean).slice(0, 10);
+  const client = docs.find((doc) => doc.id === clientId2)?.data || { firstName: "", lastName: "", email: loginEmail };
+  const profile = mergedProfile(docs, clientId2, loginEmail);
+  if (!profile.email) profile.email = loginEmail;
+  let ownedTeam = null;
+  for (const id of clientIds) {
+    const ownedRows = await queryEqual("teams", "ownerClientId", id);
+    if (ownedRows[0]) {
+      ownedTeam = teamFrom(ownedRows[0].id, ownedRows[0].data);
+      break;
+    }
+  }
+  let memberRow = null;
+  for (const id of clientIds) {
+    const byId = await queryEqual("members", "linkedClientId", id);
+    if (byId[0]) {
+      memberRow = byId[0];
+      break;
+    }
+  }
   const byEmail = profile.email ? await queryEqual("members", "email", profile.email) : [];
-  const memberRow = byUid[0] || byEmail.find((row) => row.data.ownerClientId !== clientId2) || null;
+  memberRow = memberRow || byEmail.find((row) => !clientIds.includes(String(row.data.ownerClientId || ""))) || null;
   let membership = memberRow ? memberFrom(memberRow.id, memberRow.data) : null;
   if (membership && !membership.linkedClientId) {
     membership = { ...membership, linkedClientId: clientId2, status: "active" };
@@ -23813,7 +23916,7 @@ async function loadActor(uid, email) {
     const members = await queryEqual("members", "teamId", membership.teamId);
     grant = grantFromMembers(membership.ownerClientId, membership.teamId, members.map((row) => memberFrom(row.id, row.data)));
   }
-  return { uid, email: hubEmail(email) || profile.email, clientId: clientId2, client, profile, ownedTeam, membership, grant };
+  return { uid, email: loginEmail || profile.email, clientId: clientId2, clientIds, client, profile, ownedTeam, membership, grant };
 }
 function assert(ok, status2, message) {
   if (!ok) throw new HubError(status2, message);
@@ -23848,20 +23951,32 @@ async function saveProfile(actor2, input) {
   if (containsRawCard(input)) throw new HubError(400, "Card numbers are not stored on the profile.");
   const profile = sanitizeProfilePatch(input, actor2.email || actor2.profile.email);
   if (!profile.firstName) throw new HubError(400, "First name is required.");
-  await writeDoc("clients", actor2.clientId, {
-    firebaseUid: actor2.uid,
-    firstName: profile.firstName,
-    lastName: profile.lastName,
-    phone: profile.phone,
-    email: actor2.email || actor2.profile.email || profile.email,
-    company: profile.brokerage,
-    hubProfile: profile,
-    portalAccess: true,
-    status: actor2.client.status || "active",
-    updatedAt: nowStamp()
-  });
-  await stampOwnedListings(actor2.clientId, profile);
+  await writeProfileToMatches(actor2, profile);
   return { profile };
+}
+async function writeProfileToMatches(actor2, profile) {
+  const email = actor2.email || actor2.profile.email || profile.email;
+  for (const id of actor2.clientIds) {
+    const canonical = id === actor2.clientId;
+    await writeDoc("clients", id, {
+      ...canonical ? {
+        firebaseUid: actor2.uid,
+        firstName: profile.firstName,
+        lastName: profile.lastName,
+        phone: profile.phone,
+        email,
+        company: profile.brokerage,
+        portalAccess: true,
+        status: actor2.client.status || "active"
+      } : {
+        firebaseUid: actor2.uid,
+        linkedClientId: actor2.clientId
+      },
+      hubProfile: profile,
+      updatedAt: nowStamp()
+    });
+    await stampOwnedListings(id, profile);
+  }
 }
 async function stampOwnedListings(clientId2, profile) {
   const listings = await queryEqual("listings", "clientId", clientId2);
@@ -23871,6 +23986,16 @@ async function stampOwnedListings(clientId2, profile) {
     if (!listing.data.agentPhone && profile.phone) patch.agentPhone = profile.phone;
     if (!listing.data.agentEmail && profile.email) patch.agentEmail = profile.email;
     if (!listing.data.brokerage && !listing.data.brokerageName && profile.brokerage) patch.brokerage = profile.brokerage;
+    const agent = listing.data.agent;
+    const agentRecord = agent && typeof agent === "object" && !Array.isArray(agent) ? agent : null;
+    if ((agent == null || agentRecord) && (profile.headshotUrl || profile.companyLogoUrl || profile.brokerageLogoUrl)) {
+      patch.agent = {
+        ...agentRecord || {},
+        ...profile.headshotUrl ? { headshotUrl: profile.headshotUrl } : {},
+        ...profile.companyLogoUrl ? { companyLogoUrl: profile.companyLogoUrl } : {},
+        ...profile.brokerageLogoUrl ? { brokerageLogoUrl: profile.brokerageLogoUrl } : {}
+      };
+    }
     await writeDoc("listings", listing.id, patch);
   }
 }
@@ -23878,21 +24003,50 @@ async function saveProfileAsset(actor2, kind, dataUrl) {
   const allowed = /* @__PURE__ */ new Set(["headshot", "companyLogo", "brokerageLogo", "teamLogo", "memberLogo"]);
   if (!allowed.has(kind)) throw new HubError(400, "That image is not a profile asset.");
   const parsed = parseImage(dataUrl);
-  if (!parsed) throw new HubError(400, "Upload a JPEG, PNG, or WebP image under 700 KB.");
   const url = await storeImage(actor2.clientId, kind, parsed);
-  return { url };
+  const field = PROFILE_IMAGE_FIELDS[kind];
+  if (!field) return { url, profile: actor2.profile };
+  const profile = { ...actor2.profile, [field]: url };
+  await writeProfileToMatches(actor2, profile);
+  return { url, profile };
+}
+async function saveStaffProfileAsset(clientId2, kind, dataUrl) {
+  const start = await readDoc("clients", clientId2);
+  if (!start) throw new HubError(404, "Client not found.");
+  const email = hubEmail(start.email);
+  const uid = typeof start.firebaseUid === "string" && start.firebaseUid ? start.firebaseUid : clientId2;
+  const docs = await clientDocsForLogin(uid, email);
+  if (!docs.some((doc) => doc.id === clientId2)) docs.push({ id: clientId2, data: start });
+  const profile = { ...mergedProfile(docs, clientId2, email) };
+  const parsed = parseImage(dataUrl);
+  const url = await storeImage(clientId2, kind, parsed);
+  const field = PROFILE_IMAGE_FIELDS[kind];
+  if (!field) return { url, profile };
+  const next = { ...profile, [field]: url };
+  await writeProfileToMatches({
+    uid,
+    email,
+    clientId: clientId2,
+    clientIds: [.../* @__PURE__ */ new Set([clientId2, ...docs.map((doc) => doc.id)])].slice(0, 10),
+    client: start,
+    profile: next
+  }, next);
+  return { url, profile: next };
 }
 function parseImage(dataUrl) {
   const match = /^data:(image\/(?:jpeg|png|webp));base64,([a-z0-9+/=\s]+)$/i.exec(dataUrl.trim());
-  if (!match) return null;
+  if (!match) throw new HubError(400, "Upload a JPEG, PNG, or WebP image.");
   const bytes = Buffer.from(match[2].replace(/\s/g, ""), "base64");
-  if (!bytes.length || bytes.length > 7e5) return null;
+  if (!bytes.length) throw new HubError(400, "That image was empty. Choose a JPEG, PNG, or WebP photo.");
+  if (bytes.length > MAX_PROFILE_IMAGE_BYTES) {
+    throw new HubError(400, "That image is still over 2 MB. Choose a smaller photo, or let the page resize it and try again.");
+  }
   return { mime: match[1].toLowerCase(), bytes };
 }
 async function storeImage(clientId2, kind, image) {
   const ext = image.mime === "image/png" ? "png" : image.mime === "image/webp" ? "webp" : "jpg";
   const path2 = `client-hub/${clientId2}/${kind}-${Date.now()}.${ext}`;
-  if (useMemory$1()) return `data:${image.mime};base64,${image.bytes.toString("base64")}`;
+  if (useMemory$1()) return `https://cdn.example.test/client-hub/${encodeURIComponent(clientId2)}/${kind}.${ext}`;
   try {
     const bucket2 = admin.storage().bucket();
     const token = randomBytes$1(16).toString("hex");
@@ -23936,13 +24090,13 @@ async function teamBoard(team) {
 async function getTeam(actor2) {
   if (actor2.ownedTeam) return { ...await teamBoard(actor2.ownedTeam), access: accessFor$1(actor2) };
   if (!actor2.membership || !actor2.grant) return { team: null, members: [], listings: [], orders: [], access: accessFor$1(actor2) };
-  assert(hubAllows({ uid: actor2.uid, action: "read", section: "team", ownerClientId: actor2.membership.ownerClientId, grant: actor2.grant }), 403, "You do not have access to this team.");
+  assert(ownsClient(actor2, actor2.membership.ownerClientId) || hubAllows({ uid: actor2.uid, action: "read", section: "team", ownerClientId: actor2.membership.ownerClientId, grant: actor2.grant }), 403, "You do not have access to this team.");
   const stored = await readDoc("teams", actor2.membership.teamId);
   if (!stored) return { team: null, members: [], listings: [], orders: [], access: accessFor$1(actor2) };
   return { ...await teamBoard(teamFrom(actor2.membership.teamId, stored)), access: accessFor$1(actor2) };
 }
 function requireTeamAdmin(actor2, ownerClientId) {
-  if (actor2.clientId === ownerClientId) return;
+  if (ownsClient(actor2, ownerClientId)) return;
   assert(Boolean(actor2.grant && hubAllows({ uid: actor2.uid, action: "write", section: "team", ownerClientId, grant: actor2.grant })), 403, "You do not have permission to edit this team.");
 }
 async function saveTeam(actor2, input) {
@@ -24089,7 +24243,7 @@ function crmOwner(actor2) {
 }
 function assertCrm(actor2, action) {
   const scope = crmOwner(actor2);
-  assert(hubAllows({
+  assert(ownsClient(actor2, scope.ownerClientId) || hubAllows({
     uid: actor2.uid,
     action,
     section: "clients",
@@ -24146,7 +24300,7 @@ async function importContacts(actor2, contacts) {
 }
 function billingOwner(actor2, requested) {
   const ownerClientId = requested || actor2.clientId;
-  if (ownerClientId === actor2.clientId) return ownerClientId;
+  if (ownsClient(actor2, ownerClientId)) return ownerClientId;
   assert(hubAllows({
     uid: actor2.uid,
     action: "read",
@@ -24156,10 +24310,30 @@ function billingOwner(actor2, requested) {
   }), 403, "You do not have billing permission for that account.");
   return ownerClientId;
 }
+function assertBillingWrite(actor2, ownerClientId) {
+  if (ownsClient(actor2, ownerClientId)) return;
+  assert(hubAllows({
+    uid: actor2.uid,
+    action: "write",
+    section: "billing",
+    ownerClientId,
+    grant: actor2.grant
+  }), 403, "You do not have billing permission for that account.");
+}
 async function getBilling(actor2, requestedOwner = "") {
   const ownerClientId = billingOwner(actor2, requestedOwner);
   const stored = await readDoc("billing", ownerClientId);
   const billing = billingFrom(stored);
+  if (!billing.card && ownsClient(actor2, ownerClientId)) {
+    for (const id of actor2.clientIds) {
+      if (id === ownerClientId) continue;
+      const other = billingFrom(await readDoc("billing", id));
+      if (other.card) {
+        billing.card = other.card;
+        break;
+      }
+    }
+  }
   const invoiceRows = await queryEqual("invoices", "clientId", ownerClientId);
   const invoices = await Promise.all(invoiceRows.map(async (row) => {
     const requestId = typeof row.data.orderRequestId === "string" ? row.data.orderRequestId : "";
@@ -24193,44 +24367,18 @@ function publicBillingShape(billing) {
       expMonth: billing.card.expMonth,
       expYear: billing.card.expYear
     } : null,
-    square: {
-      applicationId: process.env.SQUARE_APPLICATION_ID || process.env.VITE_SQUARE_APPLICATION_ID || "",
-      locationId: process.env.SQUARE_LOCATION_ID || "",
-      environment: process.env.SQUARE_ENVIRONMENT === "sandbox" ? "sandbox" : "production"
-    }
+    square: squareWebPaymentsConfig(process.env)
   };
 }
-async function saveBilling(actor2, requestedOwner, input) {
-  const ownerClientId = requestedOwner || actor2.clientId;
-  assert(hubAllows({
-    uid: actor2.uid,
-    action: "write",
-    section: "billing",
-    ownerClientId,
-    grant: ownerClientId === actor2.clientId ? null : actor2.grant
-  }), 403, "You do not have billing permission for that account.");
-  if (containsRawCard(input)) throw new HubError(400, "Card numbers are not stored. Use the Square card form.");
-  const contact2 = sanitizeBilling(input);
-  billingFrom(await readDoc("billing", ownerClientId));
-  const grant = ownerClientId === actor2.clientId ? null : actor2.grant;
-  const readerUids = [.../* @__PURE__ */ new Set([ownerClientId, ...grant?.billingUids || [], ...grant?.adminUids || []])];
-  await writeDoc("billing", ownerClientId, {
-    ownerClientId,
-    ...contact2,
-    readerUids,
-    updatedAt: nowStamp()
-  });
-  return getBilling(actor2, ownerClientId === actor2.clientId ? "" : ownerClientId);
+function publicCard(card) {
+  return {
+    brand: card.brand,
+    last4: card.last4,
+    expMonth: card.expMonth,
+    expYear: card.expYear
+  };
 }
-async function saveCard(actor2, requestedOwner, card) {
-  const ownerClientId = requestedOwner || actor2.clientId;
-  assert(hubAllows({
-    uid: actor2.uid,
-    action: "write",
-    section: "billing",
-    ownerClientId,
-    grant: ownerClientId === actor2.clientId ? null : actor2.grant
-  }), 403, "You do not have billing permission for that account.");
+async function writeCard(ownerClientId, card, alsoClientIds = []) {
   const existing = await readDoc("billing", ownerClientId);
   await writeDoc("billing", ownerClientId, {
     ownerClientId,
@@ -24246,6 +24394,49 @@ async function saveCard(actor2, requestedOwner, card) {
     squareCustomerId: card.squareCustomerId,
     updatedAt: nowStamp()
   });
+  const summary = publicCard(card);
+  for (const id of [.../* @__PURE__ */ new Set([ownerClientId, ...alsoClientIds])]) {
+    await writeDoc("clients", id, { cardOnFile: summary, updatedAt: nowStamp() });
+  }
+}
+async function getStaffBilling(clientId2) {
+  const client = await readDoc("clients", clientId2);
+  if (!client) throw new HubError(404, "Client not found.");
+  return {
+    billing: publicBillingShape(billingFrom(await readDoc("billing", clientId2))),
+    profile: profileFromClient(client),
+    ownerClientId: clientId2
+  };
+}
+async function saveStaffCard(clientId2, card) {
+  const client = await readDoc("clients", clientId2);
+  if (!client) throw new HubError(404, "Client not found.");
+  const email = hubEmail(client.email);
+  const uid = typeof client.firebaseUid === "string" && client.firebaseUid ? client.firebaseUid : clientId2;
+  const docs = await clientDocsForLogin(uid, email);
+  const ids = [.../* @__PURE__ */ new Set([clientId2, ...docs.map((doc) => doc.id)])];
+  await writeCard(clientId2, card, ids);
+  return getStaffBilling(clientId2);
+}
+async function saveBilling(actor2, requestedOwner, input) {
+  const ownerClientId = requestedOwner || actor2.clientId;
+  assertBillingWrite(actor2, ownerClientId);
+  if (containsRawCard(input)) throw new HubError(400, "Card numbers are not stored. Use the Square card form.");
+  const contact2 = sanitizeBilling(input);
+  const grant = ownsClient(actor2, ownerClientId) ? null : actor2.grant;
+  const readerUids = [.../* @__PURE__ */ new Set([ownerClientId, ...grant?.billingUids || [], ...grant?.adminUids || []])];
+  await writeDoc("billing", ownerClientId, {
+    ownerClientId,
+    ...contact2,
+    readerUids,
+    updatedAt: nowStamp()
+  });
+  return getBilling(actor2, ownerClientId === actor2.clientId ? "" : ownerClientId);
+}
+async function saveCard(actor2, requestedOwner, card) {
+  const ownerClientId = requestedOwner || actor2.clientId;
+  assertBillingWrite(actor2, ownerClientId);
+  await writeCard(ownerClientId, card, actor2.clientIds);
   return getBilling(actor2, ownerClientId === actor2.clientId ? "" : ownerClientId);
 }
 const router$u = Router();
@@ -24373,6 +24564,39 @@ router$u.post("/me/hub/billing/card", guard(async (req, res) => {
   });
   if ("error" in saved) throw new HubError(502, saved.error);
   res.json(await saveCard(actor2, owner, saved.card));
+}));
+function clientIdParam(value) {
+  const id = typeof value === "string" ? value.trim() : "";
+  if (!/^[A-Za-z0-9_-]{4,128}$/.test(id)) throw new HubError(400, "Client not found.");
+  return id;
+}
+router$u.get("/:id/hub/profile", requireCoordinator, guard(async (req, res) => {
+  const billing = await getStaffBilling(clientIdParam(req.params.id));
+  res.json({ profile: billing.profile });
+}));
+router$u.post("/:id/hub/profile/asset", requireCoordinator, guard(async (req, res) => {
+  const kind = typeof req.body?.kind === "string" ? req.body.kind : "";
+  const dataUrl = typeof req.body?.dataUrl === "string" ? req.body.dataUrl : "";
+  res.json(await saveStaffProfileAsset(clientIdParam(req.params.id), kind, dataUrl));
+}));
+router$u.get("/:id/hub/billing", requireCoordinator, guard(async (req, res) => {
+  res.json(await getStaffBilling(clientIdParam(req.params.id)));
+}));
+router$u.post("/:id/hub/billing/card", requireCoordinator, guard(async (req, res) => {
+  if (containsRawCard(req.body)) throw new HubError(400, "Card numbers are not stored. Use the Square card form.");
+  const clientId2 = clientIdParam(req.params.id);
+  const sourceId = typeof req.body?.sourceId === "string" ? req.body.sourceId : "";
+  const current = await getStaffBilling(clientId2);
+  const saved = await saveSquareCardOnFile({
+    sourceId,
+    customerId: "",
+    email: current.billing.email || current.profile.email,
+    name: `${current.profile.firstName} ${current.profile.lastName}`.trim(),
+    phone: current.billing.phone || current.profile.phone,
+    billing: sanitizeBilling(current.billing)
+  });
+  if ("error" in saved) throw new HubError(502, saved.error);
+  res.json(await saveStaffCard(clientId2, saved.card));
 }));
 router$u.use((req, res, next) => {
   if (req.path.startsWith("/me/hub")) return res.status(404).json({ error: "Settings path not found." });
@@ -34935,6 +35159,7 @@ function threadShell(partial) {
     email: "",
     phone: "",
     orderId: "",
+    orderNumber: "",
     clientId: "",
     photographerId: "",
     photographerPhone: "",
@@ -34960,6 +35185,7 @@ function buildUnifiedThreads(snapshot) {
     if (!current.clientId && thread.clientId) current.clientId = thread.clientId;
     if (!current.photographerId && thread.photographerId) current.photographerId = thread.photographerId;
     if (!current.orderId && thread.orderId) current.orderId = thread.orderId;
+    if (!current.orderNumber && thread.orderNumber) current.orderNumber = thread.orderNumber;
     for (const id of thread.participantIds) {
       if (id && !current.participantIds.includes(id)) current.participantIds.push(id);
     }
@@ -34969,6 +35195,7 @@ function buildUnifiedThreads(snapshot) {
     const message = messageFrom(raw, index);
     if (!message.body && !message.senderName) continue;
     const orderId = text$4(raw.orderId);
+    const orderNumber2 = shortOrderNumber(raw.orderNumber);
     const explicit = text$4(raw.threadId);
     const id = explicit || (orderId ? `order:${orderId}` : `message:${message.id}`);
     const senderType = message.senderType;
@@ -34989,7 +35216,8 @@ function buildUnifiedThreads(snapshot) {
       audiences,
       source: "messages",
       title: text$4(raw.clientName) || message.senderName || "Conversation",
-      subtitle: orderId ? `Order ${orderId.slice(0, 8)}` : text$4(raw.channel) || "Message",
+      subtitle: orderNumber2 ? `Order ${orderNumber2}` : text$4(raw.channel) || "Message",
+      orderNumber: orderNumber2,
       email: emailOf(text$4(raw.email) || text$4(raw.recipient)),
       phone: text$4(raw.phone),
       orderId,
@@ -35135,11 +35363,22 @@ function threadVisibleTo(thread, scope) {
   );
   if (scope.kind === "client") {
     if (scope.uid && ids.has(scope.uid)) return true;
+    if (scope.clientIds?.some((id) => id && ids.has(id))) return true;
     return Boolean(scope.email && thread.email && thread.email.toLowerCase() === scope.email.toLowerCase());
   }
   if (scope.uid && (thread.photographerId === scope.uid || thread.participantIds.includes(scope.uid))) return true;
   if (scope.uid && ids.has(scope.uid) && thread.audiences.includes("photographers")) return true;
   return Boolean(scope.phone && thread.photographerPhone && phonesMatch(scope.phone, thread.photographerPhone));
+}
+function portalUnreadCount(threads) {
+  let count2 = 0;
+  for (const thread of threads) {
+    const latest = thread.messages[thread.messages.length - 1];
+    if (!latest || latest.delivery === "read") continue;
+    const fromClient = latest.senderType === "client" || latest.senderType === "lead";
+    if (!fromClient) count2 += 1;
+  }
+  return count2;
 }
 const GROK_API_URL = "https://api.x.ai/v1/chat/completions";
 const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
@@ -35360,11 +35599,19 @@ async function portalScope(req) {
     }
     const clientDoc = await admin.firestore().collection("clients").doc(uid).get();
     const client = clientDoc.exists ? clientDoc.data() || {} : {};
+    let clientIds = [uid];
+    try {
+      const identity = await resolveClientIdentity(uid, email || (typeof client.email === "string" ? client.email : ""));
+      if (identity.ids.length) clientIds = identity.ids;
+    } catch (identityError) {
+      console.warn("[Communications] Client identity lookup failed.", identityError);
+    }
     return {
       kind: "client",
       uid,
       email: email || (typeof client.email === "string" ? client.email.trim().toLowerCase() : ""),
-      phone: typeof client.phone === "string" ? client.phone : ""
+      phone: typeof client.phone === "string" ? client.phone : "",
+      clientIds
     };
   } catch (error) {
     console.warn("[Communications] Portal scope lookup failed.", error);
@@ -35387,7 +35634,7 @@ router$9.get("/mine", requireAuth, async (req, res) => {
   try {
     const scope = await portalScope(req);
     const threads = threadsForPortal(await listUnifiedThreads(), scope);
-    return res.json({ threads });
+    return res.json({ threads, unreadCount: portalUnreadCount(threads) });
   } catch (error) {
     console.error("[Communications] Portal threads failed.", error);
     return res.status(500).json({ error: "Couldn't load your messages." });
