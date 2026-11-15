@@ -119,7 +119,7 @@
   color: var(--teal-mid);
   padding: 2px 7px;
   border-radius: 999px;
-}.portal-v2 .rail-nav a.active .count { background: rgba(255,255,255,.16); color: #fff; }.portal-v2 .nav-label {
+}.portal-v2 .rail-nav a.active .count { background: rgba(255,255,255,.16); color: #fff; }.portal-v2 .rail-nav a .count.unread, .portal-v2 .rail-nav button .count.unread, .portal-v2 .rail-nav a.active .count.unread, .portal-v2 .rail-nav button.active .count.unread { background: var(--gold); color: var(--ink); }.portal-v2 .nav-label {
   font-size: 10px;
   font-weight: 800;
   letter-spacing: .16em;
@@ -577,3 +577,12 @@
 .portal-v2 .portal-foot .foot-meta { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 8px; font-size: 13px; }
 .portal-v2 .doc-brand { flex: 0 0 auto; }
 .portal-v2 .doc-brand span { white-space: nowrap; }
+.portal-v2 .rail-nav button .count {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  background: var(--teal-soft);
+  color: var(--teal-mid);
+  padding: 2px 7px;
+  border-radius: 999px;
+}

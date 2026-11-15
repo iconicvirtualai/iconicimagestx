@@ -132,6 +132,7 @@ export default function ClientPortal() {
           error={error}
           example={example}
           messageCount={example ? exampleThreads().length : messageCount}
+          onMessageCount={setMessageCount}
         />
       )}
     </div>

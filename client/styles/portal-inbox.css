@@ -1,0 +1,968 @@
+/* Client portal messages. Scoped so it does not restyle Profile, Team, Clients, or Billing. */
+.portal-inbox {
+  --teal: #0d9488;
+  --teal-mid: #0e8a76;
+  --teal-dark: #0f766e;
+  --teal-soft: #e6f6f2;
+  --gold: #e8c872;
+  --gold-soft: #f8efd4;
+  --ink: #0a0a0a;
+  --ink-2: #1a1d1c;
+  --ink-3: #3d4442;
+  --muted: #7a8480;
+  --line: #e6e9e7;
+  --line-2: #efeae0;
+  --bg-2: #f4f6f5;
+  --paper: #fffcf7;
+  --cream: #fbf8f1;
+  --rose: #b4232a;
+  --shadow: 0 1px 2px rgba(26, 29, 28, 0.04), 0 8px 24px rgba(26, 29, 28, 0.06);
+  color: var(--ink);
+  min-width: 0;
+}
+.portal-inbox .page-head h1 {
+  font-size: 34px;
+  letter-spacing: -0.035em;
+  line-height: 1.05;
+}
+.portal-inbox .page-head .sub {
+  max-width: 640px;
+}
+.portal-inbox .av {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--teal);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: 800;
+  flex-shrink: 0;
+  box-shadow:
+    0 0 0 2px var(--paper),
+    0 0 0 4px var(--gold);
+}
+.portal-inbox .ib-shell {
+  background: var(--paper);
+  border-radius: 1.4rem;
+  box-shadow: var(--shadow);
+  border: 1px solid rgba(230, 224, 210, 0.7);
+  overflow: hidden;
+  margin-bottom: 36px;
+  position: relative;
+}
+.portal-inbox .ib-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line-2);
+  background: #fffdf9;
+}
+.portal-inbox .ib-tabs {
+  display: flex;
+  gap: 4px;
+  min-width: 0;
+  order: 1;
+}
+.portal-inbox .ib-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  padding: 9px 14px;
+  border-radius: 999px;
+  border: 0;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.portal-inbox .ib-tab .n {
+  font-size: 10.5px;
+  font-weight: 800;
+  background: var(--bg-2);
+  color: var(--ink-3);
+  padding: 1px 7px;
+  border-radius: 999px;
+}
+.portal-inbox .ib-tab.on {
+  background: var(--ink);
+  color: #fff;
+}
+.portal-inbox .ib-tab.on .n {
+  background: var(--gold);
+  color: var(--ink);
+}
+.portal-inbox .ib-tab:hover:not(.on) {
+  background: var(--teal-soft);
+  color: var(--teal-dark);
+}
+.portal-inbox .ib-top > .ib-search {
+  position: relative;
+  width: 280px;
+  order: 2;
+}
+.portal-inbox .ib-search {
+  position: relative;
+}
+.portal-inbox .ib-search .ib-ico {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+}
+.portal-inbox .ib-search input {
+  width: 100%;
+  min-height: 40px;
+  border-radius: 999px;
+  border: 1px solid #e4e0d6;
+  background: #fff;
+  padding: 9px 12px 9px 40px;
+  font-size: 13.5px;
+}
+.portal-inbox .ib-body {
+  display: grid;
+  grid-template-columns: 384px minmax(0, 1fr);
+  min-height: 640px;
+}
+.portal-inbox .ib-list {
+  border-right: 1px solid var(--line-2);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  position: relative;
+}
+.portal-inbox .ib-list-h {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 18px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line-2);
+}
+.portal-inbox .ib-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 18px 12px 44px minmax(0, 1fr);
+  gap: 0 8px;
+  align-items: start;
+  width: 100%;
+  padding: 16px 18px 16px 8px;
+  border: 0;
+  border-bottom: 1px solid var(--line-2);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+.portal-inbox .ib-row:hover {
+  background: #fff;
+}
+.portal-inbox .ib-row.sel {
+  background: #e9f6f2;
+  box-shadow: inset 3px 0 0 var(--teal);
+}
+.portal-inbox .ib-row.checked {
+  background: #f2faf7;
+}
+.portal-inbox .ib-check {
+  width: 18px;
+  height: 18px;
+  margin-top: 12px;
+  border-radius: 6px;
+  border: 1.8px solid #cfd5d2;
+  background: #fff;
+  display: grid;
+  place-items: center;
+  color: transparent;
+  padding: 0;
+}
+.portal-inbox .ib-check.on {
+  background: var(--teal);
+  border-color: var(--teal);
+  color: #fff;
+}
+.portal-inbox .ib-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: transparent;
+  margin-top: 18px;
+}
+.portal-inbox .ib-row.unread .ib-dot {
+  background: var(--teal);
+}
+.portal-inbox .ib-row .av {
+  width: 42px;
+  height: 42px;
+  font-size: 13px;
+}
+.portal-inbox .ib-main {
+  min-width: 0;
+  display: block;
+}
+.portal-inbox .ib-open {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  min-width: 0;
+}
+.portal-inbox .ib-row1 {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.portal-inbox .ib-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 650;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--ink-2);
+}
+.portal-inbox .ib-row.unread .ib-name {
+  font-weight: 850;
+  color: var(--ink);
+}
+.portal-inbox .ib-time {
+  font-size: 11.5px;
+  color: var(--muted);
+  font-weight: 650;
+  white-space: nowrap;
+}
+.portal-inbox .ib-row.unread .ib-time {
+  color: var(--teal-dark);
+  font-weight: 800;
+}
+.portal-inbox .ib-sub {
+  display: block;
+  font-size: 13px;
+  color: var(--ink-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+.portal-inbox .ib-chips {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.portal-inbox .ib-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid #e4dfd2;
+  color: var(--ink-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.portal-inbox .ib-chip.gold {
+  background: var(--gold-soft);
+  border-color: #eedca8;
+  color: #6b4e12;
+}
+.portal-inbox .ib-chip .ordno {
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+.portal-inbox .ib-hover {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  display: none;
+  gap: 4px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 4px;
+  box-shadow: var(--shadow);
+}
+.portal-inbox .ib-row:hover .ib-hover,
+.portal-inbox .ib-row:focus-within .ib-hover {
+  display: flex;
+}
+.portal-inbox .ib-hover button,
+.portal-inbox .ib-tool {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  border: 0;
+  background: transparent;
+  display: grid;
+  place-items: center;
+  color: var(--ink-3);
+  padding: 0;
+}
+.portal-inbox .ib-hover button:hover,
+.portal-inbox .ib-tool:hover {
+  background: var(--teal-soft);
+  color: var(--teal-dark);
+}
+.portal-inbox .ib-star {
+  color: #b48a1e;
+}
+.portal-inbox .ib-star.on svg {
+  fill: #e8c872;
+}
+.portal-inbox .ib-bulk {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 12px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow-x: auto;
+}
+.portal-inbox .ib-bulk button {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.portal-inbox .ib-bulk .sp {
+  flex: 1;
+}
+.portal-inbox .ib-bulk button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 750;
+}
+.portal-inbox .ib-bulk button:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+.portal-inbox .ib-bulk .ib-check {
+  margin: 0;
+  border-color: #fff;
+}
+.portal-inbox .ib-pane,
+.portal-inbox .ib-compose {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 640px;
+  background: linear-gradient(180deg, #fffdf9, #fffcf6);
+  position: relative;
+}
+.portal-inbox .ib-compose {
+  background: #fff;
+}
+.portal-inbox .ib-pane-h,
+.portal-inbox .ib-compose-h {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 22px;
+  border-bottom: 1px solid var(--line-2);
+}
+.portal-inbox .ib-who {
+  flex: 1;
+  min-width: 0;
+}
+.portal-inbox .ib-who .nm {
+  font-size: 16px;
+  font-weight: 850;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.portal-inbox .ib-who .meta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 2px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.portal-inbox .ib-keep {
+  white-space: nowrap;
+}
+.portal-inbox .ib-tools {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.portal-inbox .ib-tool.wide {
+  width: auto;
+  height: 34px;
+  padding: 0 11px;
+  gap: 6px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.portal-inbox .ib-tool.wide.on {
+  color: #a77a12;
+}
+.portal-inbox .ib-tool.wide.on svg {
+  fill: #e8c872;
+}
+.portal-inbox .ib-tool.del:hover {
+  color: var(--rose);
+  background: #fff5f5;
+}
+.portal-inbox .ib-back {
+  display: none;
+}
+.portal-inbox .ib-msgs {
+  flex: 1;
+  padding: 22px 26px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.portal-inbox .ib-day {
+  align-self: center;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: var(--bg-2);
+  padding: 4px 12px;
+  border-radius: 999px;
+  margin: 4px 0 8px;
+}
+.portal-inbox .ib-when {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 650;
+  margin: 8px 0 2px 40px;
+}
+.portal-inbox .ib-msg {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  max-width: 78%;
+}
+.portal-inbox .ib-msg.mine {
+  margin-left: auto;
+  flex-direction: row-reverse;
+}
+.portal-inbox .ib-msg .av {
+  width: 30px;
+  height: 30px;
+  font-size: 10.5px;
+}
+.portal-inbox .ib-msg .av.ghost {
+  visibility: hidden;
+}
+.portal-inbox .ib-bub {
+  background: #fff;
+  border: 1px solid #ece7db;
+  border-radius: 18px 18px 18px 6px;
+  padding: 10px 14px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+.portal-inbox .ib-msg.mine .ib-bub {
+  background: var(--teal-soft);
+  border-color: #cfe8e3;
+  border-radius: 18px 18px 6px 18px;
+}
+.portal-inbox .ib-reply,
+.portal-inbox .ib-compose-f {
+  border-top: 1px solid var(--line-2);
+  padding: 14px 18px 16px;
+  background: #fff;
+}
+.portal-inbox .ib-reply-box,
+.portal-inbox .ib-compose-f {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+.portal-inbox .ib-reply-box {
+  border: 1.5px solid #e4e0d6;
+  border-radius: 16px;
+  padding: 8px 8px 8px 14px;
+  background: #fff;
+}
+.portal-inbox .ib-reply-box textarea,
+.portal-inbox .ib-body-ta {
+  width: 100%;
+  border: 0;
+  resize: vertical;
+  background: transparent;
+  min-height: 40px;
+  font-size: 14px;
+  padding: 8px 0;
+}
+.portal-inbox .ib-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.portal-inbox .ib-compose-f {
+  align-items: center;
+  background: #fffdf9;
+  flex-wrap: wrap;
+}
+.portal-inbox .ib-compose-f .ib-note {
+  margin: 0 auto 0 0;
+  max-width: 320px;
+}
+.portal-inbox .ib-compose-b {
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.portal-inbox .ib-compose-h {
+  justify-content: space-between;
+  background: linear-gradient(180deg, #fffdf9, #fff);
+}
+.portal-inbox .ib-compose-h h3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 18px;
+  font-weight: 850;
+}
+.portal-inbox .ib-compose-h p {
+  font-size: 12.5px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.portal-inbox .ib-to {
+  border: 1.5px solid var(--teal);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 0 0 4px rgba(13, 148, 136, 0.08);
+}
+.portal-inbox .ib-to-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  flex-wrap: wrap;
+}
+.portal-inbox .ib-pchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px 4px 4px;
+  border-radius: 999px;
+  background: var(--teal-soft);
+  color: var(--teal-dark);
+  font-size: 13px;
+  font-weight: 750;
+  border: 0;
+}
+.portal-inbox .ib-pchip .mini,
+.portal-inbox .ib-prow .mini {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--teal);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  display: grid;
+  place-items: center;
+}
+.portal-inbox .ib-count {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--teal-dark);
+}
+.portal-inbox .ib-to-search {
+  display: flex;
+  gap: 8px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--line-2);
+}
+.portal-inbox .ib-to-search .ib-search {
+  flex: 1;
+  width: auto;
+}
+.portal-inbox .ib-to-search select {
+  min-height: 40px;
+  width: 150px;
+  border-radius: 12px;
+  border: 1px solid #e4e0d6;
+  background: #fff;
+  padding: 0 12px;
+  font-weight: 650;
+}
+.portal-inbox .ib-pick {
+  border-top: 1px solid var(--line-2);
+  max-height: 260px;
+  overflow: auto;
+  padding: 6px;
+}
+.portal-inbox .ib-mh {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 8px 10px 4px;
+}
+.portal-inbox .ib-none {
+  font-size: 12.5px;
+  color: var(--muted);
+  padding: 2px 10px 8px;
+}
+.portal-inbox .ib-prow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  text-align: left;
+}
+.portal-inbox .ib-prow.on {
+  background: #eef8f5;
+}
+.portal-inbox .ib-prow .pn {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.portal-inbox .ib-role {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.portal-inbox .ib-subj input {
+  font-size: 15px;
+  font-weight: 700;
+}
+.portal-inbox .ib-body-ta {
+  min-height: 150px;
+  border: 1px solid #e4e0d6;
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: #fff;
+}
+.portal-inbox .ib-empty {
+  margin: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 36px 24px;
+  border: 1.5px dashed #e2dccd;
+  border-radius: 1.1rem;
+  background: var(--cream);
+}
+.portal-inbox .ib-empty .em {
+  width: 64px;
+  height: 64px;
+  border-radius: 20px;
+  display: grid;
+  place-items: center;
+  background: #fff;
+  color: var(--teal);
+  box-shadow: var(--shadow);
+  margin-bottom: 14px;
+}
+.portal-inbox .ib-empty h4 {
+  font-size: 17px;
+  font-weight: 850;
+}
+.portal-inbox .ib-empty p {
+  font-size: 13.5px;
+  color: var(--ink-3);
+  max-width: 420px;
+  margin: 6px 0 16px;
+}
+.portal-inbox .ib-toast {
+  position: absolute;
+  left: 50%;
+  bottom: 22px;
+  transform: translateX(-50%);
+  background: var(--ink);
+  color: #fff;
+  border-radius: 14px;
+  padding: 12px 14px 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 13.5px;
+  font-weight: 650;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.25);
+  z-index: 5;
+  max-width: calc(100% - 32px);
+}
+.portal-inbox .ib-toast button {
+  border: 0;
+  background: none;
+  color: var(--gold);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 12px;
+}
+.portal-inbox .ib-menu {
+  position: absolute;
+  z-index: 6;
+  right: 16px;
+  top: 64px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 18px 40px rgba(26, 29, 28, 0.16);
+  padding: 6px;
+  min-width: 210px;
+}
+.portal-inbox .ib-menu button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  font-size: 13.5px;
+  font-weight: 650;
+  color: var(--ink-2);
+  text-align: left;
+}
+.portal-inbox .ib-menu button:hover {
+  background: var(--teal-soft);
+  color: var(--teal-dark);
+}
+.portal-inbox .ib-menu button.del {
+  color: var(--rose);
+}
+.portal-inbox .ib-menu .ib-mh {
+  padding: 8px 12px 4px;
+}
+.portal-inbox .order-number span {
+  display: block;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.portal-inbox .order-number strong {
+  display: block;
+  font-size: 28px;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+.portal-inbox .btn.ib-fab {
+  display: none;
+}
+.portal-inbox .ib-alert {
+  margin: 0 0 12px;
+  color: var(--rose);
+  font-size: 14px;
+  font-weight: 650;
+}
+.portal-inbox .ib-ok {
+  margin: 0 0 12px;
+  color: var(--teal-dark);
+  font-size: 14px;
+  font-weight: 650;
+}
+.portal-inbox .field label {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 7px;
+}
+.portal-inbox .field input,
+.portal-inbox .field textarea {
+  width: 100%;
+  border: 1px solid #e4e0d6;
+  border-radius: 12px;
+  padding: 12px 14px;
+  min-height: 46px;
+  background: #fff;
+}
+.portal-inbox .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-radius: 14px;
+  border: 0;
+  cursor: pointer;
+  line-height: 1;
+  white-space: nowrap;
+  text-decoration: none;
+}
+.portal-inbox .btn-teal {
+  background: var(--teal);
+  color: #fff;
+  box-shadow: 0 10px 30px rgba(13, 148, 136, 0.35);
+}
+.portal-inbox .btn-ghost {
+  background: #fff;
+  color: var(--ink-3);
+  border: 1.5px solid var(--line);
+}
+.portal-inbox .btn-md {
+  height: 40px;
+  padding: 0 1.1rem;
+  font-size: 12px;
+}
+.portal-inbox .btn-lg {
+  height: 48px;
+  padding: 0 1.4rem;
+  font-size: 13px;
+  border-radius: 1rem;
+}
+.portal-inbox .btn-sm {
+  height: 32px;
+  padding: 0 12px;
+  font-size: 11px;
+  border-radius: 999px;
+}
+.portal-inbox .btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+@media (max-width: 760px) {
+  .portal-inbox .page-head h1 {
+    font-size: 26px;
+  }
+  .portal-inbox.is-thread .page-head,
+  .portal-inbox.is-compose .page-head,
+  .portal-inbox .compose-desk {
+    display: none;
+  }
+  .portal-inbox .ib-top {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .portal-inbox .ib-top > .ib-search {
+    width: 100%;
+    order: 0;
+  }
+  .portal-inbox .ib-tabs {
+    order: 1;
+    overflow-x: auto;
+  }
+  .portal-inbox .ib-body {
+    grid-template-columns: 1fr;
+    min-height: 0;
+  }
+  .portal-inbox.is-thread .ib-list,
+  .portal-inbox.is-compose .ib-list,
+  .portal-inbox.is-thread .ib-top,
+  .portal-inbox.is-compose .ib-top {
+    display: none;
+  }
+  .portal-inbox:not(.is-thread):not(.is-compose) .ib-pane,
+  .portal-inbox:not(.is-thread):not(.is-compose) .ib-compose {
+    display: none;
+  }
+  .portal-inbox .ib-back {
+    display: grid;
+  }
+  .portal-inbox .ib-pane,
+  .portal-inbox .ib-compose {
+    min-height: 70vh;
+  }
+  .portal-inbox .ib-pane-h {
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .portal-inbox .ib-tools {
+    width: 100%;
+    justify-content: space-around;
+  }
+  .portal-inbox .ib-who .nm {
+    white-space: nowrap;
+  }
+  .portal-inbox .ib-hover {
+    display: none !important;
+  }
+  .portal-inbox:not(.is-thread):not(.is-compose) .btn.ib-fab {
+    display: inline-flex;
+    position: fixed;
+    right: 18px;
+    bottom: 24px;
+    z-index: 20;
+    height: 54px;
+    padding: 0 20px;
+    border-radius: 999px;
+  }
+  .portal-inbox .ib-compose-f .ib-note {
+    max-width: none;
+    width: 100%;
+  }
+  .portal-inbox .ib-msg {
+    max-width: 88%;
+  }
+  .portal-inbox .ib-to-search {
+    flex-direction: column;
+  }
+  .portal-inbox .ib-to-search select {
+    width: 100%;
+  }
+}
+@media (min-width: 761px) {
+  .portal-inbox .ib-check {
+    opacity: 0;
+  }
+  .portal-inbox .ib-row:hover .ib-check,
+  .portal-inbox .ib-row.checked .ib-check,
+  .portal-inbox.has-selection .ib-check {
+    opacity: 1;
+  }
+}
