@@ -74,11 +74,12 @@ isSupported().then(supported => {
   }
 });
 
-// Local emulator support (set VITE_USE_EMULATORS=true in .env.local)
+// Local emulator support (set VITE_USE_EMULATORS=true in .env.local).
+// Firestore is 8180 because the Vite app already listens on 8080.
 if (import.meta.env.VITE_USE_EMULATORS === "true") {
-  connectFirestoreEmulator(db, "localhost", 8080);
-  connectAuthEmulator(auth, "http://localhost:9099", { disableWarnings: true });
-  connectStorageEmulator(storage, "localhost", 9199);
+  connectFirestoreEmulator(db, "127.0.0.1", 8180);
+  connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
+  connectStorageEmulator(storage, "127.0.0.1", 9199);
   console.log("[Firebase] Using local emulators");
 }
 

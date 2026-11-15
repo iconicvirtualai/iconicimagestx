@@ -32,6 +32,7 @@
     "backfill:holiday-calendar": "tsx scripts/backfill-holiday-calendar.ts",
     "format.fix": "prettier --write .",
     "typecheck": "tsc",
+    "test:e2e": "firebase emulators:exec --only auth,firestore,storage --project iconic-images-aicon \"pnpm exec tsx scripts/seed-portal-emulator.ts && pnpm exec playwright test\"",
     "optimize:senior-living": "tsx scripts/optimize-senior-living.ts"
   },
   "dependencies": {
@@ -50,6 +51,7 @@
   },
   "devDependencies": {
     "@hookform/resolvers": "^5.2.1",
+    "@playwright/test": "^1.65.1",
     "@radix-ui/react-accordion": "^1.2.11",
     "@radix-ui/react-alert-dialog": "^1.1.14",
     "@radix-ui/react-aspect-ratio": "^1.1.7",
@@ -96,6 +98,7 @@
     "cors": "^2.8.5",
     "date-fns": "^4.1.0",
     "embla-carousel-react": "^8.6.0",
+    "firebase-tools": "^15.36.0",
     "framer-motion": "^12.23.12",
     "globals": "^16.3.0",
     "happy-dom": "^20.14.6",

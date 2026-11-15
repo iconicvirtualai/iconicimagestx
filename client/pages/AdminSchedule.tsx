@@ -12,6 +12,7 @@ import {
   toDate,
 } from "@/lib/scheduleRecords";
 import { addressText, recordAddressText } from "@shared/addressText";
+import { shortOrderNumber } from "@shared/orderProjectInvoice";
 import { calendarDateKey, formatChicagoDate } from "@shared/clientHome";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -99,7 +100,7 @@ function fmtCurrency(n: number): string {
 
 function orderLabel(appt: Appointment) {
   if (appt.source === "google-calendar") return "Calendar";
-  return `#${appt.orderNumber || ""}`;
+  return shortOrderNumber(appt.orderNumber);
 }
 
 function visibleServices(services: string[]) {
@@ -451,7 +452,7 @@ export default function AdminSchedule() {
                                     {appt.projectType === "business" ? "Business" : "Real Estate"}
                                   </span>
                                   {appt.twilight ? <TwilightLabel /> : null}
-                                  <span className="text-[10px] font-mono text-gray-400">{orderLabel(appt)}</span>
+                                  <span className="order-number"><strong>{orderLabel(appt)}</strong></span>
                                 </div>
                                 <h4 className="text-lg font-black text-black mb-1">{appt.clientName}</h4>
                                 <div className="flex items-center gap-2 text-sm font-bold text-[#0d9488]">
@@ -538,7 +539,7 @@ export default function AdminSchedule() {
             <div className="bg-black text-white px-8 py-6 flex items-center justify-between">
               <div>
                 <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500 mb-1">Appointment Details</p>
-                <h3 className="text-xl font-bold">{orderLabel(selectedAppt)}</h3>
+                <h3 className="order-number"><strong>{orderLabel(selectedAppt)}</strong></h3>
               </div>
               <button type="button" onClick={() => setSelectedAppt(null)} className="p-2 hover:bg-white/10 rounded-full transition-colors" aria-label="Close appointment">
                 <X className="w-5 h-5" />

@@ -5,6 +5,7 @@
 
 import { bookingListingDocId } from "./bookingListing";
 import { calendarDateKey } from "./clientHome";
+import { recordVisibleToIdentity } from "./clientLink";
 import { normalizeEmail } from "./listingAccess";
 import { storedRecordPin } from "./serviceLocation";
 
@@ -91,14 +92,20 @@ export function choosePortalClient(
 
 /** Order requests and listings the signed-in client should see. */
 export function visibleToPortalClient(
-  record: { clientId?: string | null; email?: string | null; clientEmail?: string | null } | null | undefined,
+  record: {
+    clientId?: string | null;
+    firebaseUid?: string | null;
+    clientProfileId?: string | null;
+    email?: string | null;
+    clientEmail?: string | null;
+  } | null | undefined,
   identity: PortalIdentity,
 ): boolean {
-  if (!record) return false;
-  if (record.clientId && identity.ids.includes(String(record.clientId))) return true;
-  const email = normalizeEmail(identity.email);
-  if (!email) return false;
-  return [record.email, record.clientEmail].some((value) => normalizeEmail(value) === email);
+  return recordVisibleToIdentity(record, {
+    ids: identity.ids,
+    firebaseUid: identity.ids[0] || null,
+    email: normalizeEmail(identity.email),
+  });
 }
 
 const SCHEDULE_DATE_KEYS = ["scheduledDate", "appointmentDate", "requestedDate"] as const;

@@ -2,6 +2,7 @@ import type { Server } from "node:http";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { setEmailDeliveryOverride } from "../services/email";
 import { readClientHubMemory, resetClientHubMemory, seedClientHubMemory } from "../services/clientHubStore";
+import { resetClientFilesMemory } from "../services/clientFiles";
 import { createServer } from "../index";
 
 let server: Server;
@@ -28,6 +29,7 @@ beforeAll(async () => {
 beforeEach(() => {
   sent.length = 0;
   resetClientHubMemory();
+  resetClientFilesMemory();
   seedClientHubMemory("clients", "owner-1", {
     firstName: "Example",
     lastName: "Agent",
@@ -210,10 +212,11 @@ describe("client hub permission checks", () => {
     try {
       const response = await fetch(`${baseUrl}/api/clients/me/hub/billing`, { headers: headers("owner-1", "owner@example.com") });
       expect(response.status).toBe(200);
-      const body = await response.json() as { billing: { square: { applicationId: string; locationId: string; missing: string[] } } };
+      const body = await response.json() as { billing: { square: { applicationId: string; locationId: string; missing: string[]; environment: string } } };
       expect(body.billing.square.applicationId).toBe("");
       expect(body.billing.square.locationId).toBe("LOC-example");
       expect(body.billing.square.missing).toEqual(["SQUARE_APPLICATION_ID"]);
+      expect(body.billing.square.environment).toBe("production");
     } finally {
       if (previousApp === undefined) delete process.env.SQUARE_APPLICATION_ID;
       else process.env.SQUARE_APPLICATION_ID = previousApp;
@@ -222,5 +225,94 @@ describe("client hub permission checks", () => {
       if (previousLocation === undefined) delete process.env.SQUARE_LOCATION_ID;
       else process.env.SQUARE_LOCATION_ID = previousLocation;
     }
+  });
+
+  it("formats the phone and saves preferences on both client records", async () => {
+    seedClientHubMemory("clients", "auth-ada", {
+      firstName: "Ada",
+      lastName: "Agent",
+      email: "ada@example.com",
+      firebaseUid: "auth-ada",
+    });
+    seedClientHubMemory("clients", "crm-ada", {
+      firstName: "Ada",
+      lastName: "Agent",
+      email: "ada@example.com",
+    });
+    const saved = await fetch(`${baseUrl}/api/clients/me/hub/profile`, {
+      method: "PATCH",
+      headers: headers("auth-ada", "ada@example.com"),
+      body: JSON.stringify({
+        firstName: "Ada",
+        lastName: "Agent",
+        phone: "2815550148",
+        email: "ada@example.com",
+        brokerage: "Ada Realty",
+        preferences: { email: false, sms: true, push: true },
+      }),
+    });
+    expect(saved.status).toBe(200);
+    const body = await saved.json() as { profile: { phone: string; brokerage: string }; preferences: { email: boolean; sms: boolean } };
+    expect(body.profile.phone).toBe("(281) 555-0148");
+    expect(body.profile.brokerage).toBe("Ada Realty");
+    expect(body.preferences).toMatchObject({ email: false, sms: true, push: true });
+    for (const id of ["auth-ada", "crm-ada"]) {
+      const row = readClientHubMemory("clients", id);
+      expect(row?.phone).toBe("(281) 555-0148");
+      expect(row?.company).toBe("Ada Realty");
+      expect(row?.firebaseUid).toBe("auth-ada");
+      expect(row?.profileSettings).toMatchObject({
+        notifications: { email: false, sms: true, push: true },
+      });
+    }
+    const again = await fetch(`${baseUrl}/api/clients/me/hub/profile`, { headers: headers("auth-ada", "ada@example.com") });
+    const reloaded = await again.json() as { profile: { phone: string; brokerage: string }; preferences: { sms: boolean } };
+    expect(reloaded.profile.phone).toBe("(281) 555-0148");
+    expect(reloaded.profile.brokerage).toBe("Ada Realty");
+    expect(reloaded.preferences.sms).toBe(true);
+  });
+
+  it("shares a file from staff to the client and back, and hides it from another client", async () => {
+    seedClientHubMemory("clients", "auth-ada", {
+      firstName: "Ada",
+      lastName: "Agent",
+      email: "ada@example.com",
+      firebaseUid: "auth-ada",
+      linkedClientId: "crm-ada",
+    });
+    seedClientHubMemory("clients", "crm-ada", {
+      firstName: "Ada",
+      lastName: "Agent",
+      email: "ada@example.com",
+      firebaseUid: "auth-ada",
+    });
+    const pdf = `data:application/pdf;base64,${Buffer.from("%PDF-1.1 portal").toString("base64")}`;
+    const fromStaff = await fetch(`${baseUrl}/api/clients/crm-ada/files`, {
+      method: "POST",
+      headers: { ...headers("ignored", "ignored@example.com"), "x-staff-uid": "staff-1" },
+      body: JSON.stringify({ fileName: "floor-plan.pdf", contentType: "application/pdf", dataUrl: pdf }),
+    });
+    expect(fromStaff.status).toBe(201);
+    const clientList = await fetch(`${baseUrl}/api/clients/me/files`, { headers: headers("auth-ada", "ada@example.com") });
+    const clientBody = await clientList.json() as { files: Array<{ name: string; direction: string; id: string }> };
+    expect(clientBody.files.map((file) => file.name)).toContain("floor-plan.pdf");
+    expect(clientBody.files[0]?.direction).toBe("admin");
+
+    const note = `data:text/plain;base64,${Buffer.from("client note").toString("base64")}`;
+    const fromClient = await fetch(`${baseUrl}/api/clients/me/files`, {
+      method: "POST",
+      headers: headers("auth-ada", "ada@example.com"),
+      body: JSON.stringify({ fileName: "notes.txt", contentType: "text/plain", dataUrl: note }),
+    });
+    expect(fromClient.status).toBe(201);
+    const staffList = await fetch(`${baseUrl}/api/clients/crm-ada/files`, { headers: { "x-staff-uid": "staff-1" } });
+    const staffBody = await staffList.json() as { files: Array<{ name: string }> };
+    expect(staffBody.files.map((file) => file.name).sort()).toEqual(["floor-plan.pdf", "notes.txt"]);
+
+    const stranger = await fetch(`${baseUrl}/api/clients/me/files`, { headers: headers("stranger", "stranger@example.com") });
+    const strangerBody = await stranger.json() as { files: Array<{ name: string }> };
+    expect(strangerBody.files).toEqual([]);
+    const stolen = await fetch(`${baseUrl}/api/clients/me/files/${clientBody.files[0].id}/raw`, { headers: headers("stranger", "stranger@example.com") });
+    expect(stolen.status).toBe(404);
   });
 });

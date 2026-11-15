@@ -139,8 +139,11 @@ describe("visibleToPortalClient", () => {
   it("shows an order linked by portal id or by email alone", () => {
     expect(visibleToPortalClient({ clientId: "uid-marty", email: "other@example.com" }, marty)).toBe(true);
     expect(visibleToPortalClient({ clientId: "auto-marty" }, marty)).toBe(true);
+    expect(visibleToPortalClient({ firebaseUid: "uid-marty", email: "other@example.com" }, marty)).toBe(true);
+    expect(visibleToPortalClient({ clientProfileId: "client:auto-marty" }, marty)).toBe(true);
     expect(visibleToPortalClient({ email: "Marty@example.com" }, marty)).toBe(true);
     expect(visibleToPortalClient({ clientEmail: "marty@example.com" }, marty)).toBe(true);
+    expect(visibleToPortalClient({ clientId: "someone-else", email: "marty@example.com" }, marty)).toBe(false);
     expect(visibleToPortalClient({ clientId: "someone-else", email: "other@example.com" }, marty)).toBe(false);
   });
 });

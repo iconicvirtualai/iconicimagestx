@@ -978,8 +978,8 @@ export default function AdminListingFile({
             <h3 className={`${labelCls} mb-4`}>Order</h3>
             {linkedOrder ? (
               <div className="space-y-2 mb-3">
+                <OrderNumberMark value={linkedOrder.orderNumber || project.orderNumber} />
                 <p className="text-sm font-black text-black">{String(linkedOrder.clientName || project.clientName || "Client")}</p>
-                <p className="text-[10px] font-mono text-gray-400">#{String(linkedOrder.id).slice(0, 8)}</p>
                 <p className="text-xs font-bold text-gray-600">{String(linkedOrder.status || "new").replace(/_/g, " ")}</p>
                 <p className="text-sm font-black text-[#0d9488]">${Number(linkedOrder.total || (linkedOrder.pricing as { total?: unknown } | undefined)?.total || 0).toLocaleString()}</p>
               </div>

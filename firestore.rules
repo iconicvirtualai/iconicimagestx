@@ -618,6 +618,14 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // Shared portal files. The API writes them. A client reads only their own.
+    match /clientFiles/{fileId} {
+      allow read: if isStaff() || (
+        isAuthenticated() && resource.data.firebaseUid == request.auth.uid
+      );
+      allow write: if false;
+    }
+
     // ─── Catch-all: deny everything else ─────────────────────────────────────
     match /{document=**} {
       allow read, write: if false;

@@ -374,13 +374,13 @@ function galleryDeliveredHistoryEntry(input) {
   };
 }
 function staffLabel(actor2) {
-  const email = clean(actor2?.email);
-  const name = clean(actor2?.name);
-  const uid = clean(actor2?.uid);
+  const email = clean$1(actor2?.email);
+  const name = clean$1(actor2?.name);
+  const uid = clean$1(actor2?.uid);
   if (name && email) return `${name} (${email})`;
   return email || name || uid || "staff";
 }
-function clean(value) {
+function clean$1(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 const STUDIO105_LEAD_SOURCE = "Studio 105";
@@ -4615,6 +4615,11 @@ async function resolveClientIdentity(uid, email) {
   if (redirectId) ids.add(redirectId);
   const linkedId = typeof profile?.linkedClientId === "string" ? profile.linkedClientId : "";
   if (linkedId) ids.add(linkedId);
+  const byUid = await db$F().collection("clients").where("firebaseUid", "==", uid).limit(10).get();
+  for (const doc of byUid.docs) {
+    ids.add(doc.id);
+    if (!profile) profile = { id: doc.id, ...doc.data() };
+  }
   const normalized = normalizeEmail$1(email || profile?.email);
   if (normalized) {
     const matches = await db$F().collection("clients").where("email", "==", normalized).limit(10).get();
@@ -4764,6 +4769,671 @@ async function createRequestedAppointment(input) {
     updatedAt: now
   });
 }
+const INTENDED_OWNER_EMAIL = "cadi@iconicimagestx.com";
+function ownerAllowlist(raw) {
+  if (raw == null) return [];
+  const emails = raw.split(/[,;\s]+/).map((email) => email.trim().toLowerCase()).filter((email) => email.includes("@"));
+  return [...new Set(emails)];
+}
+function isOwnerEmail(email, allowlist) {
+  if (!email) return false;
+  if (allowlist.length === 0) return false;
+  return allowlist.includes(email.trim().toLowerCase());
+}
+const PERSON_KINDS = ["staff", "client", "agent"];
+const STAFF_ROLES = ["admin", "coordinator", "photographer", "editor"];
+const CAPABILITIES = [
+  "orders.view",
+  "orders.assign",
+  "clients.view",
+  "messages.view",
+  "messages.compose",
+  "tasks.view",
+  "tasks.assign",
+  "listings.view",
+  "billing.view",
+  "groups.view",
+  "groups.manage",
+  "permissions.manage"
+];
+const WEEKDAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+const CLIENT_SERVICES = ["Photos", "Video", "Drone", "Twilight", "Floor plan", "Virtual staging"];
+const PRICING_TIERS = ["Standard", "Preferred", "Brokerage"];
+const INBOX_FOLDERS = ["inbox", "drafts", "archived", "trash", "all-groups"];
+const ROLE_LABEL = {
+  admin: "Admin",
+  coordinator: "Office",
+  photographer: "Shooter",
+  editor: "Editor",
+  client: "Client",
+  agent: "Agent"
+};
+const ROLE_COLOR = {
+  admin: "#0d9488",
+  coordinator: "#2563eb",
+  photographer: "#7c3aed",
+  editor: "#ea580c",
+  client: "#0f766e",
+  agent: "#b45309"
+};
+const ROLE_CAPS = {
+  admin: CAPABILITIES,
+  coordinator: [
+    "orders.view",
+    "orders.assign",
+    "clients.view",
+    "messages.view",
+    "messages.compose",
+    "listings.view",
+    "billing.view",
+    "groups.view",
+    "groups.manage"
+  ],
+  photographer: ["orders.view", "messages.view", "messages.compose", "listings.view", "groups.view"],
+  editor: ["orders.view", "messages.view", "listings.view", "groups.view", "tasks.view"],
+  client: ["messages.view", "messages.compose", "orders.view", "listings.view", "billing.view", "groups.view"],
+  agent: ["messages.view", "messages.compose", "orders.view", "listings.view", "groups.view"]
+};
+function previewPeopleAllowed(env) {
+  if (env.VERCEL_ENV === "production") return false;
+  if (env.VERCEL_ENV === "preview") return true;
+  return env.NODE_ENV !== "production";
+}
+function profileId(kind, sourceId) {
+  return `${kind}:${sourceId}`;
+}
+function allows$1(role, permissions, key) {
+  if (permissions && Object.prototype.hasOwnProperty.call(permissions, key)) {
+    return permissions[key] === true;
+  }
+  const caps = ROLE_CAPS[role];
+  return Boolean(caps && caps.includes(key));
+}
+function permissionWriteBlocked(targetEmail, nextRole, nextPermissions) {
+  if (targetEmail.trim().toLowerCase() !== INTENDED_OWNER_EMAIL) return null;
+  if (nextRole !== "admin") return "The owner stays an admin.";
+  if (nextPermissions && nextPermissions["permissions.manage"] === false) {
+    return "The owner keeps permission to manage access.";
+  }
+  return null;
+}
+function emptyHours() {
+  return {
+    mon: { enabled: true, start: "09:00", end: "17:00" },
+    tue: { enabled: true, start: "09:00", end: "17:00" },
+    wed: { enabled: true, start: "09:00", end: "17:00" },
+    thu: { enabled: true, start: "09:00", end: "17:00" },
+    fri: { enabled: true, start: "09:00", end: "17:00" },
+    sat: { enabled: false, start: "09:00", end: "13:00" },
+    sun: { enabled: false, start: "09:00", end: "13:00" }
+  };
+}
+function text$w(value, max) {
+  return String(value ?? "").replace(/\s+/g, " ").trim().slice(0, max);
+}
+function clock(value, fallback) {
+  const raw = text$w(value, 5);
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(raw) ? raw : fallback;
+}
+function flag(value, fallback) {
+  return typeof value === "boolean" ? value : fallback;
+}
+function colorOf(value, fallback) {
+  const raw = text$w(value, 7);
+  return /^#[0-9a-fA-F]{6}$/.test(raw) ? raw.toLowerCase() : fallback;
+}
+function photoOf(value) {
+  const raw = text$w(value, 400);
+  if (!raw) return "";
+  if (raw.startsWith("https://") || raw.startsWith("/")) return raw;
+  return "";
+}
+function miles(value) {
+  if (value === null || value === "") return null;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 500) return null;
+  return Math.round(parsed);
+}
+function defaultStaffSettings(role, displayName = "") {
+  return {
+    displayName,
+    bio: "",
+    photoUrl: "",
+    color: ROLE_COLOR[role] || ROLE_COLOR.coordinator,
+    hours: emptyHours(),
+    comms: { email: true, sms: false, push: true },
+    zones: { zones: [], maxDriveMiles: 30, maxDriveMinutes: 45 }
+  };
+}
+function defaultClientSettings(displayName = "") {
+  return {
+    displayName,
+    photoUrl: "",
+    color: ROLE_COLOR.client,
+    notifications: { email: true, sms: false, push: true },
+    defaultServices: ["Photos"],
+    pricingTier: "Standard",
+    customerTeamId: ""
+  };
+}
+function sanitizeStaffSettings(input, role) {
+  const raw = input && typeof input === "object" ? input : {};
+  const base = defaultStaffSettings(role);
+  const hoursIn = raw.hours && typeof raw.hours === "object" ? raw.hours : {};
+  const hours = emptyHours();
+  for (const day of WEEKDAYS) {
+    const row = hoursIn[day] && typeof hoursIn[day] === "object" ? hoursIn[day] : {};
+    hours[day] = {
+      enabled: flag(row.enabled, base.hours[day].enabled),
+      start: clock(row.start, base.hours[day].start),
+      end: clock(row.end, base.hours[day].end)
+    };
+  }
+  const comms = raw.comms && typeof raw.comms === "object" ? raw.comms : {};
+  const zones = raw.zones && typeof raw.zones === "object" ? raw.zones : {};
+  const zoneList = Array.isArray(zones.zones) ? zones.zones.map((zone) => text$w(zone, 40)).filter(Boolean).slice(0, 12) : [];
+  return {
+    displayName: text$w(raw.displayName, 80),
+    bio: text$w(raw.bio, 500),
+    photoUrl: photoOf(raw.photoUrl),
+    color: colorOf(raw.color, base.color),
+    hours,
+    comms: {
+      email: flag(comms.email, true),
+      sms: flag(comms.sms, false),
+      push: flag(comms.push, true)
+    },
+    zones: {
+      zones: zoneList,
+      maxDriveMiles: miles(zones.maxDriveMiles),
+      maxDriveMinutes: miles(zones.maxDriveMinutes)
+    }
+  };
+}
+function sanitizeClientSettings(input) {
+  const raw = input && typeof input === "object" ? input : {};
+  const base = defaultClientSettings();
+  const notes = raw.notifications && typeof raw.notifications === "object" ? raw.notifications : {};
+  const services2 = Array.isArray(raw.defaultServices) ? raw.defaultServices.map((item) => text$w(item, 40)).filter((item) => CLIENT_SERVICES.includes(item)).slice(0, 8) : base.defaultServices;
+  const tier = text$w(raw.pricingTier, 20);
+  return {
+    displayName: text$w(raw.displayName, 80),
+    photoUrl: photoOf(raw.photoUrl),
+    color: colorOf(raw.color, base.color),
+    notifications: {
+      email: flag(notes.email, true),
+      sms: flag(notes.sms, false),
+      push: flag(notes.push, true)
+    },
+    defaultServices: services2.length ? services2 : ["Photos"],
+    pricingTier: PRICING_TIERS.includes(tier) ? tier : "Standard",
+    customerTeamId: text$w(raw.customerTeamId, 80)
+  };
+}
+function sanitizePermissions(input) {
+  const raw = input && typeof input === "object" ? input : {};
+  const next = {};
+  for (const key of CAPABILITIES) {
+    if (typeof raw[key] === "boolean") next[key] = raw[key];
+  }
+  return next;
+}
+function isStaffRole(value) {
+  return STAFF_ROLES.includes(value);
+}
+function asRecord$8(value) {
+  return value && typeof value === "object" ? value : {};
+}
+function profileFromStaff(sourceId, data, preview = false) {
+  const role = isStaffRole(String(data.role || "")) ? String(data.role) : "photographer";
+  const legalName = text$w(`${data.firstName || ""} ${data.lastName || ""}`, 120) || text$w(data.name, 120) || text$w(data.email, 120) || "Staff";
+  const settings = sanitizeStaffSettings(data.profileSettings, role);
+  if (!settings.displayName) settings.displayName = legalName;
+  return {
+    id: profileId("staff", sourceId),
+    kind: "staff",
+    sourceId,
+    uid: text$w(data.uid, 128) || sourceId,
+    role,
+    legalName,
+    displayName: settings.displayName,
+    email: text$w(data.email, 160).toLowerCase(),
+    phone: text$w(data.phone, 40),
+    photoUrl: settings.photoUrl,
+    color: settings.color,
+    bio: settings.bio,
+    brokerage: "",
+    staffSettings: settings,
+    clientSettings: null,
+    permissions: data.permissions ? sanitizePermissions(data.permissions) : null,
+    groupIds: Array.isArray(data.groupIds) ? data.groupIds.map((id) => text$w(id, 80)).filter(Boolean) : [],
+    card: null,
+    preview
+  };
+}
+function profileFromClient$1(sourceId, data, card = null, preview = false) {
+  const hub = asRecord$8(data.hubProfile);
+  const legalName = text$w(`${data.firstName || hub.firstName || ""} ${data.lastName || hub.lastName || ""}`, 120) || text$w(data.name, 120) || "Client";
+  const settings = sanitizeClientSettings(data.profileSettings);
+  if (!settings.displayName) settings.displayName = legalName;
+  const brokerage = text$w(hub.brokerage, 120);
+  return {
+    id: profileId("client", sourceId),
+    kind: "client",
+    sourceId,
+    uid: text$w(data.firebaseUid, 128) || sourceId,
+    role: "client",
+    legalName,
+    displayName: settings.displayName,
+    email: text$w(data.email || hub.email, 160).toLowerCase(),
+    phone: text$w(data.phone || hub.phone, 40),
+    photoUrl: settings.photoUrl || photoOf(hub.headshotUrl),
+    color: settings.color,
+    bio: "",
+    brokerage,
+    staffSettings: null,
+    clientSettings: settings,
+    permissions: null,
+    groupIds: Array.isArray(data.groupIds) ? data.groupIds.map((id) => text$w(id, 80)).filter(Boolean) : [],
+    card,
+    preview
+  };
+}
+function profileFromAgent(sourceId, data, preview = false) {
+  const legalName = text$w(data.name, 120) || "Agent";
+  const linked = text$w(data.linkedClientId, 128);
+  return {
+    id: profileId("agent", sourceId),
+    kind: "agent",
+    sourceId,
+    uid: linked,
+    role: "agent",
+    legalName,
+    displayName: legalName,
+    email: text$w(data.email, 160).toLowerCase(),
+    phone: text$w(data.phone, 40),
+    photoUrl: "",
+    color: ROLE_COLOR.agent,
+    bio: text$w(data.notes, 500),
+    brokerage: "",
+    staffSettings: null,
+    clientSettings: null,
+    permissions: null,
+    groupIds: [],
+    card: null,
+    preview
+  };
+}
+function cardSummaryFrom(data) {
+  if (!data) return null;
+  const card = asRecord$8(data.card);
+  const last4 = text$w(card.last4, 4);
+  if (!/^\d{4}$/.test(last4)) return null;
+  return {
+    brand: text$w(card.brand, 20) || "Card",
+    last4,
+    expMonth: Number(card.expMonth) || 0,
+    expYear: Number(card.expYear) || 0
+  };
+}
+function normalizePersonName$1(value) {
+  return value.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+}
+function directoryHit(profile, query, role) {
+  if (role && role !== "all" && profile.role !== role) return false;
+  const needle = normalizePersonName$1(query);
+  if (!needle) return true;
+  const hay = normalizePersonName$1(`${profile.displayName} ${profile.legalName} ${profile.email} ${ROLE_LABEL[profile.role]}`);
+  return hay.includes(needle);
+}
+function groupDelivery(group, senderUid) {
+  if (!group.canMessageUids.includes(senderUid)) {
+    return { ok: false, error: "You do not have permission to message this group." };
+  }
+  const members = [...new Set(group.memberUids.filter(Boolean))];
+  if (members.length === 0) return { ok: false, error: "This group has no members to receive a message." };
+  return {
+    ok: true,
+    participantUids: [.../* @__PURE__ */ new Set([...members, senderUid])],
+    notifyUids: members
+  };
+}
+function directDelivery(senderUid, recipientUids) {
+  const recipients = [...new Set(recipientUids.filter((uid) => uid && uid !== senderUid))];
+  if (recipients.length === 0) return { ok: false, error: "Choose at least one person with a login." };
+  if (recipients.length > 20) return { ok: false, error: "Choose 20 people or fewer. A message to many people belongs in Marketing, then Campaigns." };
+  return { ok: true, participantUids: [.../* @__PURE__ */ new Set([senderUid, ...recipients])], notifyUids: recipients };
+}
+function threadsForFolder(threads, actor2, folder) {
+  return threads.filter((thread) => visibleInFolder(thread, actor2, folder)).map((thread) => ({ ...thread, notified: thread.notifyUids.includes(actor2.uid) })).sort((a, b) => a.updatedAt < b.updatedAt ? 1 : -1);
+}
+function visibleInFolder(thread, actor2, folder) {
+  if (thread.folderByUid[actor2.uid] === "purged") return false;
+  if (folder === "all-groups") {
+    return actor2.leadAdmin && thread.kind === "group" && thread.status === "sent";
+  }
+  if (thread.status === "draft") {
+    if (thread.ownerUid !== actor2.uid) return false;
+    const stored2 = thread.folderByUid[actor2.uid];
+    if (folder === "trash") return stored2 === "trash";
+    if (folder === "drafts") return stored2 !== "trash" && stored2 !== "archived";
+    if (folder === "archived") return stored2 === "archived";
+    return false;
+  }
+  if (!thread.participantUids.includes(actor2.uid)) return false;
+  const stored = thread.folderByUid[actor2.uid] || "inbox";
+  if (folder === "drafts") return false;
+  return stored === folder;
+}
+function applyFolder(thread, uid, folder) {
+  if (folder === "purge") {
+    if (thread.status === "draft" && thread.ownerUid === uid) return "delete";
+    return { ...thread, folderByUid: { ...thread.folderByUid, [uid]: "purged" }, updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
+  }
+  return { ...thread, folderByUid: { ...thread.folderByUid, [uid]: folder }, updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
+}
+function person(partial) {
+  const role = partial.role;
+  const staff = partial.kind === "staff" ? defaultStaffSettings(role, partial.displayName) : null;
+  if (staff) {
+    staff.color = partial.color || staff.color;
+    staff.photoUrl = partial.photoUrl || "";
+    staff.bio = partial.bio || "";
+  }
+  const client = partial.kind === "client" ? defaultClientSettings(partial.displayName) : null;
+  if (client) {
+    client.color = partial.color || client.color;
+    client.photoUrl = partial.photoUrl || "";
+  }
+  return {
+    bio: "",
+    brokerage: "",
+    photoUrl: "",
+    color: ROLE_COLOR[role],
+    staffSettings: staff,
+    clientSettings: client,
+    permissions: null,
+    groupIds: partial.groupIds || [],
+    card: null,
+    ...partial
+  };
+}
+function previewProfiles() {
+  const rows = [
+    person({ id: "staff:sample-cadi", kind: "staff", sourceId: "sample-cadi", uid: "sample-cadi", role: "admin", legalName: "Cadi Torres", displayName: "Cadi Torres", email: "cadi@iconicimagestx.com", phone: "", preview: true, color: "#0d9488" }),
+    person({ id: "staff:sample-cora", kind: "staff", sourceId: "sample-cora", uid: "sample-cora", role: "coordinator", legalName: "Cora", displayName: "Cora", email: "cora@iconicimagestx.com", phone: "", preview: true, color: "#2563eb", bio: "Office desk. Preview sample." }),
+    person({ id: "staff:sample-mike", kind: "staff", sourceId: "sample-mike", uid: "sample-mike", role: "photographer", legalName: "Mike Luna", displayName: "Mike Luna", email: "mike@iconicimagestx.com", phone: "(281) 555-0101", preview: true, color: "#7c3aed", bio: "Listing and video sets." }),
+    person({ id: "staff:sample-daniel", kind: "staff", sourceId: "sample-daniel", uid: "sample-daniel", role: "editor", legalName: "Daniel Adaclog", displayName: "Daniel Adaclog", email: "daniel@iconicimagestx.com", phone: "", preview: true, color: "#ea580c", bio: "Video edit." }),
+    person({ id: "staff:sample-armando", kind: "staff", sourceId: "sample-armando", uid: "sample-armando", role: "photographer", legalName: "Armando Reyes", displayName: "Armando Reyes", email: "armando@iconicimagestx.com", phone: "", preview: true, color: "#7c3aed", bio: "Video group. Last name is a preview placeholder." }),
+    person({ id: "client:sample-jane", kind: "client", sourceId: "sample-jane", uid: "sample-jane", role: "client", legalName: "Jane Doe", displayName: "Jane Doe", email: "jane.doe@example.com", phone: "(281) 555-0199", preview: true, brokerage: "Sample Brokerage", groupIds: ["preview-admin", "preview-brokerage"] }),
+    person({ id: "client:sample-riley", kind: "client", sourceId: "sample-riley", uid: "sample-riley", role: "client", legalName: "Riley Broker", displayName: "Riley Broker", email: "riley.broker@example.com", phone: "", preview: true, brokerage: "Sample Brokerage", groupIds: ["preview-brokerage"] }),
+    person({ id: "agent:sample-agent", kind: "agent", sourceId: "sample-agent", uid: "", role: "agent", legalName: "Avery Agent", displayName: "Avery Agent", email: "avery.agent@example.com", phone: "", preview: true, bio: "Agent contact. No login yet, so messages wait until an account exists." })
+  ];
+  const jane = rows.find((row) => row.id === "client:sample-jane");
+  if (jane?.clientSettings) {
+    jane.clientSettings.defaultServices = ["Photos", "Video"];
+    jane.clientSettings.pricingTier = "Brokerage";
+    jane.clientSettings.customerTeamId = "preview-brokerage";
+    jane.brokerage = "Sample Brokerage";
+  }
+  const mike = rows.find((row) => row.id === "staff:sample-mike");
+  if (mike) {
+    mike.groupIds = ["preview-video"];
+    if (mike.staffSettings) mike.staffSettings.zones.zones = ["North Houston", "Conroe"];
+  }
+  const daniel = rows.find((row) => row.id === "staff:sample-daniel");
+  if (daniel) daniel.groupIds = ["preview-video"];
+  const armando = rows.find((row) => row.id === "staff:sample-armando");
+  if (armando) armando.groupIds = ["preview-video"];
+  const cadi = rows.find((row) => row.id === "staff:sample-cadi");
+  if (cadi) cadi.groupIds = ["preview-admin"];
+  const cora = rows.find((row) => row.id === "staff:sample-cora");
+  if (cora) cora.groupIds = ["preview-admin"];
+  return rows;
+}
+function previewGroups() {
+  return [
+    {
+      id: "preview-video",
+      name: "Video group",
+      kind: "internal",
+      customerTeamId: null,
+      memberProfileIds: ["staff:sample-mike", "staff:sample-daniel", "staff:sample-armando"],
+      memberUids: ["sample-mike", "sample-daniel", "sample-armando"],
+      canMessageProfileIds: ["staff:sample-mike", "staff:sample-daniel", "staff:sample-armando"],
+      canMessageUids: ["sample-mike", "sample-daniel", "sample-armando"],
+      shared: { projects: true, orders: true, listings: true, billing: false },
+      color: "#7c3aed",
+      preview: true,
+      sampleProjects: [
+        { id: "sample-order-127", title: "Listing video reel", kind: "order" },
+        { id: "sample-listing-126", title: "126 Sample Street", kind: "listing" }
+      ]
+    },
+    {
+      id: "preview-admin",
+      name: "Admin Group",
+      kind: "internal",
+      customerTeamId: null,
+      memberProfileIds: ["staff:sample-cadi", "staff:sample-cora", "client:sample-jane"],
+      memberUids: ["sample-cadi", "sample-cora", "sample-jane"],
+      canMessageProfileIds: ["staff:sample-cadi", "staff:sample-cora", "client:sample-jane", "client:sample-riley"],
+      canMessageUids: ["sample-cadi", "sample-cora", "sample-jane", "sample-riley"],
+      shared: { projects: true, orders: true, listings: false, billing: false },
+      color: "#0d9488",
+      preview: true,
+      sampleProjects: [
+        { id: "office-week", title: "Office week", kind: "project" }
+      ]
+    },
+    {
+      id: "preview-brokerage",
+      name: "Sample Brokerage",
+      kind: "client",
+      customerTeamId: null,
+      memberProfileIds: ["client:sample-jane", "client:sample-riley"],
+      memberUids: ["sample-jane", "sample-riley"],
+      canMessageProfileIds: ["client:sample-jane", "client:sample-riley"],
+      canMessageUids: ["sample-jane", "sample-riley"],
+      shared: { projects: true, orders: true, listings: true, billing: true },
+      color: "#0f766e",
+      preview: true,
+      sampleProjects: [
+        { id: "broker-order", title: "Shared brokerage order", kind: "order" }
+      ]
+    }
+  ];
+}
+function previewThreads() {
+  const at = "2026-11-14T15:00:00.000Z";
+  return [
+    {
+      id: "preview-thread-video",
+      kind: "group",
+      status: "sent",
+      subject: "Saturday reel",
+      body: "I can take the Saturday reel. Daniel, can you cut it Monday?",
+      messages: [{
+        id: "preview-note-video",
+        senderUid: "sample-mike",
+        senderProfileId: "staff:sample-mike",
+        senderName: "Mike Luna",
+        body: "I can take the Saturday reel. Daniel, can you cut it Monday?",
+        at
+      }],
+      ownerUid: "sample-mike",
+      senderUid: "sample-mike",
+      senderProfileId: "staff:sample-mike",
+      senderName: "Mike Luna",
+      participantUids: ["sample-mike", "sample-daniel", "sample-armando"],
+      notifyUids: ["sample-mike", "sample-daniel", "sample-armando"],
+      recipientProfileIds: ["staff:sample-mike", "staff:sample-daniel", "staff:sample-armando"],
+      groupId: "preview-video",
+      groupName: "Video group",
+      folderByUid: {},
+      createdAt: at,
+      updatedAt: at,
+      preview: true
+    },
+    {
+      id: "preview-thread-admin",
+      kind: "group",
+      status: "sent",
+      subject: "Portal question",
+      body: "Can someone on the admin desk confirm the brokerage invoice?",
+      messages: [{
+        id: "preview-note-admin",
+        senderUid: "sample-riley",
+        senderProfileId: "client:sample-riley",
+        senderName: "Riley Broker",
+        body: "Can someone on the admin desk confirm the brokerage invoice?",
+        at
+      }],
+      ownerUid: "sample-riley",
+      senderUid: "sample-riley",
+      senderProfileId: "client:sample-riley",
+      senderName: "Riley Broker",
+      participantUids: ["sample-cadi", "sample-cora", "sample-jane", "sample-riley"],
+      notifyUids: ["sample-cadi", "sample-cora", "sample-jane"],
+      recipientProfileIds: ["staff:sample-cadi", "staff:sample-cora", "client:sample-jane"],
+      groupId: "preview-admin",
+      groupName: "Admin Group",
+      folderByUid: {},
+      createdAt: at,
+      updatedAt: at,
+      preview: true
+    }
+  ];
+}
+function buildOutbound(actor2, input, profiles, groups, now = (/* @__PURE__ */ new Date()).toISOString()) {
+  const subject = text$w(input.subject, 140) || "Message";
+  const body = text$w(input.body, 2e3);
+  if (!body) return { ok: false, error: "Write a message first." };
+  const sender = profiles.find((profile) => profile.uid === actor2.uid) || null;
+  const senderProfileId = sender?.id || profileId(actor2.kind === "client" ? "client" : "staff", actor2.uid);
+  const senderName = sender?.displayName || actor2.email || "Iconic";
+  if (input.groupId) {
+    const group = groups.find((item) => item.id === input.groupId);
+    if (!group) return { ok: false, error: "Choose a group." };
+    const delivery2 = groupDelivery(group, actor2.uid);
+    if (delivery2.ok === false) return { ok: false, error: delivery2.error };
+    const note2 = { id: `note-${now}`, senderUid: actor2.uid, senderProfileId, senderName, body, at: now };
+    return {
+      ok: true,
+      thread: {
+        id: input.threadId || `thread-${now}`,
+        kind: "group",
+        status: "sent",
+        subject,
+        body,
+        messages: [note2],
+        ownerUid: actor2.uid,
+        senderUid: actor2.uid,
+        senderProfileId,
+        senderName,
+        participantUids: delivery2.participantUids,
+        notifyUids: delivery2.notifyUids,
+        recipientProfileIds: group.memberProfileIds,
+        groupId: group.id,
+        groupName: group.name,
+        folderByUid: {},
+        createdAt: now,
+        updatedAt: now,
+        preview: group.preview
+      }
+    };
+  }
+  const chosen = (input.profileIds || []).map((id) => profiles.find((profile) => profile.id === id)).filter((profile) => Boolean(profile));
+  const missingLogin = chosen.find((profile) => !profile.uid);
+  if (missingLogin) return { ok: false, error: `${missingLogin.displayName} does not have a login yet.` };
+  const delivery = directDelivery(actor2.uid, chosen.map((profile) => profile.uid));
+  if (delivery.ok === false) return { ok: false, error: delivery.error };
+  const note = { id: `note-${now}`, senderUid: actor2.uid, senderProfileId, senderName, body, at: now };
+  return {
+    ok: true,
+    thread: {
+      id: input.threadId || `thread-${now}`,
+      kind: "direct",
+      status: "sent",
+      subject,
+      body,
+      messages: [note],
+      ownerUid: actor2.uid,
+      senderUid: actor2.uid,
+      senderProfileId,
+      senderName,
+      participantUids: delivery.participantUids,
+      notifyUids: delivery.notifyUids,
+      recipientProfileIds: chosen.map((profile) => profile.id),
+      groupId: null,
+      groupName: null,
+      folderByUid: {},
+      createdAt: now,
+      updatedAt: now,
+      preview: chosen.every((profile) => profile.preview)
+    }
+  };
+}
+function buildDraft(actor2, input, now = (/* @__PURE__ */ new Date()).toISOString()) {
+  return {
+    id: input.threadId || `draft-${now}`,
+    kind: input.groupId ? "group" : "direct",
+    status: "draft",
+    subject: text$w(input.subject, 140),
+    body: text$w(input.body, 2e3),
+    messages: [],
+    ownerUid: actor2.uid,
+    senderUid: actor2.uid,
+    senderProfileId: profileId(actor2.kind === "client" ? "client" : "staff", actor2.uid),
+    senderName: actor2.email || "Draft",
+    participantUids: [actor2.uid],
+    notifyUids: [],
+    recipientProfileIds: input.groupId ? [] : (input.profileIds || []).slice(0, 20),
+    groupId: input.groupId || null,
+    groupName: null,
+    folderByUid: {},
+    createdAt: now,
+    updatedAt: now,
+    preview: true
+  };
+}
+function clean(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+function clientLinkStamp(uid, canonicalId = uid) {
+  const clientId2 = canonicalId.trim() || uid.trim();
+  const firebaseUid = uid.trim() || clientId2;
+  return {
+    clientId: clientId2,
+    firebaseUid,
+    clientProfileId: profileId("client", clientId2)
+  };
+}
+function identityIds(identity) {
+  const ids = new Set(identity.ids.map((id) => id.trim()).filter(Boolean));
+  const uid = clean(identity.firebaseUid);
+  if (uid) ids.add(uid);
+  return ids;
+}
+function identityProfiles(identity, ids) {
+  const listed = (identity.profileIds || []).map((id) => id.trim()).filter(Boolean);
+  return new Set(listed.length ? listed : [...ids].map((id) => profileId("client", id)));
+}
+function recordVisibleToIdentity(record2, identity) {
+  if (!record2) return false;
+  const ids = identityIds(identity);
+  const profiles = identityProfiles(identity, ids);
+  const clientId2 = clean(record2.clientId);
+  const firebaseUid = clean(record2.firebaseUid);
+  const profile = clean(record2.clientProfileId);
+  if (clientId2 && ids.has(clientId2)) return true;
+  if (firebaseUid && ids.has(firebaseUid)) return true;
+  if (profile && profiles.has(profile)) return true;
+  if (clientId2 || firebaseUid || profile) return false;
+  const email = clean(identity.email).toLowerCase();
+  if (!email) return false;
+  return [record2.email, record2.clientEmail].some((value) => clean(value).toLowerCase() === email);
+}
 const PORTAL_LISTING_ID$1 = /^[A-Za-z0-9_-]{4,128}$/;
 const NEVER_FILL = /* @__PURE__ */ new Set([
   "images",
@@ -4799,40 +5469,40 @@ function bookingListingGroups(input) {
   for (const doc of requests) {
     const node = nodeId("orderRequests", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("listings", text$w(doc.data.listingId)));
-    uf.link(node, nodeId("orders", text$w(doc.data.orderId) || text$w(doc.data.convertedToOrderId)));
-    uf.link(node, nodeId("invoices", text$w(doc.data.invoiceId)));
-    uf.link(node, nodeId("galleries", text$w(doc.data.galleryId)));
+    uf.link(node, nodeId("listings", text$v(doc.data.listingId)));
+    uf.link(node, nodeId("orders", text$v(doc.data.orderId) || text$v(doc.data.convertedToOrderId)));
+    uf.link(node, nodeId("invoices", text$v(doc.data.invoiceId)));
+    uf.link(node, nodeId("galleries", text$v(doc.data.galleryId)));
   }
   for (const doc of orders) {
     const node = nodeId("orders", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$w(doc.data.orderRequestId)));
-    uf.link(node, nodeId("listings", text$w(doc.data.listingId)));
-    uf.link(node, nodeId("invoices", text$w(doc.data.invoiceId)));
-    uf.link(node, nodeId("galleries", text$w(doc.data.galleryId)));
+    uf.link(node, nodeId("orderRequests", text$v(doc.data.orderRequestId)));
+    uf.link(node, nodeId("listings", text$v(doc.data.listingId)));
+    uf.link(node, nodeId("invoices", text$v(doc.data.invoiceId)));
+    uf.link(node, nodeId("galleries", text$v(doc.data.galleryId)));
   }
   for (const doc of invoices) {
     const node = nodeId("invoices", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$w(doc.data.orderRequestId)));
-    uf.link(node, nodeId("orders", text$w(doc.data.orderId)));
-    uf.link(node, nodeId("listings", text$w(doc.data.listingId)));
+    uf.link(node, nodeId("orderRequests", text$v(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$v(doc.data.orderId)));
+    uf.link(node, nodeId("listings", text$v(doc.data.listingId)));
   }
   for (const doc of appointments) {
     const node = nodeId("appointments", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$w(doc.data.orderRequestId)));
-    uf.link(node, nodeId("orders", text$w(doc.data.orderId)));
-    uf.link(node, nodeId("listings", text$w(doc.data.listingId)));
+    uf.link(node, nodeId("orderRequests", text$v(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$v(doc.data.orderId)));
+    uf.link(node, nodeId("listings", text$v(doc.data.listingId)));
   }
   for (const doc of galleries) {
     const node = nodeId("galleries", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$w(doc.data.orderRequestId)));
-    uf.link(node, nodeId("orders", text$w(doc.data.orderId)));
-    uf.link(node, nodeId("invoices", text$w(doc.data.invoiceId)));
-    uf.link(node, nodeId("listings", text$w(doc.data.listingId)));
+    uf.link(node, nodeId("orderRequests", text$v(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$v(doc.data.orderId)));
+    uf.link(node, nodeId("invoices", text$v(doc.data.invoiceId)));
+    uf.link(node, nodeId("listings", text$v(doc.data.listingId)));
   }
   const groups = [];
   for (const nodes of uf.components()) {
@@ -4892,7 +5562,7 @@ function fillEmptyListingFields(existing, desired) {
   return patch;
 }
 function clientOwnsListing(listing, clients) {
-  const clientId2 = text$w(listing.clientId);
+  const clientId2 = text$v(listing.clientId);
   const email = normalizeEmail$1(listing.clientEmail || listing.email);
   if (!clientId2 && !email) return true;
   if (clientId2 && clients.ids.includes(clientId2)) return true;
@@ -4964,10 +5634,10 @@ function chooseListing(group, listings, clients) {
 }
 function listingMatches(doc, group) {
   if (doc.id === group.stableId || group.preferredListingIds.includes(doc.id)) return true;
-  const requestId = text$w(doc.data.orderRequestId);
-  const orderId = text$w(doc.data.orderId);
-  const invoiceId = text$w(doc.data.invoiceId);
-  const appointmentId = text$w(doc.data.appointmentId);
+  const requestId = text$v(doc.data.orderRequestId);
+  const orderId = text$v(doc.data.orderId);
+  const invoiceId = text$v(doc.data.invoiceId);
+  const appointmentId = text$v(doc.data.appointmentId);
   return Boolean(
     requestId && group.orderRequestIds.includes(requestId) || orderId && group.orderIds.includes(orderId) || invoiceId && group.invoiceIds.includes(invoiceId) || appointmentId && group.appointmentIds.includes(appointmentId)
   );
@@ -4977,7 +5647,7 @@ function linksFor(group, listingId, listings, clients) {
   const links = [];
   const push = (collection, docs) => {
     for (const doc of docs) {
-      const current = text$w(doc.data.listingId);
+      const current = text$v(doc.data.listingId);
       if (current === listingId) continue;
       if (current && isPortalListingId(current) && ownedIds.has(current)) continue;
       links.push({ collection, id: doc.id });
@@ -4994,7 +5664,7 @@ function clientsFor(group, identity) {
   const ids = /* @__PURE__ */ new Set();
   const emails = /* @__PURE__ */ new Set();
   const addId = (value) => {
-    const id = text$w(value);
+    const id = text$v(value);
     if (id) ids.add(id);
   };
   const addEmail = (value) => {
@@ -5013,7 +5683,7 @@ function clientsFor(group, identity) {
 function preferredListingIds(group) {
   const ids = [];
   const push = (value) => {
-    const id = text$w(value);
+    const id = text$v(value);
     if (id && isPortalListingId(id) && !ids.includes(id)) ids.push(id);
   };
   for (const doc of [...group.orderRequests, ...group.orders, ...group.invoices, ...group.appointments, ...group.galleries]) {
@@ -5048,9 +5718,9 @@ function bestAddress(group) {
   }
   for (const doc of propertyDocs(group)) {
     for (const key of ["address", "propertyAddress", "shootLocation"]) {
-      if (typeof doc.data[key] === "string" && text$w(doc.data[key])) return text$w(doc.data[key]);
+      if (typeof doc.data[key] === "string" && text$v(doc.data[key])) return text$v(doc.data[key]);
     }
-    if (text$w(doc.data.addressLabel)) return text$w(doc.data.addressLabel);
+    if (text$v(doc.data.addressLabel)) return text$v(doc.data.addressLabel);
   }
   return null;
 }
@@ -5066,7 +5736,7 @@ function firstScheduleDate(group) {
 function firstScheduleTime(group) {
   for (const doc of [...group.appointments, ...group.orders, ...group.orderRequests]) {
     for (const key of ["scheduledTime", "appointmentTime", "apptTime", "requestedTime"]) {
-      const value = text$w(doc.data[key]);
+      const value = text$v(doc.data[key]);
       if (value && !/^tbd$/i.test(value)) return value;
     }
   }
@@ -5083,7 +5753,7 @@ function projectType(group) {
     if (doc.data.projectType === "real_estate") return "real_estate";
     const service = doc.data.selectedService;
     if (service && typeof service === "object") {
-      const category = text$w(service.category);
+      const category = text$v(service.category);
       if (category === "business" || category === "branding") return "business";
       if (category === "listings") return "real_estate";
     }
@@ -5109,7 +5779,7 @@ function namesFrom(value) {
   for (const item of value) {
     if (typeof item === "string" && item.trim()) names.push(item.trim());
     else if (item && typeof item === "object") {
-      const name = text$w(item.name);
+      const name = text$v(item.name);
       if (name) names.push(name);
     }
     if (names.length >= 40) break;
@@ -5134,9 +5804,9 @@ function accessInfo(group) {
   return [firstText$2(group, ["accessMethod"]), firstText$2(group, ["lockboxCode"])].filter(Boolean).join(" - ");
 }
 function clientId(group, identity) {
-  const bookingIds = propertyDocs(group).map((doc) => text$w(doc.data.clientId)).filter(Boolean);
-  const identityIds = (identity?.ids || []).map((id) => text$w(id)).filter(Boolean);
-  return bookingIds.find((id) => identityIds.includes(id)) || bookingIds[0] || identityIds[0] || "";
+  const bookingIds = propertyDocs(group).map((doc) => text$v(doc.data.clientId)).filter(Boolean);
+  const identityIds2 = (identity?.ids || []).map((id) => text$v(id)).filter(Boolean);
+  return bookingIds.find((id) => identityIds2.includes(id)) || bookingIds[0] || identityIds2[0] || "";
 }
 function clientEmail(group, identity) {
   const identityEmail = normalizeEmail$1(identity?.email);
@@ -5149,8 +5819,8 @@ function clientEmail(group, identity) {
 }
 function clientName$1(group) {
   for (const doc of propertyDocs(group)) {
-    if (text$w(doc.data.clientName)) return text$w(doc.data.clientName);
-    const joined = `${text$w(doc.data.firstName)} ${text$w(doc.data.lastName)}`.trim();
+    if (text$v(doc.data.clientName)) return text$v(doc.data.clientName);
+    const joined = `${text$v(doc.data.firstName)} ${text$v(doc.data.lastName)}`.trim();
     if (joined) return joined;
   }
   return "";
@@ -5158,7 +5828,7 @@ function clientName$1(group) {
 function chosenInvoiceId(group) {
   const known = new Set(group.invoiceIds);
   for (const doc of [...group.orderRequests, ...group.orders]) {
-    const id = text$w(doc.data.invoiceId);
+    const id = text$v(doc.data.invoiceId);
     if (id && known.has(id)) return id;
   }
   return newestDoc(group.invoices)?.id || group.invoiceIds[0] || "";
@@ -5167,7 +5837,7 @@ function chosenId(docs, ids, pointers = [], keys = []) {
   const known = new Set(ids);
   for (const doc of pointers) {
     for (const key of keys) {
-      const id = text$w(doc.data[key]);
+      const id = text$v(doc.data[key]);
       if (id && known.has(id)) return id;
     }
   }
@@ -5179,7 +5849,7 @@ function propertyDocs(group) {
 function firstText$2(group, keys) {
   for (const doc of propertyDocs(group)) {
     for (const key of keys) {
-      const value = text$w(doc.data[key]);
+      const value = text$v(doc.data[key]);
       if (value) return value;
     }
   }
@@ -5247,7 +5917,7 @@ function hasAddress(value) {
   if (typeof value === "string") return value.trim().length > 0;
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const record2 = value;
-  return ["formatted", "label", "street", "line1", "addressLine1", "city", "state", "zip"].some((key) => text$w(record2[key]).length > 0);
+  return ["formatted", "label", "street", "line1", "addressLine1", "city", "state", "zip"].some((key) => text$v(record2[key]).length > 0);
 }
 function statusKey(value) {
   return String(value || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
@@ -5279,14 +5949,14 @@ function isEmpty(value) {
 function isSentinel$1(value) {
   return Boolean(value && typeof value === "object" && "_methodName" in value);
 }
-function text$w(value) {
+function text$v(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function cleanDocs(docs) {
   const out = [];
   const seen = /* @__PURE__ */ new Set();
   for (const doc of docs || []) {
-    const id = text$w(doc?.id);
+    const id = text$v(doc?.id);
     if (!id || seen.has(id)) continue;
     seen.add(id);
     out.push({ id, data: doc.data && typeof doc.data === "object" ? doc.data : {} });
@@ -5334,11 +6004,11 @@ class UnionFind {
   }
 }
 function visibleToPortalClient(record2, identity) {
-  if (!record2) return false;
-  if (record2.clientId && identity.ids.includes(String(record2.clientId))) return true;
-  const email = normalizeEmail$1(identity.email);
-  if (!email) return false;
-  return [record2.email, record2.clientEmail].some((value) => normalizeEmail$1(value) === email);
+  return recordVisibleToIdentity(record2, {
+    ids: identity.ids,
+    firebaseUid: identity.ids[0] || null,
+    email: normalizeEmail$1(identity.email)
+  });
 }
 const db$D = () => admin.firestore();
 const LINK_COLLECTIONS = /* @__PURE__ */ new Set([
@@ -5372,7 +6042,7 @@ async function ensureBookingListingForRequest(orderRequestId) {
     galleries: []
   });
   const identity = {
-    ids: text$v(request.data.clientId) ? [text$v(request.data.clientId)] : [],
+    ids: text$u(request.data.clientId) ? [text$u(request.data.clientId)] : [],
     email: normalizeEmail$1(request.data.clientEmail || request.data.email)
   };
   const plans = await plansFor(bundle, identity);
@@ -5425,7 +6095,7 @@ async function applyBookingListingPlan(plan) {
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
       created = true;
-      console.info(`[Listings] Created ${plan.listingId} for booking ${text$v(plan.createFields.orderRequestId) || text$v(plan.createFields.orderId) || text$v(plan.createFields.invoiceId)}`);
+      console.info(`[Listings] Created ${plan.listingId} for booking ${text$u(plan.createFields.orderRequestId) || text$u(plan.createFields.orderId) || text$u(plan.createFields.invoiceId)}`);
     } catch (err) {
       if (!alreadyExists(err)) throw err;
       await fillListing(ref, plan.createFields);
@@ -5454,7 +6124,7 @@ async function linkRecord(collectionName2, id, listingId) {
   const ref = db$D().collection(collectionName2).doc(id);
   const snap = await ref.get();
   if (!snap.exists) return;
-  if (text$v(snap.data()?.listingId) === listingId) return;
+  if (text$u(snap.data()?.listingId) === listingId) return;
   await ref.update({
     listingId,
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
@@ -5468,9 +6138,9 @@ async function loadVisibleSeeds(identity) {
   const keep = (map, docs) => {
     for (const doc of docs) {
       if (!visibleToPortalClient({
-        clientId: text$v(doc.data.clientId),
-        email: text$v(doc.data.email),
-        clientEmail: text$v(doc.data.clientEmail)
+        clientId: text$u(doc.data.clientId),
+        email: text$u(doc.data.email),
+        clientEmail: text$u(doc.data.clientEmail)
       }, identity)) continue;
       if (!map.has(doc.id)) map.set(doc.id, doc);
     }
@@ -5509,36 +6179,36 @@ async function hydrateBundle(seed2) {
   const galleries = mapDocs(seed2.galleries);
   const requestIds = new Set(requests.keys());
   for (const doc of [...orders.values(), ...invoices.values(), ...appointments.values()]) {
-    const id = text$v(doc.data.orderRequestId);
+    const id = text$u(doc.data.orderRequestId);
     if (id) requestIds.add(id);
   }
   await readMissing("orderRequests", requestIds, requests);
   const orderIds = new Set(orders.keys());
   for (const doc of requests.values()) {
-    const id = text$v(doc.data.convertedToOrderId) || text$v(doc.data.orderId);
+    const id = text$u(doc.data.convertedToOrderId) || text$u(doc.data.orderId);
     if (id) orderIds.add(id);
   }
   for (const doc of [...invoices.values(), ...appointments.values()]) {
-    const id = text$v(doc.data.orderId);
+    const id = text$u(doc.data.orderId);
     if (id) orderIds.add(id);
   }
   await readMissing("orders", orderIds, orders);
   const invoiceIds = new Set(invoices.keys());
   for (const doc of [...requests.values(), ...orders.values()]) {
-    const id = text$v(doc.data.invoiceId);
+    const id = text$u(doc.data.invoiceId);
     if (id) invoiceIds.add(id);
   }
   await readMissing("invoices", invoiceIds, invoices);
   const legacyIds = /* @__PURE__ */ new Set();
   for (const doc of requests.values()) {
-    for (const id of legacyInvoiceDocIds({ orderRequestId: doc.id, listingId: text$v(doc.data.listingId) })) {
+    for (const id of legacyInvoiceDocIds({ orderRequestId: doc.id, listingId: text$u(doc.data.listingId) })) {
       legacyIds.add(id);
     }
   }
   for (const doc of orders.values()) {
     for (const id of legacyInvoiceDocIds({
-      orderRequestId: text$v(doc.data.orderRequestId),
-      listingId: text$v(doc.data.listingId)
+      orderRequestId: text$u(doc.data.orderRequestId),
+      listingId: text$u(doc.data.listingId)
     })) {
       legacyIds.add(id);
     }
@@ -5551,7 +6221,7 @@ async function hydrateBundle(seed2) {
   mergeDocs(appointments, await queryIn("appointments", "orderId", [...orders.keys()]));
   const galleryIds = new Set(galleries.keys());
   for (const doc of [...requests.values(), ...orders.values()]) {
-    const id = text$v(doc.data.galleryId);
+    const id = text$u(doc.data.galleryId);
     if (id) galleryIds.add(id);
   }
   await readMissing("galleries", galleryIds, galleries);
@@ -5680,7 +6350,7 @@ function alreadyExists(err) {
 function isSentinel(value) {
   return Boolean(value && typeof value === "object" && "_methodName" in value);
 }
-function text$v(value) {
+function text$u(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function chunk$1(items, size) {
@@ -5697,14 +6367,14 @@ const BOOKING_PHOTOGRAPHER_STAFF_UIDS = {
   "david-gonzalez": "",
   "cadi-torres": ""
 };
-function text$u(value) {
+function text$t(value) {
   return typeof value === "string" ? value.trim().toLowerCase() : "";
 }
 function resolveBookingPhotographerStaff(input) {
   const publicId = input.publicId.trim();
   const configured = String(BOOKING_PHOTOGRAPHER_STAFF_UIDS[publicId] || "").trim();
-  const calendar = text$u(input.calendarId);
-  const match = calendar ? (input.staff || []).find((member) => text$u(member.email) === calendar || text$u(member.googleCalendarId) === calendar) : void 0;
+  const calendar = text$t(input.calendarId);
+  const match = calendar ? (input.staff || []).find((member) => text$t(member.email) === calendar || text$t(member.googleCalendarId) === calendar) : void 0;
   const candidate = String(match?.id || configured || "").trim();
   const uid = candidate && candidate !== publicId ? candidate : null;
   const matchedName = typeof match?.name === "string" ? match.name.trim() : "";
@@ -5804,7 +6474,7 @@ function adminRevenueAcceptance(by, at = (/* @__PURE__ */ new Date()).toISOStrin
   return { countsTowardRevenue: true, revenueAcceptedAt: at, revenueAcceptedBy: actor2 };
 }
 function revenueAcceptanceForRequest(request, staffBy, at = (/* @__PURE__ */ new Date()).toISOString()) {
-  const row = asRecord$8(request);
+  const row = asRecord$7(request);
   const source = typeof row.source === "string" ? row.source : "";
   const adminSource = source === "admin" || source === "manual_invoice";
   if (row.countsTowardRevenue === true || adminSource) {
@@ -5819,21 +6489,21 @@ function isPlaytestRecord(record2, links) {
   if (playtestId(record2)) return true;
   if (playtestFlag(links?.order) || playtestFlag(links?.client)) return true;
   if (playtestId(links?.order) || playtestId(links?.client)) return true;
-  const data = asRecord$8(record2);
+  const data = asRecord$7(record2);
   return playtestFlag(data.order) || playtestFlag(data.client) || playtestFlag(data.invoice) || playtestId(data.order) || playtestId(data.client);
 }
 function isQaOnlyRecord(record2, links) {
   if (qaOnlyFlag(record2)) return true;
   if (qaOnlyFlag(links?.order) || qaOnlyFlag(links?.client)) return true;
-  const data = asRecord$8(record2);
+  const data = asRecord$7(record2);
   return qaOnlyFlag(data.order) || qaOnlyFlag(data.client) || qaOnlyFlag(data.invoice);
 }
 function recordCountsTowardRevenue(record2, links) {
   if (isPlaytestRecord(record2, links) || isQaOnlyRecord(record2, links)) return false;
-  return asRecord$8(record2).countsTowardRevenue === true;
+  return asRecord$7(record2).countsTowardRevenue === true;
 }
 function revenueStamp(record2) {
-  const row = asRecord$8(record2);
+  const row = asRecord$7(record2);
   return {
     countsTowardRevenue: recordCountsTowardRevenue(record2),
     ...row.playtest === true ? { playtest: true } : {},
@@ -5843,7 +6513,7 @@ function revenueStamp(record2) {
 function sumTransactionAmounts(records) {
   return records.reduce((sum, record2) => {
     if (!recordCountsTowardRevenue(record2)) return sum;
-    return sum + (Number(asRecord$8(record2).amount) || 0);
+    return sum + (Number(asRecord$7(record2).amount) || 0);
   }, 0);
 }
 function planRevenueAcceptanceUpdates(input) {
@@ -5880,15 +6550,15 @@ function planRevenueAcceptanceUpdates(input) {
   return { found: patches.length > 0, patches };
 }
 function playtestFlag(record2) {
-  return asRecord$8(record2).playtest === true;
+  return asRecord$7(record2).playtest === true;
 }
 function playtestId(record2) {
-  return textId$1(asRecord$8(record2).id).toLowerCase().startsWith("playtest-");
+  return textId$1(asRecord$7(record2).id).toLowerCase().startsWith("playtest-");
 }
 function qaOnlyFlag(record2) {
-  return asRecord$8(record2).qaOnly === true;
+  return asRecord$7(record2).qaOnly === true;
 }
-function asRecord$8(value) {
+function asRecord$7(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
   return value;
 }
@@ -5995,7 +6665,7 @@ function synthesizePackageLine(record2) {
 }
 function packageLabel(record2) {
   for (const key of PACKAGE_LABEL_KEYS) {
-    const value = text$t(record2[key]);
+    const value = text$s(record2[key]);
     if (value) return value;
   }
   return "";
@@ -6032,7 +6702,7 @@ function moneyOrNull$1(value) {
 function nested$2(value) {
   return value && typeof value === "object" ? value : {};
 }
-function text$t(value) {
+function text$s(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function roundMoney$5(value) {
@@ -6064,7 +6734,7 @@ function buildAdminOrderTile(record2) {
   const packageName = skin2?.title || named || "Custom order";
   const charges = orderChargeSummary(record2, lines);
   return {
-    id: text$s(record2.id) || packageName,
+    id: text$r(record2.id) || packageName,
     orderCode: orderCode(kind, record2),
     kind,
     typeLabel: kind === "business" ? "Business" : "Listing",
@@ -6087,7 +6757,7 @@ function buildAdminOrderTile(record2) {
   };
 }
 function orderKind(record2, skin2) {
-  const raw = text$s(record2.projectType || record2.orderType || record2.type).toLowerCase();
+  const raw = text$r(record2.projectType || record2.orderType || record2.type).toLowerCase();
   if (raw === "business" || raw === "brand" || raw === "social") return "business";
   if (raw === "real_estate" || raw === "listing" || raw === "property") return "listing";
   if (skin2?.category === "listing") return "listing";
@@ -6101,36 +6771,36 @@ function channelFor(skin2, kind) {
   return kind === "business" ? "Human Brand" : "Listings & Spaces";
 }
 function orderCode(kind, record2) {
-  const explicit = text$s(record2.orderCode || record2.orderNumber || record2.displayId);
+  const explicit = text$r(record2.orderCode || record2.orderNumber || record2.displayId);
   if (explicit) return explicit.toUpperCase();
-  const id = text$s(record2.id);
+  const id = text$r(record2.id);
   const prefix = kind === "listing" ? "L" : "B";
   return `ORD - ${prefix} - ${orderCodeTail(id)}`;
 }
 function heroFromRecord(record2) {
-  const explicit = text$s(record2.heroUrl) || text$s(record2.coverUrl) || text$s(record2.coverImage);
+  const explicit = text$r(record2.heroUrl) || text$r(record2.coverUrl) || text$r(record2.coverImage);
   if (explicit) return explicit;
   const images = record2.images;
   if (!Array.isArray(images)) return "";
   for (const image of images) {
     if (typeof image === "string" && image.trim()) return image.trim();
     if (image && typeof image === "object") {
-      const url = text$s(image.url) || text$s(image.thumbnailUrl);
+      const url = text$r(image.url) || text$r(image.thumbnailUrl);
       if (url) return url;
     }
   }
   return "";
 }
 function clientName(record2) {
-  const named = text$s(record2.clientName) || text$s(record2.customerName) || text$s(record2.agentName) || [text$s(record2.firstName), text$s(record2.lastName)].filter(Boolean).join(" ");
+  const named = text$r(record2.clientName) || text$r(record2.customerName) || text$r(record2.agentName) || [text$r(record2.firstName), text$r(record2.lastName)].filter(Boolean).join(" ");
   return named || "—";
 }
 function appointmentLabel(record2) {
   const raw = record2.appointmentDate ?? record2.apptDate ?? record2.scheduledDate ?? record2.requestedDate;
   const key = calendarDateKey(raw);
   const date = formatShootDateLabel(key, typeof raw === "string" ? raw : void 0);
-  const time = text$s(record2.scheduledTime || record2.appointmentTime || record2.requestedTime);
-  const photographer = text$s(record2.assignedPhotographerName || record2.photographerName || record2.photographerPreference);
+  const time = text$r(record2.scheduledTime || record2.appointmentTime || record2.requestedTime);
+  const photographer = text$r(record2.assignedPhotographerName || record2.photographerName || record2.photographerPreference);
   return [date, time, photographer].filter(Boolean).join(" · ") || "—";
 }
 function tilePrice(amount) {
@@ -6224,7 +6894,7 @@ function money$5(value) {
   }
   return 0;
 }
-function text$s(value) {
+function text$r(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 const NOT_PROVIDED = "Not provided";
@@ -6248,7 +6918,7 @@ function officeNewOrderEmail(saved, options) {
   const subtotal = subtotalBeforeProcessing(saved, lines, processingAmount);
   const fields = [
     ["Order number", orderNumber2],
-    ["Admin link", text$r(options?.adminUrl) || NOT_PROVIDED],
+    ["Admin link", text$q(options?.adminUrl) || NOT_PROVIDED],
     ["Client name", clientName2],
     ["Client email", firstText$1(saved, ["clientEmail", "email"])],
     ["Client phone", firstText$1(saved, ["clientPhone", "phone"])],
@@ -6283,7 +6953,7 @@ function officeNewOrderEmail(saved, options) {
     ["Notes", notes],
     ["Booked via", bookedVia(saved)]
   ];
-  const officeNote = text$r(saved.officeNote);
+  const officeNote = text$q(saved.officeNote);
   if (officeNote) fields.unshift(["Office note", officeNote]);
   const subjectCore = `New order ${orderNumber2} — ${packageName} — ${address} — ${requestedDate}`;
   const subject = isTestOrder(clientName2, notes) ? `[TEST] ${subjectCore}` : subjectCore;
@@ -6297,19 +6967,19 @@ ${notes}`.toUpperCase().includes("TEST ORDER");
 }
 function orderNumberOf(saved) {
   for (const key of ["orderNumber", "orderCode", "displayId"]) {
-    const value = text$r(saved[key]);
+    const value = text$q(saved[key]);
     if (value && value !== NOT_PROVIDED) return value;
   }
-  if (!text$r(saved.id)) return NOT_PROVIDED;
+  if (!text$q(saved.id)) return NOT_PROVIDED;
   return buildAdminOrderTile(saved).orderCode;
 }
 function explicitPackageName(saved) {
   for (const key of ["packageName", "serviceName"]) {
-    const value = text$r(saved[key]);
+    const value = text$q(saved[key]);
     if (value && value !== NOT_PROVIDED) return cleanPackageName(value) || value;
   }
-  const selected = text$r(saved.selectedService);
-  if (text$r(saved.id) || selected) {
+  const selected = text$q(saved.selectedService);
+  if (text$q(saved.id) || selected) {
     const tileName = buildAdminOrderTile(saved).packageName;
     if (tileName && tileName !== "Custom order") return tileName;
   }
@@ -6319,7 +6989,7 @@ function explicitPackageName(saved) {
 function clientNameOf(saved) {
   const named = firstText$1(saved, ["clientName", "customerName"]);
   if (named) return named;
-  const joined = [text$r(saved.firstName), text$r(saved.lastName)].filter(Boolean).join(" ");
+  const joined = [text$q(saved.firstName), text$q(saved.lastName)].filter(Boolean).join(" ");
   return joined || NOT_PROVIDED;
 }
 function agentContactOf(saved) {
@@ -6337,7 +7007,7 @@ function agentField(saved, keys, nestedKey) {
   if (direct !== NOT_PROVIDED) return direct;
   for (const holder of [saved.agent, saved.listingAgent, saved.realtor]) {
     const record2 = nested(holder);
-    const value = text$r(record2[nestedKey]);
+    const value = text$q(record2[nestedKey]);
     if (value) return value;
   }
   return "";
@@ -6349,7 +7019,7 @@ function notesOf(saved) {
   const seen = /* @__PURE__ */ new Set();
   const lines = [];
   for (const key of ["vibeNote", "notes", "specialInstructions", "internalNotes"]) {
-    const chunk2 = text$r(saved[key]);
+    const chunk2 = text$q(saved[key]);
     if (!chunk2) continue;
     for (const line of chunk2.split(/\n+/)) {
       const trimmed = line.trim();
@@ -6400,12 +7070,12 @@ function lockboxOf(saved) {
   return code || NOT_PROVIDED;
 }
 function occupancyOf(saved) {
-  const parts = ["occupancy", "propertyStatus", "furnishingStatus"].map((key) => text$r(saved[key])).filter(Boolean);
+  const parts = ["occupancy", "propertyStatus", "furnishingStatus"].map((key) => text$q(saved[key])).filter(Boolean);
   return parts.length ? parts.join(", ") : NOT_PROVIDED;
 }
 function bookedVia(saved) {
-  const lead = text$r(saved.leadSource);
-  const source = text$r(saved.source);
+  const lead = text$q(saved.leadSource);
+  const source = text$q(saved.source);
   const blob = `${lead} ${source}`.toLowerCase();
   if (!blob.trim()) return NOT_PROVIDED;
   if (/admin/.test(blob)) return "Admin";
@@ -6415,7 +7085,7 @@ function bookedVia(saved) {
 }
 function paymentOf(saved, total) {
   const invoice = nested(saved.invoice);
-  const explicit = [saved.paymentStatus, saved.invoiceStatus, invoice.status].map((value) => text$r(value).toLowerCase()).find(Boolean) || "";
+  const explicit = [saved.paymentStatus, saved.invoiceStatus, invoice.status].map((value) => text$q(value).toLowerCase()).find(Boolean) || "";
   if (/partial/.test(explicit)) return "Partial";
   if (/\bpaid\b/.test(explicit) && !/unpaid/.test(explicit)) return "Paid";
   if (/unpaid/.test(explicit)) return "Unpaid";
@@ -6522,7 +7192,7 @@ function moneyOrNull(value) {
 function nested(value) {
   return value && typeof value === "object" ? value : {};
 }
-function text$r(value) {
+function text$q(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function escapeHtml$a(value) {
@@ -6936,15 +7606,15 @@ function canonicalSlotTime(value) {
   if (hour < 1 || hour > 12) return null;
   return `${hour}:${match[2]} ${match[3].toUpperCase()}`;
 }
-function text$q(value) {
+function text$p(value) {
   return typeof value === "string" ? value : "";
 }
 function isHolidayTestBooking(order) {
-  const email = `${text$q(order.email)} ${text$q(order.clientEmail)}`.toLowerCase();
+  const email = `${text$p(order.email)} ${text$p(order.clientEmail)}`.toLowerCase();
   if (email.includes("ops+deliveryqa@")) return true;
   if (order.playtest === true || order.test === true || order.isTest === true) return true;
-  const name = text$q(order.clientName) || `${text$q(order.firstName)} ${text$q(order.lastName)}`.trim();
-  const notes = text$q(order.vibeNote) || text$q(order.notes);
+  const name = text$p(order.clientName) || `${text$p(order.firstName)} ${text$p(order.lastName)}`.trim();
+  const notes = text$p(order.vibeNote) || text$p(order.notes);
   return `${name}
 ${notes}`.toUpperCase().includes("TEST ORDER");
 }
@@ -6965,15 +7635,15 @@ function holidayStoredDate(order) {
       }).format(date);
     }
   }
-  const fromNote = /^Date:\s*(\d{4}-\d{2}-\d{2})/im.exec(text$q(order.vibeNote));
+  const fromNote = /^Date:\s*(\d{4}-\d{2}-\d{2})/im.exec(text$p(order.vibeNote));
   if (fromNote) return fromNote[1];
-  if (text$q(order.leadSource).trim() === HOLIDAY_RSVP_LEAD) return THANKFUL_EVENT_DATE;
+  if (text$p(order.leadSource).trim() === HOLIDAY_RSVP_LEAD) return THANKFUL_EVENT_DATE;
   return null;
 }
 function holidayStoredTime(order) {
   const labeled = canonicalSlotTime(order.requestedTimeLabel);
   if (labeled) return labeled;
-  const note = text$q(order.vibeNote);
+  const note = text$p(order.vibeNote);
   const requested = /Requested photo time:\s*(\d{1,2}:\d{2}\s*[AP]M)/i.exec(note);
   if (requested) return canonicalSlotTime(requested[1]);
   const line = /^Time:\s*(\d{1,2}:\d{2}\s*[AP]M)/im.exec(note);
@@ -6983,8 +7653,8 @@ function holidayStoredTime(order) {
 function holidaySlotClaim(leadSource, date, time) {
   const clock2 = canonicalSlotTime(time);
   if (!clock2) return null;
-  const lead = text$q(leadSource).trim();
-  const day = text$q(date).trim().slice(0, 10);
+  const lead = text$p(leadSource).trim();
+  const day = text$p(date).trim().slice(0, 10);
   if (lead === HOLIDAY_RSVP_LEAD) {
     const thankfulDay = day || THANKFUL_EVENT_DATE;
     if (thankfulDay !== THANKFUL_EVENT_DATE || !thankfulSlotTimes().includes(clock2)) return null;
@@ -7010,7 +7680,7 @@ function holidayTakenFromOrders(orders, limit = HOLIDAY_SLOT_LIMIT) {
   const counts2 = /* @__PURE__ */ new Map();
   for (const order of orders) {
     if (isHolidayTestBooking(order)) continue;
-    const status2 = text$q(order.status).trim().toLowerCase();
+    const status2 = text$p(order.status).trim().toLowerCase();
     if (CLOSED_STATUSES$1.has(status2)) continue;
     const claim = holidaySlotClaim(order.leadSource, holidayStoredDate(order), holidayStoredTime(order));
     if (!claim) continue;
@@ -7043,18 +7713,18 @@ const HOLIDAY_SLOT_MINUTES = 15;
 const LEGACY_THANKFUL_DATE = "2026-11-14";
 const LEGACY_THANKFUL_TIME = "11:00 AM";
 const CLOSED_STATUSES = /* @__PURE__ */ new Set(["declined", "cancelled", "canceled"]);
-function text$p(value) {
+function text$o(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function noteOf(order) {
-  return text$p(order.vibeNote) || text$p(order.notes);
+  return text$o(order.vibeNote) || text$o(order.notes);
 }
 function lineValue(note, label) {
   const match = new RegExp(`^${label}:\\s*(.*)$`, "im").exec(note);
   return match ? match[1].trim() : "";
 }
 function holidayGuestName(order) {
-  const named = text$p(order.clientName) || `${text$p(order.firstName)} ${text$p(order.lastName)}`.trim();
+  const named = text$o(order.clientName) || `${text$o(order.firstName)} ${text$o(order.lastName)}`.trim();
   return named || "Guest";
 }
 function holidayHeadcountLabel(order) {
@@ -7088,18 +7758,18 @@ function holidayNotesLabel(order) {
   return lineValue(noteOf(order), "Notes");
 }
 function holidayPackageLabel(order) {
-  const selected = text$p(order.selectedService);
+  const selected = text$o(order.selectedService);
   if (selected) return selected;
-  const named = text$p(order.packageName);
+  const named = text$o(order.packageName);
   if (named) return named;
   const fromNote = lineValue(noteOf(order), "Package");
   return fromNote || "Holiday shoot";
 }
 function closedStatus(order) {
-  return CLOSED_STATUSES.has(text$p(order.status).toLowerCase());
+  return CLOSED_STATUSES.has(text$o(order.status).toLowerCase());
 }
 function holidayLead(order) {
-  const lead = text$p(order.leadSource);
+  const lead = text$o(order.leadSource);
   if (lead === HOLIDAY_RSVP_LEAD) return "thankful";
   if (lead === HOLIDAY_SEASON_LEAD) return "season";
   return null;
@@ -7155,11 +7825,11 @@ function buildPlan(order, adminUrl) {
   const name = holidayGuestName(order);
   const headcount = holidayHeadcountLabel(order);
   const headcountTitle = holidayHeadcountNumber(headcount) ?? (headcount || "—");
-  const orderNumber2 = text$p(order.orderNumber);
+  const orderNumber2 = text$o(order.orderNumber);
   const summary = kind === "thankful" ? `Thankful RSVP — ${name} (${headcountTitle})` : `'Tis shoot — ${name} — ${holidayPackageLabel(order)}`;
   const description = [
-    `Email: ${text$p(order.email) || text$p(order.clientEmail) || "—"}`,
-    `Phone: ${text$p(order.phone) || text$p(order.clientPhone) || "—"}`,
+    `Email: ${text$o(order.email) || text$o(order.clientEmail) || "—"}`,
+    `Phone: ${text$o(order.phone) || text$o(order.clientPhone) || "—"}`,
     `Headcount: ${headcount || "—"}`,
     `Kids/Santa: ${holidaySantaLabel(order) || "—"}`,
     `Menu vote: ${holidayMenuVote(order) || "—"}`,
@@ -7168,7 +7838,7 @@ function buildPlan(order, adminUrl) {
     `Admin: ${adminUrl}`
   ].join("\n");
   return {
-    orderId: text$p(order.id),
+    orderId: text$o(order.id),
     orderNumber: orderNumber2,
     kind,
     name,
@@ -7185,7 +7855,7 @@ function classifyHolidayCalendarOrder(order, adminUrl) {
   if (!holidayLead(order)) return { action: "skip", reason: "notASlot" };
   if (isHolidayTestBooking(order)) return { action: "skip", reason: "test" };
   if (closedStatus(order)) return { action: "skip", reason: "cancelled" };
-  if (text$p(order.calendarEventId)) return { action: "skip", reason: "already" };
+  if (text$o(order.calendarEventId)) return { action: "skip", reason: "already" };
   const plan = buildPlan(order, adminUrl);
   if (!plan) return { action: "skip", reason: "notASlot" };
   return { action: "create", plan };
@@ -7398,6 +8068,11 @@ const SQUARE_VERSION_FALLBACK = "2026-08-20";
 function squareApiBaseUrl(environment) {
   return environment === "sandbox" ? "https://connect.squareupsandbox.com" : "https://connect.squareup.com";
 }
+function squareEnvironment(env) {
+  const applicationId = (env.SQUARE_APPLICATION_ID || env.VITE_SQUARE_APPLICATION_ID || "").trim();
+  if (env.SQUARE_ENVIRONMENT === "sandbox" || applicationId.startsWith("sandbox-")) return "sandbox";
+  return "production";
+}
 function squareConfigured(env) {
   return Boolean(env.SQUARE_ACCESS_TOKEN && env.SQUARE_LOCATION_ID);
 }
@@ -7410,7 +8085,7 @@ function squareWebPaymentsConfig(env = {}) {
   return {
     applicationId,
     locationId,
-    environment: env.SQUARE_ENVIRONMENT === "sandbox" ? "sandbox" : "production",
+    environment: squareEnvironment(env),
     missing
   };
 }
@@ -7614,7 +8289,7 @@ function roundMoney$4(value) {
   if (!Number.isFinite(value)) return 0;
   return Math.round(value * 100) / 100;
 }
-function text$o(value) {
+function text$n(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function amountOf(value, fallback = 0) {
@@ -7793,15 +8468,15 @@ function optionalNumber(value) {
   return Number.isFinite(amount) ? amount : void 0;
 }
 function fromDoc(doc, current) {
-  const id = text$o(doc.id) || current?.id || "";
+  const id = text$n(doc.id) || current?.id || "";
   if (!id) return null;
-  const kindRaw = text$o(doc.kind);
-  const modeRaw = text$o(doc.mode);
+  const kindRaw = text$n(doc.kind);
+  const modeRaw = text$n(doc.mode);
   const kind = KINDS$1.has(kindRaw) ? kindRaw : current?.kind;
   const mode = MODES.has(modeRaw) ? modeRaw : current?.mode;
   if (!kind || !mode) return null;
-  const code = text$o(doc.code) || current?.code;
-  const note = text$o(doc.note) || current?.note;
+  const code = text$n(doc.code) || current?.code;
+  const note = text$n(doc.note) || current?.note;
   const zone = optionalNumber(doc.zone) ?? current?.zone;
   const outerMiles = optionalNumber(doc.outerMiles) ?? current?.outerMiles;
   const minCount = optionalNumber(doc.minCount) ?? current?.minCount;
@@ -7809,7 +8484,7 @@ function fromDoc(doc, current) {
   return {
     id,
     kind,
-    name: text$o(doc.name) || current?.name || id,
+    name: text$n(doc.name) || current?.name || id,
     active: doc.active === false ? false : doc.active === true ? true : current?.active ?? true,
     removed: false,
     mode,
@@ -7827,7 +8502,7 @@ function mergePricingAdjustments(liveDocs = [], options) {
   const byId = /* @__PURE__ */ new Map();
   for (const item of defaultPricingAdjustments()) byId.set(item.id, { ...item });
   for (const doc of liveDocs) {
-    const id = text$o(doc.id);
+    const id = text$n(doc.id);
     if (!id) continue;
     if (doc.removed === true) {
       {
@@ -7860,8 +8535,8 @@ function pricingRates(items = mergePricingAdjustments([])) {
     feeCents: Math.round(Math.max(0, item.amount) * 100)
   })).filter((zone) => zone.zone > 0 && zone.outerMiles > 0).sort((a, b) => a.outerMiles - b.outerMiles);
   const travelSeedMissing = seedTravelIds.some((id) => !travelItems.some((item) => item.id === id));
-  const promos = items.filter((item) => item.kind === "promo" && item.active && !item.removed && text$o(item.code)).map((item) => ({
-    code: text$o(item.code).toUpperCase(),
+  const promos = items.filter((item) => item.kind === "promo" && item.active && !item.removed && text$n(item.code)).map((item) => ({
+    code: text$n(item.code).toUpperCase(),
     discount: Math.max(0, item.amount),
     mode: item.mode === "percent" ? "percent" : "flat",
     active: true
@@ -8073,31 +8748,31 @@ function payAtCloseTimestampMs(raw, now = Date.now()) {
 function payAtCloseSignatureExpected(secret2, timestamp, rawBody, hmacHex2) {
   return hmacHex2(secret2, `${timestamp}.${rawBody}`);
 }
-function asRecord$7(value) {
+function asRecord$6(value) {
   return value && typeof value === "object" ? value : null;
 }
-function text$n(value) {
+function text$m(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function interpretPayAtCloseWebhook(body) {
-  const event = asRecord$7(body);
-  const eventType = text$n(event?.type);
-  const payload = asRecord$7(event?.payload) || {};
+  const event = asRecord$6(body);
+  const eventType = text$m(event?.type);
+  const payload = asRecord$6(event?.payload) || {};
   if (eventType === "refund.created" || eventType === "refund.updated") {
     return {
       type: "refund",
       eventType,
-      refundId: text$n(payload.id),
-      checkoutId: text$n(payload.checkoutId),
+      refundId: text$m(payload.id),
+      checkoutId: text$m(payload.checkoutId),
       amount: roundPayAtCloseMoney(Number(payload.amount) || 0),
-      refundStatus: text$n(payload.status)
+      refundStatus: text$m(payload.status)
     };
   }
   if (eventType === "checkout.loan_application_denied" || eventType === "authorization.loan_application_denied") {
     return {
       type: "checkout",
       eventType,
-      checkoutId: text$n(payload.id),
+      checkoutId: text$m(payload.id),
       invoiceId: "",
       checkoutStatus: "requires-payment",
       application: "denied",
@@ -8108,7 +8783,7 @@ function interpretPayAtCloseWebhook(body) {
     return {
       type: "checkout",
       eventType,
-      checkoutId: text$n(payload.id),
+      checkoutId: text$m(payload.id),
       invoiceId: "",
       checkoutStatus: "requires-payment",
       application: "under_review"
@@ -8118,28 +8793,28 @@ function interpretPayAtCloseWebhook(body) {
     return {
       type: "checkout",
       eventType,
-      checkoutId: text$n(payload.id),
+      checkoutId: text$m(payload.id),
       invoiceId: "",
       checkoutStatus: "requires-payment",
       application: "approved"
     };
   }
   if (!eventType.startsWith("checkout.")) return { type: "ignore", eventType };
-  const metadata = asRecord$7(payload.metadata);
-  const invoiceId = text$n(payload.orderId) || text$n(metadata?.invoiceId);
-  const checkoutStatus = text$n(payload.status);
-  const error = asRecord$7(payload.lastPaymentError);
+  const metadata = asRecord$6(payload.metadata);
+  const invoiceId = text$m(payload.orderId) || text$m(metadata?.invoiceId);
+  const checkoutStatus = text$m(payload.status);
+  const error = asRecord$6(payload.lastPaymentError);
   const amount = roundPayAtCloseMoney((Number(payload.amount) || 0) + (Number(payload.tipAmount) || 0));
-  const paidAt = text$n(payload.updatedAt) || text$n(event?.createdAt);
+  const paidAt = text$m(payload.updatedAt) || text$m(event?.createdAt);
   return {
     type: "checkout",
     eventType,
-    checkoutId: text$n(payload.id),
+    checkoutId: text$m(payload.id),
     invoiceId,
     checkoutStatus,
     amount,
     ...paidAt ? { paidAt } : {},
-    ...eventType === "checkout.payment_failed" ? { failureReason: text$n(error?.message) || text$n(error?.code) || "Payment failed." } : {}
+    ...eventType === "checkout.payment_failed" ? { failureReason: text$m(error?.message) || text$m(error?.code) || "Payment failed." } : {}
   };
 }
 function payAtCloseSettlement(action, amountDue) {
@@ -8155,7 +8830,7 @@ function payAtCloseSettlement(action, amountDue) {
 }
 function isMirroredPayAtCloseSquarePayment(payment, invoice) {
   if (String(payment?.source_type || "").toUpperCase() !== "EXTERNAL") return false;
-  return invoice?.paymentMethod === PAY_AT_CLOSE_METHOD || invoice?.paymentProvider === PAY_AT_CLOSE_METHOD || Boolean(text$n(invoice?.titusCheckoutId));
+  return invoice?.paymentMethod === PAY_AT_CLOSE_METHOD || invoice?.paymentProvider === PAY_AT_CLOSE_METHOD || Boolean(text$m(invoice?.titusCheckoutId));
 }
 const PAY_NOW_DISCOUNT_CENTS = 500;
 const PAY_NOW_METHOD = "pay_now";
@@ -8604,22 +9279,44 @@ function emptySocials() {
     realtor: ""
   };
 }
-function text$m(value, max = 160) {
+function text$l(value, max = 160) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
 }
 function record$2(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
 }
 function hubEmail(value) {
-  const email = text$m(value, 160).toLowerCase();
+  const email = text$l(value, 160).toLowerCase();
   if (!email || !email.includes("@") || email.includes(" ")) return "";
   return email;
 }
 function hubPhone(value) {
-  return text$m(value, 40).replace(/[^\d+().\-\s]/g, "");
+  const cleaned = text$l(value, 40).replace(/[^\d+().\-\s]/g, "");
+  const digits2 = cleaned.replace(/\D/g, "");
+  const national = digits2.length === 11 && digits2.startsWith("1") ? digits2.slice(1) : digits2;
+  if (national.length !== 10) return cleaned;
+  return `(${national.slice(0, 3)}) ${national.slice(3, 6)}-${national.slice(6)}`;
+}
+function preferencesFromClient(data) {
+  const settings = record$2(data?.profileSettings);
+  const notes = record$2(settings.notifications);
+  return {
+    email: notes.email !== false,
+    sms: notes.sms === true,
+    push: notes.push !== false
+  };
+}
+function sanitizePreferences(input) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return null;
+  const raw = input;
+  return {
+    email: raw.email !== false,
+    sms: raw.sms === true,
+    push: raw.push !== false
+  };
 }
 function hubHttpUrl(value, max = 400) {
-  const raw = text$m(value, max);
+  const raw = text$l(value, max);
   if (!raw) return "";
   if (raw.startsWith("/media/") && !raw.includes("..") && !raw.includes("\\")) return raw;
   try {
@@ -8631,7 +9328,7 @@ function hubHttpUrl(value, max = 400) {
   }
 }
 function hubImageUrl(value) {
-  const raw = text$m(value, 500);
+  const raw = text$l(value, 500);
   if (!raw) return "";
   if (raw.startsWith("data:image/")) return "";
   return hubHttpUrl(raw, 500);
@@ -8657,7 +9354,7 @@ function pickCanonicalClientId(uid, docs) {
   };
   return [...others].sort((left, right) => score(right) - score(left) || left.id.localeCompare(right.id))[0].id;
 }
-function profileFromClient$1(data) {
+function profileFromClient(data) {
   const source = record$2(data);
   const stored = record$2(source.hubProfile);
   const socialSource = record$2(stored.socials);
@@ -8668,13 +9365,13 @@ function profileFromClient$1(data) {
   const customSocials = Array.isArray(stored.customSocials) ? stored.customSocials.slice(0, 12).map((entry2, index) => {
     const row = record$2(entry2);
     return {
-      id: text$m(row.id, 40) || `custom-${index + 1}`,
-      label: text$m(row.label, 40),
+      id: text$l(row.id, 40) || `custom-${index + 1}`,
+      label: text$l(row.label, 40),
       url: hubHttpUrl(row.url)
     };
   }).filter((entry2) => entry2.label && entry2.url) : [];
-  const firstName = text$m(stored.firstName, 80) || text$m(source.firstName, 80);
-  const lastName = text$m(stored.lastName, 80) || text$m(source.lastName, 80);
+  const firstName = text$l(stored.firstName, 80) || text$l(source.firstName, 80);
+  const lastName = text$l(stored.lastName, 80) || text$l(source.lastName, 80);
   return {
     firstName,
     lastName,
@@ -8682,7 +9379,7 @@ function profileFromClient$1(data) {
     email: hubEmail(stored.email || source.email),
     headshotUrl: hubImageUrl(stored.headshotUrl),
     companyLogoUrl: hubImageUrl(stored.companyLogoUrl),
-    brokerage: text$m(stored.brokerage, 160) || text$m(source.company, 160),
+    brokerage: text$l(stored.brokerage, 160) || text$l(source.company, 160),
     brokerageLogoUrl: hubImageUrl(stored.brokerageLogoUrl),
     website: hubHttpUrl(stored.website),
     socials,
@@ -8690,7 +9387,7 @@ function profileFromClient$1(data) {
   };
 }
 function sanitizeProfilePatch(input, currentEmail = "") {
-  const profile = profileFromClient$1({ hubProfile: record$2(input) });
+  const profile = profileFromClient({ hubProfile: record$2(input) });
   if (!profile.email) profile.email = hubEmail(currentEmail);
   return profile;
 }
@@ -8707,21 +9404,21 @@ function applyProfileToAgent(agent, profile) {
   const name = profile ? profileDisplayName(profile) : "";
   const links = profile ? socialLinks(profile) : [];
   return {
-    name: text$m(current.name, 160) || name,
-    brokerage: text$m(current.brokerage, 160) || profile?.brokerage || "",
-    license: text$m(current.license, 40),
-    phone: text$m(current.phone, 40) || profile?.phone || "",
+    name: text$l(current.name, 160) || name,
+    brokerage: text$l(current.brokerage, 160) || profile?.brokerage || "",
+    license: text$l(current.license, 40),
+    phone: text$l(current.phone, 40) || profile?.phone || "",
     email: hubEmail(current.email) || profile?.email || "",
     headshotUrl: hubImageUrl(current.headshotUrl) || profile?.headshotUrl || "",
     companyLogoUrl: hubImageUrl(current.companyLogoUrl) || profile?.companyLogoUrl || "",
     brokerageLogoUrl: hubImageUrl(current.brokerageLogoUrl) || profile?.brokerageLogoUrl || "",
     website: hubHttpUrl(current.website) || profile?.website || "",
-    socials: Array.isArray(current.socials) && current.socials.length ? current.socials.map((item) => ({ label: text$m(item.label, 40), url: hubHttpUrl(item.url) })).filter((item) => item.label && item.url) : links
+    socials: Array.isArray(current.socials) && current.socials.length ? current.socials.map((item) => ({ label: text$l(item.label, 40), url: hubHttpUrl(item.url) })).filter((item) => item.label && item.url) : links
   };
 }
 function normalizePermissions(value) {
   const list2 = Array.isArray(value) ? value : [];
-  const picked = [...new Set(list2.map((item) => text$m(item, 20)).filter((item) => PERMISSION_SET.has(item)))];
+  const picked = [...new Set(list2.map((item) => text$l(item, 20)).filter((item) => PERMISSION_SET.has(item)))];
   if (picked.includes("admin")) return [...TEAM_PERMISSIONS];
   if (picked.length === 0) return ["view"];
   if (!picked.includes("view")) picked.unshift("view");
@@ -8751,8 +9448,8 @@ function grantFromMembers(ownerClientId, teamId, members) {
   return grant;
 }
 function hubAllows(input) {
-  const uid = text$m(input.uid, 128);
-  const ownerClientId = text$m(input.ownerClientId, 128);
+  const uid = text$l(input.uid, 128);
+  const ownerClientId = text$l(input.ownerClientId, 128);
   if (!uid || !ownerClientId) return false;
   if (uid === ownerClientId) return true;
   const grant = input.grant;
@@ -8769,34 +9466,34 @@ function hubAllows(input) {
   return false;
 }
 function contactStatus(value) {
-  const status2 = text$m(value, 40);
+  const status2 = text$l(value, 40);
   return STATUS_SET.has(status2) ? status2 : "lead";
 }
 function sanitizeContact(input, ownerClientId, teamId = "") {
   const row = record$2(input);
-  const tags = Array.isArray(row.tags) ? row.tags.map((tag) => text$m(tag, 40)).filter(Boolean).slice(0, 12) : text$m(row.tags, 200).split(/[|,]/).map((tag) => tag.trim()).filter(Boolean).slice(0, 12);
+  const tags = Array.isArray(row.tags) ? row.tags.map((tag) => text$l(tag, 40)).filter(Boolean).slice(0, 12) : text$l(row.tags, 200).split(/[|,]/).map((tag) => tag.trim()).filter(Boolean).slice(0, 12);
   return {
     ownerClientId,
     teamId,
-    name: text$m(row.name, 120),
+    name: text$l(row.name, 120),
     email: hubEmail(row.email),
     phone: hubPhone(row.phone),
     tags,
-    notes: text$m(row.notes, 2e3),
-    lastContact: /^\d{4}-\d{2}-\d{2}$/.test(text$m(row.lastContact, 10)) ? text$m(row.lastContact, 10) : "",
+    notes: text$l(row.notes, 2e3),
+    lastContact: /^\d{4}-\d{2}-\d{2}$/.test(text$l(row.lastContact, 10)) ? text$l(row.lastContact, 10) : "",
     status: contactStatus(row.status),
     source: row.source === "share" || row.source === "import" ? row.source : "manual",
-    shareRef: text$m(row.shareRef, 160)
+    shareRef: text$l(row.shareRef, 160)
   };
 }
 function shareContactsFromListing(listing, ownerClientId) {
-  const listingId = text$m(listing.id, 128) || "listing";
+  const listingId = text$l(listing.id, 128) || "listing";
   const rows = [];
   const inquiries = Array.isArray(listing.listingSiteInquiries) ? listing.listingSiteInquiries : [];
   inquiries.forEach((entry2, index) => {
     const row = record$2(entry2);
-    const name = text$m(row.name, 120);
-    const contact2 = text$m(row.contact, 160);
+    const name = text$l(row.name, 120);
+    const contact2 = text$l(row.contact, 160);
     if (!name && !contact2) return;
     const email = hubEmail(contact2);
     rows.push({
@@ -8806,8 +9503,8 @@ function shareContactsFromListing(listing, ownerClientId) {
       email,
       phone: email ? "" : hubPhone(contact2),
       tags: ["shared"],
-      notes: text$m(row.when, 80) ? `Showing request: ${text$m(row.when, 80)}` : "Shared from the listing site.",
-      lastContact: text$m(row.at, 10).slice(0, 10),
+      notes: text$l(row.when, 80) ? `Showing request: ${text$l(row.when, 80)}` : "Shared from the listing site.",
+      lastContact: text$l(row.at, 10).slice(0, 10),
       status: "lead",
       source: "share",
       shareRef: `${listingId}:${index}`
@@ -8816,7 +9513,7 @@ function shareContactsFromListing(listing, ownerClientId) {
   const shares = Array.isArray(listing.shares) ? listing.shares : [];
   shares.forEach((entry2, index) => {
     const row = record$2(entry2);
-    const name = text$m(row.name, 120);
+    const name = text$l(row.name, 120);
     const email = hubEmail(row.email);
     if (!name && !email) return;
     rows.push({
@@ -8946,11 +9643,11 @@ function sanitizeBilling(input) {
   return {
     email: hubEmail(row.email || row.billingEmail),
     phone: hubPhone(row.phone || row.billingPhone),
-    line1: text$m(row.line1 || address.line1, 120),
-    line2: text$m(row.line2 || address.line2, 120),
-    city: text$m(row.city || address.city, 80),
-    state: text$m(row.state || address.state, 40),
-    postalCode: text$m(row.postalCode || address.postalCode || address.zip, 20)
+    line1: text$l(row.line1 || address.line1, 120),
+    line2: text$l(row.line2 || address.line2, 120),
+    city: text$l(row.city || address.city, 80),
+    state: text$l(row.state || address.state, 40),
+    postalCode: text$l(row.postalCode || address.postalCode || address.zip, 20)
   };
 }
 function billingAddressLine(billing) {
@@ -8962,7 +9659,7 @@ function portalBillingStamp(source) {
   const billing = sanitizeBilling(row.billing && typeof row.billing === "object" ? row.billing : row);
   const email = hubEmail(row.billingEmail) || billing.email;
   const phone = hubPhone(row.billingPhone) || billing.phone;
-  const address = text$m(row.billToAddress, 240) || billingAddressLine(billing);
+  const address = text$l(row.billToAddress, 240) || billingAddressLine(billing);
   const stamp2 = {};
   if (email) stamp2.billingEmail = email;
   if (phone) stamp2.billingPhone = phone;
@@ -8975,7 +9672,7 @@ function squareBuyerPrefill(invoice) {
   if (email) data.buyer_email = email;
   const phone = squareBuyerPhone(hubPhone(invoice.billingPhone) || hubPhone(invoice.clientPhone));
   if (phone) data.buyer_phone_number = phone;
-  const address = squareBuyerAddress(text$m(invoice.billToAddress, 240));
+  const address = squareBuyerAddress(text$l(invoice.billToAddress, 240));
   if (address) data.buyer_address = address;
   return data;
 }
@@ -8985,17 +9682,17 @@ function accountBalanceCents(invoices, storedCents = 0) {
   return Number.isFinite(storedCents) ? Math.round(storedCents) : 0;
 }
 function cardOnFileFromSquare(card, customerId) {
-  const last4 = text$m(card.last_4 || card.last4, 4);
+  const last4 = text$l(card.last_4 || card.last4, 4);
   if (!/^\d{4}$/.test(last4)) return null;
   const expMonth = Number(card.exp_month || card.expMonth);
   const expYear = Number(card.exp_year || card.expYear);
   return {
-    brand: text$m(card.card_brand || card.brand, 20) || "Card",
+    brand: text$l(card.card_brand || card.brand, 20) || "Card",
     last4,
     expMonth: Number.isFinite(expMonth) ? expMonth : 0,
     expYear: Number.isFinite(expYear) ? expYear : 0,
-    squareCardId: text$m(card.id || card.squareCardId, 80),
-    squareCustomerId: text$m(customerId, 80)
+    squareCardId: text$l(card.id || card.squareCardId, 80),
+    squareCustomerId: text$l(customerId, 80)
   };
 }
 function teamInviteDelivery(env = process.env) {
@@ -9020,11 +9717,11 @@ async function nextOrderNumber() {
   return formatOrderNumber(n);
 }
 const SETTLED = /* @__PURE__ */ new Set(["paid", "comped"]);
-function text$l(value) {
+function text$k(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function status(value) {
-  return text$l(value).toLowerCase();
+  return text$k(value).toLowerCase();
 }
 function settled(value) {
   return SETTLED.has(status(value));
@@ -9032,12 +9729,12 @@ function settled(value) {
 function isPlaytestDoc(doc) {
   if (!doc) return false;
   if (doc.playtest === true) return true;
-  return text$l(doc.id).toLowerCase().startsWith("playtest-");
+  return text$k(doc.id).toLowerCase().startsWith("playtest-");
 }
 function nestedInvoiceStatus(listing) {
   const nested2 = listing?.invoice;
   if (!nested2 || typeof nested2 !== "object") return "";
-  return text$l(nested2.status);
+  return text$k(nested2.status);
 }
 function releaseFlags(subject) {
   const listing = subject.listing;
@@ -9759,28 +10456,28 @@ function quoteApprenticeship(input) {
   };
 }
 const EMAIL_RE$5 = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-function text$k(value) {
+function text$j(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function parseApprenticeshipOrder(body) {
   const raw = body && typeof body === "object" ? body : {};
-  if (text$k(raw.website) || text$k(raw.companyWebsite)) {
+  if (text$j(raw.website) || text$j(raw.companyWebsite)) {
     return { ok: false, error: "Received.", honeypot: true };
   }
-  const name = text$k(raw.name);
-  const explicitFirst = text$k(raw.firstName);
-  const explicitLast = text$k(raw.lastName);
+  const name = text$j(raw.name);
+  const explicitFirst = text$j(raw.firstName);
+  const explicitLast = text$j(raw.lastName);
   const parts = name.split(/\s+/).filter(Boolean);
   const firstName = explicitFirst || parts[0] || "";
   const lastName = explicitLast || parts.slice(1).join(" ") || (explicitFirst ? "" : "");
-  const email = text$k(raw.email).toLowerCase();
-  const phone = text$k(raw.phone);
-  const address = text$k(raw.address);
-  const packageId = text$k(raw.packageId);
-  const slotStart = text$k(raw.slotStart);
-  const preferredTime = text$k(raw.preferredTime);
-  const details = text$k(raw.details);
-  const gclid = text$k(raw.gclid);
+  const email = text$j(raw.email).toLowerCase();
+  const phone = text$j(raw.phone);
+  const address = text$j(raw.address);
+  const packageId = text$j(raw.packageId);
+  const slotStart = text$j(raw.slotStart);
+  const preferredTime = text$j(raw.preferredTime);
+  const details = text$j(raw.details);
+  const gclid = text$j(raw.gclid);
   if (!isApprenticeshipPackage(packageId) || !findApprenticeshipPackage(packageId)) {
     return { ok: false, error: "Choose an apprenticeship package." };
   }
@@ -10313,12 +11010,12 @@ function publishHeadshotSlots(slots, quantity, options) {
   return published;
 }
 const EMAIL_RE$4 = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-function text$j(value) {
+function text$i(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function parseHeadshotOrder(body, options) {
   const raw = body && typeof body === "object" ? body : {};
-  if (text$j(raw.website) || text$j(raw.companyWebsite)) {
+  if (text$i(raw.website) || text$i(raw.companyWebsite)) {
     return { ok: false, error: "Received.", honeypot: true };
   }
   const maxQuantity = options?.maxQuantity ?? HEADSHOTS_MAX_QUANTITY;
@@ -10326,11 +11023,11 @@ function parseHeadshotOrder(body, options) {
   if (Number(raw.quantity) > maxQuantity) {
     return { ok: false, error: `Choose between 1 and ${maxQuantity} headshots.` };
   }
-  const firstName = text$j(raw.firstName);
-  const lastName = text$j(raw.lastName);
-  const email = text$j(raw.email).toLowerCase();
-  const phone = text$j(raw.phone);
-  const slotStart = text$j(raw.slotStart);
+  const firstName = text$i(raw.firstName);
+  const lastName = text$i(raw.lastName);
+  const email = text$i(raw.email).toLowerCase();
+  const phone = text$i(raw.phone);
+  const slotStart = text$i(raw.slotStart);
   if (firstName.length < 2 || lastName.length < 1) return { ok: false, error: "Enter your first and last name." };
   if (`${firstName} ${lastName}`.length > 80) return { ok: false, error: "Name is too long." };
   if (!EMAIL_RE$4.test(email)) return { ok: false, error: "Enter an email address." };
@@ -11105,6 +11802,17 @@ function createRateLimiter(options) {
 }
 const router$D = Router();
 const db$z = () => admin.firestore();
+async function portalOrderLink(header2, source) {
+  if (source !== "portal" || !header2?.startsWith("Bearer ") || !admin.apps.length) return null;
+  try {
+    const decoded = await admin.auth().verifyIdToken(header2.slice("Bearer ".length).trim());
+    const staff = await db$z().collection("staff").doc(decoded.uid).get();
+    if (staff.exists && staff.data()?.isActive !== false) return null;
+    return clientLinkStamp(decoded.uid, decoded.uid);
+  } catch {
+    return null;
+  }
+}
 const BOOKING_SUBMIT_WINDOW_MS = 15 * 60 * 1e3;
 const BOOKING_SUBMIT_MAX = 10;
 const bookingSubmitLimiter = createRateLimiter({
@@ -11204,6 +11912,7 @@ router$D.post("/", async (req, res) => {
       return res.status(409).json({ error: HOLIDAY_SLOT_TAKEN_MESSAGE });
     }
     const clientName2 = `${firstName} ${lastName}`.trim();
+    const portalLink = await portalOrderLink(req.headers.authorization, req.body?.source);
     const locationFields = storedServiceLocationFields(address);
     const savedAddress = locationFields.address;
     if (!savedAddress) {
@@ -11438,6 +12147,7 @@ router$D.post("/", async (req, res) => {
       dotOptInToken: createPayToken(),
       status: "new",
       source: req.body.source === "portal" ? "portal" : "booking_form",
+      ...portalLink ? portalLink : {},
       ...placedRevenueFields(),
       ...portalBillingStamp(req.body),
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -11528,7 +12238,7 @@ router$D.post("/", async (req, res) => {
       skipReason: null
     };
     try {
-      account = await attachBookingClient({
+      account = portalLink ? { clientId: portalLink.clientId, createdAccount: false, passwordSetupLink: null, skipReason: null } : await attachBookingClient({
         email: normalizedEmail,
         firstName,
         lastName,
@@ -11541,7 +12251,9 @@ router$D.post("/", async (req, res) => {
     if (account.clientId) {
       try {
         await docRef.update({
-          clientId: account.clientId,
+          clientId: portalLink?.clientId || account.clientId,
+          firebaseUid: portalLink?.firebaseUid || account.clientId,
+          clientProfileId: portalLink?.clientProfileId || `client:${account.clientId}`,
           clientEmail: normalizedEmail,
           portalAttached: true,
           updatedAt: admin.firestore.FieldValue.serverTimestamp()
@@ -12714,7 +13426,7 @@ const SENIOR_LIVING_SERVICE_LABELS = {
 };
 const SERVICE_ID_SET = new Set(SENIOR_LIVING_SERVICE_IDS);
 const EMAIL_RE$3 = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-function text$i(value) {
+function text$h(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function oneLine$2(value, max) {
@@ -12734,21 +13446,21 @@ function parseSeniorLivingRequest(body) {
     return { ok: false, honeypot: false, error: "That request could not be read." };
   }
   const raw = body;
-  const trap = text$i(raw.companyWebsite);
+  const trap = text$h(raw.companyWebsite);
   if (trap) return { ok: false, honeypot: true };
-  const name = oneLine$2(text$i(raw.name), 80);
-  const community = oneLine$2(text$i(raw.community), 120);
-  const email = oneLine$2(text$i(raw.email), 120);
-  const phone = oneLine$2(text$i(raw.phone), 30);
-  const address = oneLine$2(text$i(raw.address), 200);
-  const preferredDates = oneLine$2(text$i(raw.preferredDates), 160);
-  const notes = text$i(raw.notes).replace(/\u0000/g, "").trim().slice(0, 2e3);
+  const name = oneLine$2(text$h(raw.name), 80);
+  const community = oneLine$2(text$h(raw.community), 120);
+  const email = oneLine$2(text$h(raw.email), 120);
+  const phone = oneLine$2(text$h(raw.phone), 30);
+  const address = oneLine$2(text$h(raw.address), 200);
+  const preferredDates = oneLine$2(text$h(raw.preferredDates), 160);
+  const notes = text$h(raw.notes).replace(/\u0000/g, "").trim().slice(0, 2e3);
   if (name.length < 2) return { ok: false, honeypot: false, error: "Enter your name." };
-  if (text$i(raw.name).trim().length > 80)
+  if (text$h(raw.name).trim().length > 80)
     return { ok: false, honeypot: false, error: "Name is too long." };
   if (community.length < 2)
     return { ok: false, honeypot: false, error: "Enter the community name." };
-  if (text$i(raw.community).trim().length > 120)
+  if (text$h(raw.community).trim().length > 120)
     return { ok: false, honeypot: false, error: "Community name is too long." };
   if (!EMAIL_RE$3.test(email))
     return { ok: false, honeypot: false, error: "Enter a valid email." };
@@ -12757,18 +13469,18 @@ function parseSeniorLivingRequest(body) {
     return { ok: false, honeypot: false, error: "Enter a phone number." };
   if (address.length < 5)
     return { ok: false, honeypot: false, error: "Enter the community address." };
-  if (text$i(raw.address).trim().length > 200)
+  if (text$h(raw.address).trim().length > 200)
     return { ok: false, honeypot: false, error: "Address is too long." };
   if (preferredDates.length < 2)
     return { ok: false, honeypot: false, error: "Enter preferred dates." };
-  if (text$i(raw.preferredDates).trim().length > 160)
+  if (text$h(raw.preferredDates).trim().length > 160)
     return { ok: false, honeypot: false, error: "Preferred dates are too long." };
-  if (text$i(raw.notes).trim().length > 2e3)
+  if (text$h(raw.notes).trim().length > 2e3)
     return { ok: false, honeypot: false, error: "Notes are too long." };
   const servicesRaw = Array.isArray(raw.services) ? raw.services : [];
   const services2 = [];
   for (const entry2 of servicesRaw) {
-    const id = text$i(entry2);
+    const id = text$h(entry2);
     if (!id) continue;
     if (!SERVICE_ID_SET.has(id))
       return { ok: false, honeypot: false, error: "Choose a listed service." };
@@ -12956,14 +13668,14 @@ function parseSeniorLivingOrder(body, rates) {
     return { ok: false, honeypot: false, error: "That order could not be read." };
   }
   const raw = body;
-  if (text$i(raw.companyWebsite)) return { ok: false, honeypot: true };
+  if (text$h(raw.companyWebsite)) return { ok: false, honeypot: true };
   const roomCount = raw.roomCount == null || raw.roomCount === "" ? 0 : Number(raw.roomCount);
   const facilitySqft = raw.facilitySqft == null || raw.facilitySqft === "" ? 0 : Number(raw.facilitySqft);
   const quoted = quoteSeniorLivingOrder({
     tour: raw.tour === true,
     roomCount,
     facilitySqft,
-    address: text$i(raw.address),
+    address: text$h(raw.address),
     rates
   });
   if (quoted.ok === false) return { ok: false, honeypot: false, error: quoted.error };
@@ -12974,16 +13686,16 @@ function parseSeniorLivingOrder(body, rates) {
       error: "We could not price travel for that address. Call us and we will quote the trip."
     };
   }
-  const name = oneLine$2(text$i(raw.name), 80);
-  const community = oneLine$2(text$i(raw.community), 120);
-  const title = oneLine$2(text$i(raw.title), 80);
-  const email = oneLine$2(text$i(raw.email), 120);
-  const phone = oneLine$2(text$i(raw.phone), 30);
-  const address = oneLine$2(text$i(raw.address), 200);
-  const onsiteContact = oneLine$2(text$i(raw.onsiteContact), 120);
-  const notes = text$i(raw.notes).replace(/\u0000/g, "").trim().slice(0, 2e3);
-  const scheduledDate = oneLine$2(text$i(raw.scheduledDate), 10);
-  const scheduledTime = oneLine$2(text$i(raw.scheduledTime), 20);
+  const name = oneLine$2(text$h(raw.name), 80);
+  const community = oneLine$2(text$h(raw.community), 120);
+  const title = oneLine$2(text$h(raw.title), 80);
+  const email = oneLine$2(text$h(raw.email), 120);
+  const phone = oneLine$2(text$h(raw.phone), 30);
+  const address = oneLine$2(text$h(raw.address), 200);
+  const onsiteContact = oneLine$2(text$h(raw.onsiteContact), 120);
+  const notes = text$h(raw.notes).replace(/\u0000/g, "").trim().slice(0, 2e3);
+  const scheduledDate = oneLine$2(text$h(raw.scheduledDate), 10);
+  const scheduledTime = oneLine$2(text$h(raw.scheduledTime), 20);
   if (name.length < 2) return { ok: false, honeypot: false, error: "Enter your name." };
   if (community.length < 2) return { ok: false, honeypot: false, error: "Enter the community name." };
   if (title.length < 2) return { ok: false, honeypot: false, error: "Enter your title." };
@@ -13014,7 +13726,7 @@ function parseSeniorLivingOrder(body, rates) {
       error: "Choose monthly hosting or a transfer of ownership."
     };
   }
-  const hosting = text$i(raw.hosting);
+  const hosting = text$h(raw.hosting);
   return {
     ok: true,
     value: {
@@ -13646,9 +14358,9 @@ async function loadRevenueDocs(id) {
   for (const doc of docs) {
     if (doc.collection === "orders") orderIds.add(doc.id);
     if (doc.collection === "orderRequests") requestIds.add(doc.id);
-    const converted = text$h(doc.data.convertedToOrderId);
-    const requestId = text$h(doc.data.orderRequestId);
-    const orderId = text$h(doc.data.orderId);
+    const converted = text$g(doc.data.convertedToOrderId);
+    const requestId = text$g(doc.data.orderRequestId);
+    const orderId = text$g(doc.data.orderId);
     if (converted) orderIds.add(converted);
     if (requestId) requestIds.add(requestId);
     if (orderId) orderIds.add(orderId);
@@ -13681,7 +14393,7 @@ async function loadRevenueDocs(id) {
   }
   return docs;
 }
-function text$h(value) {
+function text$g(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 const router$B = Router();
@@ -13966,17 +14678,6 @@ function orderApprovalError(status2, note) {
   if (text2.length > NOTE_MAX) return "Notes are limited to 2,000 characters.";
   return null;
 }
-const INTENDED_OWNER_EMAIL = "cadi@iconicimagestx.com";
-function ownerAllowlist(raw) {
-  if (raw == null) return [];
-  const emails = raw.split(/[,;\s]+/).map((email) => email.trim().toLowerCase()).filter((email) => email.includes("@"));
-  return [...new Set(emails)];
-}
-function isOwnerEmail(email, allowlist) {
-  if (!email) return false;
-  if (allowlist.length === 0) return false;
-  return allowlist.includes(email.trim().toLowerCase());
-}
 const OWNER_FIXTURE_BEARER = "owner-fixture";
 const OWNER_SESSION_COOKIE = "owners_session";
 const SESSION_MS = 12 * 60 * 60 * 1e3;
@@ -14089,14 +14790,14 @@ function readCookie(header2, name) {
   }
   return null;
 }
-const memory$4 = /* @__PURE__ */ new Map();
+const memory$5 = /* @__PURE__ */ new Map();
 function useMemoryStore() {
   return !admin.apps.length || process.env.NODE_ENV === "test" || process.env.ORDER_APPROVAL_STORE === "memory";
 }
 async function writeOrderApproval(id, approval) {
   if (useMemoryStore()) {
-    if (!memory$4.has(id)) return null;
-    memory$4.set(id, { approval });
+    if (!memory$5.has(id)) return null;
+    memory$5.set(id, { approval });
     return approval;
   }
   const ref = admin.firestore().collection("orders").doc(id);
@@ -14257,36 +14958,36 @@ const VIDEO_FILE = /\.(mp4|m4v|mov|webm)(\?|#|$)/i;
 const BLOCKED_EXT = /\.(zip|pdf|dng|cr2|cr3|nef|nrw|arw|srf|sr2|raw|rw2|orf|raf|pef|3fr|fff|iiq|heic|heif|mp4|m4v|mov|webm)(\?|#|$)/i;
 const FILE_KEYS = ["downloadUrl", "fileUrl", "originalUrl", "fullResUrl", "mlsUrl", "zipUrl", "printUrl", "reelUrl", "mp4Url", "rawUrl", "src"];
 const DISPLAY_KEYS = ["previewUrl", "displayUrl", "webUrl", "thumbnailUrl"];
-function text$g(value) {
+function text$f(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function rowOf$2(item) {
   return item && typeof item === "object" ? item : null;
 }
 function shareableUrl$1(value) {
-  const url = text$g(value);
+  const url = text$f(value);
   if (!url || url.startsWith("//") || url.includes("\\") || url.includes("..")) return "";
   if (url.startsWith("/")) return url;
   if (url.startsWith("https://") || url.startsWith("http://")) return url;
   return "";
 }
 function mediaName$1(row, fallback) {
-  return text$g(row.deliveryName) || text$g(row.name) || text$g(row.fileName) || text$g(row.title) || fallback;
+  return text$f(row.deliveryName) || text$f(row.name) || text$f(row.fileName) || text$f(row.title) || fallback;
 }
 function labelOf(row) {
-  return `${text$g(row.fileName)} ${text$g(row.name)} ${text$g(row.title)} ${text$g(row.path)} ${text$g(row.storagePath)}`.toLowerCase();
+  return `${text$f(row.fileName)} ${text$f(row.name)} ${text$f(row.title)} ${text$f(row.path)} ${text$f(row.storagePath)}`.toLowerCase();
 }
 function isMls(row) {
-  const category = text$g(row.category).toLowerCase();
-  const type = text$g(row.type).toLowerCase();
+  const category = text$f(row.category).toLowerCase();
+  const type = text$f(row.type).toLowerCase();
   if (category === "mls" || type === "mls") return true;
   const label = labelOf(row);
   if (/(^|[^a-z0-9])mls([^a-z0-9]|$)/.test(label)) return true;
   return /\/mls\//.test(label);
 }
 function isFullRes(row) {
-  const category = text$g(row.category).toLowerCase();
-  const type = text$g(row.type).toLowerCase();
+  const category = text$f(row.category).toLowerCase();
+  const type = text$f(row.type).toLowerCase();
   if (category === "full-res" || category === "fullres" || type === "full-res" || type === "fullres") return true;
   const label = labelOf(row);
   if (/(^|[^a-z0-9])full[\s_-]?res([^a-z0-9]|$)/.test(label)) return true;
@@ -14295,7 +14996,7 @@ function isFullRes(row) {
 function isRasterUrl(url, row) {
   if (!url || BLOCKED_EXT.test(url.split("#")[0]) || VIDEO_FILE.test(url.split("#")[0])) return false;
   if (RASTER.test(url.split("#")[0])) return true;
-  const content = text$g(row.contentType).toLowerCase();
+  const content = text$f(row.contentType).toLowerCase();
   return /^image\/(jpeg|jpg|png|webp|gif)/.test(content);
 }
 function blockedFileUrls(row, includeOwnUrl) {
@@ -14324,11 +15025,11 @@ function separateDisplay(row) {
 }
 function rasterShareSource(row, legacyDropTagged = false) {
   if (legacyDropTagged && isMls(row)) return "";
-  const type = text$g(row.type).toLowerCase();
+  const type = text$f(row.type).toLowerCase();
   if (type === "video" || type === "reel" || type === "file" || type === "matterport") return "";
-  const content = text$g(row.contentType).toLowerCase();
+  const content = text$f(row.contentType).toLowerCase();
   if (content.startsWith("video/") || content === "application/pdf" || content === "application/zip") return "";
-  const path2 = `${text$g(row.path)} ${text$g(row.storagePath)}`.toLowerCase();
+  const path2 = `${text$f(row.path)} ${text$f(row.storagePath)}`.toLowerCase();
   if (/\/(raw|downloads?|print|zips?)\//.test(path2)) return "";
   const display = separateDisplay(row);
   if (legacyDropTagged && isFullRes(row)) return display;
@@ -14358,11 +15059,11 @@ function videoFileUrl(row) {
 function videoPlaceholderSource(row) {
   if (rasterPoster(row)) return "";
   const file = videoFileUrl(row);
-  const type = text$g(row.type).toLowerCase();
-  const content = text$g(row.contentType).toLowerCase();
+  const type = text$f(row.type).toLowerCase();
+  const content = text$f(row.contentType).toLowerCase();
   const named = type === "video" || type === "reel" || content.startsWith("video/");
   if (!file && !named) return "";
-  const id = text$g(row.id) || file || text$g(row.path) || text$g(row.storagePath) || text$g(row.name) || text$g(row.fileName);
+  const id = text$f(row.id) || file || text$f(row.path) || text$f(row.storagePath) || text$f(row.name) || text$f(row.fileName);
   if (!id) return "";
   return `${VIDEO_PLACEHOLDER_PREFIX}${encodeURIComponent(id)}`;
 }
@@ -14423,8 +15124,8 @@ function listingOwnerDisplayItems(listing) {
   return items;
 }
 function isGalleryFloor(row) {
-  const type = text$g(row.type).toLowerCase();
-  const category = text$g(row.category).toLowerCase();
+  const type = text$f(row.type).toLowerCase();
+  const category = text$f(row.category).toLowerCase();
   return type === "floorplan" || type === "floor-plan" || category === "floorplan" || category === "floor-plan";
 }
 function galleryOwnerDisplayItems(media) {
@@ -14432,7 +15133,7 @@ function galleryOwnerDisplayItems(media) {
   const seen = /* @__PURE__ */ new Set();
   const rows = media.map(rowOf$2).filter((row) => Boolean(row));
   for (const row of rows) {
-    const type = text$g(row.type).toLowerCase();
+    const type = text$f(row.type).toLowerCase();
     if (type === "video" || type === "reel" || type === "matterport" || type === "tour" || type === "file" || type === "pdf") continue;
     const source = rasterShareSource(row);
     if (!source) continue;
@@ -14440,7 +15141,7 @@ function galleryOwnerDisplayItems(media) {
     pushDisplay(items, seen, mediaName$1(row, floor ? "Floor plan" : "Photo"), source, floor ? "floorPlan" : "image");
   }
   for (const row of rows) {
-    const type = text$g(row.type).toLowerCase();
+    const type = text$f(row.type).toLowerCase();
     if (type !== "video" && type !== "reel") continue;
     const poster = rasterPoster(row) || videoPlaceholderSource(row);
     pushDisplay(items, seen, mediaName$1(row, "Video"), poster, "poster");
@@ -14457,24 +15158,24 @@ function posterIndex(row, items) {
   return items.findIndex((item) => item.sourceUrl === poster);
 }
 function isUnbranded(row) {
-  const category = text$g(row.category).toLowerCase();
-  const type = text$g(row.type).toLowerCase();
+  const category = text$f(row.category).toLowerCase();
+  const type = text$f(row.type).toLowerCase();
   if (category === "unbranded" || type === "unbranded") return true;
-  const name = `${text$g(row.name)} ${text$g(row.fileName)} ${text$g(row.title)}`.toLowerCase();
+  const name = `${text$f(row.name)} ${text$f(row.fileName)} ${text$f(row.title)}`.toLowerCase();
   return name.includes("unbranded");
 }
 function isBrandedPlayback(row) {
   if (isMls(row) || isUnbranded(row)) return false;
-  const category = text$g(row.category).toLowerCase();
-  const type = text$g(row.type).toLowerCase();
+  const category = text$f(row.category).toLowerCase();
+  const type = text$f(row.type).toLowerCase();
   if (category === "branded" || type === "branded") return true;
-  const name = `${text$g(row.name)} ${text$g(row.fileName)} ${text$g(row.title)}`.toLowerCase();
+  const name = `${text$f(row.name)} ${text$f(row.fileName)} ${text$f(row.title)}`.toLowerCase();
   return /(^|[^a-z])branded([^a-z]|$)/.test(name);
 }
 function isReelPlayback(row) {
   if (isMls(row) || isUnbranded(row)) return false;
-  const category = text$g(row.category).toLowerCase();
-  const type = text$g(row.type).toLowerCase();
+  const category = text$f(row.category).toLowerCase();
+  const type = text$f(row.type).toLowerCase();
   return category === "reel" || type === "reel";
 }
 function deliveredVideoUrl(row) {
@@ -14675,12 +15376,12 @@ const FILE_EXT = /* @__PURE__ */ new Set(["jpg", "png", "webp", "gif", "tif", "m
 function sectionIdOk(value) {
   return SECTION_ID.test(value);
 }
-function text$f(value, limit = 180) {
+function text$e(value, limit = 180) {
   if (typeof value !== "string") return "";
   return value.replace(/\u0000/g, "").trim().slice(0, limit);
 }
 function httpUrl$1(value) {
-  const url = text$f(value, 2e3);
+  const url = text$e(value, 2e3);
   return /^https?:\/\//i.test(url) ? url : "";
 }
 function arrangementFileName(index, addressOrSlug, originalName) {
@@ -14694,18 +15395,18 @@ function arrangementFileName(index, addressOrSlug, originalName) {
 }
 function rowId(row, fallback) {
   for (const key of ["id", "path", "storagePath", "url", "shareUrl"]) {
-    const value = text$f(row[key]);
+    const value = text$e(row[key]);
     if (value) return value.slice(0, 180);
   }
   return fallback.slice(0, 180);
 }
 function rowName(row, fallback) {
-  return text$f(row.name) || text$f(row.fileName) || text$f(row.title) || fallback;
+  return text$e(row.name) || text$e(row.fileName) || text$e(row.title) || fallback;
 }
 function isVideoRow(row) {
-  const content = text$f(row.contentType).toLowerCase();
+  const content = text$e(row.contentType).toLowerCase();
   if (content.startsWith("video/")) return true;
-  const name = `${rowName(row, "")} ${text$f(row.path)} ${text$f(row.url)}`;
+  const name = `${rowName(row, "")} ${text$e(row.path)} ${text$e(row.url)}`;
   return /\.(mp4|mov|m4v|webm)(\?|#|$)/i.test(name);
 }
 function pushRow(out, seen, row, kind, bucket2, index, fallbackName) {
@@ -14716,17 +15417,17 @@ function pushRow(out, seen, row, kind, bucket2, index, fallbackName) {
   seen.add(id);
   const width = typeof row.width === "number" && Number.isFinite(row.width) ? row.width : void 0;
   const height = typeof row.height === "number" && Number.isFinite(row.height) ? row.height : void 0;
-  const assetType = text$f(row.assetType) || text$f(row.type);
-  const brandLabel = text$f(row.brandLabel, 20);
-  const aspectLabel = text$f(row.aspectLabel, 24);
-  const platform = text$f(row.platform, 40);
-  const caption = text$f(row.caption, 500);
+  const assetType = text$e(row.assetType) || text$e(row.type);
+  const brandLabel = text$e(row.brandLabel, 20);
+  const aspectLabel = text$e(row.aspectLabel, 24);
+  const platform = text$e(row.platform, 40);
+  const caption = text$e(row.caption, 500);
   const webUrl = httpUrl$1(row.webUrl) || httpUrl$1(row.previewUrl) || httpUrl$1(row.displayUrl) || httpUrl$1(row.thumbnailUrl);
   out.push({
     id,
     kind,
     name: rowName(row, fallbackName),
-    path: text$f(row.path) || text$f(row.storagePath),
+    path: text$e(row.path) || text$e(row.storagePath),
     url,
     culled: row.culled === true,
     bucket: bucket2,
@@ -14752,7 +15453,7 @@ function collectArrangementMedia(listing) {
   const seen = /* @__PURE__ */ new Set();
   const seenTourUrls = /* @__PURE__ */ new Set();
   rowsOf$1(source.images).forEach((row, index) => {
-    const asset = text$f(row.assetType).toLowerCase() || text$f(row.type).toLowerCase();
+    const asset = text$e(row.assetType).toLowerCase() || text$e(row.type).toLowerCase();
     const kind = asset === "floorplan" ? "floorplan" : asset === "file" || asset === "document" ? "file" : asset === "video" || isVideoRow(row) ? "video" : "photo";
     pushRow(out, seen, row, kind, asset === "social" ? "socialAssets" : "images", index, `Photo ${index + 1}`);
   });
@@ -14781,17 +15482,17 @@ function collectArrangementMedia(listing) {
     pushRow(out, seen, row, "file", "files", index, `File ${index + 1}`);
   });
   rowsOf$1(source.socialAssets).forEach((row, index) => {
-    pushRow(out, seen, { ...row, assetType: text$f(row.assetType) || "social" }, "photo", "socialAssets", index, `Social ${index + 1}`);
+    pushRow(out, seen, { ...row, assetType: text$e(row.assetType) || "social" }, "photo", "socialAssets", index, `Social ${index + 1}`);
   });
   rowsOf$1(source.clientPortalUploads).forEach((row, index) => {
-    const kind = text$f(row.kind);
+    const kind = text$e(row.kind);
     const arrangementKind = kind === "video" ? "video" : "file";
     pushRow(out, seen, row, arrangementKind, "clientPortalUploads", index, `File ${index + 1}`);
   });
   return out;
 }
 function sectionName(value) {
-  return text$f(value, 60);
+  return text$e(value, 60);
 }
 function readMediaArrangement(value) {
   const row = value && typeof value === "object" && !Array.isArray(value) ? value : {};
@@ -14801,7 +15502,7 @@ function readMediaArrangement(value) {
     for (const item of row.sections) {
       if (!item || typeof item !== "object") continue;
       const section = item;
-      const id = text$f(section.id, 32);
+      const id = text$e(section.id, 32);
       const name = sectionName(section.name);
       if (!sectionIdOk(id) || !name || seenSections.has(id)) continue;
       seenSections.add(id);
@@ -14828,10 +15529,10 @@ function readMediaArrangement(value) {
     for (const item of row.placements) {
       if (!item || typeof item !== "object") continue;
       const placement = item;
-      const id = text$f(placement.id);
+      const id = text$e(placement.id);
       if (!id || seenIds.has(id)) continue;
       seenIds.add(id);
-      const sectionId = text$f(placement.sectionId, 32);
+      const sectionId = text$e(placement.sectionId, 32);
       draft.push({
         id,
         sectionId: known.has(sectionId) ? sectionId : "",
@@ -14853,7 +15554,7 @@ function readMediaArrangement(value) {
       });
     }
   }
-  const coverId = text$f(row.coverId, 180);
+  const coverId = text$e(row.coverId, 180);
   return coverId ? { sections, placements, coverId } : { sections, placements };
 }
 function arrangementActive(arrangement) {
@@ -14920,10 +15621,10 @@ function hiddenSectionIdSet(arrangement) {
 function isHiddenFromClientGallery(listing, row) {
   if (row.hiddenFromGallery === true || row.culled === true) return true;
   const arrangement = readMediaArrangement(listing?.mediaArrangement);
-  const id = text$f(row.id) || text$f(row.path) || text$f(row.storagePath) || text$f(row.url) || text$f(row.shareUrl);
+  const id = text$e(row.id) || text$e(row.path) || text$e(row.storagePath) || text$e(row.url) || text$e(row.shareUrl);
   const placement = id ? arrangement.placements.find((item) => item.id === id) : void 0;
   if (placement?.hiddenFromGallery) return true;
-  const sectionId = text$f(row.sectionId, 32) || placement?.sectionId || "";
+  const sectionId = text$e(row.sectionId, 32) || placement?.sectionId || "";
   if (!sectionId) return false;
   return arrangement.sections.some((section) => section.id === sectionId && section.hideFromClientGallery);
 }
@@ -14931,9 +15632,9 @@ function isHiddenFromListingSites(listing, row) {
   const arrangement = readMediaArrangement(listing?.mediaArrangement);
   const hidden = hiddenSectionIdSet(arrangement);
   if (hidden.size === 0) return false;
-  const sectionId = text$f(row.sectionId, 32);
+  const sectionId = text$e(row.sectionId, 32);
   if (sectionId && hidden.has(sectionId)) return true;
-  const id = text$f(row.id) || text$f(row.path) || text$f(row.storagePath) || text$f(row.url);
+  const id = text$e(row.id) || text$e(row.path) || text$e(row.storagePath) || text$e(row.url);
   if (!id) return false;
   return arrangement.placements.some((placement) => placement.id === id && hidden.has(placement.sectionId));
 }
@@ -15010,9 +15711,9 @@ function stampGalleryMediaItems(items, sequenced) {
     if (row.url) byUrl.set(row.url, row);
   }
   return items.map((item) => {
-    const path2 = text$f(item.storagePath) || text$f(item.path);
-    const id = text$f(item.id);
-    const url = text$f(item.url) || text$f(item.shareUrl);
+    const path2 = text$e(item.storagePath) || text$e(item.path);
+    const id = text$e(item.id);
+    const url = text$e(item.url) || text$e(item.shareUrl);
     const hit = path2 && byPath2.get(path2) || id && byId.get(id) || url && byUrl.get(url) || void 0;
     if (!hit) return item;
     return {
@@ -15232,15 +15933,15 @@ function statusOf(doc) {
 function isReleased(doc) {
   return RELEASED_GALLERY_STATUSES.includes(statusOf(doc));
 }
-function text$e(value) {
+function text$d(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function httpUrl(value) {
-  const url = text$e(value);
+  const url = text$d(value);
   return url.startsWith("https://") || url.startsWith("http://") ? url : "";
 }
 function shareableUrl(value) {
-  const url = text$e(value);
+  const url = text$d(value);
   if (!url || url.startsWith("//") || url.includes("\\") || url.includes("..")) return "";
   if (url.startsWith("/")) return url;
   return httpUrl(url);
@@ -15282,7 +15983,7 @@ function isPrivateMedia(path2, name, url) {
   return PRIVATE_FILE.test(name) || PRIVATE_FILE.test(url);
 }
 function mediaName(row, fallback) {
-  return text$e(row.name) || text$e(row.fileName) || text$e(row.title) || fallback;
+  return text$d(row.name) || text$d(row.fileName) || text$d(row.title) || fallback;
 }
 function publicImages(listing) {
   if (!Array.isArray(listing.images)) return [];
@@ -15302,7 +16003,7 @@ function publicImages(listing) {
   });
   const coverId = readMediaArrangement(listing.mediaArrangement).coverId;
   if (coverId && Array.isArray(listing.images)) {
-    const cover = listing.images.find((row) => text$e(row.id) === coverId || text$e(row.path) === coverId || text$e(row.url) === coverId);
+    const cover = listing.images.find((row) => text$d(row.id) === coverId || text$d(row.path) === coverId || text$d(row.url) === coverId);
     const coverUrl = cover ? httpUrl(cover.url) : "";
     const index = coverUrl ? images.findIndex((image) => image.url === coverUrl) : -1;
     if (index > 0) {
@@ -15320,14 +16021,14 @@ function publicVideos(listing) {
     keptShots(group).forEach((item, index) => {
       const row = rowOf(item);
       if (!row) return;
-      const content = text$e(row.contentType).toLowerCase();
-      const nameHint = `${mediaName(row, "")} ${text$e(row.url)}`;
-      const video = content.startsWith("video/") || /\.(mp4|mov|m4v|webm)(\?|#|$)/i.test(nameHint) || text$e(row.assetType) === "video" || text$e(row.type) === "video";
+      const content = text$d(row.contentType).toLowerCase();
+      const nameHint = `${mediaName(row, "")} ${text$d(row.url)}`;
+      const video = content.startsWith("video/") || /\.(mp4|mov|m4v|webm)(\?|#|$)/i.test(nameHint) || text$d(row.assetType) === "video" || text$d(row.type) === "video";
       if (!video) return;
       const url = httpUrl(row.url);
       const original = mediaName(row, "Video");
       const name = deliveryFileName(row, index);
-      const path2 = text$e(row.path) || text$e(row.storagePath);
+      const path2 = text$d(row.path) || text$d(row.storagePath);
       if (!url || isPrivateMedia(path2, original, url) || isPrivateMedia(path2, name, url)) return;
       if (isHiddenFromClientGallery(listing, row)) return;
       if (videos.some((clip2) => clip2.url === url)) return;
@@ -15354,10 +16055,10 @@ function publicTour(listing) {
   return "";
 }
 function agentNameOf$1(listing) {
-  const direct = text$e(listing.agentName) || text$e(listing.listingAgent);
+  const direct = text$d(listing.agentName) || text$d(listing.listingAgent);
   if (direct) return direct;
   const agent = listing.agent;
-  if (agent && typeof agent === "object") return text$e(agent.name);
+  if (agent && typeof agent === "object") return text$d(agent.name);
   if (typeof agent === "string") return agent.trim();
   return "";
 }
@@ -15369,14 +16070,14 @@ function publicFloorPlans(listing) {
     keptShots(group).forEach((item, index) => {
       const row = rowOf(item);
       if (!row) return;
-      const asset = text$e(row.assetType).toLowerCase();
-      const type = text$e(row.type).toLowerCase();
+      const asset = text$d(row.assetType).toLowerCase();
+      const type = text$d(row.type).toLowerCase();
       const fromImages = group === listing.images;
       if (fromImages && asset !== "floorplan" && type !== "floorplan") return;
       const url = httpUrl(row.url) || httpUrl(row.shareUrl);
       const original = mediaName(row, "Floor plan");
       const name = deliveryFileName(row, index);
-      const path2 = text$e(row.path) || text$e(row.storagePath);
+      const path2 = text$d(row.path) || text$d(row.storagePath);
       if (!url || isPrivateMedia(path2, original, url) || isPrivateMedia(path2, name, url)) return;
       if (isHiddenFromClientGallery(listing, row)) return;
       if (plans.some((plan) => plan.url === url)) return;
@@ -15408,7 +16109,7 @@ function ownerFiles(listing) {
       const row = rowOf(item);
       if (!row || isHiddenFromClientGallery(listing, row)) return;
       const name = mediaName(row, `File ${index + 1}`);
-      const path2 = text$e(row.path) || text$e(row.storagePath);
+      const path2 = text$d(row.path) || text$d(row.storagePath);
       const display = httpUrl(row.url);
       const download = downloadUrlOf(row);
       if (download) push(download, name);
@@ -15439,12 +16140,12 @@ function ownerRevisions(listing) {
     const row = rowOf(item) || {};
     const photoIndex = typeof row.photoIndex === "number" ? row.photoIndex : null;
     return {
-      id: text$e(row.id) || `revision-${index + 1}`,
-      type: text$e(row.type) || "gallery",
+      id: text$d(row.id) || `revision-${index + 1}`,
+      type: text$d(row.type) || "gallery",
       photoIndex,
-      description: text$e(row.description),
-      status: text$e(row.status) || "pending",
-      createdAt: text$e(row.createdAt)
+      description: text$d(row.description),
+      status: text$d(row.status) || "pending",
+      createdAt: text$d(row.createdAt)
     };
   });
 }
@@ -15453,11 +16154,11 @@ function invoiceOf(listing) {
   if (nested2 && typeof nested2 === "object" && typeof nested2.status === "string") {
     return { status: nested2.status };
   }
-  const status2 = text$e(listing.invoiceStatus);
+  const status2 = text$d(listing.invoiceStatus);
   return status2 ? { status: status2 } : null;
 }
 function pickReleasedGallery(listing, related) {
-  const preferred = text$e(listing.galleryId) || text$e(listing.playtestGalleryId);
+  const preferred = text$d(listing.galleryId) || text$d(listing.playtestGalleryId);
   const released = related.filter((doc) => isReleased(doc));
   if (preferred) {
     const match = released.find((doc) => doc.id === preferred);
@@ -15548,24 +16249,24 @@ function isStreamUrl(url) {
   return /(youtube\.com|youtu\.be|vimeo\.com|player\.vimeo\.com|mux\.com|stream\.mux|cloudflarestream\.com)/i.test(url);
 }
 function isFullResOrMls(row) {
-  const category = text$e(row.category).toLowerCase();
-  const type = text$e(row.type).toLowerCase();
+  const category = text$d(row.category).toLowerCase();
+  const type = text$d(row.type).toLowerCase();
   if (category === "mls" || category === "full-res" || category === "fullres" || type === "mls") return true;
-  const label = `${text$e(row.fileName)} ${text$e(row.name)} ${text$e(row.title)} ${text$e(row.path)} ${text$e(row.storagePath)}`.toLowerCase();
+  const label = `${text$d(row.fileName)} ${text$d(row.name)} ${text$d(row.title)} ${text$d(row.path)} ${text$d(row.storagePath)}`.toLowerCase();
   if (/(^|[^a-z0-9])(full[\s_-]?res|mls)([^a-z0-9]|$)/.test(label)) return true;
   return /\/(mls|full)\//.test(label);
 }
 function rowIsDeliveryOriginal(row) {
   if (row.downloadable === true || isFullResOrMls(row)) return true;
-  const type = text$e(row.type).toLowerCase();
+  const type = text$d(row.type).toLowerCase();
   if (type === "video" || type === "reel" || type === "file") return true;
-  const content = text$e(row.contentType).toLowerCase();
+  const content = text$d(row.contentType).toLowerCase();
   if (content.startsWith("video/") || content === "application/zip" || content === "application/pdf") return true;
   const candidates = [row.url, row.shareUrl, row.embedUrl, ...FILE_URL_KEYS.map((key) => row[key])];
-  return candidates.some((value) => isOriginalFileUrl(httpUrl(value) || text$e(value)));
+  return candidates.some((value) => isOriginalFileUrl(httpUrl(value) || text$d(value)));
 }
 function pushNeedle(needles, value) {
-  const raw = text$e(value);
+  const raw = text$d(value);
   if (raw.length >= 12) needles.push(raw);
 }
 function walkOriginalNeedles(value, needles, inheritedOriginal = false) {
@@ -15580,7 +16281,7 @@ function walkOriginalNeedles(value, needles, inheritedOriginal = false) {
   if (original) {
     const fileUrls = new Set(FILE_URL_KEYS.map((key) => shareableUrl(row[key])).filter(Boolean));
     for (const key of ["url", "shareUrl", "embedUrl", "sourcePath", "storagePath", "path"]) {
-      const raw = text$e(row[key]);
+      const raw = text$d(row[key]);
       if (!raw) continue;
       const asUrl = shareableUrl(raw);
       if (asUrl && isStreamUrl(asUrl)) continue;
@@ -15687,7 +16388,7 @@ function embedTour(listing, needles) {
       for (const key of ["embedUrl", "url", "shareUrl"]) {
         const url = shareableUrl(row[key]);
         if (!url || isOriginalFileUrl(url) || containsOriginal(url, needles)) continue;
-        const type = text$e(row.type).toLowerCase();
+        const type = text$d(row.type).toLowerCase();
         if (type === "matterport" || type === "tour" || /matterport\.com/i.test(url)) return url;
       }
     }
@@ -15709,7 +16410,7 @@ function displaySafeShareMedia(listing) {
 function ownerStudioProject(listing, pub, gate2 = {}) {
   const authoritativeInvoice = Object.prototype.hasOwnProperty.call(gate2, "invoice");
   const invoiceDoc = authoritativeInvoice && gate2.invoice && typeof gate2.invoice === "object" ? gate2.invoice : null;
-  const invoiceStatus = authoritativeInvoice ? text$e(invoiceDoc?.status) : text$e(invoiceOf(listing)?.status);
+  const invoiceStatus = authoritativeInvoice ? text$d(invoiceDoc?.status) : text$d(invoiceOf(listing)?.status);
   const invoice = invoiceStatus ? { status: invoiceStatus } : null;
   const downloadsUnlocked = studioDownloadsUnlocked({
     listing: {
@@ -15728,9 +16429,9 @@ function ownerStudioProject(listing, pub, gate2 = {}) {
   const project = {
     ...source,
     view: "owner",
-    clientName: text$e(listing.clientName),
-    clientEmail: text$e(listing.clientEmail),
-    clientPhone: text$e(listing.clientPhone),
+    clientName: text$d(listing.clientName),
+    clientEmail: text$d(listing.clientEmail),
+    clientPhone: text$d(listing.clientPhone),
     revisions: ownerRevisions(listing),
     lockDownloads: lockDownloadsOn(listing.lockDownloads),
     requirePayment: requirePaymentOn(listing.requirePayment),
@@ -15776,8 +16477,8 @@ function decideClientGalleryLink(input) {
   }
   if (input.pointedListing) return listingResult(input.pointedListing, input.relatedGalleries);
   if (input.order) {
-    const galleryId = text$e(input.order.galleryId);
-    const listingId = text$e(input.order.listingId);
+    const galleryId = text$d(input.order.galleryId);
+    const listingId = text$d(input.order.listingId);
     if (galleryId || listingId) {
       return {
         ok: false,
@@ -15794,8 +16495,8 @@ function decideClientGalleryLink(input) {
     };
   }
   if (input.orderRequest) {
-    const galleryId = text$e(input.orderRequest.galleryId);
-    const listingId = text$e(input.orderRequest.listingId);
+    const galleryId = text$d(input.orderRequest.galleryId);
+    const listingId = text$d(input.orderRequest.listingId);
     if (galleryId || listingId) {
       return {
         ok: false,
@@ -16590,9 +17291,9 @@ function firebaseDownloadUrl(bucketName2, storagePath, token) {
 }
 async function createListingUploadUrl(listingId, fileName2, contentType, folder) {
   await ensureBucketCors();
-  const safeName = safeStorageFileName(fileName2);
-  const resolvedType = contentTypeForUpload(safeName, contentType);
-  const storagePath = `listings/${listingId}/${folder}/${Date.now()}_${safeName}`;
+  const safeName2 = safeStorageFileName(fileName2);
+  const resolvedType = contentTypeForUpload(safeName2, contentType);
+  const storagePath = `listings/${listingId}/${folder}/${Date.now()}_${safeName2}`;
   const file = bucket$3().file(storagePath);
   const [uploadUrl] = await file.getSignedUrl({
     version: "v4",
@@ -16603,9 +17304,9 @@ async function createListingUploadUrl(listingId, fileName2, contentType, folder)
   return { uploadUrl, storagePath, contentType: resolvedType };
 }
 async function saveListingBytes(listingId, fileName2, contentType, folder, bytes) {
-  const safeName = safeStorageFileName(fileName2);
-  const resolvedType = contentTypeForUpload(safeName, contentType);
-  const storagePath = `listings/${listingId}/${folder}/${Date.now()}_${safeName}`;
+  const safeName2 = safeStorageFileName(fileName2);
+  const resolvedType = contentTypeForUpload(safeName2, contentType);
+  const storagePath = `listings/${listingId}/${folder}/${Date.now()}_${safeName2}`;
   const token = randomUUID();
   const file = bucket$3().file(storagePath);
   await file.save(bytes, {
@@ -18160,7 +18861,7 @@ async function orderIdForGallery(gallery) {
   return typeof orderId === "string" ? orderId.trim() : "";
 }
 const db$q = () => admin.firestore();
-function text$d(value) {
+function text$c(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function docRecord(snap) {
@@ -18182,7 +18883,7 @@ async function galleryById(id) {
 }
 async function relatedForListing(listing) {
   const related = await galleriesWhere("listingId", listing.id);
-  const extras = [text$d(listing.galleryId), text$d(listing.playtestGalleryId)];
+  const extras = [text$c(listing.galleryId), text$c(listing.playtestGalleryId)];
   for (const galleryId of extras) {
     if (!galleryId || related.some((doc) => doc.id === galleryId)) continue;
     const extra = await galleryById(galleryId);
@@ -18231,8 +18932,8 @@ async function resolveClientGalleryLink(id) {
   const order = docRecord(orderSnap);
   const orderRequest = docRecord(requestSnap);
   const galleriesByOrderId = order ? await galleriesWhere("orderId", id) : [];
-  const pointedGalleryId = text$d(orderRequest?.galleryId) || text$d(order?.galleryId);
-  const pointedListingId = text$d(orderRequest?.listingId) || text$d(order?.listingId);
+  const pointedGalleryId = text$c(orderRequest?.galleryId) || text$c(order?.galleryId);
+  const pointedListingId = text$c(orderRequest?.listingId) || text$c(order?.listingId);
   const pointedGallery = pointedGalleryId ? await galleryById(pointedGalleryId) : null;
   let pointedListing = null;
   let pointedRelated = relatedGalleries;
@@ -18254,7 +18955,7 @@ async function resolveClientGalleryLink(id) {
 }
 async function invoiceForListing(listing) {
   const load = (id) => db$q().collection("invoices").doc(id).get();
-  const invoiceId = text$d(listing.invoiceId);
+  const invoiceId = text$c(listing.invoiceId);
   if (invoiceId) {
     const doc = await readInvoiceDoc(load, invoiceId);
     if (doc && !invoiceRedirectTarget(doc.data)) return { id: doc.id, ...doc.data };
@@ -18266,7 +18967,7 @@ async function invoiceForListing(listing) {
     const doc = await readInvoiceDoc(load, legacyId);
     if (doc && !invoiceRedirectTarget(doc.data)) return { id: doc.id, ...doc.data };
   }
-  const orderId = text$d(listing.orderId);
+  const orderId = text$c(listing.orderId);
   if (!orderId) return null;
   try {
     const snap = await db$q().collection("invoices").where("orderId", "==", orderId).limit(1).get();
@@ -18624,8 +19325,8 @@ router$A.post("/:id/upload-url", requirePhotographer, async (req, res) => {
     const galleryDoc = await db$p().collection("galleries").doc(req.params.id).get();
     if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
     const folder = isRaw2 ? "raw" : "edited";
-    const safeName = fileName2.replace(/[^a-zA-Z0-9._-]/g, "_");
-    const path2 = `galleries/${req.params.id}/${folder}/${Date.now()}_${safeName}`;
+    const safeName2 = fileName2.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const path2 = `galleries/${req.params.id}/${folder}/${Date.now()}_${safeName2}`;
     const file = storage().file(path2);
     const [uploadUrl] = await file.getSignedUrl({
       version: "v4",
@@ -18634,7 +19335,7 @@ router$A.post("/:id/upload-url", requirePhotographer, async (req, res) => {
       // 15 minutes
       contentType: fileType
     });
-    return res.json({ uploadUrl, path: path2, fileName: safeName });
+    return res.json({ uploadUrl, path: path2, fileName: safeName2 });
   } catch (err) {
     console.error("[Galleries] Upload URL error:", err);
     return res.status(500).json({ error: "Failed to generate upload URL." });
@@ -18864,11 +19565,11 @@ function buildPaymentReceipt(input) {
     fees,
     totalPaid
   });
-  const galleryId = text$c(input.galleryId) || text$c(input.invoice.galleryId);
+  const galleryId = text$b(input.galleryId) || text$b(input.invoice.galleryId);
   const galleryUrl = galleryId ? publicClientUrl(`/gallery/${encodeURIComponent(galleryId)}`, input.env) : "";
   const presentationUrl = input.presentationUrl === void 0 ? presentationLinkForReceipt(input.listing) || "" : input.presentationUrl || "";
   return renderPaymentReceipt({
-    clientName: text$c(input.invoice.clientName) || "there",
+    clientName: text$b(input.invoice.clientName) || "there",
     invoiceNumber: receiptEmailNumber({
       invoiceNumber: input.invoice.invoiceNumber,
       id: input.invoiceId,
@@ -18893,7 +19594,7 @@ function finite(value) {
   const amount = Number(value);
   return Number.isFinite(amount) ? amount : null;
 }
-function text$c(value) {
+function text$b(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function prefillOrNull(prefill) {
@@ -21228,7 +21929,7 @@ const PHOTO_EDIT_REQUEST_LIMIT = 100;
 const PHOTO_EDIT_REPLACEMENT_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const STATUSES = /* @__PURE__ */ new Set(["requested", "sent_out", "received_back"]);
 const REPLACEMENT_TYPES$1 = new Set(PHOTO_EDIT_REPLACEMENT_TYPES);
-function text$b(value, limit) {
+function text$a(value, limit) {
   if (typeof value !== "string") return "";
   return value.replace(/\s+/g, " ").trim().slice(0, limit);
 }
@@ -21244,7 +21945,7 @@ function stamp(value) {
   return Number.isFinite(parsed) ? new Date(parsed).toISOString() : "";
 }
 function idText(value, limit = 80) {
-  const id = text$b(value, limit);
+  const id = text$a(value, limit);
   return /^[A-Za-z0-9_-]{8,80}$/.test(id) ? id : "";
 }
 function photoIdText(value) {
@@ -21260,7 +21961,7 @@ function timelineEntry(value) {
   const row = value && typeof value === "object" ? value : null;
   if (!row || !STATUSES.has(row.status)) return null;
   const at = stamp(row.at);
-  const actorId = text$b(row.actorId, 128);
+  const actorId = text$a(row.actorId, 128);
   if (!at || !actorId) return null;
   if (row.actor !== "client" && row.actor !== "staff") return null;
   return { status: row.status, at, actor: row.actor, actorId };
@@ -21268,11 +21969,11 @@ function timelineEntry(value) {
 function replacementEntry(value, listingId) {
   if (!value || typeof value !== "object") return null;
   const row = value;
-  const name = text$b(row.name, 180);
+  const name = text$a(row.name, 180);
   const path2 = typeof row.path === "string" ? row.path.trim() : "";
   const contentType = typeof row.contentType === "string" ? row.contentType.trim().toLowerCase() : "";
   const attachedAt = stamp(row.attachedAt);
-  const attachedBy = text$b(row.attachedBy, 128);
+  const attachedBy = text$a(row.attachedBy, 128);
   const url = httpsUrl(row.url);
   if (!name || !attachedAt || !attachedBy || !url || !REPLACEMENT_TYPES$1.has(contentType)) return null;
   if (!replacementPath(listingId, path2)) return null;
@@ -21306,10 +22007,10 @@ function parseRequest(value) {
   const row = value && typeof value === "object" ? value : null;
   if (!row) return null;
   const id = idText(row.id);
-  const listingId = idText(row.listingId, 128) || text$b(row.listingId, 128);
+  const listingId = idText(row.listingId, 128) || text$a(row.listingId, 128);
   const photoId = photoIdText(row.photoId);
   const note = noteText(row.note);
-  const clientId2 = text$b(row.clientId, 128);
+  const clientId2 = text$a(row.clientId, 128);
   const createdAt = stamp(row.createdAt);
   const updatedAt = stamp(row.updatedAt);
   if (!id || !listingId || !photoId || !note || !clientId2 || !createdAt || !updatedAt) return null;
@@ -21321,7 +22022,7 @@ function parseRequest(value) {
     id,
     listingId,
     photoId,
-    photoName: text$b(row.photoName, 180) || "Photo",
+    photoName: text$a(row.photoName, 180) || "Photo",
     photoUrl: httpsUrl(row.photoUrl),
     note,
     status: row.status,
@@ -21349,10 +22050,10 @@ function openPhotoEditForPhoto(requests, photoId) {
 }
 function createPhotoEditRequest(input) {
   const id = idText(input.id);
-  const listingId = text$b(input.listingId, 128);
+  const listingId = text$a(input.listingId, 128);
   const photoId = photoIdText(input.photoId);
   const note = noteText(input.note);
-  const clientId2 = text$b(input.clientId, 128);
+  const clientId2 = text$a(input.clientId, 128);
   const at = stamp(input.at);
   if (!id) return { ok: false, status: 400, error: "Could not save that edit request." };
   if (!/^[A-Za-z0-9_-]{4,128}$/.test(listingId)) return { ok: false, status: 400, error: "Listing id is not valid." };
@@ -21372,7 +22073,7 @@ function createPhotoEditRequest(input) {
     id,
     listingId,
     photoId,
-    photoName: text$b(input.photoName, 180) || "Photo",
+    photoName: text$a(input.photoName, 180) || "Photo",
     photoUrl: httpsUrl(input.photoUrl),
     note,
     status: "requested",
@@ -21386,7 +22087,7 @@ function createPhotoEditRequest(input) {
 }
 function advancePhotoEditRequest(input) {
   const requestId = idText(input.requestId);
-  const actorId = text$b(input.actorId, 128);
+  const actorId = text$a(input.actorId, 128);
   const at = stamp(input.at);
   if (!requestId || !actorId || !at) return { ok: false, status: 400, error: "Could not update that edit request." };
   const current = input.requests.find((request2) => request2.id === requestId);
@@ -21496,7 +22197,7 @@ const WEBSITE_COLORS = /* @__PURE__ */ new Set(["ink", "teal", "warm"]);
 const WEBSITE_STYLES = /* @__PURE__ */ new Set(["classic", "editorial", "minimal"]);
 const PORTAL_LISTING_ID = /^[A-Za-z0-9_-]{4,128}$/;
 function portalListingId(value) {
-  const id = text$a(value);
+  const id = text$9(value);
   return PORTAL_LISTING_ID.test(id) ? id : "";
 }
 function isInvoiceOrPaymentActivity(event) {
@@ -21559,16 +22260,16 @@ function hiddenPresentationKeys(listing) {
 function rowHiddenFromPresentation(row, hiddenKeys) {
   if (row.culled === true) return true;
   if (row.hiddenFromPresentation === true || row.portalHidden === true) return true;
-  const sectionId = text$a(row.sectionId);
+  const sectionId = text$9(row.sectionId);
   if (sectionId && hiddenKeys.has(`section:${sectionId}`)) return true;
-  const id = text$a(row.id);
-  const path2 = text$a(row.path) || text$a(row.storagePath);
-  const url = text$a(row.url) || text$a(row.shareUrl);
+  const id = text$9(row.id);
+  const path2 = text$9(row.path) || text$9(row.storagePath);
+  const url = text$9(row.url) || text$9(row.shareUrl);
   return [id, path2, url].some((key) => Boolean(key) && hiddenKeys.has(key));
 }
 function buildPortalListingDetail(sources) {
   const listing = sources.listing || {};
-  const id = text$a(listing.id);
+  const id = text$9(listing.id);
   const records = [listing, sources.order, sources.orderRequest].filter(Boolean);
   const address = readAddress(records);
   const store = readMediaStore(listing.portalMedia);
@@ -21583,7 +22284,7 @@ function buildPortalListingDetail(sources) {
   const website = readWebsite(listing.portalWebsite);
   const invoices = readInvoices(sources.invoices || [], sources);
   const activity = buildActivity(sources, photos, videos, floorplans, tours);
-  const status2 = text$a(listing.status) || text$a(sources.order?.status) || text$a(sources.orderRequest?.status) || "open";
+  const status2 = text$9(listing.status) || text$9(sources.order?.status) || text$9(sources.orderRequest?.status) || "open";
   const orderNumber2 = shortOrderNumber(listing.orderNumber) || shortOrderNumber(sources.order?.orderNumber) || shortOrderNumber(sources.orderRequest?.orderNumber) || shortOrderNumber((sources.invoices || []).map((invoice) => invoice.orderNumber).find(Boolean));
   return applyStoredPortalData({
     id,
@@ -21634,10 +22335,10 @@ function portalFactsDraftFromDetail(detail) {
   };
 }
 function sanitizePortalListingFacts(value) {
-  const row = asRecord$6(value);
+  const row = asRecord$5(value);
   if (!row) return null;
-  const addressRow = asRecord$6(row.address);
-  const factsRow = asRecord$6(row.facts);
+  const addressRow = asRecord$5(row.address);
+  const factsRow = asRecord$5(row.facts);
   if (!addressRow || !factsRow) return null;
   const facts = {};
   for (const fact of FACT_DEFS) {
@@ -21683,10 +22384,10 @@ function applyStoredPortalData(detail, stored) {
   };
 }
 function readStoredPortalData(value) {
-  const row = asRecord$6(value);
+  const row = asRecord$5(value);
   if (!row) return null;
-  const addressRow = asRecord$6(row.address);
-  const factsRow = asRecord$6(row.facts);
+  const addressRow = asRecord$5(row.address);
+  const factsRow = asRecord$5(row.facts);
   if (!addressRow && !factsRow) return null;
   const facts = {};
   if (factsRow) {
@@ -21857,10 +22558,10 @@ function nextGroupId(existing) {
 }
 function sanitizeWebsiteSettings(value, base = defaultPortalWebsite()) {
   const row = value && typeof value === "object" ? value : {};
-  const design = text$a(row.design);
-  const font = text$a(row.font);
-  const color = text$a(row.color);
-  const style = text$a(row.style);
+  const design = text$9(row.design);
+  const font = text$9(row.font);
+  const color = text$9(row.color);
+  const style = text$9(row.style);
   return {
     design: WEBSITE_DESIGNS.has(design) ? design : base.design,
     font: WEBSITE_FONTS.has(font) ? font : base.font,
@@ -21900,7 +22601,7 @@ function readPhotoGroups(value) {
   const groups = [];
   const seen = /* @__PURE__ */ new Set();
   for (const item of value) {
-    const row = asRecord$6(item);
+    const row = asRecord$5(item);
     if (!row) continue;
     const id = groupIdText(row.id);
     const name = clipText(row.name, 60);
@@ -21931,18 +22632,18 @@ function readPrefs(value) {
 function readWebsite(value) {
   return sanitizeWebsiteSettings(value, defaultPortalWebsite());
 }
-function text$a(value) {
+function text$9(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function boolOr(value, fallback) {
   return typeof value === "boolean" ? value : fallback;
 }
-function asRecord$6(value) {
+function asRecord$5(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : null;
 }
 function readFact(records, keys) {
   for (const record2 of records) {
-    const bags = [record2, asRecord$6(record2.property), asRecord$6(record2.propertyDetails), asRecord$6(record2.listingInfo), asRecord$6(record2.details)];
+    const bags = [record2, asRecord$5(record2.property), asRecord$5(record2.propertyDetails), asRecord$5(record2.listingInfo), asRecord$5(record2.details)];
     for (const bag of bags) {
       if (!bag) continue;
       for (const key of keys) {
@@ -21997,19 +22698,19 @@ function fillAddress(target, source) {
   if (target.lng == null && source.lng != null) target.lng = source.lng;
 }
 function addressFromRecord(record2) {
-  const structured = asRecord$6(record2.address) || asRecord$6(record2.shootLocation) || asRecord$6(record2.propertyAddress);
+  const structured = asRecord$5(record2.address) || asRecord$5(record2.shootLocation) || asRecord$5(record2.propertyAddress);
   const parsed = parseAddressText(
-    text$a(record2.addressLine1) ? "" : addressString(record2.address) || addressString(record2.propertyAddress) || addressString(record2.shootLocation) || text$a(structured?.formatted)
+    text$9(record2.addressLine1) ? "" : addressString(record2.address) || addressString(record2.propertyAddress) || addressString(record2.shootLocation) || text$9(structured?.formatted)
   );
-  const line1 = firstText(record2, ["addressLine1", "line1", "street", "streetAddress"]) || text$a(structured?.street) || text$a(structured?.line1) || text$a(structured?.addressLine1) || parsed.line1;
-  const line2 = firstText(record2, ["addressLine2", "line2", "unit", "street2"]) || text$a(structured?.line2) || text$a(structured?.unit) || parsed.line2;
+  const line1 = firstText(record2, ["addressLine1", "line1", "street", "streetAddress"]) || text$9(structured?.street) || text$9(structured?.line1) || text$9(structured?.addressLine1) || parsed.line1;
+  const line2 = firstText(record2, ["addressLine2", "line2", "unit", "street2"]) || text$9(structured?.line2) || text$9(structured?.unit) || parsed.line2;
   const split = splitUnit(line1);
   return {
     line1: split.line1,
     line2: line2 || split.line2,
-    city: firstText(record2, ["city"]) || text$a(structured?.city) || parsed.city,
-    state: firstText(record2, ["state"]) || text$a(structured?.state) || parsed.state,
-    zip: firstText(record2, ["zip", "postalCode"]) || text$a(structured?.zip) || text$a(structured?.postalCode) || parsed.zip,
+    city: firstText(record2, ["city"]) || text$9(structured?.city) || parsed.city,
+    state: firstText(record2, ["state"]) || text$9(structured?.state) || parsed.state,
+    zip: firstText(record2, ["zip", "postalCode"]) || text$9(structured?.zip) || text$9(structured?.postalCode) || parsed.zip,
     formatted: "",
     lat: readCoord(record2.lat ?? record2.latitude ?? structured?.lat ?? structured?.latitude ?? nestedCoord(record2, "lat"), "lat"),
     lng: readCoord(record2.lng ?? record2.longitude ?? structured?.lng ?? structured?.longitude ?? nestedCoord(record2, "lng"), "lng"),
@@ -22021,7 +22722,7 @@ function addressString(value) {
 }
 function firstText(record2, keys) {
   for (const key of keys) {
-    const value = text$a(record2[key]);
+    const value = text$9(record2[key]);
     if (value) return value;
   }
   return "";
@@ -22054,9 +22755,9 @@ function splitUnit(line1) {
   return { line1: match[1].trim(), line2: match[2].trim() };
 }
 function nestedCoord(record2, axis) {
-  const geo = asRecord$6(record2.geo) || asRecord$6(record2.location) || asRecord$6(record2.geometry);
+  const geo = asRecord$5(record2.geo) || asRecord$5(record2.location) || asRecord$5(record2.geometry);
   if (!geo) return void 0;
-  const location = asRecord$6(geo.location) || geo;
+  const location = asRecord$5(geo.location) || geo;
   if (axis === "lat") return location.lat ?? location.latitude;
   return location.lng ?? location.longitude;
 }
@@ -22086,14 +22787,14 @@ function collectVideos(listing, galleries, store, savedOrder = false) {
   );
 }
 function collectClientUploads(listing, kind, savedOrder = false) {
-  const tagged = rowsFrom(listing.images).filter((row) => text$a(row.assetType).toLowerCase() === kind || text$a(row.type).toLowerCase() === kind);
+  const tagged = rowsFrom(listing.images).filter((row) => text$9(row.assetType).toLowerCase() === kind || text$9(row.type).toLowerCase() === kind);
   const socialBucket = kind === "social" ? rowsFrom(listing.socialAssets) : [];
   return finishMedia(kind === "social" ? "photo" : "floorplan", [...clientUploadRows(listing, kind), ...tagged, ...socialBucket], {}, () => true, savedOrder, listing).map((item) => ({ ...item, kind: kind === "social" ? "photo" : "floorplan" }));
 }
 function collectFloorplans(listing, galleries, store, savedOrder = false) {
   const rows = [
     ...rowsFrom(listing.floorplans).filter(isRasterFloorplan),
-    ...rowsFrom(listing.images).filter((row) => (text$a(row.assetType).toLowerCase() === "floorplan" || text$a(row.type).toLowerCase() === "floorplan") && isRasterFloorplan(row)),
+    ...rowsFrom(listing.images).filter((row) => (text$9(row.assetType).toLowerCase() === "floorplan" || text$9(row.type).toLowerCase() === "floorplan") && isRasterFloorplan(row)),
     ...rowsFrom(listing.designAssets).filter(isFloorplan),
     ...rowsFrom(listing.cubiCasaImports).filter(isFloorplan),
     ...galleryRows(galleries).filter(isFloorplan)
@@ -22115,19 +22816,19 @@ function collectTours(listing, galleries, store, savedOrder = false) {
     const url = safeHttpUrl(row.url) || safeHttpUrl(row.shareUrl) || safeHttpUrl(row.href);
     if (!url || seen.has(url)) return;
     const provider = providerFor(url, row);
-    const typed = /^(tour|matterport)$/i.test(text$a(row.type)) || provider != null || isTourField(text$a(row.id));
+    const typed = /^(tour|matterport)$/i.test(text$9(row.type)) || provider != null || isTourField(text$9(row.id));
     if (!typed) return;
     seen.add(url);
     const id = mediaId("tour", row, index);
     const prefs = store.tours[id];
-    const deliveryName = text$a(row.deliveryName);
+    const deliveryName = text$9(row.deliveryName);
     const storedOrder = typeof row.sortOrder === "number" && Number.isFinite(row.sortOrder) ? row.sortOrder : null;
     drafts.push({
       id,
       kind: "tour",
-      name: text$a(row.name) || text$a(row.title) || provider || "Virtual tour",
+      name: text$9(row.name) || text$9(row.title) || provider || "Virtual tour",
       url,
-      contentType: text$a(row.contentType),
+      contentType: text$9(row.contentType),
       hidden: prefs?.hidden === true || row.hiddenFromPresentation === true || isHiddenFromClientGallery(listing, row),
       order: savedOrder ? storedOrder ?? index + 1e5 : prefs?.order ?? index,
       groupId: "",
@@ -22150,21 +22851,21 @@ function finishMedia(kind, rows, prefs, include, savedOrder = false, listing = {
     const url = safeHttpUrl(row.url) || safeHttpUrl(row.shareUrl);
     if (!url) return;
     const id = mediaId(kind, row, index);
-    const key = text$a(row.path) || text$a(row.storagePath) || url;
+    const key = text$9(row.path) || text$9(row.storagePath) || url;
     if (seen.has(id) || seen.has(key) || seen.has(url)) return;
     seen.add(id);
     seen.add(key);
     seen.add(url);
     const pref = prefs[id];
-    const deliveryName = text$a(row.deliveryName);
+    const deliveryName = text$9(row.deliveryName);
     const storedOrder = typeof row.sortOrder === "number" && Number.isFinite(row.sortOrder) ? row.sortOrder : null;
     const sectionId = groupIdText(row.sectionId);
     items.push({
       id,
       kind,
-      name: text$a(row.name) || text$a(row.fileName) || text$a(row.title) || `${kind} ${items.length + 1}`,
+      name: text$9(row.name) || text$9(row.fileName) || text$9(row.title) || `${kind} ${items.length + 1}`,
       url,
-      contentType: text$a(row.contentType).toLowerCase(),
+      contentType: text$9(row.contentType).toLowerCase(),
       hidden: pref?.hidden === true || row.hiddenFromPresentation === true || row.portalHidden === true || isHiddenFromClientGallery(listing, row),
       order: savedOrder ? storedOrder ?? index + 1e5 : pref?.order ?? index,
       groupId: kind === "photo" ? savedOrder ? sectionId : groupIdText(pref?.groupId) : "",
@@ -22175,7 +22876,7 @@ function finishMedia(kind, rows, prefs, include, savedOrder = false, listing = {
   return items.sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
 }
 function clientUploadRows(listing, kind) {
-  return rowsFrom(listing.clientPortalUploads).filter((row) => text$a(row.kind) === kind);
+  return rowsFrom(listing.clientPortalUploads).filter((row) => text$9(row.kind) === kind);
 }
 function rowsFrom(value) {
   if (!Array.isArray(value)) return [];
@@ -22189,7 +22890,7 @@ function galleryRows(galleries) {
   return rows;
 }
 function mediaId(kind, row, index) {
-  const raw = text$a(row.id) || text$a(row.path) || text$a(row.storagePath) || text$a(row.url) || text$a(row.shareUrl) || `${kind}-${index}`;
+  const raw = text$9(row.id) || text$9(row.path) || text$9(row.storagePath) || text$9(row.url) || text$9(row.shareUrl) || `${kind}-${index}`;
   return raw.slice(0, 180);
 }
 const RAW_EXT$1 = /\.(cr2|cr3|nef|nrw|arw|srf|sr2|dng|raw|rw2|orf|raf|pef|3fr|fff|iiq|heic)$/i;
@@ -22197,47 +22898,47 @@ const IMAGE_EXT$1 = /\.(jpe?g|png|webp|gif)$/i;
 const FLOOR_IMAGE = /\.(jpe?g|png)$/i;
 const VIDEO_EXT = /\.(mp4|mov)$/i;
 function fileName(row) {
-  return text$a(row.name) || text$a(row.fileName) || text$a(row.title) || text$a(row.path) || text$a(row.url);
+  return text$9(row.name) || text$9(row.fileName) || text$9(row.title) || text$9(row.path) || text$9(row.url);
 }
 function isRaw(row) {
-  const path2 = text$a(row.path) || text$a(row.storagePath);
+  const path2 = text$9(row.path) || text$9(row.storagePath);
   const name = fileName(row);
   return RAW_EXT$1.test(name) || RAW_EXT$1.test(path2) || path2.includes("/raw/");
 }
 function isFloorplan(row) {
   if (!isRasterFloorplan(row)) return false;
-  const type = text$a(row.type).toLowerCase();
-  const asset = text$a(row.assetType).toLowerCase();
+  const type = text$9(row.type).toLowerCase();
+  const asset = text$9(row.assetType).toLowerCase();
   const name = fileName(row);
   return type === "floorplan" || asset === "floorplan" || /floor\s*plan|floorplan/i.test(name) || type === "image" && asset === "floorplan";
 }
 function isRasterFloorplan(row) {
-  const content = text$a(row.contentType).toLowerCase();
-  const declared = text$a(row.type).toLowerCase();
+  const content = text$9(row.contentType).toLowerCase();
+  const declared = text$9(row.type).toLowerCase();
   const name = fileName(row);
-  const url = text$a(row.url) || text$a(row.shareUrl);
+  const url = text$9(row.url) || text$9(row.shareUrl);
   if (content === "image/jpeg" || content === "image/png" || declared === "image/jpeg" || declared === "image/png") return true;
   return FLOOR_IMAGE.test(name) || FLOOR_IMAGE.test(url.split("?")[0]);
 }
 function isVideo(row) {
-  const type = text$a(row.type).toLowerCase();
+  const type = text$9(row.type).toLowerCase();
   if (type === "tour" || type === "matterport" || type === "floorplan") return false;
-  const content = text$a(row.contentType).toLowerCase();
+  const content = text$9(row.contentType).toLowerCase();
   const name = fileName(row);
-  const url = (text$a(row.url) || text$a(row.shareUrl)).split("?")[0];
+  const url = (text$9(row.url) || text$9(row.shareUrl)).split("?")[0];
   if (content === "video/mp4" || content === "video/quicktime") return true;
   return VIDEO_EXT.test(name) || VIDEO_EXT.test(url);
 }
 function isPhoto(row) {
-  const declared = text$a(row.type).toLowerCase();
-  const asset = text$a(row.assetType).toLowerCase();
+  const declared = text$9(row.type).toLowerCase();
+  const asset = text$9(row.assetType).toLowerCase();
   if (asset === "social" || asset === "file" || declared === "social" || declared === "file" || declared === "document") return false;
   if (isVideo(row) || declared === "floorplan" || asset === "floorplan" || isRaw(row)) return false;
-  const type = text$a(row.type).toLowerCase();
+  const type = text$9(row.type).toLowerCase();
   if (type === "tour" || type === "matterport" || type === "video" || type === "reel" || type === "file" || type === "document") return false;
-  const content = text$a(row.contentType).toLowerCase();
+  const content = text$9(row.contentType).toLowerCase();
   const name = fileName(row);
-  const path2 = text$a(row.path) || text$a(row.storagePath);
+  const path2 = text$9(row.path) || text$9(row.storagePath);
   if (content.startsWith("video/")) return false;
   if (content && !content.startsWith("image/") && !IMAGE_EXT$1.test(name)) return false;
   return !content || content.startsWith("image/") || IMAGE_EXT$1.test(name) || IMAGE_EXT$1.test(path2);
@@ -22249,14 +22950,14 @@ function providerFor(url, row) {
   } catch {
     return null;
   }
-  if (host.includes("matterport.com") || /matterport/i.test(text$a(row.type)) || /matterport/i.test(text$a(row.name))) return "Matterport";
+  if (host.includes("matterport.com") || /matterport/i.test(text$9(row.type)) || /matterport/i.test(text$9(row.name))) return "Matterport";
   if (host.includes("cloudpano.com")) return "CloudPano";
   if (host.includes("iguide")) return "iGUIDE";
   if (host.includes("kuula.co")) return "Kuula";
   if (host.includes("eyespy360.com")) return "EyeSpy360";
   if (host.includes("asteroom.com")) return "Asteroom";
   if (host.includes("zillow.com") && /3d|tour/i.test(url)) return "Zillow 3D";
-  if (/^(tour|matterport)$/i.test(text$a(row.type))) return "Virtual tour";
+  if (/^(tour|matterport)$/i.test(text$9(row.type))) return "Virtual tour";
   return null;
 }
 function safeHttpUrl(value) {
@@ -22272,19 +22973,19 @@ function safeHttpUrl(value) {
   }
 }
 function orderForInvoice(invoice, sources) {
-  const requestId = text$a(invoice.orderRequestId);
-  const orderId = text$a(invoice.orderId);
+  const requestId = text$9(invoice.orderRequestId);
+  const orderId = text$9(invoice.orderId);
   const request = sources.orderRequest || null;
   const order = sources.order || null;
-  if (request && (!requestId || text$a(request.id) === requestId)) return request;
-  if (order && (!orderId || text$a(order.id) === orderId)) return order;
+  if (request && (!requestId || text$9(request.id) === requestId)) return request;
+  if (order && (!orderId || text$9(order.id) === orderId)) return order;
   return null;
 }
 function readInvoices(invoices, sources) {
   const seen = /* @__PURE__ */ new Set();
   const summaries = [];
   for (const invoice of invoices) {
-    const id = text$a(invoice.id);
+    const id = text$9(invoice.id);
     if (!id || seen.has(id)) continue;
     seen.add(id);
     const total = money$1(invoice.total);
@@ -22292,7 +22993,7 @@ function readInvoices(invoices, sources) {
       id,
       invoiceNumber: portalDisplayedInvoiceNumber(invoice, orderForInvoice(invoice, sources)),
       orderNumber: shortOrderNumber(invoice.orderNumber) || shortOrderNumber(orderForInvoice(invoice, sources)?.orderNumber),
-      status: text$a(invoice.status) || "draft",
+      status: text$9(invoice.status) || "draft",
       total,
       amountDue: invoice.amountDue == null ? total : money$1(invoice.amountDue)
     });
@@ -22313,7 +23014,7 @@ function buildActivity(sources, photos, videos, floorplans, tours, invoices) {
   const request = sources.orderRequest;
   if (request) {
     push(eventOf(
-      `booking-${text$a(request.id) || "request"}`,
+      `booking-${text$9(request.id) || "request"}`,
       request.submittedAt || request.createdAt,
       "booking",
       "Booking request received"
@@ -22321,9 +23022,9 @@ function buildActivity(sources, photos, videos, floorplans, tours, invoices) {
   }
   for (const appointment of sources.appointments || []) {
     const when = appointment.createdAt || appointment.scheduledDate;
-    const status2 = text$a(appointment.status);
+    const status2 = text$9(appointment.status);
     push(eventOf(
-      `appointment-${text$a(appointment.id) || events.length}`,
+      `appointment-${text$9(appointment.id) || events.length}`,
       when,
       "appointment",
       status2 === "confirmed" ? "Appointment confirmed" : "Appointment requested"
@@ -22332,14 +23033,14 @@ function buildActivity(sources, photos, videos, floorplans, tours, invoices) {
   const order = sources.order;
   if (order) {
     push(eventOf(
-      `order-${text$a(order.id) || "order"}`,
+      `order-${text$9(order.id) || "order"}`,
       order.confirmedAt || order.createdAt,
       "booking",
       "Booking confirmed"
     ));
   }
   push(eventOf(
-    `listing-${text$a(sources.listing.id) || "listing"}`,
+    `listing-${text$9(sources.listing.id) || "listing"}`,
     sources.listing.createdAt,
     "listing",
     "Listing file created"
@@ -22357,26 +23058,26 @@ function buildActivity(sources, photos, videos, floorplans, tours, invoices) {
     push(eventOf(`tour-${tour.id}`, tour.uploadedAt, "tour", `${tour.provider} tour added`));
   }
   for (const gallery of sources.galleries || []) {
-    const status2 = text$a(gallery.status).replace(/_/g, " ") || "opened";
+    const status2 = text$9(gallery.status).replace(/_/g, " ") || "opened";
     push(eventOf(
-      `gallery-${text$a(gallery.id) || events.length}`,
+      `gallery-${text$9(gallery.id) || events.length}`,
       gallery.updatedAt || gallery.createdAt,
       "gallery",
       `Gallery ${status2}`
     ));
   }
   for (const invoice of sources.invoices || []) {
-    const id = text$a(invoice.id);
+    const id = text$9(invoice.id);
     const number = portalDisplayedInvoiceNumber(invoice, orderForInvoice(invoice, sources));
-    const status2 = text$a(invoice.status) || "draft";
+    const status2 = text$9(invoice.status) || "draft";
     const summary = status2 === "paid" ? `Payment recorded on ${number}` : `Invoice ${number} is ${status2.replace(/_/g, " ")}`;
     push(eventOf(`invoice-${id || number}`, invoice.paidAt || invoice.updatedAt || invoice.createdAt, "invoice", summary));
   }
   for (const entry2 of rowsFrom(sources.listing.auditLog)) {
-    const action = text$a(entry2.action);
+    const action = text$9(entry2.action);
     if (!action || /lockbox|internal|password|secret/i.test(action)) continue;
     push(eventOf(
-      `audit-${text$a(entry2.id) || action}-${text$a(entry2.at)}`,
+      `audit-${text$9(entry2.id) || action}-${text$9(entry2.at)}`,
       entry2.at || entry2.createdAt,
       "audit",
       action
@@ -22384,10 +23085,10 @@ function buildActivity(sources, photos, videos, floorplans, tours, invoices) {
   }
   for (const entry2 of rowsFrom(sources.listing.portalActivity)) {
     push({
-      id: text$a(entry2.id) || `portal-activity-${events.length}`,
+      id: text$9(entry2.id) || `portal-activity-${events.length}`,
       at: portalTimestamp(entry2.at),
-      kind: text$a(entry2.kind) || "listing",
-      summary: text$a(entry2.summary)
+      kind: text$9(entry2.kind) || "listing",
+      summary: text$9(entry2.summary)
     });
   }
   return events.filter((event) => event.summary).sort((a, b) => {
@@ -22443,7 +23144,7 @@ function listingSiteSlug(input) {
 function isListingSiteSlug(value) {
   return typeof value === "string" && value.length <= 80 && SLUG$1.test(value);
 }
-function text$9(value) {
+function text$8(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function record$1(value) {
@@ -22453,12 +23154,12 @@ function addressParts$1(listing) {
   const portal = record$1(listing.portalData);
   const saved = record$1(portal?.address);
   const structured = record$1(listing.address) || record$1(listing.shootLocation) || record$1(listing.propertyAddress);
-  const line1 = text$9(saved?.line1) || text$9(structured?.street) || text$9(structured?.line1) || text$9(listing.addressLine1);
-  const city = text$9(saved?.city) || text$9(structured?.city) || text$9(listing.city);
-  const state = text$9(saved?.state) || text$9(structured?.state) || text$9(listing.state);
-  const zip = text$9(saved?.zip) || text$9(structured?.zip) || text$9(listing.zip);
+  const line1 = text$8(saved?.line1) || text$8(structured?.street) || text$8(structured?.line1) || text$8(listing.addressLine1);
+  const city = text$8(saved?.city) || text$8(structured?.city) || text$8(listing.city);
+  const state = text$8(saved?.state) || text$8(structured?.state) || text$8(listing.state);
+  const zip = text$8(saved?.zip) || text$8(structured?.zip) || text$8(listing.zip);
   if (!line1 && typeof listing.address === "string") {
-    const raw = text$9(listing.address);
+    const raw = text$8(listing.address);
     const parts = raw.split(",").map((part) => part.trim()).filter(Boolean);
     return { line1: parts[0] || raw, city: parts.length >= 3 ? parts[parts.length - 2] : "", formatted: raw };
   }
@@ -22469,7 +23170,7 @@ function money(value) {
   if (typeof value === "number" && Number.isFinite(value) && value > 0) {
     return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(value);
   }
-  const raw = text$9(value);
+  const raw = text$8(value);
   if (!raw || raw === "0") return "";
   if (raw.startsWith("$")) return raw;
   const numeric2 = Number(raw.replace(/[$,]/g, ""));
@@ -22480,7 +23181,7 @@ function money(value) {
 }
 function count(value) {
   if (typeof value === "number" && Number.isFinite(value)) return String(value);
-  return text$9(value);
+  return text$8(value);
 }
 function factValue(listing, keys) {
   const portal = record$1(listing.portalData);
@@ -22495,18 +23196,18 @@ function factValue(listing, keys) {
 }
 function agentOf(listing) {
   const agent = record$1(listing.agent);
-  const name = text$9(listing.agentName) || text$9(listing.listingAgent) || text$9(agent?.name);
-  const profile = listing.clientHubProfile ? profileFromClient$1({ hubProfile: listing.clientHubProfile, ...record$1(listing.clientContact) }) : null;
+  const name = text$8(listing.agentName) || text$8(listing.listingAgent) || text$8(agent?.name);
+  const profile = listing.clientHubProfile ? profileFromClient({ hubProfile: listing.clientHubProfile, ...record$1(listing.clientContact) }) : null;
   return applyProfileToAgent({
     name,
-    brokerage: text$9(listing.brokerage) || text$9(listing.brokerageName) || text$9(agent?.brokerage),
-    license: text$9(listing.licenseNumber) || text$9(listing.agentLicense) || text$9(agent?.license),
-    phone: text$9(listing.agentPhone) || text$9(agent?.phone),
-    email: text$9(listing.agentEmail) || text$9(agent?.email),
-    headshotUrl: text$9(agent?.headshotUrl),
-    companyLogoUrl: text$9(agent?.companyLogoUrl),
-    brokerageLogoUrl: text$9(agent?.brokerageLogoUrl),
-    website: text$9(agent?.website),
+    brokerage: text$8(listing.brokerage) || text$8(listing.brokerageName) || text$8(agent?.brokerage),
+    license: text$8(listing.licenseNumber) || text$8(listing.agentLicense) || text$8(agent?.license),
+    phone: text$8(listing.agentPhone) || text$8(agent?.phone),
+    email: text$8(listing.agentEmail) || text$8(agent?.email),
+    headshotUrl: text$8(agent?.headshotUrl),
+    companyLogoUrl: text$8(agent?.companyLogoUrl),
+    brokerageLogoUrl: text$8(agent?.brokerageLogoUrl),
+    website: text$8(agent?.website),
     socials: Array.isArray(agent?.socials) ? agent.socials : []
   }, profile);
 }
@@ -22527,7 +23228,7 @@ function tourUrl(listing) {
   const blockedUrls = /* @__PURE__ */ new Set();
   const direct = [];
   for (const key of ["matterportUrl", "virtualTourUrl", "tourUrl"]) {
-    const url = text$9(listing[key]);
+    const url = text$8(listing[key]);
     if (!url) continue;
     if (isHiddenFromListingSites(listing, { id: key, url })) blockedUrls.add(url);
     else direct.push(url);
@@ -22536,7 +23237,7 @@ function tourUrl(listing) {
   for (const tour of tours) {
     const row = record$1(tour);
     if (!row) continue;
-    const url = text$9(row.embedUrl) || text$9(row.url);
+    const url = text$8(row.embedUrl) || text$8(row.url);
     if (!url) continue;
     if (isHiddenFromListingSites(listing, row)) blockedUrls.add(url);
     else direct.push(url);
@@ -22565,10 +23266,10 @@ function hiddenSources(listing) {
     for (const item of items) {
       const row = record$1(item);
       if (!row) continue;
-      const id = text$9(row.id);
+      const id = text$8(row.id);
       const sectionHidden = isHiddenFromListingSites(listing, row);
       if (!sectionHidden && (!id || !prefs[id]?.hidden)) continue;
-      const source = rasterShareSource(row) || videoPlaceholderSource(row) || text$9(row.url);
+      const source = rasterShareSource(row) || videoPlaceholderSource(row) || text$8(row.url);
       if (source) hidden.add(source);
     }
   }
@@ -22578,7 +23279,7 @@ function buildPublicListingSite(listing) {
   if (!listing) return null;
   const website = sanitizeWebsiteSettings(listing.portalWebsite);
   if (!website.published) return null;
-  const id = text$9(listing.id);
+  const id = text$8(listing.id);
   if (!/^[A-Za-z0-9_-]{4,128}$/.test(id)) return null;
   const address = addressParts$1(listing);
   const slug = listingSiteSlug({ line1: address.line1, city: address.city });
@@ -22773,17 +23474,17 @@ function isPortalUploadKind(value) {
 }
 function portalUploadDecision(kind, fileName2, providedType, byteSize) {
   if (!isPortalUploadKind(kind)) return { ok: false, error: "Choose video, social, or a document." };
-  const safeName = safeStorageFileName(fileName2);
-  if (safeName === "upload") return { ok: false, error: "That file needs a name." };
+  const safeName2 = safeStorageFileName(fileName2);
+  if (safeName2 === "upload") return { ok: false, error: "That file needs a name." };
   const size = typeof byteSize === "number" && Number.isFinite(byteSize) ? byteSize : Number.NaN;
   if (!Number.isFinite(size) || size <= 0) return { ok: false, error: "That file is empty." };
   if (size > PORTAL_UPLOAD_LIMITS[kind]) {
     const limit = kind === "video" ? "2 GB" : kind === "social" ? "80 MB" : "40 MB";
     return { ok: false, error: `That file is over the ${limit} limit.` };
   }
-  const contentType = allowedContentType(kind, safeName, providedType);
+  const contentType = allowedContentType(kind, safeName2, providedType);
   if (!contentType) return { ok: false, error: rejectionCopy(kind) };
-  return { ok: true, kind, contentType, fileName: safeName };
+  return { ok: true, kind, contentType, fileName: safeName2 };
 }
 function portalUploadStoragePath(listingId, kind, fileName2, now = Date.now()) {
   return `listings/${listingId}/client-uploads/${kind}/${now}_${safeStorageFileName(fileName2)}`;
@@ -22917,7 +23618,7 @@ function adminReady$4(res) {
 function listingIdFrom(value) {
   return portalListingId(value);
 }
-function text$8(value) {
+function text$7(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function sendKnownError$3(res, err, fallback) {
@@ -22968,7 +23669,7 @@ function unique(records) {
   const out = [];
   for (const record2 of records) {
     if (!record2) continue;
-    const id = text$8(record2.id);
+    const id = text$7(record2.id);
     if (id && seen.has(id)) continue;
     if (id) seen.add(id);
     out.push(record2);
@@ -22976,35 +23677,35 @@ function unique(records) {
   return out;
 }
 async function loadSources(listingId, listing) {
-  const requestId = text$8(listing.orderRequestId);
+  const requestId = text$7(listing.orderRequestId);
   const requests = unique([
     await readDoc$1("orderRequests", requestId),
     ...await readWhere("orderRequests", "listingId", listingId)
   ]);
   const orderRequest = requests.find((record2) => record2.id === requestId) || requests[0] || null;
-  const orderId = text$8(listing.orderId) || text$8(orderRequest?.convertedToOrderId) || text$8(orderRequest?.orderId);
+  const orderId = text$7(listing.orderId) || text$7(orderRequest?.convertedToOrderId) || text$7(orderRequest?.orderId);
   const orders = unique([
     await readDoc$1("orders", orderId),
     ...await readWhere("orders", "listingId", listingId)
   ]);
   const order = orders.find((record2) => record2.id === orderId) || orders[0] || null;
-  const invoiceIds = [text$8(listing.invoiceId), text$8(order?.invoiceId), text$8(orderRequest?.invoiceId)].filter(Boolean);
+  const invoiceIds = [text$7(listing.invoiceId), text$7(order?.invoiceId), text$7(orderRequest?.invoiceId)].filter(Boolean);
   const legacyIds = [
-    ...legacyInvoiceDocIds({ orderRequestId: text$8(orderRequest?.id), listingId }),
-    ...legacyInvoiceDocIds({ orderRequestId: text$8(order?.orderRequestId), listingId: text$8(order?.listingId) || listingId })
+    ...legacyInvoiceDocIds({ orderRequestId: text$7(orderRequest?.id), listingId }),
+    ...legacyInvoiceDocIds({ orderRequestId: text$7(order?.orderRequestId), listingId: text$7(order?.listingId) || listingId })
   ].filter((id) => !invoiceIds.includes(id));
-  const galleryId = text$8(listing.galleryId) || text$8(orderRequest?.galleryId) || text$8(order?.galleryId);
+  const galleryId = text$7(listing.galleryId) || text$7(orderRequest?.galleryId) || text$7(order?.galleryId);
   const [invoiceDocs, legacyDocs, invoicesByListing, invoicesByOrder, invoicesByRequest, galleryDoc, galleriesByListing, galleriesByOrder, appointmentsByRequest, appointmentsByOrder, appointmentsByListing] = await Promise.all([
     Promise.all(invoiceIds.map((id) => readLiveInvoice(id))),
     Promise.all(legacyIds.map((id) => readLiveInvoice(id))),
     readWhere("invoices", "listingId", listingId),
-    readWhere("invoices", "orderId", text$8(order?.id)),
-    readWhere("invoices", "orderRequestId", text$8(orderRequest?.id)),
+    readWhere("invoices", "orderId", text$7(order?.id)),
+    readWhere("invoices", "orderRequestId", text$7(orderRequest?.id)),
     readDoc$1("galleries", galleryId),
     readWhere("galleries", "listingId", listingId),
-    readWhere("galleries", "orderId", text$8(order?.id)),
-    readWhere("appointments", "orderRequestId", text$8(orderRequest?.id)),
-    readWhere("appointments", "orderId", text$8(order?.id)),
+    readWhere("galleries", "orderId", text$7(order?.id)),
+    readWhere("appointments", "orderRequestId", text$7(orderRequest?.id)),
+    readWhere("appointments", "orderId", text$7(order?.id)),
     readWhere("appointments", "listingId", listingId)
   ]);
   return {
@@ -23034,29 +23735,29 @@ async function authorizedListing(req, listingId) {
 }
 function mediaChange(body) {
   const row = body && typeof body === "object" ? body : {};
-  const kind = text$8(row.kind);
+  const kind = text$7(row.kind);
   if (kind === "photo" && Array.isArray(row.layout)) {
     const layout = row.layout.flatMap((entry2) => {
       const item = entry2 && typeof entry2 === "object" ? entry2 : null;
-      const id2 = text$8(item?.id);
+      const id2 = text$7(item?.id);
       if (!id2) return [];
-      const groupId = text$8(item?.groupId);
+      const groupId = text$7(item?.groupId);
       return [{ id: id2, groupId }];
     });
     if (layout.length) return { kind: "photo", layout };
   }
   if (kind === "photo" && row.group && typeof row.group === "object") {
     const group = row.group;
-    const action = text$8(group.action);
-    const name = text$8(group.name).slice(0, 60);
-    const id2 = text$8(group.id);
-    const photoIds = Array.isArray(group.photoIds) ? group.photoIds.map((item) => text$8(item)).filter(Boolean).slice(0, 200) : [];
+    const action = text$7(group.action);
+    const name = text$7(group.name).slice(0, 60);
+    const id2 = text$7(group.id);
+    const photoIds = Array.isArray(group.photoIds) ? group.photoIds.map((item) => text$7(item)).filter(Boolean).slice(0, 200) : [];
     if (action === "create" && name && photoIds.length) return { kind: "photo", group: { action: "create", name, photoIds } };
     if (action === "rename" && id2 && name) return { kind: "photo", group: { action: "rename", id: id2, name } };
     if (action === "remove" && id2) return { kind: "photo", group: { action: "remove", id: id2 } };
     return null;
   }
-  const id = text$8(row.id);
+  const id = text$7(row.id);
   if (!KINDS.has(kind) || !id) return null;
   if (typeof row.hidden === "boolean") return { kind, id, hidden: row.hidden };
   if (row.move === "earlier" || row.move === "later") return { kind, id, move: row.move };
@@ -23202,7 +23903,7 @@ const handleCreatePhotoEditRequest = async (req, res) => {
   const listingId = listingIdFrom(req.params.id);
   if (!listingId) return res.status(400).json({ error: "Listing id is not valid." });
   const body = req.body && typeof req.body === "object" ? req.body : {};
-  const photoId = text$8(body.photoId);
+  const photoId = text$7(body.photoId);
   const note = typeof body.note === "string" ? body.note : "";
   if (!photoId) return res.status(400).json({ error: "Choose a file." });
   try {
@@ -23272,7 +23973,7 @@ const handlePatchPortalWebsite = async (req, res) => {
 const router$w = Router();
 const db$i = () => admin.firestore();
 const HOME_LIMIT = 100;
-function asRecord$5(value) {
+function asRecord$4(value) {
   return value && typeof value === "object" ? value : {};
 }
 router$w.get("/", requireStaff, async (req, res) => {
@@ -23400,36 +24101,58 @@ router$w.get("/me/home", requireAuth, async (req, res) => {
     };
     const pushInvoice = (entry2) => {
       if (seenInvoice.has(entry2.id)) return;
+      const data = entry2.data();
+      if (!visibleToPortalClient(
+        { clientId: data.clientId, firebaseUid: data.firebaseUid, clientProfileId: data.clientProfileId, email: data.email, clientEmail: data.clientEmail },
+        identity
+      )) return;
       seenInvoice.add(entry2.id);
-      invoiceDocs.push({ id: entry2.id, data: asRecord$5(jsonSafe(entry2.data())) });
+      invoiceDocs.push({ id: entry2.id, data: asRecord$4(jsonSafe(data)) });
     };
     const pushListing = (entry2) => {
       if (seenProject.has(entry2.id)) return;
+      const data = entry2.data();
+      if (!visibleToPortalClient(
+        { clientId: data.clientId, firebaseUid: data.firebaseUid, clientProfileId: data.clientProfileId, email: data.email, clientEmail: data.clientEmail },
+        identity
+      )) return;
       seenProject.add(entry2.id);
-      projects.push(buildClientListing(entry2.id, asRecord$5(jsonSafe(entry2.data()))));
+      projects.push(buildClientListing(entry2.id, asRecord$4(jsonSafe(data))));
     };
     for (const clientId2 of identity.ids) {
-      const [gallerySnap, invoiceSnap, projectSnap] = await Promise.all([
+      const profileKey = profileId("client", clientId2);
+      const [gallerySnap, invoiceSnap, projectSnap, galleryByUid, invoiceByUid, projectByUid, galleryByProfile, invoiceByProfile, projectByProfile] = await Promise.all([
         db$i().collection("galleries").where("clientId", "==", clientId2).limit(HOME_LIMIT).get(),
         db$i().collection("invoices").where("clientId", "==", clientId2).limit(HOME_LIMIT).get(),
-        db$i().collection("listings").where("clientId", "==", clientId2).limit(HOME_LIMIT).get()
+        db$i().collection("listings").where("clientId", "==", clientId2).limit(HOME_LIMIT).get(),
+        db$i().collection("galleries").where("firebaseUid", "==", clientId2).limit(HOME_LIMIT).get(),
+        db$i().collection("invoices").where("firebaseUid", "==", clientId2).limit(HOME_LIMIT).get(),
+        db$i().collection("listings").where("firebaseUid", "==", clientId2).limit(HOME_LIMIT).get(),
+        db$i().collection("galleries").where("clientProfileId", "==", profileKey).limit(HOME_LIMIT).get(),
+        db$i().collection("invoices").where("clientProfileId", "==", profileKey).limit(HOME_LIMIT).get(),
+        db$i().collection("listings").where("clientProfileId", "==", profileKey).limit(HOME_LIMIT).get()
       ]);
-      for (const doc of gallerySnap.docs) {
+      for (const doc of [...gallerySnap.docs, ...galleryByUid.docs, ...galleryByProfile.docs]) {
         if (seenGallery.has(doc.id)) continue;
-        seenGallery.add(doc.id);
         const data = doc.data();
+        if (!visibleToPortalClient(
+          { clientId: data.clientId, firebaseUid: data.firebaseUid, clientProfileId: data.clientProfileId, email: data.email, clientEmail: data.clientEmail },
+          identity
+        )) continue;
+        seenGallery.add(doc.id);
+        const listingId = typeof data.listingId === "string" ? data.listingId : "";
         galleries.push({
           id: doc.id,
           title: data.title || addressText(data.address) || "Gallery",
           address: addressText(data.address),
           status: data.status || "pending_upload",
-          href: `/gallery/${doc.id}`
+          href: listingId ? clientListingPath(listingId) : `/gallery/${doc.id}`
         });
       }
-      if (invoiceSnap.size >= HOME_LIMIT) invoicesTruncated = true;
-      invoiceSnap.docs.forEach(pushInvoice);
-      if (projectSnap.size >= HOME_LIMIT) listingsTruncated = true;
-      projectSnap.docs.forEach(pushListing);
+      if (invoiceSnap.size >= HOME_LIMIT || invoiceByUid.size >= HOME_LIMIT || invoiceByProfile.size >= HOME_LIMIT) invoicesTruncated = true;
+      [...invoiceSnap.docs, ...invoiceByUid.docs, ...invoiceByProfile.docs].forEach(pushInvoice);
+      if (projectSnap.size >= HOME_LIMIT || projectByUid.size >= HOME_LIMIT || projectByProfile.size >= HOME_LIMIT) listingsTruncated = true;
+      [...projectSnap.docs, ...projectByUid.docs, ...projectByProfile.docs].forEach(pushListing);
       try {
         const appointmentSnap = await db$i().collection("appointments").where("clientId", "==", clientId2).limit(HOME_LIMIT).get();
         if (appointmentSnap.size >= HOME_LIMIT) appointmentsTruncated = true;
@@ -23445,25 +24168,30 @@ router$w.get("/me/home", requireAuth, async (req, res) => {
       if (seenOrder.has(entry2.id)) return;
       const data = entry2.data();
       if (!visibleToPortalClient(
-        { clientId: data.clientId, email: data.email, clientEmail: data.clientEmail },
+        { clientId: data.clientId, firebaseUid: data.firebaseUid, clientProfileId: data.clientProfileId, email: data.email, clientEmail: data.clientEmail },
         { ids: identity.ids, email: identity.email }
       )) return;
       seenOrder.add(entry2.id);
-      const stored = asRecord$5(jsonSafe(data));
+      const stored = asRecord$4(jsonSafe(data));
       ordersById.set(entry2.id, { ...stored, id: entry2.id });
       const listingId = typeof data.listingId === "string" ? data.listingId : "";
       orders.push({
         id: entry2.id,
         address: addressText(data.address || data.shootLocation) || "Order",
         status: data.status || "new",
-        href: listingId ? `/studio/${listingId}` : "",
+        href: listingId ? clientListingPath(listingId) : "/portal/home?section=orders",
         orderNumber: stored.orderNumber ?? null
       });
     };
     try {
       for (const clientId2 of identity.ids) {
-        const snap = await db$i().collection("orderRequests").where("clientId", "==", clientId2).limit(HOME_LIMIT).get();
-        snap.docs.forEach(pushOrder);
+        const profileKey = profileId("client", clientId2);
+        const [byId, byUid, byProfile] = await Promise.all([
+          db$i().collection("orderRequests").where("clientId", "==", clientId2).limit(HOME_LIMIT).get(),
+          db$i().collection("orderRequests").where("firebaseUid", "==", clientId2).limit(HOME_LIMIT).get(),
+          db$i().collection("orderRequests").where("clientProfileId", "==", profileKey).limit(HOME_LIMIT).get()
+        ]);
+        [...byId.docs, ...byUid.docs, ...byProfile.docs].forEach(pushOrder);
       }
       if (identity.email) {
         const [byEmail, byClientEmail] = await Promise.all([
@@ -23500,7 +24228,7 @@ router$w.get("/me/home", requireAuth, async (req, res) => {
     const requestIds = appointmentDocs.map((entry2) => entry2.data().orderRequestId).filter((id) => typeof id === "string" && id.trim().length > 0);
     const orderRequests = await orderRequestsById(requestIds);
     const storedAppointments = appointmentDocs.map((entry2) => {
-      const data = asRecord$5(jsonSafe(entry2.data()));
+      const data = asRecord$4(jsonSafe(entry2.data()));
       const orderRequestId = typeof data.orderRequestId === "string" ? data.orderRequestId : "";
       return buildClientAppointment(entry2.id, data, orderRequests.get(orderRequestId) || null);
     });
@@ -23621,7 +24349,7 @@ async function orderRequestsById(ids) {
     const snaps = await db$i().getAll(...unique2.map((id) => db$i().collection("orderRequests").doc(id)));
     snaps.forEach((snap) => {
       if (!snap.exists) return;
-      map.set(snap.id, asRecord$5(jsonSafe(snap.data() || {})));
+      map.set(snap.id, asRecord$4(jsonSafe(snap.data() || {})));
     });
   } catch (err) {
     console.error("[Clients] Order request schedule lookup failed:", err);
@@ -23637,7 +24365,7 @@ async function saveSquareCardOnFile(input, deps = {}) {
   if (!squareConfigured(env)) return { error: "Square is not configured yet." };
   const sourceId = input.sourceId.trim();
   if (!sourceId || sourceId.length > 200) return { error: "Square did not return a card token." };
-  const base = squareApiBaseUrl(env.SQUARE_ENVIRONMENT);
+  const base = squareApiBaseUrl(squareEnvironment(env));
   const headers = {
     "Content-Type": "application/json",
     "Square-Version": env.SQUARE_VERSION || "2026-08-20",
@@ -23718,7 +24446,7 @@ class HubError extends Error {
     this.status = status2;
   }
 }
-const memory$3 = {
+const memory$4 = {
   clients: /* @__PURE__ */ new Map(),
   teams: /* @__PURE__ */ new Map(),
   members: /* @__PURE__ */ new Map(),
@@ -23728,29 +24456,33 @@ const memory$3 = {
   orders: /* @__PURE__ */ new Map(),
   invoices: /* @__PURE__ */ new Map()
 };
-function useMemory$1() {
+function readClientHubMemory(collection, id) {
+  const row = memory$4[collection].get(id);
+  return row ? { ...row } : null;
+}
+function useMemory$2() {
   return !admin.apps.length || process.env.CLIENT_HUB_STORE === "memory";
 }
 function db$h() {
   return admin.firestore();
 }
 function nowStamp() {
-  return useMemory$1() ? (/* @__PURE__ */ new Date()).toISOString() : admin.firestore.FieldValue.serverTimestamp();
+  return useMemory$2() ? (/* @__PURE__ */ new Date()).toISOString() : admin.firestore.FieldValue.serverTimestamp();
 }
 function newId$1() {
   return randomBytes$1(9).toString("hex");
 }
-function asRecord$4(value) {
+function asRecord$3(value) {
   return value && typeof value === "object" ? value : {};
 }
 async function readDoc(collection, id) {
-  if (useMemory$1()) return memory$3[collection].get(id) || null;
+  if (useMemory$2()) return memory$4[collection].get(id) || null;
   const snap = await db$h().collection(collectionName(collection)).doc(id).get();
   return snap.exists ? { ...snap.data() || {} } : null;
 }
 async function writeDoc(collection, id, data, merge = true) {
-  if (useMemory$1()) {
-    memory$3[collection].set(id, merge ? { ...memory$3[collection].get(id) || {}, ...data } : { ...data });
+  if (useMemory$2()) {
+    memory$4[collection].set(id, merge ? { ...memory$4[collection].get(id) || {}, ...data } : { ...data });
     return;
   }
   await db$h().collection(collectionName(collection)).doc(id).set(data, { merge });
@@ -23764,8 +24496,8 @@ function collectionName(collection) {
   return collection;
 }
 async function queryEqual(collection, field, value) {
-  if (useMemory$1()) {
-    return [...memory$3[collection].entries()].filter(([, row]) => row[field] === value).map(([id, row]) => ({ id, data: row }));
+  if (useMemory$2()) {
+    return [...memory$4[collection].entries()].filter(([, row]) => row[field] === value).map(([id, row]) => ({ id, data: row }));
   }
   const snap = await db$h().collection(collectionName(collection)).where(field, "==", value).limit(50).get();
   return snap.docs.map((doc) => ({ id: doc.id, data: doc.data() || {} }));
@@ -23807,10 +24539,10 @@ function contactFrom(id, data) {
 function billingFrom(data) {
   const source = data || {};
   const contact2 = sanitizeBilling(source);
-  const card = asRecord$4(source.card);
+  const card = asRecord$3(source.card);
   const last4 = typeof card.last4 === "string" ? card.last4 : "";
   const credits = Array.isArray(source.credits) ? source.credits.slice(0, 50).map((entry2, index) => {
-    const row = asRecord$4(entry2);
+    const row = asRecord$3(entry2);
     const cents2 = Math.round(Number(row.cents) || 0);
     return {
       id: typeof row.id === "string" ? row.id : `credit-${index + 1}`,
@@ -23848,6 +24580,8 @@ async function clientDocsForLogin(uid, email) {
   const linkedId = typeof direct?.linkedClientId === "string" ? direct.linkedClientId : "";
   if (redirectId) ids.add(redirectId);
   if (linkedId) ids.add(linkedId);
+  const byUid = await queryEqual("clients", "firebaseUid", uid);
+  byUid.slice(0, 10).forEach((row) => ids.add(row.id));
   const normalized = hubEmail(email || direct?.email);
   if (normalized) {
     const matches = await queryEqual("clients", "email", normalized);
@@ -23862,10 +24596,10 @@ async function clientDocsForLogin(uid, email) {
 }
 function mergedProfile(docs, canonicalId, email) {
   const canonical = docs.find((doc) => doc.id === canonicalId);
-  const profile = profileFromClient$1(canonical?.data || null);
+  const profile = profileFromClient(canonical?.data || null);
   if (!profile.email) profile.email = email;
   for (const doc of docs) {
-    const other = profileFromClient$1(doc.data);
+    const other = profileFromClient(doc.data);
     if (!profile.firstName && other.firstName) profile.firstName = other.firstName;
     if (!profile.lastName && other.lastName) profile.lastName = other.lastName;
     if (!profile.phone && other.phone) profile.phone = other.phone;
@@ -23946,34 +24680,40 @@ function accessFor$1(actor2) {
   };
 }
 async function getProfile(actor2) {
-  return { profile: actor2.profile, access: accessFor$1(actor2) };
+  return { profile: actor2.profile, access: accessFor$1(actor2), preferences: preferencesFromClient(actor2.client) };
 }
 async function saveProfile(actor2, input) {
   if (containsRawCard(input)) throw new HubError(400, "Card numbers are not stored on the profile.");
   const profile = sanitizeProfilePatch(input, actor2.email || actor2.profile.email);
   if (!profile.firstName) throw new HubError(400, "First name is required.");
-  await writeProfileToMatches(actor2, profile);
-  return { profile };
+  const posted = input && typeof input === "object" ? input.preferences : void 0;
+  const preferences = sanitizePreferences(posted) || preferencesFromClient(actor2.client);
+  await writeProfileToMatches(actor2, profile, preferences);
+  return { profile, preferences };
 }
-async function writeProfileToMatches(actor2, profile) {
+async function writeProfileToMatches(actor2, profile, preferences) {
   const email = actor2.email || actor2.profile.email || profile.email;
   for (const id of actor2.clientIds) {
-    const canonical = id === actor2.clientId;
+    const existing = await readDoc("clients", id);
+    const currentSettings = asRecord$3(existing?.profileSettings);
+    const currentNotes = asRecord$3(currentSettings.notifications);
     await writeDoc("clients", id, {
-      ...canonical ? {
-        firebaseUid: actor2.uid,
-        firstName: profile.firstName,
-        lastName: profile.lastName,
-        phone: profile.phone,
-        email,
-        company: profile.brokerage,
-        portalAccess: true,
-        status: actor2.client.status || "active"
-      } : {
-        firebaseUid: actor2.uid,
-        linkedClientId: actor2.clientId
-      },
+      firebaseUid: actor2.uid,
+      firstName: profile.firstName,
+      lastName: profile.lastName,
+      phone: profile.phone,
+      email,
+      company: profile.brokerage,
+      portalAccess: true,
+      status: existing?.status || actor2.client.status || "active",
+      ...id !== actor2.clientId ? { linkedClientId: actor2.clientId } : {},
       hubProfile: profile,
+      profileSettings: {
+        ...currentSettings,
+        ...profile.headshotUrl ? { photoUrl: profile.headshotUrl } : {},
+        displayName: profileDisplayName(profile) || String(currentSettings.displayName || ""),
+        notifications: preferences ? { email: preferences.email, sms: preferences.sms, push: preferences.push } : currentNotes
+      },
       updatedAt: nowStamp()
     });
     await stampOwnedListings(id, profile);
@@ -24047,7 +24787,7 @@ function parseImage(dataUrl) {
 async function storeImage(clientId2, kind, image) {
   const ext = image.mime === "image/png" ? "png" : image.mime === "image/webp" ? "webp" : "jpg";
   const path2 = `client-hub/${clientId2}/${kind}-${Date.now()}.${ext}`;
-  if (useMemory$1()) return `https://cdn.example.test/client-hub/${encodeURIComponent(clientId2)}/${kind}.${ext}`;
+  if (useMemory$2()) return `https://cdn.example.test/client-hub/${encodeURIComponent(clientId2)}/${kind}.${ext}`;
   try {
     const bucket2 = admin.storage().bucket();
     const token = randomBytes$1(16).toString("hex");
@@ -24101,7 +24841,7 @@ function requireTeamAdmin(actor2, ownerClientId) {
   assert(Boolean(actor2.grant && hubAllows({ uid: actor2.uid, action: "write", section: "team", ownerClientId, grant: actor2.grant })), 403, "You do not have permission to edit this team.");
 }
 async function saveTeam(actor2, input) {
-  const row = asRecord$4(input);
+  const row = asRecord$3(input);
   const name = String(row.name || "").trim().slice(0, 80);
   if (!name) throw new HubError(400, "Team name is required.");
   const logoUrl = hubImageUrl(row.logoUrl);
@@ -24151,7 +24891,7 @@ async function refreshGrant(teamId, ownerClientId) {
 async function addTeamMember(actor2, input, invite) {
   const board = await ensureTeam(actor2);
   requireTeamAdmin(actor2, board.team.ownerClientId);
-  const row = asRecord$4(input);
+  const row = asRecord$3(input);
   const name = String(row.name || "").trim().slice(0, 120);
   const email = hubEmail(row.email);
   if (!name || !email) throw new HubError(400, "Name and email are required.");
@@ -24187,7 +24927,7 @@ async function updateTeamMember(actor2, memberId, input) {
   if (!existing) throw new HubError(404, "Teammate not found.");
   const member = memberFrom(memberId, existing);
   requireTeamAdmin(actor2, member.ownerClientId);
-  const row = asRecord$4(input);
+  const row = asRecord$3(input);
   const next = {
     name: String(row.name || member.name).trim().slice(0, 120),
     phone: String(row.phone ?? member.phone).trim().slice(0, 40),
@@ -24204,7 +24944,7 @@ async function removeTeamMember(actor2, memberId) {
   if (!existing) throw new HubError(404, "Teammate not found.");
   const member = memberFrom(memberId, existing);
   requireTeamAdmin(actor2, member.ownerClientId);
-  if (useMemory$1()) memory$3.members.delete(memberId);
+  if (useMemory$2()) memory$4.members.delete(memberId);
   else await db$h().collection("customerTeamMembers").doc(memberId).delete();
   await refreshGrant(member.teamId, member.ownerClientId);
   return getTeam(await loadActor(actor2.uid, actor2.email));
@@ -24286,7 +25026,7 @@ async function deleteContact(actor2, contactId) {
   const scope = assertCrm(actor2, "write");
   const existing = await readDoc("contacts", contactId);
   if (!existing || existing.ownerClientId !== scope.ownerClientId) throw new HubError(404, "Contact not found.");
-  if (useMemory$1()) memory$3.contacts.delete(contactId);
+  if (useMemory$2()) memory$4.contacts.delete(contactId);
   else await db$h().collection("agentContacts").doc(contactId).delete();
   return { ok: true };
 }
@@ -24405,7 +25145,7 @@ async function getStaffBilling(clientId2) {
   if (!client) throw new HubError(404, "Client not found.");
   return {
     billing: publicBillingShape(billingFrom(await readDoc("billing", clientId2))),
-    profile: profileFromClient$1(client),
+    profile: profileFromClient(client),
     ownerClientId: clientId2
   };
 }
@@ -24440,6 +25180,124 @@ async function saveCard(actor2, requestedOwner, card) {
   await writeCard(ownerClientId, card, actor2.clientIds);
   return getBilling(actor2, ownerClientId === actor2.clientId ? "" : ownerClientId);
 }
+const memory$3 = /* @__PURE__ */ new Map();
+const MAX_BYTES = 5e6;
+const ALLOWED = /* @__PURE__ */ new Map([
+  ["application/pdf", "pdf"],
+  ["image/jpeg", "jpg"],
+  ["image/png", "png"],
+  ["image/webp", "webp"],
+  ["text/plain", "txt"],
+  ["text/csv", "csv"]
+]);
+function useMemory$1() {
+  return !admin.apps.length || process.env.CLIENT_HUB_STORE === "memory";
+}
+function safeName(fileName2, contentType) {
+  const ext = ALLOWED.get(contentType) || "bin";
+  const base = fileName2.replace(/\.[^.]+$/, "").replace(/[^a-zA-Z0-9._-]/g, "_").replace(/_+/g, "_").slice(0, 60) || "file";
+  return `${base}.${ext}`;
+}
+function parsePayload(fileName2, contentType, dataUrl) {
+  const name = typeof fileName2 === "string" ? fileName2.trim().slice(0, 120) : "";
+  const type = typeof contentType === "string" ? contentType.trim().toLowerCase() : "";
+  if (!name) throw new HubError(400, "Choose a file name.");
+  if (!ALLOWED.has(type)) throw new HubError(400, "Upload a PDF, JPEG, PNG, WebP, text, or CSV file.");
+  const raw = typeof dataUrl === "string" ? dataUrl.trim() : "";
+  const match = new RegExp(`^data:${type.replace("+", "\\+")};base64,([a-z0-9+/=s]+)$`, "i").exec(raw);
+  if (!match) throw new HubError(400, "That file did not upload. Try it again.");
+  const bytes = Buffer.from(match[1].replace(/\s/g, ""), "base64");
+  if (!bytes.length) throw new HubError(400, "That file was empty.");
+  if (bytes.length > MAX_BYTES) throw new HubError(400, "Files shared in the portal must be 5 MB or smaller.");
+  return { name: safeName(name, type), contentType: type, bytes };
+}
+function visible(file, scope) {
+  const uids = new Set(scope.firebaseUids);
+  const ids = new Set(scope.clientIds);
+  return uids.has(file.firebaseUid) || ids.has(file.clientId) || ids.has(file.firebaseUid);
+}
+async function listClientFiles(scope) {
+  const rows = useMemory$1() ? [...memory$3.values()] : await listedFromFirestore(scope);
+  return rows.filter((file) => visible(file, scope)).sort((a, b) => a.createdAt < b.createdAt ? 1 : -1).map(publicFile);
+}
+async function listedFromFirestore(scope) {
+  const db2 = admin.firestore();
+  const found = /* @__PURE__ */ new Map();
+  const keys = [.../* @__PURE__ */ new Set([...scope.firebaseUids, ...scope.clientIds])].filter(Boolean).slice(0, 10);
+  for (const key of keys) {
+    const [byUid, byClient, byProfile] = await Promise.all([
+      db2.collection("clientFiles").where("firebaseUid", "==", key).limit(50).get(),
+      db2.collection("clientFiles").where("clientId", "==", key).limit(50).get(),
+      db2.collection("clientFiles").where("clientProfileId", "==", profileId("client", key)).limit(50).get()
+    ]);
+    for (const snap of [...byUid.docs, ...byClient.docs, ...byProfile.docs]) {
+      found.set(snap.id, { id: snap.id, ...snap.data() });
+    }
+  }
+  return [...found.values()];
+}
+async function addClientFile(input) {
+  const parsed = parsePayload(input.fileName, input.contentType, input.dataUrl);
+  const stamp2 = clientLinkStamp(input.firebaseUid, input.clientId);
+  const id = randomBytes$1(9).toString("hex");
+  const storagePath = `client-files/${stamp2.firebaseUid}/${id}/${parsed.name}`;
+  const createdAt = (/* @__PURE__ */ new Date()).toISOString();
+  const record2 = {
+    id,
+    name: parsed.name,
+    contentType: parsed.contentType,
+    byteSize: parsed.bytes.length,
+    storagePath,
+    firebaseUid: stamp2.firebaseUid,
+    clientId: stamp2.clientId,
+    clientProfileId: stamp2.clientProfileId,
+    direction: input.direction,
+    uploadedByUid: input.uploadedByUid,
+    createdAt
+  };
+  if (useMemory$1()) {
+    memory$3.set(id, { ...record2, bytes: parsed.bytes });
+    return publicFile(record2);
+  }
+  const token = randomBytes$1(16).toString("hex");
+  const file = admin.storage().bucket().file(storagePath);
+  await file.save(parsed.bytes, {
+    contentType: parsed.contentType,
+    metadata: { metadata: { firebaseStorageDownloadTokens: token } }
+  });
+  const bucket2 = admin.storage().bucket().name;
+  record2.downloadUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket2}/o/${encodeURIComponent(storagePath)}?alt=media&token=${token}`;
+  await admin.firestore().collection("clientFiles").doc(id).set(record2);
+  return publicFile(record2);
+}
+async function readClientFile(fileId, scope) {
+  if (useMemory$1()) {
+    const stored = memory$3.get(fileId);
+    if (!stored || !visible(stored, scope) || !stored.bytes) return null;
+    return { file: publicFile(stored), bytes: stored.bytes };
+  }
+  const snap = await admin.firestore().collection("clientFiles").doc(fileId).get();
+  if (!snap.exists) return null;
+  const file = { id: snap.id, ...snap.data() };
+  if (!visible(file, scope)) return null;
+  const [bytes] = await admin.storage().bucket().file(file.storagePath).download();
+  return { file: publicFile(file), bytes };
+}
+function publicFile(file) {
+  return {
+    id: file.id,
+    name: file.name,
+    contentType: file.contentType,
+    byteSize: file.byteSize,
+    storagePath: file.storagePath,
+    firebaseUid: file.firebaseUid,
+    clientId: file.clientId,
+    clientProfileId: file.clientProfileId,
+    direction: file.direction,
+    uploadedByUid: file.uploadedByUid,
+    createdAt: file.createdAt
+  };
+}
 const router$v = Router();
 function guard(handler) {
   return async (req, res) => {
@@ -24452,17 +25310,34 @@ function guard(handler) {
     }
   };
 }
+function testClient(req) {
+  return process.env.CLIENT_HUB_TEST_AUTH === "1" && typeof req.headers["x-client-hub-uid"] === "string";
+}
+function testStaff(req) {
+  return process.env.CLIENT_HUB_TEST_AUTH === "1" && typeof req.headers["x-staff-uid"] === "string";
+}
 router$v.use((req, res, next) => {
-  if (!req.path.startsWith("/me/hub")) return next();
-  if (process.env.CLIENT_HUB_TEST_AUTH === "1" && typeof req.headers["x-client-hub-uid"] === "string") {
+  const clientPath = req.path.startsWith("/me/hub") || req.path.startsWith("/me/files");
+  if (clientPath && testClient(req)) {
     req.user = {
-      uid: req.headers["x-client-hub-uid"],
+      uid: String(req.headers["x-client-hub-uid"]),
       email: typeof req.headers["x-client-hub-email"] === "string" ? req.headers["x-client-hub-email"] : ""
     };
     return next();
   }
+  if (!clientPath) return next();
   return requireAuth(req, res, next);
 });
+function coordinatorOrTest(req, res, next) {
+  if (testStaff(req)) {
+    req.user = {
+      uid: String(req.headers["x-staff-uid"]),
+      email: "staff@example.com"
+    };
+    return next();
+  }
+  return requireCoordinator(req, res, next);
+}
 router$v.get("/me/hub/profile", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   res.json(await getProfile(await loadActor(req.user.uid, req.user.email || "")));
@@ -24547,6 +25422,35 @@ router$v.patch("/me/hub/billing", guard(async (req, res) => {
   const owner = typeof req.query.account === "string" ? req.query.account : "";
   res.json(await saveBilling(await loadActor(req.user.uid, req.user.email || ""), owner, req.body));
 }));
+router$v.get("/me/files", guard(async (req, res) => {
+  if (!req.user) throw new HubError(401, "Sign in to open your files.");
+  const actor2 = await loadActor(req.user.uid, req.user.email || "");
+  const files = await listClientFiles({ firebaseUids: [actor2.uid, ...actor2.clientIds], clientIds: actor2.clientIds });
+  res.json({ files });
+}));
+router$v.post("/me/files", guard(async (req, res) => {
+  if (!req.user) throw new HubError(401, "Sign in to upload a file.");
+  const actor2 = await loadActor(req.user.uid, req.user.email || "");
+  const file = await addClientFile({
+    firebaseUid: actor2.uid,
+    clientId: actor2.clientId,
+    uploadedByUid: actor2.uid,
+    direction: "client",
+    fileName: req.body?.fileName,
+    contentType: req.body?.contentType,
+    dataUrl: req.body?.dataUrl
+  });
+  res.status(201).json({ file });
+}));
+router$v.get("/me/files/:fileId/raw", guard(async (req, res) => {
+  if (!req.user) throw new HubError(401, "Sign in to open your files.");
+  const actor2 = await loadActor(req.user.uid, req.user.email || "");
+  const found = await readClientFile(req.params.fileId, { firebaseUids: [actor2.uid, ...actor2.clientIds], clientIds: actor2.clientIds });
+  if (!found) throw new HubError(404, "That file is not in your portal.");
+  res.setHeader("Content-Type", found.file.contentType);
+  res.setHeader("Content-Disposition", `inline; filename="${found.file.name.replace(/"/g, "")}"`);
+  res.send(found.bytes);
+}));
 router$v.post("/me/hub/billing/card", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   if (containsRawCard(req.body)) throw new HubError(400, "Card numbers are not stored. Use the Square card form.");
@@ -24583,6 +25487,49 @@ router$v.post("/:id/hub/profile/asset", requireCoordinator, guard(async (req, re
 router$v.get("/:id/hub/billing", requireCoordinator, guard(async (req, res) => {
   res.json(await getStaffBilling(clientIdParam(req.params.id)));
 }));
+async function staffFileScope(clientId2) {
+  let data = null;
+  if (!admin.apps.length || process.env.CLIENT_HUB_STORE === "memory") {
+    data = readClientHubMemory("clients", clientId2);
+  } else {
+    const snap = await admin.firestore().collection("clients").doc(clientId2).get();
+    data = snap.exists ? snap.data() || {} : null;
+  }
+  if (!data) throw new HubError(404, "Client not found.");
+  const uid = typeof data.firebaseUid === "string" && data.firebaseUid ? data.firebaseUid : clientId2;
+  const linked = typeof data.linkedClientId === "string" ? data.linkedClientId : "";
+  return {
+    firebaseUids: [.../* @__PURE__ */ new Set([uid, clientId2])],
+    clientIds: [...new Set([clientId2, uid, linked].filter(Boolean))],
+    firebaseUid: uid,
+    clientId: clientId2
+  };
+}
+router$v.get("/:id/files", coordinatorOrTest, guard(async (req, res) => {
+  const scope = await staffFileScope(clientIdParam(req.params.id));
+  res.json({ files: await listClientFiles(scope) });
+}));
+router$v.post("/:id/files", coordinatorOrTest, guard(async (req, res) => {
+  const scope = await staffFileScope(clientIdParam(req.params.id));
+  const file = await addClientFile({
+    firebaseUid: scope.firebaseUid,
+    clientId: scope.clientId,
+    uploadedByUid: req.user?.uid || "staff",
+    direction: "admin",
+    fileName: req.body?.fileName,
+    contentType: req.body?.contentType,
+    dataUrl: req.body?.dataUrl
+  });
+  res.status(201).json({ file });
+}));
+router$v.get("/:id/files/:fileId/raw", coordinatorOrTest, guard(async (req, res) => {
+  const scope = await staffFileScope(clientIdParam(req.params.id));
+  const found = await readClientFile(req.params.fileId, scope);
+  if (!found) throw new HubError(404, "That file is not on this client.");
+  res.setHeader("Content-Type", found.file.contentType);
+  res.setHeader("Content-Disposition", `inline; filename="${found.file.name.replace(/"/g, "")}"`);
+  res.send(found.bytes);
+}));
 router$v.post("/:id/hub/billing/card", requireCoordinator, guard(async (req, res) => {
   if (containsRawCard(req.body)) throw new HubError(400, "Card numbers are not stored. Use the Square card form.");
   const clientId2 = clientIdParam(req.params.id);
@@ -24600,7 +25547,9 @@ router$v.post("/:id/hub/billing/card", requireCoordinator, guard(async (req, res
   res.json(await saveStaffCard(clientId2, saved.card));
 }));
 router$v.use((req, res, next) => {
-  if (req.path.startsWith("/me/hub")) return res.status(404).json({ error: "Settings path not found." });
+  if (req.path.startsWith("/me/hub") || req.path.startsWith("/me/files")) {
+    return res.status(404).json({ error: "Settings path not found." });
+  }
   return next();
 });
 const HISTORY_LIMIT = 10;
@@ -24643,7 +25592,7 @@ function siteEditorAccess(input) {
   }
   return { ...normalizeSiteEditorFlags(input.flags), locked: false };
 }
-function allows$1(access, level) {
+function allows(access, level) {
   if (level === "view") return access.view;
   if (level === "edit") return access.edit;
   return access.publish;
@@ -25865,7 +26814,7 @@ function normalizeEmail(value) {
 function isValidEmail(value) {
   return EMAIL_RE$2.test(normalizeEmail(value));
 }
-function normalizePersonName$1(value) {
+function normalizePersonName(value) {
   return String(value || "").toLowerCase().replace(/[^a-z\s]/g, " ").replace(/\s+/g, " ").trim();
 }
 function contactName(contact2) {
@@ -26173,11 +27122,11 @@ function buildImportPlan(input) {
 }
 function entry(now, draft) {
   const names = draft.names || [];
-  const aliases = (draft.aliases || names).map((name) => normalizePersonName$1(name)).filter(Boolean);
+  const aliases = (draft.aliases || names).map((name) => normalizePersonName(name)).filter(Boolean);
   return {
-    id: draft.kind === "email" ? `email:${normalizeEmail(draft.value)}` : draft.kind === "domain" ? `domain:${draft.value.replace(/^@/, "").toLowerCase()}` : `name:${normalizePersonName$1(draft.value)}`,
+    id: draft.kind === "email" ? `email:${normalizeEmail(draft.value)}` : draft.kind === "domain" ? `domain:${draft.value.replace(/^@/, "").toLowerCase()}` : `name:${normalizePersonName(draft.value)}`,
     kind: draft.kind,
-    value: draft.kind === "email" ? normalizeEmail(draft.value) : draft.kind === "domain" ? draft.value.replace(/^@/, "").trim().toLowerCase() : normalizePersonName$1(draft.value),
+    value: draft.kind === "email" ? normalizeEmail(draft.value) : draft.kind === "domain" ? draft.value.replace(/^@/, "").trim().toLowerCase() : normalizePersonName(draft.value),
     reason: draft.reason,
     hold: draft.hold || "",
     note: draft.note,
@@ -26227,13 +27176,13 @@ function seedSuppression(now) {
 function buildSuppression(now, draft) {
   if (draft.kind === "email" && !isValidEmail(draft.value)) return null;
   if (draft.kind === "domain" && !draft.value.replace(/^@/, "").includes(".")) return null;
-  if (draft.kind === "name" && !normalizePersonName$1(draft.value)) return null;
+  if (draft.kind === "name" && !normalizePersonName(draft.value)) return null;
   return entry(now, draft);
 }
 function matchSuppression(contact2, list2) {
   const email = normalizeEmail(contact2.email);
   const domain = email.split("@")[1] || "";
-  const name = normalizePersonName$1(`${contact2.firstName} ${contact2.lastName}`);
+  const name = normalizePersonName(`${contact2.firstName} ${contact2.lastName}`);
   for (const item of list2) {
     if (item.kind === "email" && item.value === email) return item;
     if (item.email && item.email === email) return item;
@@ -27155,7 +28104,7 @@ function suppressionFromGrid(rows) {
       emailCols.forEach((index) => takeEmail(row[index] || ""));
       phoneCols.forEach((index) => takePhone(row[index] || ""));
       nameCols.forEach((index) => {
-        const name = normalizePersonName$1(row[index] || "");
+        const name = normalizePersonName(row[index] || "");
         if (name.includes(" ")) names.add(name);
       });
       row.forEach(takeEmail);
@@ -27208,7 +28157,7 @@ function marketingBlocked(lead, list2) {
 function sheetBlocked(lead, index) {
   if (lead.email && index.suppressionEmails.includes(lead.email)) return "suppression list email";
   if (lead.phone && index.suppressionPhones.includes(lead.phone)) return "suppression list phone";
-  const name = normalizePersonName$1(lead.name);
+  const name = normalizePersonName(lead.name);
   if (name && index.suppressionNames.includes(name)) return "suppression list name";
   if (marketingBlocked(lead, index.marketingSuppression)) return "Firestore marketingSuppression";
   return "";
@@ -28389,7 +29338,7 @@ function list(value) {
   }
   return [];
 }
-function text$7(row, key) {
+function text$6(row, key) {
   const value = row[key] ?? row[key[0].toUpperCase() + key.slice(1)];
   return value == null ? "" : String(value);
 }
@@ -28406,12 +29355,12 @@ function summarizeGmassReport(input) {
   const unsubscribes = list(input.unsubscribes);
   const replies = list(input.replies);
   const sent = recipients.length || Number(input.aggregate?.recipients || 0);
-  const bounceEmails = new Set(bounces.map((row) => text$7(row, "emailAddress").toLowerCase()).filter(Boolean));
-  const blockEmails = new Set(blocks.map((row) => text$7(row, "emailAddress").toLowerCase()).filter(Boolean));
+  const bounceEmails = new Set(bounces.map((row) => text$6(row, "emailAddress").toLowerCase()).filter(Boolean));
+  const blockEmails = new Set(blocks.map((row) => text$6(row, "emailAddress").toLowerCase()).filter(Boolean));
   const delivered = Math.max(0, sent - (/* @__PURE__ */ new Set([...bounceEmails, ...blockEmails])).size);
-  const uniqueOpens = new Set(opens.map((row) => text$7(row, "emailAddress").toLowerCase()).filter(Boolean)).size || (recipients.length ? 0 : Number(input.aggregate?.opens || 0));
+  const uniqueOpens = new Set(opens.map((row) => text$6(row, "emailAddress").toLowerCase()).filter(Boolean)).size || (recipients.length ? 0 : Number(input.aggregate?.opens || 0));
   const openTotal = opens.reduce((sum, row) => sum + Number(row.openCount || row.OpenCount || 1), 0) || uniqueOpens;
-  const clickEmails = new Set(clicks.map((row) => text$7(row, "emailAddress").toLowerCase()).filter(Boolean));
+  const clickEmails = new Set(clicks.map((row) => text$6(row, "emailAddress").toLowerCase()).filter(Boolean));
   const uniqueClicks = clickEmails.size || (recipients.length ? 0 : Number(input.aggregate?.clicks || 0));
   const replyCount = replies.length || Number(input.aggregate?.replies || 0);
   const bounceCount = bounces.length || Number(input.aggregate?.bounces || 0);
@@ -28419,10 +29368,10 @@ function summarizeGmassReport(input) {
   const unsubCount = unsubscribes.length || Number(input.aggregate?.unsubscribes || 0);
   const linkMap = /* @__PURE__ */ new Map();
   for (const row of clicks) {
-    const url = text$7(row, "url") || "(unknown link)";
+    const url = text$6(row, "url") || "(unknown link)";
     const current = linkMap.get(url) || { clicks: 0, emails: /* @__PURE__ */ new Set() };
     current.clicks += 1;
-    const email = text$7(row, "emailAddress").toLowerCase();
+    const email = text$6(row, "emailAddress").toLowerCase();
     if (email) current.emails.add(email);
     linkMap.set(url, current);
   }
@@ -28436,41 +29385,41 @@ function summarizeGmassReport(input) {
     return byEmail.get(key);
   };
   for (const row of recipients) {
-    const item = ensure(text$7(row, "emailAddress"));
-    if (item) item.sentAt = text$7(row, "sentTime");
+    const item = ensure(text$6(row, "emailAddress"));
+    if (item) item.sentAt = text$6(row, "sentTime");
   }
   for (const row of opens) {
-    const item = ensure(text$7(row, "emailAddress"));
+    const item = ensure(text$6(row, "emailAddress"));
     if (item) item.opens = Number(row.openCount || row.OpenCount || 1);
   }
   for (const row of clicks) {
-    const item = ensure(text$7(row, "emailAddress"));
+    const item = ensure(text$6(row, "emailAddress"));
     if (item) item.clicks += 1;
   }
   for (const row of replies) {
-    const item = ensure(text$7(row, "emailAddress"));
+    const item = ensure(text$6(row, "emailAddress"));
     if (item) item.replied = true;
   }
   for (const row of bounces) {
-    const item = ensure(text$7(row, "emailAddress"));
+    const item = ensure(text$6(row, "emailAddress"));
     if (item) item.bounced = true;
   }
   for (const row of blocks) {
-    const item = ensure(text$7(row, "emailAddress"));
+    const item = ensure(text$6(row, "emailAddress"));
     if (item) item.blocked = true;
   }
   for (const row of unsubscribes) {
-    const item = ensure(text$7(row, "emailAddress"));
+    const item = ensure(text$6(row, "emailAddress"));
     if (item) item.unsubscribed = true;
   }
   const timeline = [
-    ...recipients.map((row) => ({ at: text$7(row, "sentTime"), type: "sent", email: text$7(row, "emailAddress"), detail: "Sent" })),
-    ...opens.map((row) => ({ at: text$7(row, "lastOpenTime"), type: "open", email: text$7(row, "emailAddress"), detail: `${row.openCount || 1} opens` })),
-    ...clicks.map((row) => ({ at: text$7(row, "clickTime"), type: "click", email: text$7(row, "emailAddress"), detail: text$7(row, "url") })),
-    ...replies.map((row) => ({ at: text$7(row, "replyTime"), type: "reply", email: text$7(row, "emailAddress"), detail: "Replied" })),
-    ...bounces.map((row) => ({ at: text$7(row, "bounceTime"), type: "bounce", email: text$7(row, "emailAddress"), detail: text$7(row, "bounceReason") || "Bounced" })),
-    ...blocks.map((row) => ({ at: text$7(row, "blockTime"), type: "block", email: text$7(row, "emailAddress"), detail: text$7(row, "blockReason") || "Blocked" })),
-    ...unsubscribes.map((row) => ({ at: text$7(row, "unsubscribeTime"), type: "unsubscribe", email: text$7(row, "emailAddress"), detail: "Unsubscribed" }))
+    ...recipients.map((row) => ({ at: text$6(row, "sentTime"), type: "sent", email: text$6(row, "emailAddress"), detail: "Sent" })),
+    ...opens.map((row) => ({ at: text$6(row, "lastOpenTime"), type: "open", email: text$6(row, "emailAddress"), detail: `${row.openCount || 1} opens` })),
+    ...clicks.map((row) => ({ at: text$6(row, "clickTime"), type: "click", email: text$6(row, "emailAddress"), detail: text$6(row, "url") })),
+    ...replies.map((row) => ({ at: text$6(row, "replyTime"), type: "reply", email: text$6(row, "emailAddress"), detail: "Replied" })),
+    ...bounces.map((row) => ({ at: text$6(row, "bounceTime"), type: "bounce", email: text$6(row, "emailAddress"), detail: text$6(row, "bounceReason") || "Bounced" })),
+    ...blocks.map((row) => ({ at: text$6(row, "blockTime"), type: "block", email: text$6(row, "emailAddress"), detail: text$6(row, "blockReason") || "Blocked" })),
+    ...unsubscribes.map((row) => ({ at: text$6(row, "unsubscribeTime"), type: "unsubscribe", email: text$6(row, "emailAddress"), detail: "Unsubscribed" }))
   ].filter((item) => item.at).sort((a, b) => b.at.localeCompare(a.at));
   const bounceRate = sent ? bounceCount / sent : 0;
   return {
@@ -30584,7 +31533,7 @@ async function readHolyGrailAudience(reader) {
       people: peopleFromContacts(contacts.rows),
       blockedEmails: [...blocked.emails, ...held.emails],
       blockedPhones: [...blocked.phones, ...held.phones].map((phone) => phoneDigits(phone) || phone),
-      blockedNames: [...blocked.names, ...held.names].map((name) => normalizePersonName$1(name)).filter(Boolean),
+      blockedNames: [...blocked.names, ...held.names].map((name) => normalizePersonName(name)).filter(Boolean),
       truncated: contacts.truncated || suppression.truncated || dnc.truncated
     };
   } catch (error) {
@@ -30726,7 +31675,7 @@ async function loadChannelAudience(segmentId = "", excludeCampaignId = "") {
   const blockedPhones = new Set(sheet.blockedPhones.map((phone) => phoneDigits(phone) || phone));
   const blockedNames = new Set(sheet.blockedNames);
   for (const person2 of byEmail.values()) {
-    const name = normalizePersonName$1(`${person2.firstName} ${person2.lastName}`);
+    const name = normalizePersonName(`${person2.firstName} ${person2.lastName}`);
     if (blockedEmails.has(person2.email) || blockedPhones.has(phoneDigits(person2.phone)) || name && blockedNames.has(name)) {
       person2.doNotContact = true;
     }
@@ -33081,7 +34030,7 @@ const db$7 = () => admin.firestore();
 function httpError(status2, message) {
   return Object.assign(new Error(message), { status: status2 });
 }
-function text$6(value) {
+function text$5(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 const PRIVATE_KEY = /email|phone|sms|token|secret|password/i;
@@ -33093,15 +34042,15 @@ function previewListing(id, data) {
   return row;
 }
 function previewStudioJob(data) {
-  const listingId = text$6(data.listingId);
+  const listingId = text$5(data.listingId);
   if (!listingId) return null;
   return {
     listingId,
-    status: text$6(data.status),
-    origin: text$6(data.origin),
-    sourcePath: text$6(data.sourcePath),
-    type: text$6(data.type),
-    label: text$6(data.label)
+    status: text$5(data.status),
+    origin: text$5(data.origin),
+    sourcePath: text$5(data.sourcePath),
+    type: text$5(data.type),
+    label: text$5(data.label)
   };
 }
 async function loadPhotographerPreview(staffId) {
@@ -33119,12 +34068,12 @@ async function loadPhotographerPreview(staffId) {
   const merged = /* @__PURE__ */ new Map();
   for (const doc of [...byUid.docs, ...byIds.docs]) merged.set(doc.id, doc);
   const listings = [...merged.values()].map((doc) => previewListing(doc.id, doc.data() || {}));
-  const allowed = new Set(listings.map((listing) => text$6(listing.id)));
+  const allowed = new Set(listings.map((listing) => text$5(listing.id)));
   const studioJobs = jobSnap.docs.map((doc) => previewStudioJob(doc.data() || {})).filter((job) => Boolean(job && allowed.has(job.listingId)));
   return {
     photographer: {
       id: staffId,
-      firstName: text$6(staff.firstName) || "Photographer",
+      firstName: text$5(staff.firstName) || "Photographer",
       payRate: typeof staff.payRate === "number" && staff.payRate > 0 ? staff.payRate : 75
     },
     listings,
@@ -34745,7 +35694,7 @@ function toContactThreadView(thread) {
     }))
   };
 }
-function asRecord$3(data) {
+function asRecord$2(data) {
   if (!data || typeof data !== "object") return null;
   const raw = data;
   if (typeof raw.id !== "string" || typeof raw.accessToken !== "string") return null;
@@ -34780,7 +35729,7 @@ function createMemoryStore() {
   const rows = /* @__PURE__ */ new Map();
   const read = (id) => {
     const row = rows.get(id);
-    return row ? asRecord$3(row) : null;
+    return row ? asRecord$2(row) : null;
   };
   return {
     async get(id) {
@@ -34795,10 +35744,10 @@ function createMemoryStore() {
       const next = change(current);
       if (!next) return null;
       rows.set(id, next);
-      return asRecord$3(next);
+      return asRecord$2(next);
     },
     async listRecent(limit) {
-      return [...rows.values()].map((row) => asRecord$3(row)).filter((row) => Boolean(row)).sort((a, b) => a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0).slice(0, limit);
+      return [...rows.values()].map((row) => asRecord$2(row)).filter((row) => Boolean(row)).sort((a, b) => a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0).slice(0, limit);
     },
     clear() {
       rows.clear();
@@ -34812,7 +35761,7 @@ function createFirestoreStore() {
     async get(id) {
       const snap = await col().doc(id).get();
       if (!snap.exists) return null;
-      return asRecord$3(snap.data());
+      return asRecord$2(snap.data());
     },
     async insert(thread) {
       await col().doc(thread.id).set(thread);
@@ -34822,7 +35771,7 @@ function createFirestoreStore() {
       return db2().runTransaction(async (tx) => {
         const snap = await tx.get(ref);
         if (!snap.exists) return null;
-        const current = asRecord$3(snap.data());
+        const current = asRecord$2(snap.data());
         if (!current) return null;
         const next = change(current);
         if (!next) return null;
@@ -34832,7 +35781,7 @@ function createFirestoreStore() {
     },
     async listRecent(limit) {
       const snap = await col().orderBy("updatedAt", "desc").limit(limit).get();
-      return snap.docs.map((doc) => asRecord$3(doc.data())).filter((row) => Boolean(row));
+      return snap.docs.map((doc) => asRecord$2(doc.data())).filter((row) => Boolean(row));
     },
     clear() {
     }
@@ -35088,7 +36037,7 @@ const SOCIALS = [
   { id: "social-tiktok", title: "TikTok", detail: "TikTok DMs and comments" },
   { id: "social-google-business", title: "Google Business", detail: "Google Business DMs and comments" }
 ];
-function text$5(value) {
+function text$4(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function emailOf(value) {
@@ -35117,18 +36066,18 @@ function byTimeDesc(left, right) {
   return (Date.parse(right.updatedAt) || 0) - (Date.parse(left.updatedAt) || 0);
 }
 function messageFrom(raw, index) {
-  const senderType = text$5(raw.senderType) || "client";
-  const direction = text$5(raw.direction) === "outbound" || senderType === "staff" ? "outbound" : "inbound";
+  const senderType = text$4(raw.senderType) || "client";
+  const direction = text$4(raw.direction) === "outbound" || senderType === "staff" ? "outbound" : "inbound";
   return {
-    id: text$5(raw.id) || `msg-${index}`,
-    direction: text$5(raw.direction) === "inbound" || text$5(raw.direction) === "outbound" ? text$5(raw.direction) : direction,
-    senderId: text$5(raw.senderId),
-    senderName: text$5(raw.senderName) || (senderType === "staff" ? "Iconic Images" : "Client"),
+    id: text$4(raw.id) || `msg-${index}`,
+    direction: text$4(raw.direction) === "inbound" || text$4(raw.direction) === "outbound" ? text$4(raw.direction) : direction,
+    senderId: text$4(raw.senderId),
+    senderName: text$4(raw.senderName) || (senderType === "staff" ? "Iconic Images" : "Client"),
     senderType,
-    body: text$5(raw.content) || text$5(raw.body) || text$5(raw.text),
-    channel: text$5(raw.channel) || "in-app",
+    body: text$4(raw.content) || text$4(raw.body) || text$4(raw.text),
+    channel: text$4(raw.channel) || "in-app",
     createdAt: timeOf(raw.createdAt),
-    delivery: text$5(raw.delivery)
+    delivery: text$4(raw.delivery)
   };
 }
 function socialThreads() {
@@ -35195,13 +36144,13 @@ function buildUnifiedThreads(snapshot) {
   for (const [index, raw] of (snapshot.messages || []).entries()) {
     const message = messageFrom(raw, index);
     if (!message.body && !message.senderName) continue;
-    const orderId = text$5(raw.orderId);
+    const orderId = text$4(raw.orderId);
     const orderNumber2 = shortOrderNumber(raw.orderNumber);
-    const explicit = text$5(raw.threadId);
+    const explicit = text$4(raw.threadId);
     const id = explicit || (orderId ? `order:${orderId}` : `message:${message.id}`);
     const senderType = message.senderType;
-    const clientId2 = text$5(raw.clientId) || (senderType === "client" && !explicit.startsWith("contact:") && !explicit.startsWith("lead:") ? message.senderId : "");
-    const photographerId = text$5(raw.photographerId) || (senderType === "photographer" ? message.senderId : "");
+    const clientId2 = text$4(raw.clientId) || (senderType === "client" && !explicit.startsWith("contact:") && !explicit.startsWith("lead:") ? message.senderId : "");
+    const photographerId = text$4(raw.photographerId) || (senderType === "photographer" ? message.senderId : "");
     const audiences = [];
     if (explicit.startsWith("contact:") || explicit.startsWith("lead:")) {
       audiences.push("leads");
@@ -35216,11 +36165,11 @@ function buildUnifiedThreads(snapshot) {
       id,
       audiences,
       source: "messages",
-      title: text$5(raw.clientName) || message.senderName || "Conversation",
-      subtitle: orderNumber2 ? `Order ${orderNumber2}` : text$5(raw.channel) || "Message",
+      title: text$4(raw.clientName) || message.senderName || "Conversation",
+      subtitle: orderNumber2 ? `Order ${orderNumber2}` : text$4(raw.channel) || "Message",
       orderNumber: orderNumber2,
-      email: emailOf(text$5(raw.email) || text$5(raw.recipient)),
-      phone: text$5(raw.phone),
+      email: emailOf(text$4(raw.email) || text$4(raw.recipient)),
+      phone: text$4(raw.phone),
       orderId,
       clientId: clientId2,
       photographerId,
@@ -35235,47 +36184,47 @@ function buildUnifiedThreads(snapshot) {
     }
   }
   for (const raw of snapshot.conversations || []) {
-    const id = `conversation:${text$5(raw.id) || text$5(raw.conversationSid)}`;
-    const clientId2 = text$5(raw.clientId);
-    const photographerId = text$5(raw.photographerId);
+    const id = `conversation:${text$4(raw.id) || text$4(raw.conversationSid)}`;
+    const clientId2 = text$4(raw.clientId);
+    const photographerId = text$4(raw.photographerId);
     ensure(threadShell({
       id,
       audiences: ["clients", "photographers"],
       source: "conversations",
-      title: `${text$5(raw.photographerName) || "Photographer"} ↔ ${text$5(raw.clientName) || "Client"}`,
+      title: `${text$4(raw.photographerName) || "Photographer"} ↔ ${text$4(raw.clientName) || "Client"}`,
       subtitle: "Masked SMS",
-      preview: text$5(raw.status) === "closed" ? "Closed bridge" : "Twilio masked number",
+      preview: text$4(raw.status) === "closed" ? "Closed bridge" : "Twilio masked number",
       updatedAt: timeOf(raw.createdAt),
-      email: text$5(raw.clientEmail),
-      phone: text$5(raw.clientPhone),
-      orderId: text$5(raw.orderId),
+      email: text$4(raw.clientEmail),
+      phone: text$4(raw.clientPhone),
+      orderId: text$4(raw.orderId),
       clientId: clientId2,
       photographerId,
-      photographerPhone: text$5(raw.photographerPhone),
+      photographerPhone: text$4(raw.photographerPhone),
       participantIds: [clientId2, photographerId].filter(Boolean)
     }));
   }
   const mirrored = new Set(
-    (snapshot.messages || []).map((raw) => `${text$5(raw.orderId)}|${text$5(raw.content) || text$5(raw.body)}`)
+    (snapshot.messages || []).map((raw) => `${text$4(raw.orderId)}|${text$4(raw.content) || text$4(raw.body)}`)
   );
   for (const [index, raw] of (snapshot.smsLogs || []).entries()) {
-    const body = text$5(raw.body) || text$5(raw.content);
-    const orderId = text$5(raw.orderId);
+    const body = text$4(raw.body) || text$4(raw.content);
+    const orderId = text$4(raw.orderId);
     if (orderId && mirrored.has(`${orderId}|${body}`)) continue;
-    const message = messageFrom({ ...raw, content: body, channel: "sms", senderType: text$5(raw.senderType) || (text$5(raw.direction) === "outbound" ? "staff" : "client") }, index);
-    const senderType = text$5(raw.senderType);
-    const id = orderId ? `order:${orderId}` : `sms:${text$5(raw.id) || message.id}`;
+    const message = messageFrom({ ...raw, content: body, channel: "sms", senderType: text$4(raw.senderType) || (text$4(raw.direction) === "outbound" ? "staff" : "client") }, index);
+    const senderType = text$4(raw.senderType);
+    const id = orderId ? `order:${orderId}` : `sms:${text$4(raw.id) || message.id}`;
     const audiences = senderType === "photographer" ? ["photographers"] : orderId ? ["clients"] : ["leads"];
     const thread = ensure(threadShell({
       id,
       audiences,
       source: orderId ? "messages" : "sms",
-      title: text$5(raw.clientName) || text$5(raw.from) || text$5(raw.to) || "Text message",
+      title: text$4(raw.clientName) || text$4(raw.from) || text$4(raw.to) || "Text message",
       subtitle: "SMS",
-      phone: text$5(raw.to) || text$5(raw.from) || text$5(raw.phone),
+      phone: text$4(raw.to) || text$4(raw.from) || text$4(raw.phone),
       orderId,
-      clientId: text$5(raw.clientId),
-      photographerId: text$5(raw.photographerId) || (senderType === "photographer" ? text$5(raw.senderId) : ""),
+      clientId: text$4(raw.clientId),
+      photographerId: text$4(raw.photographerId) || (senderType === "photographer" ? text$4(raw.senderId) : ""),
       updatedAt: message.createdAt
     }));
     if (body) thread.messages.push(message);
@@ -35309,9 +36258,9 @@ function buildUnifiedThreads(snapshot) {
     }));
   }
   for (const raw of snapshot.orderRequests || []) {
-    const id = `lead:${text$5(raw.id)}`;
-    const name = text$5(raw.clientName) || [text$5(raw.firstName), text$5(raw.lastName)].filter(Boolean).join(" ") || text$5(raw.name) || "Order request";
-    const body = text$5(raw.message) || text$5(raw.notes) || text$5(raw.services) || text$5(raw.address) || text$5(raw.propertyAddress) || "New order request";
+    const id = `lead:${text$4(raw.id)}`;
+    const name = text$4(raw.clientName) || [text$4(raw.firstName), text$4(raw.lastName)].filter(Boolean).join(" ") || text$4(raw.name) || "Order request";
+    const body = text$4(raw.message) || text$4(raw.notes) || text$4(raw.services) || text$4(raw.address) || text$4(raw.propertyAddress) || "New order request";
     const createdAt = timeOf(raw.createdAt) || timeOf(raw.submittedAt);
     ensure(threadShell({
       id,
@@ -35321,14 +36270,14 @@ function buildUnifiedThreads(snapshot) {
       subtitle: "Order request",
       preview: body,
       updatedAt: createdAt,
-      email: text$5(raw.email) || text$5(raw.clientEmail),
-      phone: text$5(raw.phone) || text$5(raw.clientPhone),
-      orderId: text$5(raw.id),
-      clientId: text$5(raw.clientId),
+      email: text$4(raw.email) || text$4(raw.clientEmail),
+      phone: text$4(raw.phone) || text$4(raw.clientPhone),
+      orderId: text$4(raw.id),
+      clientId: text$4(raw.clientId),
       messages: [{
         id: `${id}-note`,
         direction: "inbound",
-        senderId: text$5(raw.clientId),
+        senderId: text$4(raw.clientId),
         senderName: name,
         senderType: "lead",
         body,
@@ -35764,623 +36713,6 @@ router$a.post("/assist", requireOwnerOrAdmin, async (req, res) => {
   if (result.ok === false) return res.status(result.status).json({ error: result.message, enabled: false });
   return res.json({ reply: result.reply });
 });
-const PERSON_KINDS = ["staff", "client", "agent"];
-const STAFF_ROLES = ["admin", "coordinator", "photographer", "editor"];
-const CAPABILITIES = [
-  "orders.view",
-  "orders.assign",
-  "clients.view",
-  "messages.view",
-  "messages.compose",
-  "tasks.view",
-  "tasks.assign",
-  "listings.view",
-  "billing.view",
-  "groups.view",
-  "groups.manage",
-  "permissions.manage"
-];
-const WEEKDAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
-const CLIENT_SERVICES = ["Photos", "Video", "Drone", "Twilight", "Floor plan", "Virtual staging"];
-const PRICING_TIERS = ["Standard", "Preferred", "Brokerage"];
-const INBOX_FOLDERS = ["inbox", "drafts", "archived", "trash", "all-groups"];
-const ROLE_LABEL = {
-  admin: "Admin",
-  coordinator: "Office",
-  photographer: "Shooter",
-  editor: "Editor",
-  client: "Client",
-  agent: "Agent"
-};
-const ROLE_COLOR = {
-  admin: "#0d9488",
-  coordinator: "#2563eb",
-  photographer: "#7c3aed",
-  editor: "#ea580c",
-  client: "#0f766e",
-  agent: "#b45309"
-};
-const ROLE_CAPS = {
-  admin: CAPABILITIES,
-  coordinator: [
-    "orders.view",
-    "orders.assign",
-    "clients.view",
-    "messages.view",
-    "messages.compose",
-    "listings.view",
-    "billing.view",
-    "groups.view",
-    "groups.manage"
-  ],
-  photographer: ["orders.view", "messages.view", "messages.compose", "listings.view", "groups.view"],
-  editor: ["orders.view", "messages.view", "listings.view", "groups.view", "tasks.view"],
-  client: ["messages.view", "messages.compose", "orders.view", "listings.view", "billing.view", "groups.view"],
-  agent: ["messages.view", "messages.compose", "orders.view", "listings.view", "groups.view"]
-};
-function previewPeopleAllowed(env) {
-  if (env.VERCEL_ENV === "production") return false;
-  if (env.VERCEL_ENV === "preview") return true;
-  return env.NODE_ENV !== "production";
-}
-function profileId(kind, sourceId) {
-  return `${kind}:${sourceId}`;
-}
-function allows(role, permissions, key) {
-  if (permissions && Object.prototype.hasOwnProperty.call(permissions, key)) {
-    return permissions[key] === true;
-  }
-  const caps = ROLE_CAPS[role];
-  return Boolean(caps && caps.includes(key));
-}
-function permissionWriteBlocked(targetEmail, nextRole, nextPermissions) {
-  if (targetEmail.trim().toLowerCase() !== INTENDED_OWNER_EMAIL) return null;
-  if (nextRole !== "admin") return "The owner stays an admin.";
-  if (nextPermissions && nextPermissions["permissions.manage"] === false) {
-    return "The owner keeps permission to manage access.";
-  }
-  return null;
-}
-function emptyHours() {
-  return {
-    mon: { enabled: true, start: "09:00", end: "17:00" },
-    tue: { enabled: true, start: "09:00", end: "17:00" },
-    wed: { enabled: true, start: "09:00", end: "17:00" },
-    thu: { enabled: true, start: "09:00", end: "17:00" },
-    fri: { enabled: true, start: "09:00", end: "17:00" },
-    sat: { enabled: false, start: "09:00", end: "13:00" },
-    sun: { enabled: false, start: "09:00", end: "13:00" }
-  };
-}
-function text$4(value, max) {
-  return String(value ?? "").replace(/\s+/g, " ").trim().slice(0, max);
-}
-function clock(value, fallback) {
-  const raw = text$4(value, 5);
-  return /^([01]\d|2[0-3]):[0-5]\d$/.test(raw) ? raw : fallback;
-}
-function flag(value, fallback) {
-  return typeof value === "boolean" ? value : fallback;
-}
-function colorOf(value, fallback) {
-  const raw = text$4(value, 7);
-  return /^#[0-9a-fA-F]{6}$/.test(raw) ? raw.toLowerCase() : fallback;
-}
-function photoOf(value) {
-  const raw = text$4(value, 400);
-  if (!raw) return "";
-  if (raw.startsWith("https://") || raw.startsWith("/")) return raw;
-  return "";
-}
-function miles(value) {
-  if (value === null || value === "") return null;
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 500) return null;
-  return Math.round(parsed);
-}
-function defaultStaffSettings(role, displayName = "") {
-  return {
-    displayName,
-    bio: "",
-    photoUrl: "",
-    color: ROLE_COLOR[role] || ROLE_COLOR.coordinator,
-    hours: emptyHours(),
-    comms: { email: true, sms: false, push: true },
-    zones: { zones: [], maxDriveMiles: 30, maxDriveMinutes: 45 }
-  };
-}
-function defaultClientSettings(displayName = "") {
-  return {
-    displayName,
-    photoUrl: "",
-    color: ROLE_COLOR.client,
-    notifications: { email: true, sms: false, push: true },
-    defaultServices: ["Photos"],
-    pricingTier: "Standard",
-    customerTeamId: ""
-  };
-}
-function sanitizeStaffSettings(input, role) {
-  const raw = input && typeof input === "object" ? input : {};
-  const base = defaultStaffSettings(role);
-  const hoursIn = raw.hours && typeof raw.hours === "object" ? raw.hours : {};
-  const hours = emptyHours();
-  for (const day of WEEKDAYS) {
-    const row = hoursIn[day] && typeof hoursIn[day] === "object" ? hoursIn[day] : {};
-    hours[day] = {
-      enabled: flag(row.enabled, base.hours[day].enabled),
-      start: clock(row.start, base.hours[day].start),
-      end: clock(row.end, base.hours[day].end)
-    };
-  }
-  const comms = raw.comms && typeof raw.comms === "object" ? raw.comms : {};
-  const zones = raw.zones && typeof raw.zones === "object" ? raw.zones : {};
-  const zoneList = Array.isArray(zones.zones) ? zones.zones.map((zone) => text$4(zone, 40)).filter(Boolean).slice(0, 12) : [];
-  return {
-    displayName: text$4(raw.displayName, 80),
-    bio: text$4(raw.bio, 500),
-    photoUrl: photoOf(raw.photoUrl),
-    color: colorOf(raw.color, base.color),
-    hours,
-    comms: {
-      email: flag(comms.email, true),
-      sms: flag(comms.sms, false),
-      push: flag(comms.push, true)
-    },
-    zones: {
-      zones: zoneList,
-      maxDriveMiles: miles(zones.maxDriveMiles),
-      maxDriveMinutes: miles(zones.maxDriveMinutes)
-    }
-  };
-}
-function sanitizeClientSettings(input) {
-  const raw = input && typeof input === "object" ? input : {};
-  const base = defaultClientSettings();
-  const notes = raw.notifications && typeof raw.notifications === "object" ? raw.notifications : {};
-  const services2 = Array.isArray(raw.defaultServices) ? raw.defaultServices.map((item) => text$4(item, 40)).filter((item) => CLIENT_SERVICES.includes(item)).slice(0, 8) : base.defaultServices;
-  const tier = text$4(raw.pricingTier, 20);
-  return {
-    displayName: text$4(raw.displayName, 80),
-    photoUrl: photoOf(raw.photoUrl),
-    color: colorOf(raw.color, base.color),
-    notifications: {
-      email: flag(notes.email, true),
-      sms: flag(notes.sms, false),
-      push: flag(notes.push, true)
-    },
-    defaultServices: services2.length ? services2 : ["Photos"],
-    pricingTier: PRICING_TIERS.includes(tier) ? tier : "Standard",
-    customerTeamId: text$4(raw.customerTeamId, 80)
-  };
-}
-function sanitizePermissions(input) {
-  const raw = input && typeof input === "object" ? input : {};
-  const next = {};
-  for (const key of CAPABILITIES) {
-    if (typeof raw[key] === "boolean") next[key] = raw[key];
-  }
-  return next;
-}
-function isStaffRole(value) {
-  return STAFF_ROLES.includes(value);
-}
-function asRecord$2(value) {
-  return value && typeof value === "object" ? value : {};
-}
-function profileFromStaff(sourceId, data, preview = false) {
-  const role = isStaffRole(String(data.role || "")) ? String(data.role) : "photographer";
-  const legalName = text$4(`${data.firstName || ""} ${data.lastName || ""}`, 120) || text$4(data.name, 120) || text$4(data.email, 120) || "Staff";
-  const settings = sanitizeStaffSettings(data.profileSettings, role);
-  if (!settings.displayName) settings.displayName = legalName;
-  return {
-    id: profileId("staff", sourceId),
-    kind: "staff",
-    sourceId,
-    uid: text$4(data.uid, 128) || sourceId,
-    role,
-    legalName,
-    displayName: settings.displayName,
-    email: text$4(data.email, 160).toLowerCase(),
-    phone: text$4(data.phone, 40),
-    photoUrl: settings.photoUrl,
-    color: settings.color,
-    bio: settings.bio,
-    brokerage: "",
-    staffSettings: settings,
-    clientSettings: null,
-    permissions: data.permissions ? sanitizePermissions(data.permissions) : null,
-    groupIds: Array.isArray(data.groupIds) ? data.groupIds.map((id) => text$4(id, 80)).filter(Boolean) : [],
-    card: null,
-    preview
-  };
-}
-function profileFromClient(sourceId, data, card = null, preview = false) {
-  const hub = asRecord$2(data.hubProfile);
-  const legalName = text$4(`${data.firstName || hub.firstName || ""} ${data.lastName || hub.lastName || ""}`, 120) || text$4(data.name, 120) || "Client";
-  const settings = sanitizeClientSettings(data.profileSettings);
-  if (!settings.displayName) settings.displayName = legalName;
-  const brokerage = text$4(hub.brokerage, 120);
-  return {
-    id: profileId("client", sourceId),
-    kind: "client",
-    sourceId,
-    uid: sourceId,
-    role: "client",
-    legalName,
-    displayName: settings.displayName,
-    email: text$4(data.email || hub.email, 160).toLowerCase(),
-    phone: text$4(data.phone || hub.phone, 40),
-    photoUrl: settings.photoUrl || photoOf(hub.headshotUrl),
-    color: settings.color,
-    bio: "",
-    brokerage,
-    staffSettings: null,
-    clientSettings: settings,
-    permissions: null,
-    groupIds: Array.isArray(data.groupIds) ? data.groupIds.map((id) => text$4(id, 80)).filter(Boolean) : [],
-    card,
-    preview
-  };
-}
-function profileFromAgent(sourceId, data, preview = false) {
-  const legalName = text$4(data.name, 120) || "Agent";
-  const linked = text$4(data.linkedClientId, 128);
-  return {
-    id: profileId("agent", sourceId),
-    kind: "agent",
-    sourceId,
-    uid: linked,
-    role: "agent",
-    legalName,
-    displayName: legalName,
-    email: text$4(data.email, 160).toLowerCase(),
-    phone: text$4(data.phone, 40),
-    photoUrl: "",
-    color: ROLE_COLOR.agent,
-    bio: text$4(data.notes, 500),
-    brokerage: "",
-    staffSettings: null,
-    clientSettings: null,
-    permissions: null,
-    groupIds: [],
-    card: null,
-    preview
-  };
-}
-function cardSummaryFrom(data) {
-  if (!data) return null;
-  const card = asRecord$2(data.card);
-  const last4 = text$4(card.last4, 4);
-  if (!/^\d{4}$/.test(last4)) return null;
-  return {
-    brand: text$4(card.brand, 20) || "Card",
-    last4,
-    expMonth: Number(card.expMonth) || 0,
-    expYear: Number(card.expYear) || 0
-  };
-}
-function normalizePersonName(value) {
-  return value.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
-}
-function directoryHit(profile, query, role) {
-  if (role && role !== "all" && profile.role !== role) return false;
-  const needle = normalizePersonName(query);
-  if (!needle) return true;
-  const hay = normalizePersonName(`${profile.displayName} ${profile.legalName} ${profile.email} ${ROLE_LABEL[profile.role]}`);
-  return hay.includes(needle);
-}
-function groupDelivery(group, senderUid) {
-  if (!group.canMessageUids.includes(senderUid)) {
-    return { ok: false, error: "You do not have permission to message this group." };
-  }
-  const members = [...new Set(group.memberUids.filter(Boolean))];
-  if (members.length === 0) return { ok: false, error: "This group has no members to receive a message." };
-  return {
-    ok: true,
-    participantUids: [.../* @__PURE__ */ new Set([...members, senderUid])],
-    notifyUids: members
-  };
-}
-function directDelivery(senderUid, recipientUids) {
-  const recipients = [...new Set(recipientUids.filter((uid) => uid && uid !== senderUid))];
-  if (recipients.length === 0) return { ok: false, error: "Choose at least one person with a login." };
-  if (recipients.length > 20) return { ok: false, error: "Choose 20 people or fewer. A message to many people belongs in Marketing, then Campaigns." };
-  return { ok: true, participantUids: [.../* @__PURE__ */ new Set([senderUid, ...recipients])], notifyUids: recipients };
-}
-function threadsForFolder(threads, actor2, folder) {
-  return threads.filter((thread) => visibleInFolder(thread, actor2, folder)).map((thread) => ({ ...thread, notified: thread.notifyUids.includes(actor2.uid) })).sort((a, b) => a.updatedAt < b.updatedAt ? 1 : -1);
-}
-function visibleInFolder(thread, actor2, folder) {
-  if (thread.folderByUid[actor2.uid] === "purged") return false;
-  if (folder === "all-groups") {
-    return actor2.leadAdmin && thread.kind === "group" && thread.status === "sent";
-  }
-  if (thread.status === "draft") {
-    if (thread.ownerUid !== actor2.uid) return false;
-    const stored2 = thread.folderByUid[actor2.uid];
-    if (folder === "trash") return stored2 === "trash";
-    if (folder === "drafts") return stored2 !== "trash" && stored2 !== "archived";
-    if (folder === "archived") return stored2 === "archived";
-    return false;
-  }
-  if (!thread.participantUids.includes(actor2.uid)) return false;
-  const stored = thread.folderByUid[actor2.uid] || "inbox";
-  if (folder === "drafts") return false;
-  return stored === folder;
-}
-function applyFolder(thread, uid, folder) {
-  if (folder === "purge") {
-    if (thread.status === "draft" && thread.ownerUid === uid) return "delete";
-    return { ...thread, folderByUid: { ...thread.folderByUid, [uid]: "purged" }, updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
-  }
-  return { ...thread, folderByUid: { ...thread.folderByUid, [uid]: folder }, updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
-}
-function person(partial) {
-  const role = partial.role;
-  const staff = partial.kind === "staff" ? defaultStaffSettings(role, partial.displayName) : null;
-  if (staff) {
-    staff.color = partial.color || staff.color;
-    staff.photoUrl = partial.photoUrl || "";
-    staff.bio = partial.bio || "";
-  }
-  const client = partial.kind === "client" ? defaultClientSettings(partial.displayName) : null;
-  if (client) {
-    client.color = partial.color || client.color;
-    client.photoUrl = partial.photoUrl || "";
-  }
-  return {
-    bio: "",
-    brokerage: "",
-    photoUrl: "",
-    color: ROLE_COLOR[role],
-    staffSettings: staff,
-    clientSettings: client,
-    permissions: null,
-    groupIds: partial.groupIds || [],
-    card: null,
-    ...partial
-  };
-}
-function previewProfiles() {
-  const rows = [
-    person({ id: "staff:sample-cadi", kind: "staff", sourceId: "sample-cadi", uid: "sample-cadi", role: "admin", legalName: "Cadi Torres", displayName: "Cadi Torres", email: "cadi@iconicimagestx.com", phone: "", preview: true, color: "#0d9488" }),
-    person({ id: "staff:sample-cora", kind: "staff", sourceId: "sample-cora", uid: "sample-cora", role: "coordinator", legalName: "Cora", displayName: "Cora", email: "cora@iconicimagestx.com", phone: "", preview: true, color: "#2563eb", bio: "Office desk. Preview sample." }),
-    person({ id: "staff:sample-mike", kind: "staff", sourceId: "sample-mike", uid: "sample-mike", role: "photographer", legalName: "Mike Luna", displayName: "Mike Luna", email: "mike@iconicimagestx.com", phone: "(281) 555-0101", preview: true, color: "#7c3aed", bio: "Listing and video sets." }),
-    person({ id: "staff:sample-daniel", kind: "staff", sourceId: "sample-daniel", uid: "sample-daniel", role: "editor", legalName: "Daniel Adaclog", displayName: "Daniel Adaclog", email: "daniel@iconicimagestx.com", phone: "", preview: true, color: "#ea580c", bio: "Video edit." }),
-    person({ id: "staff:sample-armando", kind: "staff", sourceId: "sample-armando", uid: "sample-armando", role: "photographer", legalName: "Armando Reyes", displayName: "Armando Reyes", email: "armando@iconicimagestx.com", phone: "", preview: true, color: "#7c3aed", bio: "Video group. Last name is a preview placeholder." }),
-    person({ id: "client:sample-jane", kind: "client", sourceId: "sample-jane", uid: "sample-jane", role: "client", legalName: "Jane Doe", displayName: "Jane Doe", email: "jane.doe@example.com", phone: "(281) 555-0199", preview: true, brokerage: "Sample Brokerage", groupIds: ["preview-admin", "preview-brokerage"] }),
-    person({ id: "client:sample-riley", kind: "client", sourceId: "sample-riley", uid: "sample-riley", role: "client", legalName: "Riley Broker", displayName: "Riley Broker", email: "riley.broker@example.com", phone: "", preview: true, brokerage: "Sample Brokerage", groupIds: ["preview-brokerage"] }),
-    person({ id: "agent:sample-agent", kind: "agent", sourceId: "sample-agent", uid: "", role: "agent", legalName: "Avery Agent", displayName: "Avery Agent", email: "avery.agent@example.com", phone: "", preview: true, bio: "Agent contact. No login yet, so messages wait until an account exists." })
-  ];
-  const jane = rows.find((row) => row.id === "client:sample-jane");
-  if (jane?.clientSettings) {
-    jane.clientSettings.defaultServices = ["Photos", "Video"];
-    jane.clientSettings.pricingTier = "Brokerage";
-    jane.clientSettings.customerTeamId = "preview-brokerage";
-    jane.brokerage = "Sample Brokerage";
-  }
-  const mike = rows.find((row) => row.id === "staff:sample-mike");
-  if (mike) {
-    mike.groupIds = ["preview-video"];
-    if (mike.staffSettings) mike.staffSettings.zones.zones = ["North Houston", "Conroe"];
-  }
-  const daniel = rows.find((row) => row.id === "staff:sample-daniel");
-  if (daniel) daniel.groupIds = ["preview-video"];
-  const armando = rows.find((row) => row.id === "staff:sample-armando");
-  if (armando) armando.groupIds = ["preview-video"];
-  const cadi = rows.find((row) => row.id === "staff:sample-cadi");
-  if (cadi) cadi.groupIds = ["preview-admin"];
-  const cora = rows.find((row) => row.id === "staff:sample-cora");
-  if (cora) cora.groupIds = ["preview-admin"];
-  return rows;
-}
-function previewGroups() {
-  return [
-    {
-      id: "preview-video",
-      name: "Video group",
-      kind: "internal",
-      customerTeamId: null,
-      memberProfileIds: ["staff:sample-mike", "staff:sample-daniel", "staff:sample-armando"],
-      memberUids: ["sample-mike", "sample-daniel", "sample-armando"],
-      canMessageProfileIds: ["staff:sample-mike", "staff:sample-daniel", "staff:sample-armando"],
-      canMessageUids: ["sample-mike", "sample-daniel", "sample-armando"],
-      shared: { projects: true, orders: true, listings: true, billing: false },
-      color: "#7c3aed",
-      preview: true,
-      sampleProjects: [
-        { id: "sample-order-127", title: "Listing video reel", kind: "order" },
-        { id: "sample-listing-126", title: "126 Sample Street", kind: "listing" }
-      ]
-    },
-    {
-      id: "preview-admin",
-      name: "Admin Group",
-      kind: "internal",
-      customerTeamId: null,
-      memberProfileIds: ["staff:sample-cadi", "staff:sample-cora", "client:sample-jane"],
-      memberUids: ["sample-cadi", "sample-cora", "sample-jane"],
-      canMessageProfileIds: ["staff:sample-cadi", "staff:sample-cora", "client:sample-jane", "client:sample-riley"],
-      canMessageUids: ["sample-cadi", "sample-cora", "sample-jane", "sample-riley"],
-      shared: { projects: true, orders: true, listings: false, billing: false },
-      color: "#0d9488",
-      preview: true,
-      sampleProjects: [
-        { id: "office-week", title: "Office week", kind: "project" }
-      ]
-    },
-    {
-      id: "preview-brokerage",
-      name: "Sample Brokerage",
-      kind: "client",
-      customerTeamId: null,
-      memberProfileIds: ["client:sample-jane", "client:sample-riley"],
-      memberUids: ["sample-jane", "sample-riley"],
-      canMessageProfileIds: ["client:sample-jane", "client:sample-riley"],
-      canMessageUids: ["sample-jane", "sample-riley"],
-      shared: { projects: true, orders: true, listings: true, billing: true },
-      color: "#0f766e",
-      preview: true,
-      sampleProjects: [
-        { id: "broker-order", title: "Shared brokerage order", kind: "order" }
-      ]
-    }
-  ];
-}
-function previewThreads() {
-  const at = "2026-11-14T15:00:00.000Z";
-  return [
-    {
-      id: "preview-thread-video",
-      kind: "group",
-      status: "sent",
-      subject: "Saturday reel",
-      body: "I can take the Saturday reel. Daniel, can you cut it Monday?",
-      messages: [{
-        id: "preview-note-video",
-        senderUid: "sample-mike",
-        senderProfileId: "staff:sample-mike",
-        senderName: "Mike Luna",
-        body: "I can take the Saturday reel. Daniel, can you cut it Monday?",
-        at
-      }],
-      ownerUid: "sample-mike",
-      senderUid: "sample-mike",
-      senderProfileId: "staff:sample-mike",
-      senderName: "Mike Luna",
-      participantUids: ["sample-mike", "sample-daniel", "sample-armando"],
-      notifyUids: ["sample-mike", "sample-daniel", "sample-armando"],
-      recipientProfileIds: ["staff:sample-mike", "staff:sample-daniel", "staff:sample-armando"],
-      groupId: "preview-video",
-      groupName: "Video group",
-      folderByUid: {},
-      createdAt: at,
-      updatedAt: at,
-      preview: true
-    },
-    {
-      id: "preview-thread-admin",
-      kind: "group",
-      status: "sent",
-      subject: "Portal question",
-      body: "Can someone on the admin desk confirm the brokerage invoice?",
-      messages: [{
-        id: "preview-note-admin",
-        senderUid: "sample-riley",
-        senderProfileId: "client:sample-riley",
-        senderName: "Riley Broker",
-        body: "Can someone on the admin desk confirm the brokerage invoice?",
-        at
-      }],
-      ownerUid: "sample-riley",
-      senderUid: "sample-riley",
-      senderProfileId: "client:sample-riley",
-      senderName: "Riley Broker",
-      participantUids: ["sample-cadi", "sample-cora", "sample-jane", "sample-riley"],
-      notifyUids: ["sample-cadi", "sample-cora", "sample-jane"],
-      recipientProfileIds: ["staff:sample-cadi", "staff:sample-cora", "client:sample-jane"],
-      groupId: "preview-admin",
-      groupName: "Admin Group",
-      folderByUid: {},
-      createdAt: at,
-      updatedAt: at,
-      preview: true
-    }
-  ];
-}
-function buildOutbound(actor2, input, profiles, groups, now = (/* @__PURE__ */ new Date()).toISOString()) {
-  const subject = text$4(input.subject, 140) || "Message";
-  const body = text$4(input.body, 2e3);
-  if (!body) return { ok: false, error: "Write a message first." };
-  const sender = profiles.find((profile) => profile.uid === actor2.uid) || null;
-  const senderProfileId = sender?.id || profileId(actor2.kind === "client" ? "client" : "staff", actor2.uid);
-  const senderName = sender?.displayName || actor2.email || "Iconic";
-  if (input.groupId) {
-    const group = groups.find((item) => item.id === input.groupId);
-    if (!group) return { ok: false, error: "Choose a group." };
-    const delivery2 = groupDelivery(group, actor2.uid);
-    if (delivery2.ok === false) return { ok: false, error: delivery2.error };
-    const note2 = { id: `note-${now}`, senderUid: actor2.uid, senderProfileId, senderName, body, at: now };
-    return {
-      ok: true,
-      thread: {
-        id: input.threadId || `thread-${now}`,
-        kind: "group",
-        status: "sent",
-        subject,
-        body,
-        messages: [note2],
-        ownerUid: actor2.uid,
-        senderUid: actor2.uid,
-        senderProfileId,
-        senderName,
-        participantUids: delivery2.participantUids,
-        notifyUids: delivery2.notifyUids,
-        recipientProfileIds: group.memberProfileIds,
-        groupId: group.id,
-        groupName: group.name,
-        folderByUid: {},
-        createdAt: now,
-        updatedAt: now,
-        preview: group.preview
-      }
-    };
-  }
-  const chosen = (input.profileIds || []).map((id) => profiles.find((profile) => profile.id === id)).filter((profile) => Boolean(profile));
-  const missingLogin = chosen.find((profile) => !profile.uid);
-  if (missingLogin) return { ok: false, error: `${missingLogin.displayName} does not have a login yet.` };
-  const delivery = directDelivery(actor2.uid, chosen.map((profile) => profile.uid));
-  if (delivery.ok === false) return { ok: false, error: delivery.error };
-  const note = { id: `note-${now}`, senderUid: actor2.uid, senderProfileId, senderName, body, at: now };
-  return {
-    ok: true,
-    thread: {
-      id: input.threadId || `thread-${now}`,
-      kind: "direct",
-      status: "sent",
-      subject,
-      body,
-      messages: [note],
-      ownerUid: actor2.uid,
-      senderUid: actor2.uid,
-      senderProfileId,
-      senderName,
-      participantUids: delivery.participantUids,
-      notifyUids: delivery.notifyUids,
-      recipientProfileIds: chosen.map((profile) => profile.id),
-      groupId: null,
-      groupName: null,
-      folderByUid: {},
-      createdAt: now,
-      updatedAt: now,
-      preview: chosen.every((profile) => profile.preview)
-    }
-  };
-}
-function buildDraft(actor2, input, now = (/* @__PURE__ */ new Date()).toISOString()) {
-  return {
-    id: input.threadId || `draft-${now}`,
-    kind: input.groupId ? "group" : "direct",
-    status: "draft",
-    subject: text$4(input.subject, 140),
-    body: text$4(input.body, 2e3),
-    messages: [],
-    ownerUid: actor2.uid,
-    senderUid: actor2.uid,
-    senderProfileId: profileId(actor2.kind === "client" ? "client" : "staff", actor2.uid),
-    senderName: actor2.email || "Draft",
-    participantUids: [actor2.uid],
-    notifyUids: [],
-    recipientProfileIds: input.groupId ? [] : (input.profileIds || []).slice(0, 20),
-    groupId: input.groupId || null,
-    groupName: null,
-    folderByUid: {},
-    createdAt: now,
-    updatedAt: now,
-    preview: true
-  };
-}
 const overlay = {
   profiles: /* @__PURE__ */ new Map(),
   groups: /* @__PURE__ */ new Map(),
@@ -36422,7 +36754,7 @@ async function loadProfiles() {
     ]);
     const cards = new Map(billing.map((row) => [row.id, cardSummaryFrom(row.data)]));
     for (const row of staff) map.set(`staff:${row.id}`, profileFromStaff(row.id, row.data));
-    for (const row of clients) map.set(`client:${row.id}`, profileFromClient(row.id, row.data, cards.get(row.id) || null));
+    for (const row of clients) map.set(`client:${row.id}`, profileFromClient$1(row.id, row.data, cards.get(row.id) || null));
     for (const row of agents) {
       if (row.data.linkedClientId) continue;
       map.set(`agent:${row.id}`, profileFromAgent(row.id, row.data));
@@ -36467,11 +36799,11 @@ function deny(actor2, key) {
     if (key === "messages.view" || key === "messages.compose" || key === "groups.view") return null;
     return "That action is not available on a client login.";
   }
-  if (!allows(actor2.role, actor2.permissions, key)) return "You do not have permission for that.";
+  if (!allows$1(actor2.role, actor2.permissions, key)) return "You do not have permission for that.";
   return null;
 }
 async function directory(actor2, query, role) {
-  if (actor2.kind === "staff" && !allows(actor2.role, actor2.permissions, "clients.view") && !allows(actor2.role, actor2.permissions, "messages.view")) {
+  if (actor2.kind === "staff" && !allows$1(actor2.role, actor2.permissions, "clients.view") && !allows$1(actor2.role, actor2.permissions, "messages.view")) {
     return { error: "You do not have permission for that.", status: 403 };
   }
   if (actor2.kind === "client" && deny(actor2, "messages.view")) {
@@ -36491,7 +36823,7 @@ async function directory(actor2, query, role) {
   };
 }
 function visibleGroupsFor(actor2, groups) {
-  const canManage = actor2.kind === "staff" && allows(actor2.role, actor2.permissions, "groups.manage");
+  const canManage = actor2.kind === "staff" && allows$1(actor2.role, actor2.permissions, "groups.manage");
   if (actor2.leadAdmin || canManage) return groups;
   return groups.filter((group) => group.memberUids.includes(actor2.uid) || group.canMessageUids.includes(actor2.uid));
 }
@@ -39388,7 +39720,7 @@ function gate(level) {
     const run = async () => {
       const access = await accessFor(editorReq);
       editorReq.siteAccess = access;
-      if (!allows$1(access, level)) {
+      if (!allows(access, level)) {
         return res.status(403).json({ error: level === "publish" ? "Only owner/admin can publish." : "Site editor permission required." });
       }
       return next();
@@ -41007,11 +41339,11 @@ async function loadMarketingSuppression() {
     const kind = data.kind === "email" || data.kind === "domain" || data.kind === "name" ? data.kind : null;
     const value = typeof data.value === "string" ? data.value.trim() : "";
     if (!kind || !value) continue;
-    const aliases = Array.isArray(data.aliases) ? data.aliases.map((item) => normalizePersonName$1(item)).filter(Boolean) : [];
+    const aliases = Array.isArray(data.aliases) ? data.aliases.map((item) => normalizePersonName(item)).filter(Boolean) : [];
     entries.push({
       id: doc.id,
       kind,
-      value: kind === "name" ? normalizePersonName$1(value) : kind === "email" ? normalizeSyncEmail(value) : value.replace(/^@/, "").toLowerCase(),
+      value: kind === "name" ? normalizePersonName(value) : kind === "email" ? normalizeSyncEmail(value) : value.replace(/^@/, "").toLowerCase(),
       reason: "manual",
       hold: data.hold === "personal" ? "personal" : "",
       note: "",
@@ -42061,6 +42393,11 @@ if (!admin.apps.length) {
     admin.initializeApp({
       credential: admin.credential.applicationDefault(),
       storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET || process.env.FIREBASE_STORAGE_BUCKET
+    });
+  } else if (process.env.FIRESTORE_EMULATOR_HOST) {
+    admin.initializeApp({
+      projectId: process.env.GCLOUD_PROJECT || process.env.FIREBASE_PROJECT_ID || "iconic-images-aicon",
+      storageBucket: process.env.FIREBASE_STORAGE_BUCKET || process.env.VITE_FIREBASE_STORAGE_BUCKET || "iconic-images-aicon.firebasestorage.app"
     });
   } else {
     console.warn(

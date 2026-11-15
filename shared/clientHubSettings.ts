@@ -206,8 +206,40 @@ export function hubEmail(value: unknown): string {
   return email;
 }
 
+/** US numbers display as (281) 555-0100. Other lengths stay as typed digits. */
 export function hubPhone(value: unknown): string {
-  return text(value, 40).replace(/[^\d+().\-\s]/g, "");
+  const cleaned = text(value, 40).replace(/[^\d+().\-\s]/g, "");
+  const digits = cleaned.replace(/\D/g, "");
+  const national = digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
+  if (national.length !== 10) return cleaned;
+  return `(${national.slice(0, 3)}) ${national.slice(3, 6)}-${national.slice(6)}`;
+}
+
+export interface ClientPreferences {
+  email: boolean;
+  sms: boolean;
+  push: boolean;
+}
+
+/** In-app switches only. Saving these does not send email, SMS, or push. */
+export function preferencesFromClient(data: Record<string, unknown> | null | undefined): ClientPreferences {
+  const settings = record(data?.profileSettings);
+  const notes = record(settings.notifications);
+  return {
+    email: notes.email !== false,
+    sms: notes.sms === true,
+    push: notes.push !== false,
+  };
+}
+
+export function sanitizePreferences(input: unknown): ClientPreferences | null {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return null;
+  const raw = input as Record<string, unknown>;
+  return {
+    email: raw.email !== false,
+    sms: raw.sms === true,
+    push: raw.push !== false,
+  };
 }
 
 /** https URLs, or a same-site media path. Anything else is dropped. */

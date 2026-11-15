@@ -489,7 +489,7 @@ export function profileFromClient(sourceId: string, data: Record<string, unknown
     id: profileId("client", sourceId),
     kind: "client",
     sourceId,
-    uid: sourceId,
+    uid: text(data.firebaseUid, 128) || sourceId,
     role: "client",
     legalName,
     displayName: settings.displayName,

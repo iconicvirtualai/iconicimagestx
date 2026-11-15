@@ -1,6 +1,20 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
+describe("shared client files", () => {
+  const firestore = readFileSync("firestore.rules", "utf8");
+  const storage = readFileSync("storage.rules", "utf8");
+
+  it("lets a client read only files stored on their auth uid", () => {
+    expect(firestore).toContain("match /clientFiles/{fileId}");
+    expect(firestore).toMatch(/match \/clientFiles\/\{fileId\}[\s\S]*resource\.data\.firebaseUid == request\.auth\.uid/);
+    expect(firestore).toMatch(/match \/clientFiles\/\{fileId\}[\s\S]*allow write: if false/);
+    expect(storage).toContain("match /client-files/{uid}/{allPaths=**}");
+    expect(storage).toMatch(/match \/client-files\/\{uid\}\/\{allPaths=\*\*\}[\s\S]*request\.auth\.uid == uid/);
+    expect(storage).toMatch(/match \/client-files\/\{uid\}\/\{allPaths=\*\*\}[\s\S]*allow write: if false/);
+  });
+});
+
 describe("client hub firestore rules", () => {
   const rules = readFileSync("firestore.rules", "utf8");
 
