@@ -314,8 +314,8 @@ export function ListingRow({ listing, example }: { listing: ClientListingCard; e
   const photos = listing.imageCount === 0 ? "No photos yet" : `${listing.imageCount} photo${listing.imageCount === 1 ? "" : "s"}`;
   return (
     <Link to={listingHref(listing, example)} className="lcard">
-      <div className="ph">
-        {listing.coverUrl ? <img src={listing.coverUrl} alt="" /> : null}
+      <div className={listing.coverUrl ? "ph" : "ph empty"}>
+        {listing.coverUrl ? <img src={listing.coverUrl} alt="" /> : <span>No photo yet</span>}
       </div>
       <div className="body">
         <div className="tags">

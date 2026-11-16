@@ -77,7 +77,7 @@ export function ClientFilesPanel({
 
   return (
     <div data-testid="shared-files" className="space-y-3">
-      <label className="inline-flex min-h-11 cursor-pointer items-center rounded-xl bg-black px-4 text-[10px] font-black uppercase tracking-widest text-white">
+      <label className="portal-primary" style={{ display: "inline-flex", alignItems: "center", cursor: "pointer" }}>
         {busy ? "Uploading" : "Upload file"}
         <input
           type="file"

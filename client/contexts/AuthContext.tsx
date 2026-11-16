@@ -377,6 +377,11 @@ export function useAuth() {
   return ctx;
 }
 
+/** Portal chrome can render in tests that do not mount the auth provider. */
+export function useOptionalAuth() {
+  return useContext(AuthContext);
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function getAuthErrorMessage(err: unknown): string {

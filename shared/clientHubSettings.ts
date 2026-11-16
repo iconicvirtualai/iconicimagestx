@@ -5,6 +5,7 @@
  */
 
 import { clientNotifyLive } from "./clientNotify.ts";
+import { isExpiringStorageUrl, isProfileMediaPath } from "./profileMedia.ts";
 import { squareBuyerAddress, squareBuyerPhone } from "./squareCheckout.ts";
 
 export const HUB_SOCIAL_PLATFORMS = [
@@ -242,11 +243,12 @@ export function sanitizePreferences(input: unknown): ClientPreferences | null {
   };
 }
 
-/** https URLs, or a same-site media path. Anything else is dropped. */
+/** https URLs, a same-site media path, or a durable profile-media path. Anything else is dropped. */
 export function hubHttpUrl(value: unknown, max = 400): string {
   const raw = text(value, max);
   if (!raw) return "";
   if (raw.startsWith("/media/") && !raw.includes("..") && !raw.includes("\\")) return raw;
+  if (isProfileMediaPath(raw)) return raw;
   try {
     const url = new URL(raw);
     if (url.protocol !== "https:" && url.protocol !== "http:") return "";
@@ -257,10 +259,12 @@ export function hubHttpUrl(value: unknown, max = 400): string {
 }
 
 export function hubImageUrl(value: unknown): string {
-  const raw = text(value, 500);
+  const raw = text(value, 2000);
   if (!raw) return "";
   if (raw.startsWith("data:image/")) return "";
-  return hubHttpUrl(raw, 500);
+  if (isExpiringStorageUrl(raw)) return "";
+  if (isProfileMediaPath(raw)) return raw;
+  return hubHttpUrl(raw, 2000);
 }
 
 /**

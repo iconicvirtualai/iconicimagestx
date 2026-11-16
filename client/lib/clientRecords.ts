@@ -40,7 +40,8 @@ export interface ClientRecord {
   conciergeNotes?: string;
   presentation?: ClientPresentation;
   taxNotes?: string;
-  hubProfile?: { headshotUrl?: string };
+  hubProfile?: { headshotUrl?: string; companyLogoUrl?: string; brokerageLogoUrl?: string };
+  profileSettings?: { photoUrl?: string };
   cardOnFile?: { brand?: string; last4?: string; expMonth?: number; expYear?: number };
 }
 

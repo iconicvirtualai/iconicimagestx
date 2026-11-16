@@ -1,8 +1,16 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { CHANGE_PASSWORD_PATH } from "@shared/passwordAccount";
+import { portalPortrait, type PortalAvatarInput } from "@shared/portalAvatar";
 import { PortalFooter } from "@/components/portal/PortalFooter";
+import { useOptionalAuth } from "@/contexts/AuthContext";
 import "@/styles/portal-v2.css";
+
+export const PORTAL_AVATAR_EVENT = "portal-avatar";
+
+export function publishPortalAvatar(profile: PortalAvatarInput) {
+  window.dispatchEvent(new CustomEvent(PORTAL_AVATAR_EVENT, { detail: profile }));
+}
 
 export type PortalHomeSection = "listings" | "schedule" | "messages" | "orders";
 export type PortalSettingsSection = "profile" | "team" | "clients" | "billing" | "files";
@@ -28,6 +36,11 @@ export function portalHref(path: string, example: boolean, section?: string): st
   if (section) params.set("section", section);
   const query = params.toString();
   return query ? `${path}?${query}` : path;
+}
+
+function Portrait({ name, portrait }: { name: string; portrait: ReturnType<typeof portalPortrait> }) {
+  if (portrait.url) return <img src={portrait.url} alt="" />;
+  return <>{initials(name)}</>;
 }
 
 function initials(name: string): string {
@@ -155,7 +168,32 @@ export function PortalShell({
   const [menuOpen, setMenuOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const accountRef = useRef<HTMLDivElement>(null);
+  const auth = useOptionalAuth();
+  const user = auth?.user;
+  const [portraitInput, setPortraitInput] = useState<PortalAvatarInput>({});
   const name = (accountName || firstName || "there").trim();
+  const portrait = portalPortrait(portraitInput);
+
+  useEffect(() => {
+    if (example || !user) return;
+    let cancelled = false;
+    void user.getIdToken().then(async (token) => {
+      const response = await fetch("/api/clients/me/hub/profile", { headers: { Authorization: `Bearer ${token}` } });
+      if (!response.ok || cancelled) return;
+      const body = await response.json().catch(() => ({}));
+      if (!cancelled && body.profile) setPortraitInput(body.profile);
+    }).catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [example, user]);
+
+  useEffect(() => {
+    function onAvatar(event: Event) {
+      const detail = (event as CustomEvent<PortalAvatarInput>).detail;
+      if (detail) setPortraitInput(detail);
+    }
+    window.addEventListener(PORTAL_AVATAR_EVENT, onAvatar);
+    return () => window.removeEventListener(PORTAL_AVATAR_EVENT, onAvatar);
+  }, []);
 
   useEffect(() => {
     function close(event: MouseEvent) {
@@ -200,7 +238,12 @@ export function PortalShell({
             onNavigate={() => setMenuOpen(false)}
             open={menuOpen}
           />
-          <div className="rail-foot">Your Iconic desk is at Studio 105, The Woodlands.</div>
+          <div className="rail-foot">
+            <span className="av" data-testid="portal-sidebar-avatar" data-avatar-kind={portrait.kind}>
+              <Portrait name={name} portrait={portrait} />
+            </span>
+            <span>Your Iconic desk is at Studio 105, The Woodlands.</span>
+          </div>
         </aside>
         <div className="stage">
           <header className="topbar">
@@ -219,11 +262,13 @@ export function PortalShell({
               <button
                 type="button"
                 className="av"
+                data-testid="portal-avatar"
+                data-avatar-kind={portrait.kind}
                 aria-label="Account menu"
                 aria-expanded={accountOpen}
                 onClick={() => setAccountOpen((open) => !open)}
               >
-                {initials(name)}
+                <Portrait name={name} portrait={portrait} />
               </button>
               {accountOpen ? (
                 <div className="acct-menu desk-only" role="menu">

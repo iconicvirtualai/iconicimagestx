@@ -257,6 +257,16 @@ describe("client home dashboard", () => {
     expect(html).toContain("Open billing");
   });
 
+  it("lists stored orders with the large order number when invoices are empty", () => {
+    const html = view({
+      section: "orders",
+      listings: [listing({ orderNumber: "#014", address: "14 Ember Lane" })],
+    });
+    expect(html).toContain("#014");
+    expect(html).toContain("14 Ember Lane");
+    expect(html).toContain("No invoices are stored on this account yet");
+  });
+
   it("colors past, submitted, accepted, and changed appointments", () => {
     const html = view({
       section: "schedule",
