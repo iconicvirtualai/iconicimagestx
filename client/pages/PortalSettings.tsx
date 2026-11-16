@@ -14,9 +14,18 @@ import type { ClientInvoiceStatement, ClientListingCard } from "@shared/clientHo
 import { Button } from "@/components/ui/button";
 import { PortalShell, portalHref, type PortalSettingsSection } from "@/components/client-hub/PortalShell";
 import { BillingSettings, ClientsSettings, ProfileSettings, TeamSettings } from "@/components/client-hub/SettingsPages";
+import { ClientFilesPanel } from "@/components/portal/ClientFilesPanel";
+import type { ClientPreferences } from "@shared/clientHubSettings";
 import { exampleBilling, exampleContacts, exampleInvoice, exampleListing, exampleMembers, exampleOrders, samplePortalProfile } from "@/lib/exampleHub";
 
-const SECTIONS = new Set(["profile", "team", "clients", "billing"]);
+const SECTIONS = new Set(["profile", "team", "clients", "billing", "files"]);
+const SECTION_LABEL: Record<string, string> = {
+  profile: "Profile",
+  team: "Team",
+  clients: "Clients",
+  billing: "Billing",
+  files: "Files",
+};
 
 export function useExampleMode(): boolean {
   const [params] = useSearchParams();
@@ -76,14 +85,15 @@ export default function PortalSettings() {
           </div>
         </div>
         <nav className="stabs" aria-label="Settings sections">
-          {(["profile", "team", "clients", "billing"] as const).map((id) => (
-            <Link key={id} to={portalHref(`/portal/settings/${id}`, example)} className={active === id ? "active" : undefined}>{id}</Link>
+          {(["profile", "team", "clients", "billing", "files"] as const).map((id) => (
+            <Link key={id} to={portalHref(`/portal/settings/${id}`, example)} className={active === id ? "active" : undefined}>{SECTION_LABEL[id]}</Link>
           ))}
         </nav>
         {active === "profile" ? <ProfileRoute example={example} /> : null}
         {active === "team" ? <TeamRoute example={example} /> : null}
         {active === "clients" ? <ClientsRoute example={example} /> : null}
         {active === "billing" ? <BillingRoute example={example} /> : null}
+        {active === "files" ? <FilesRoute example={example} /> : null}
       </PortalShell>
     </div>
   );
@@ -92,12 +102,17 @@ export default function PortalSettings() {
 function ProfileRoute({ example }: { example: boolean }) {
   const { user } = useAuth();
   const [profile, setProfile] = useState<ClientHubProfile | null>(example ? samplePortalProfile() : null);
+  const [preferences, setPreferences] = useState<ClientPreferences>({ email: true, sms: false, push: true });
   const [error, setError] = useState("");
   useEffect(() => {
     if (example || !user) return;
     let cancelled = false;
-    void hubFetch<{ profile: ClientHubProfile }>("/api/clients/me/hub/profile", () => user.getIdToken())
-      .then((body) => { if (!cancelled) setProfile(body.profile); })
+    void hubFetch<{ profile: ClientHubProfile; preferences?: ClientPreferences }>("/api/clients/me/hub/profile", () => user.getIdToken())
+      .then((body) => {
+        if (cancelled) return;
+        setProfile(body.profile);
+        if (body.preferences) setPreferences(body.preferences);
+      })
       .catch((err: Error) => { if (!cancelled) setError(err.message); });
     return () => { cancelled = true; };
   }, [example, user]);
@@ -106,19 +121,42 @@ function ProfileRoute({ example }: { example: boolean }) {
   return (
     <ProfileSettings
       profile={profile}
+      preferences={preferences}
       example={example}
-      onSave={async (next) => {
+      onSave={async (next, nextPreferences) => {
         if (example) {
           setProfile(next);
+          setPreferences(nextPreferences);
           return;
         }
-        const saved = await hubFetch<{ profile: ClientHubProfile }>("/api/clients/me/hub/profile", () => user!.getIdToken(), {
+        const saved = await hubFetch<{ profile: ClientHubProfile; preferences?: ClientPreferences }>("/api/clients/me/hub/profile", () => user!.getIdToken(), {
           method: "PATCH",
-          body: JSON.stringify(next),
+          body: JSON.stringify({ ...next, preferences: nextPreferences }),
         });
         setProfile(saved.profile);
+        if (saved.preferences) setPreferences(saved.preferences);
       }}
     />
+  );
+}
+
+function FilesRoute({ example }: { example: boolean }) {
+  const { user } = useAuth();
+  if (example) {
+    return <p className="text-sm text-gray-500">Sample preview. Shared files appear here after you sign in.</p>;
+  }
+  if (!user) return <Pending />;
+  return (
+    <div className="space-y-3">
+      <h2 className="text-2xl font-black">Files</h2>
+      <p className="text-sm text-gray-500">Files from Iconic show up here. Files you upload show on your client record for the team.</p>
+      <ClientFilesPanel
+        listUrl="/api/clients/me/files"
+        uploadUrl="/api/clients/me/files"
+        rawUrl={(fileId) => `/api/clients/me/files/${fileId}/raw`}
+        getToken={() => user.getIdToken()}
+      />
+    </div>
   );
 }
 

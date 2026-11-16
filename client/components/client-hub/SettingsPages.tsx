@@ -6,10 +6,12 @@ import {
   TEAM_PERMISSIONS,
   billingAddressLine,
   cardLabel,
+  hubPhone,
   marketingMaterialFromProfile,
   type AgentContactRecord,
   type BillingProfile,
   type ClientHubProfile,
+  type ClientPreferences,
   type TeamMemberRecord,
   type TeamPermission,
 } from "@shared/clientHubSettings";
@@ -54,18 +56,22 @@ async function tokenFor(): Promise<string> {
 
 export function ProfileSettings({
   profile,
+  preferences = { email: true, sms: false, push: true },
   example = false,
   onSave,
 }: {
   profile: ClientHubProfile;
+  preferences?: ClientPreferences;
   example?: boolean;
-  onSave: (profile: ClientHubProfile) => Promise<void>;
+  onSave: (profile: ClientHubProfile, preferences: ClientPreferences) => Promise<void>;
 }) {
   const [draft, setDraft] = useState(profile);
+  const [prefs, setPrefs] = useState(preferences);
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
   const material = marketingMaterialFromProfile(draft);
   useEffect(() => setDraft(profile), [profile]);
+  useEffect(() => setPrefs(preferences), [preferences]);
 
   async function onFile(kind: "headshot" | "companyLogo" | "brokerageLogo", file: File | undefined) {
     if (!file) return;
@@ -93,7 +99,7 @@ export function ProfileSettings({
     setSaving(true);
     setMessage("");
     try {
-      await onSave(draft);
+      await onSave({ ...draft, phone: hubPhone(draft.phone) }, prefs);
       setMessage(example ? "Example preview — nothing was saved." : "Profile saved. Marketing materials use these details.");
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Could not save the profile.");
@@ -111,7 +117,7 @@ export function ProfileSettings({
       <div className="grid sm:grid-cols-2 gap-4 min-w-0 bg-white rounded-2xl border border-gray-100 p-4">
         <Field label="First name"><input className={fieldClass} value={draft.firstName} onChange={(event) => setDraft({ ...draft, firstName: event.target.value })} required /></Field>
         <Field label="Last name"><input className={fieldClass} value={draft.lastName} onChange={(event) => setDraft({ ...draft, lastName: event.target.value })} /></Field>
-        <Field label="Phone"><input className={fieldClass} value={draft.phone} onChange={(event) => setDraft({ ...draft, phone: event.target.value })} inputMode="tel" /></Field>
+        <Field label="Phone"><input className={fieldClass} value={draft.phone} onChange={(event) => setDraft({ ...draft, phone: event.target.value })} onBlur={() => setDraft((current) => ({ ...current, phone: hubPhone(current.phone) }))} inputMode="tel" /></Field>
         <Field label="Email"><input className={fieldClass} type="email" value={draft.email} onChange={(event) => setDraft({ ...draft, email: event.target.value })} /></Field>
         <Field label="Brokerage"><input className={fieldClass} value={draft.brokerage} onChange={(event) => setDraft({ ...draft, brokerage: event.target.value })} /></Field>
         <Field label="Website"><input className={fieldClass} value={draft.website} onChange={(event) => setDraft({ ...draft, website: event.target.value })} inputMode="url" placeholder="https://" /></Field>
@@ -160,6 +166,13 @@ export function ProfileSettings({
           </div>
         </div>
       ) : null}
+      <fieldset className="bg-white rounded-2xl border border-gray-100 p-4 space-y-2" data-testid="portal-preferences">
+        <legend className="text-xs font-black uppercase tracking-widest text-[#0d9488]">Preferences</legend>
+        <p className="text-sm text-gray-500">These switches are saved on your account. They do not send email, text, or a push.</p>
+        <label className="flex items-center gap-2 text-sm font-bold"><input type="checkbox" checked={prefs.email} onChange={(event) => setPrefs({ ...prefs, email: event.target.checked })} /> Email updates</label>
+        <label className="flex items-center gap-2 text-sm font-bold"><input type="checkbox" checked={prefs.sms} onChange={(event) => setPrefs({ ...prefs, sms: event.target.checked })} /> Text updates</label>
+        <label className="flex items-center gap-2 text-sm font-bold"><input type="checkbox" checked={prefs.push} onChange={(event) => setPrefs({ ...prefs, push: event.target.checked })} /> In-app updates</label>
+      </fieldset>
       {message ? <p role="status" className="text-sm font-bold">{message}</p> : null}
       <button type="submit" disabled={saving} className="min-h-12 rounded-2xl bg-black text-white px-5 text-xs font-black uppercase tracking-widest">
         {saving ? "Saving" : "Save profile"}

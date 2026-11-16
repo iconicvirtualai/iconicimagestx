@@ -8,6 +8,7 @@ import admin from "firebase-admin";
 import { contactsToCsv, containsRawCard, parseContactsCsv, sanitizeBilling } from "../../shared/clientHubSettings";
 import { requireAuth, requireCoordinator, type AuthenticatedRequest } from "../middleware/auth";
 import { saveSquareCardOnFile } from "../services/clientHubCard";
+import { addClientFile, listClientFiles, readClientFile } from "../services/clientFiles";
 import {
   HubError,
   addTeamMember,
@@ -19,6 +20,7 @@ import {
   importContacts,
   listContacts,
   loadActor,
+  readClientHubMemory,
   removeTeamMember,
   saveBilling,
   saveCard,
@@ -46,17 +48,37 @@ function guard(handler: (req: AuthenticatedRequest, res: import("express").Respo
   };
 }
 
+function testClient(req: AuthenticatedRequest): boolean {
+  return process.env.CLIENT_HUB_TEST_AUTH === "1" && typeof req.headers["x-client-hub-uid"] === "string";
+}
+
+function testStaff(req: AuthenticatedRequest): boolean {
+  return process.env.CLIENT_HUB_TEST_AUTH === "1" && typeof req.headers["x-staff-uid"] === "string";
+}
+
 router.use((req: AuthenticatedRequest, res, next) => {
-  if (!req.path.startsWith("/me/hub")) return next();
-  if (process.env.CLIENT_HUB_TEST_AUTH === "1" && typeof req.headers["x-client-hub-uid"] === "string") {
+  const clientPath = req.path.startsWith("/me/hub") || req.path.startsWith("/me/files");
+  if (clientPath && testClient(req)) {
     req.user = {
-      uid: req.headers["x-client-hub-uid"],
+      uid: String(req.headers["x-client-hub-uid"]),
       email: typeof req.headers["x-client-hub-email"] === "string" ? req.headers["x-client-hub-email"] : "",
     } as admin.auth.DecodedIdToken;
     return next();
   }
+  if (!clientPath) return next();
   return requireAuth(req, res, next);
 });
+
+function coordinatorOrTest(req: AuthenticatedRequest, res: import("express").Response, next: import("express").NextFunction) {
+  if (testStaff(req)) {
+    req.user = {
+      uid: String(req.headers["x-staff-uid"]),
+      email: "staff@example.com",
+    } as admin.auth.DecodedIdToken;
+    return next();
+  }
+  return requireCoordinator(req, res, next);
+}
 
 router.get("/me/hub/profile", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
@@ -160,6 +182,38 @@ router.patch("/me/hub/billing", guard(async (req, res) => {
   res.json(await saveBilling(await loadActor(req.user.uid, req.user.email || ""), owner, req.body));
 }));
 
+router.get("/me/files", guard(async (req, res) => {
+  if (!req.user) throw new HubError(401, "Sign in to open your files.");
+  const actor = await loadActor(req.user.uid, req.user.email || "");
+  const files = await listClientFiles({ firebaseUids: [actor.uid, ...actor.clientIds], clientIds: actor.clientIds });
+  res.json({ files });
+}));
+
+router.post("/me/files", guard(async (req, res) => {
+  if (!req.user) throw new HubError(401, "Sign in to upload a file.");
+  const actor = await loadActor(req.user.uid, req.user.email || "");
+  const file = await addClientFile({
+    firebaseUid: actor.uid,
+    clientId: actor.clientId,
+    uploadedByUid: actor.uid,
+    direction: "client",
+    fileName: req.body?.fileName,
+    contentType: req.body?.contentType,
+    dataUrl: req.body?.dataUrl,
+  });
+  res.status(201).json({ file });
+}));
+
+router.get("/me/files/:fileId/raw", guard(async (req, res) => {
+  if (!req.user) throw new HubError(401, "Sign in to open your files.");
+  const actor = await loadActor(req.user.uid, req.user.email || "");
+  const found = await readClientFile(req.params.fileId, { firebaseUids: [actor.uid, ...actor.clientIds], clientIds: actor.clientIds });
+  if (!found) throw new HubError(404, "That file is not in your portal.");
+  res.setHeader("Content-Type", found.file.contentType);
+  res.setHeader("Content-Disposition", `inline; filename="${found.file.name.replace(/"/g, "")}"`);
+  res.send(found.bytes);
+}));
+
 router.post("/me/hub/billing/card", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   if (containsRawCard(req.body)) throw new HubError(400, "Card numbers are not stored. Use the Square card form.");
@@ -201,6 +255,53 @@ router.get("/:id/hub/billing", requireCoordinator, guard(async (req, res) => {
   res.json(await getStaffBilling(clientIdParam(req.params.id)));
 }));
 
+async function staffFileScope(clientId: string) {
+  let data: Record<string, unknown> | null = null;
+  if (!admin.apps.length || process.env.CLIENT_HUB_STORE === "memory") {
+    data = readClientHubMemory("clients", clientId);
+  } else {
+    const snap = await admin.firestore().collection("clients").doc(clientId).get();
+    data = snap.exists ? (snap.data() as Record<string, unknown>) || {} : null;
+  }
+  if (!data) throw new HubError(404, "Client not found.");
+  const uid = typeof data.firebaseUid === "string" && data.firebaseUid ? data.firebaseUid : clientId;
+  const linked = typeof data.linkedClientId === "string" ? data.linkedClientId : "";
+  return {
+    firebaseUids: [...new Set([uid, clientId])],
+    clientIds: [...new Set([clientId, uid, linked].filter(Boolean))],
+    firebaseUid: uid,
+    clientId,
+  };
+}
+
+router.get("/:id/files", coordinatorOrTest, guard(async (req, res) => {
+  const scope = await staffFileScope(clientIdParam(req.params.id));
+  res.json({ files: await listClientFiles(scope) });
+}));
+
+router.post("/:id/files", coordinatorOrTest, guard(async (req, res) => {
+  const scope = await staffFileScope(clientIdParam(req.params.id));
+  const file = await addClientFile({
+    firebaseUid: scope.firebaseUid,
+    clientId: scope.clientId,
+    uploadedByUid: req.user?.uid || "staff",
+    direction: "admin",
+    fileName: req.body?.fileName,
+    contentType: req.body?.contentType,
+    dataUrl: req.body?.dataUrl,
+  });
+  res.status(201).json({ file });
+}));
+
+router.get("/:id/files/:fileId/raw", coordinatorOrTest, guard(async (req, res) => {
+  const scope = await staffFileScope(clientIdParam(req.params.id));
+  const found = await readClientFile(req.params.fileId, scope);
+  if (!found) throw new HubError(404, "That file is not on this client.");
+  res.setHeader("Content-Type", found.file.contentType);
+  res.setHeader("Content-Disposition", `inline; filename="${found.file.name.replace(/"/g, "")}"`);
+  res.send(found.bytes);
+}));
+
 router.post("/:id/hub/billing/card", requireCoordinator, guard(async (req, res) => {
   if (containsRawCard(req.body)) throw new HubError(400, "Card numbers are not stored. Use the Square card form.");
   const clientId = clientIdParam(req.params.id);
@@ -219,7 +320,9 @@ router.post("/:id/hub/billing/card", requireCoordinator, guard(async (req, res) 
 }));
 
 router.use((req, res, next) => {
-  if (req.path.startsWith("/me/hub")) return res.status(404).json({ error: "Settings path not found." });
+  if (req.path.startsWith("/me/hub") || req.path.startsWith("/me/files")) {
+    return res.status(404).json({ error: "Settings path not found." });
+  }
   return next();
 });
 

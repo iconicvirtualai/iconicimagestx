@@ -27,6 +27,13 @@ service firebase.storage {
       allow read, write: if isActiveStaff();
     }
 
+    // Client/staff shared files. The API writes with the Admin SDK.
+    // A client can read only the folder named with their Auth uid.
+    match /client-files/{uid}/{allPaths=**} {
+      allow read: if isActiveStaff() || (request.auth != null && request.auth.uid == uid);
+      allow write: if false;
+    }
+
     // Default deny
     match /{allPaths=**} {
       allow read, write: if false;

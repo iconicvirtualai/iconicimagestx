@@ -89,6 +89,13 @@ export function squareApiBaseUrl(environment: string | undefined): string {
   return environment === "sandbox" ? "https://connect.squareupsandbox.com" : "https://connect.squareup.com";
 }
 
+/** Sandbox application ids start with sandbox-. Those never use the production host. */
+export function squareEnvironment(env: Record<string, string | undefined>): "sandbox" | "production" {
+  const applicationId = (env.SQUARE_APPLICATION_ID || env.VITE_SQUARE_APPLICATION_ID || "").trim();
+  if (env.SQUARE_ENVIRONMENT === "sandbox" || applicationId.startsWith("sandbox-")) return "sandbox";
+  return "production";
+}
+
 export function squareConfigured(env: Record<string, string | undefined>): boolean {
   return Boolean(env.SQUARE_ACCESS_TOKEN && env.SQUARE_LOCATION_ID);
 }
@@ -113,7 +120,7 @@ export function squareWebPaymentsConfig(env: Record<string, string | undefined> 
   return {
     applicationId,
     locationId,
-    environment: env.SQUARE_ENVIRONMENT === "sandbox" ? "sandbox" : "production",
+    environment: squareEnvironment(env),
     missing,
   };
 }

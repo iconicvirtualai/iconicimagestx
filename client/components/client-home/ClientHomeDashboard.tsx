@@ -187,6 +187,7 @@ export function ListingTile({ listing }: { listing: ClientListingCard }) {
         </div>
       </div>
       <div className="p-4">
+        <OrderNumberMark value={listing.orderNumber} />
         <h3 className="font-bold text-sm text-black mb-1 line-clamp-1">{listing.address}</h3>
         <p className="text-xs text-gray-500">
           {listing.imageCount === 0 ? "No photos yet" : `${listing.imageCount} photo${listing.imageCount === 1 ? "" : "s"}`}

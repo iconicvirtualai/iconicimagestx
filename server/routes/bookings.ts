@@ -11,6 +11,7 @@ import { clientOrderReceivedSubject, sendEmail } from "../services/email";
 import { sendSMS, SMS_TEMPLATES } from "../services/sms";
 import { createCalendarBookingEvent } from "../services/calendar";
 import { attachBookingClient, createRequestedAppointment, sendFirebasePasswordEmail } from "../services/bookingClient";
+import { clientLinkStamp } from "../../shared/clientLink";
 import { ensureBookingListingForRequest } from "../services/bookingListing";
 import { assignBookingPhotographerToListing } from "../services/bookingPhotographerAssign";
 import { clientNotifyBlockReason, clientNotifyLive, isNotifyTestAllowlisted } from "../../shared/clientNotify";
@@ -92,6 +93,19 @@ import { createRateLimiter } from "../lib/rateLimit";
 
 const router = Router();
 const db = () => admin.firestore();
+
+/** A portal order belongs to the signed-in profile, not the email typed on the form. */
+async function portalOrderLink(header: string | undefined, source: unknown) {
+  if (source !== "portal" || !header?.startsWith("Bearer ") || !admin.apps.length) return null;
+  try {
+    const decoded = await admin.auth().verifyIdToken(header.slice("Bearer ".length).trim());
+    const staff = await db().collection("staff").doc(decoded.uid).get();
+    if (staff.exists && staff.data()?.isActive !== false) return null;
+    return clientLinkStamp(decoded.uid, decoded.uid);
+  } catch {
+    return null;
+  }
+}
 
 const BOOKING_SUBMIT_WINDOW_MS = 15 * 60 * 1000;
 const BOOKING_SUBMIT_MAX = 10;
@@ -217,6 +231,7 @@ router.post("/", async (req, res) => {
     }
 
     const clientName = `${firstName} ${lastName}`.trim();
+    const portalLink = await portalOrderLink(req.headers.authorization, req.body?.source);
     const locationFields = storedServiceLocationFields(address);
     const savedAddress = locationFields.address;
     if (!savedAddress) {
@@ -489,6 +504,7 @@ router.post("/", async (req, res) => {
       dotOptInToken: createPayToken(),
       status: "new",
       source: req.body.source === "portal" ? "portal" : "booking_form",
+      ...(portalLink ? portalLink : {}),
       ...placedRevenueFields(),
       ...portalBillingStamp(req.body),
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -591,13 +607,15 @@ router.post("/", async (req, res) => {
       skipReason: null,
     };
     try {
-      account = await attachBookingClient({
-        email: normalizedEmail,
-        firstName,
-        lastName,
-        phone,
-        preparePasswordLink: passwordSetupAllowed,
-      });
+      account = portalLink
+        ? { clientId: portalLink.clientId, createdAccount: false, passwordSetupLink: null, skipReason: null }
+        : await attachBookingClient({
+          email: normalizedEmail,
+          firstName,
+          lastName,
+          phone,
+          preparePasswordLink: passwordSetupAllowed,
+        });
     } catch (err) {
       console.error("[Bookings] Account attach failed:", err);
     }
@@ -605,7 +623,9 @@ router.post("/", async (req, res) => {
     if (account.clientId) {
       try {
         await docRef.update({
-          clientId: account.clientId,
+          clientId: portalLink?.clientId || account.clientId,
+          firebaseUid: portalLink?.firebaseUid || account.clientId,
+          clientProfileId: portalLink?.clientProfileId || `client:${account.clientId}`,
           clientEmail: normalizedEmail,
           portalAttached: true,
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),

@@ -6,6 +6,7 @@
  */
 
 import { bookingDateLabel } from "@shared/clientHome";
+import { auth } from "@/lib/firebase";
 import { lifeOfTheListingCareSelected } from "@shared/lifeOfTheListingCare";
 import { dotOptInSelected } from "@shared/doorsOpenTour";
 import { orderAddressFromBooking } from "@shared/serviceLocation";
@@ -70,11 +71,21 @@ export async function createOrder(formData: any) {
                               : undefined,
   };
 
-  console.log("POSTING ORDER TO /api/bookings:", payload);
+  let token = "";
+  if (payload.source === "portal") {
+    try {
+      token = (await auth.currentUser?.getIdToken()) || "";
+    } catch {
+      token = "";
+    }
+  }
 
   const res = await fetch("/api/bookings", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: JSON.stringify(payload),
   });
 
