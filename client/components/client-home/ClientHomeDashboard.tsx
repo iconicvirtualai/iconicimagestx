@@ -28,7 +28,6 @@ import {
 } from "@shared/clientHome";
 import { ListingPackageCard } from "@/components/listing-card/ListingPackageCard";
 import { PortalMessages } from "@/components/communications/PortalMessages";
-import { PeopleInbox } from "@/components/people/PeopleInbox";
 import { OrderNumberMark } from "@/components/OrderNumberMark";
 import { PortalListingsHome } from "@/components/client-home/PortalListingsHome";
 
@@ -75,6 +74,7 @@ export function ClientHomeView({
   error = "",
   example = false,
   messageCount = 0,
+  onMessageCount,
 }: {
   firstName: string;
   accountName?: string;
@@ -92,6 +92,7 @@ export function ClientHomeView({
   error?: string;
   example?: boolean;
   messageCount?: number;
+  onMessageCount?: (count: number) => void;
 }) {
   const orderedListings = useMemo(() => sortNewestFirst(listings), [listings]);
   const calendarAppointments = useMemo(() => mergeListingShoots(appointments, orderedListings), [appointments, orderedListings]);
@@ -139,20 +140,7 @@ export function ClientHomeView({
             <OrderHistory invoices={invoices} truncated={invoicesTruncated} filterable exampleOpen={example} />
           )
         ) : section === "messages" ? (
-          <div id="messages-jump" className="space-y-6">
-            <PortalMessages example={example} />
-            <PeopleInbox
-              tone="light"
-              exampleViewer={example ? {
-                uid: "sample-jane",
-                email: "jane.doe@example.com",
-                kind: "client",
-                role: "client",
-                leadAdmin: false,
-                permissions: null,
-              } : null}
-            />
-          </div>
+          <PortalMessages example={example} onUnreadCount={onMessageCount} />
         ) : (
           <div id="schedule-jump">
             <ScheduleCalendar appointments={calendarAppointments} today={today} truncated={appointmentsTruncated} />
@@ -199,6 +187,7 @@ export function ListingTile({ listing }: { listing: ClientListingCard }) {
         </div>
       </div>
       <div className="p-4">
+        <OrderNumberMark value={listing.orderNumber} />
         <h3 className="font-bold text-sm text-black mb-1 line-clamp-1">{listing.address}</h3>
         <p className="text-xs text-gray-500">
           {listing.imageCount === 0 ? "No photos yet" : `${listing.imageCount} photo${listing.imageCount === 1 ? "" : "s"}`}

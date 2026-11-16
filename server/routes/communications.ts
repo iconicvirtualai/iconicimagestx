@@ -2,11 +2,14 @@ import { Router } from "express";
 import { canUseAssistants } from "../../shared/communications/access";
 import { ownerAllowlist } from "../../shared/ownerAccess";
 import { filterThreads, portalUnreadCount, threadVisibleTo, type PortalScope, type ThreadAudience } from "../../shared/communications/threads";
+import type { FlagPatch } from "../../shared/portalInbox.ts";
 import { resolveClientIdentity } from "../services/clientAccounts";
 import { requireAuth, requireCoordinator, requireStaff, type AuthenticatedRequest } from "../middleware/auth";
 import { assistantStatus, completeAssistant, parseAssistantTurns } from "../services/assistants";
 import { logCommunicationMessage } from "../services/communicationLog";
 import { findUnifiedThread, listUnifiedThreads, threadsForPortal } from "../services/communicationsHub";
+import { listFlags, patchesFromBody, saveFlags } from "../services/portalInboxFlags";
+import { moveInbox, resolveDeskActor, visibleInboxThread } from "../services/peopleDesk";
 import { sendEmail } from "../services/email";
 import { sendSMS } from "../services/sms";
 import admin from "firebase-admin";
@@ -133,6 +136,62 @@ router.post("/mine/reply", requireAuth, async (req: AuthenticatedRequest, res) =
     return res.status(500).json({ error: "Couldn't save the reply." });
   }
 });
+
+router.get("/mine/flags", requireAuth, async (req: AuthenticatedRequest, res) => {
+  try {
+    const who = await resolveDeskActor(req.user?.uid || "", req.user?.email || "");
+    if (!who) return res.status(403).json({ error: "Sign in to see messages." });
+    const flags = await listFlags(who.uid);
+    return res.json({ flags });
+  } catch (error) {
+    console.error("[Communications] Portal flags failed.", error);
+    return res.status(500).json({ error: "Couldn't load your message folders." });
+  }
+});
+
+router.post("/mine/flags", requireAuth, async (req: AuthenticatedRequest, res) => {
+  const patches = patchesFromBody(req.body);
+  if (!patches) return res.status(400).json({ error: "Choose a conversation to update." });
+  try {
+    const who = await resolveDeskActor(req.user?.uid || "", req.user?.email || "");
+    if (!who) return res.status(403).json({ error: "Sign in to update a conversation." });
+    const scope = await portalScope(req);
+    const flagPatches: FlagPatch[] = [];
+    for (const patch of patches) {
+      if (patch.threadKey.startsWith("direct:")) {
+        const id = patch.threadKey.slice("direct:".length);
+        const thread = await visibleInboxThread(who, id);
+        if (!thread) return res.status(404).json({ error: "Conversation not found." });
+        if (patch.folder) {
+          const moved = await moveInbox(who, id, patch.folder);
+          if ("error" in moved && moved.error) return res.status(moved.status).json({ error: moved.error });
+        }
+        if (patch.starred !== undefined || patch.forceUnread !== undefined || patch.readAt !== undefined) {
+          flagPatches.push({
+            threadKey: patch.threadKey,
+            starred: patch.starred,
+            forceUnread: patch.forceUnread,
+            readAt: patch.readAt,
+          });
+        }
+        continue;
+      }
+      const visible = await conversationVisible(scope, patch.threadKey.slice("comm:".length));
+      if (!visible) return res.status(404).json({ error: "Conversation not found." });
+      flagPatches.push(patch);
+    }
+    const flags = flagPatches.length ? await saveFlags(who.uid, flagPatches) : await listFlags(who.uid);
+    return res.json({ flags });
+  } catch (error) {
+    console.error("[Communications] Portal flag save failed.", error);
+    return res.status(500).json({ error: "Couldn't update that conversation." });
+  }
+});
+
+async function conversationVisible(scope: PortalScope, id: string): Promise<boolean> {
+  const thread = await findUnifiedThread(id);
+  return Boolean(thread && threadVisibleTo(thread, scope));
+}
 
 router.post("/reply", requireCoordinator, async (req: AuthenticatedRequest, res) => {
   const threadId = typeof req.body?.threadId === "string" ? req.body.threadId.trim() : "";

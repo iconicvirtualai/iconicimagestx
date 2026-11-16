@@ -2,6 +2,7 @@
 
 import { recordAddressText } from "@shared/addressText";
 import { formatChicagoDate } from "@shared/clientHome";
+import { recordLinkedToClient } from "@shared/clientLink";
 
 export interface ClientSocial {
   instagram?: string;
@@ -31,6 +32,8 @@ export interface ClientRecord {
   totalOrders?: number;
   totalSpend?: number;
   portalAccess?: boolean;
+  firebaseUid?: string | null;
+  linkedClientId?: string | null;
   social?: ClientSocial;
   marketingNotes?: string;
   conciergeStatus?: string;
@@ -60,14 +63,12 @@ export function asTags(value: unknown): string[] {
   return value.map((tag) => String(tag).trim()).filter(Boolean);
 }
 
-/** Match orders, listings, and invoices to a client by id or email only. */
-export function belongsToClient(record: any, client: Pick<ClientRecord, "id" | "email">): boolean {
-  if (!record) return false;
-  if (record.clientId && record.clientId === client.id) return true;
-  const mine = normEmail(client.email);
-  if (!mine) return false;
-  const emails = [record.email, record.clientEmail].map((value) => normEmail(value)).filter(Boolean);
-  return emails.includes(mine);
+/** Match orders, listings, and invoices by profile id or firebaseUid. */
+export function belongsToClient(
+  record: any,
+  client: Pick<ClientRecord, "id" | "email"> & { firebaseUid?: string | null; linkedClientId?: string | null },
+): boolean {
+  return recordLinkedToClient(record, client);
 }
 
 export function money(value: unknown): number | null {

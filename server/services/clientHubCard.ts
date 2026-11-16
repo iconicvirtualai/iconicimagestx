@@ -4,7 +4,7 @@
 
 import { randomUUID } from "node:crypto";
 import { cardOnFileFromSquare, sanitizeBilling, type BillingProfile, type CardOnFile } from "../../shared/clientHubSettings";
-import { squareApiBaseUrl, squareConfigured } from "../../shared/squareInvoice";
+import { squareApiBaseUrl, squareConfigured, squareEnvironment } from "../../shared/squareInvoice";
 
 type FetchImpl = (
   input: string,
@@ -34,7 +34,7 @@ export async function saveSquareCardOnFile(
   const sourceId = input.sourceId.trim();
   if (!sourceId || sourceId.length > 200) return { error: "Square did not return a card token." };
 
-  const base = squareApiBaseUrl(env.SQUARE_ENVIRONMENT);
+  const base = squareApiBaseUrl(squareEnvironment(env));
   const headers = {
     "Content-Type": "application/json",
     "Square-Version": env.SQUARE_VERSION || "2026-08-20",

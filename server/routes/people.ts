@@ -13,6 +13,7 @@ import {
   groupsFor,
   inboxFor,
   moveInbox,
+  replyInbox,
   permissionRoster,
   profileFor,
   resolveDeskActor,
@@ -114,6 +115,15 @@ router.post("/inbox/send", requireAuth, async (req: AuthenticatedRequest, res) =
   const who = await actor(req);
   if (!who) return res.status(403).json({ error: "Sign in to send a message." });
   const result = await sendInbox(who, req.body || {});
+  if ("error" in result && result.error) return res.status(result.status).json({ error: result.error });
+  return res.status(201).json(result);
+});
+
+router.post("/inbox/:id/reply", requireAuth, async (req: AuthenticatedRequest, res) => {
+  const who = await actor(req);
+  if (!who) return res.status(403).json({ error: "Sign in to reply." });
+  const body = typeof req.body?.body === "string" ? req.body.body : "";
+  const result = await replyInbox(who, req.params.id, body);
   if ("error" in result && result.error) return res.status(result.status).json({ error: result.error });
   return res.status(201).json(result);
 });

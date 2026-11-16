@@ -9,12 +9,14 @@ import admin from "firebase-admin";
 import { requireCoordinator, requireStaff, requireAuth, type AuthenticatedRequest } from "../middleware/auth";
 import { cleanPersonName, normalizeEmail } from "../../shared/listingAccess";
 import { visibleToPortalClient } from "../../shared/listingWrite";
+import { profileId } from "../../shared/peopleProfiles";
 import {
   addressText,
   buildClientAppointment,
   mergeListingShoots,
   buildClientInvoice,
   buildClientListing,
+  clientListingPath,
   sortNewestFirst,
 } from "../../shared/clientHome";
 import { resolveClientIdentity, upsertPortalClient } from "../services/clientAccounts";
@@ -174,37 +176,59 @@ router.get("/me/home", requireAuth, async (req: AuthenticatedRequest, res) => {
     };
     const pushInvoice = (entry: FirebaseFirestore.QueryDocumentSnapshot) => {
       if (seenInvoice.has(entry.id)) return;
+      const data = entry.data();
+      if (!visibleToPortalClient(
+        { clientId: data.clientId, firebaseUid: data.firebaseUid, clientProfileId: data.clientProfileId, email: data.email, clientEmail: data.clientEmail },
+        identity,
+      )) return;
       seenInvoice.add(entry.id);
-      invoiceDocs.push({ id: entry.id, data: asRecord(jsonSafe(entry.data())) });
+      invoiceDocs.push({ id: entry.id, data: asRecord(jsonSafe(data)) });
     };
     const pushListing = (entry: FirebaseFirestore.QueryDocumentSnapshot) => {
       if (seenProject.has(entry.id)) return;
+      const data = entry.data();
+      if (!visibleToPortalClient(
+        { clientId: data.clientId, firebaseUid: data.firebaseUid, clientProfileId: data.clientProfileId, email: data.email, clientEmail: data.clientEmail },
+        identity,
+      )) return;
       seenProject.add(entry.id);
-      projects.push(buildClientListing(entry.id, asRecord(jsonSafe(entry.data()))));
+      projects.push(buildClientListing(entry.id, asRecord(jsonSafe(data))));
     };
 
     for (const clientId of identity.ids) {
-      const [gallerySnap, invoiceSnap, projectSnap] = await Promise.all([
+      const profileKey = profileId("client", clientId);
+      const [gallerySnap, invoiceSnap, projectSnap, galleryByUid, invoiceByUid, projectByUid, galleryByProfile, invoiceByProfile, projectByProfile] = await Promise.all([
         db().collection("galleries").where("clientId", "==", clientId).limit(HOME_LIMIT).get(),
         db().collection("invoices").where("clientId", "==", clientId).limit(HOME_LIMIT).get(),
         db().collection("listings").where("clientId", "==", clientId).limit(HOME_LIMIT).get(),
+        db().collection("galleries").where("firebaseUid", "==", clientId).limit(HOME_LIMIT).get(),
+        db().collection("invoices").where("firebaseUid", "==", clientId).limit(HOME_LIMIT).get(),
+        db().collection("listings").where("firebaseUid", "==", clientId).limit(HOME_LIMIT).get(),
+        db().collection("galleries").where("clientProfileId", "==", profileKey).limit(HOME_LIMIT).get(),
+        db().collection("invoices").where("clientProfileId", "==", profileKey).limit(HOME_LIMIT).get(),
+        db().collection("listings").where("clientProfileId", "==", profileKey).limit(HOME_LIMIT).get(),
       ]);
-      for (const doc of gallerySnap.docs) {
+      for (const doc of [...gallerySnap.docs, ...galleryByUid.docs, ...galleryByProfile.docs]) {
         if (seenGallery.has(doc.id)) continue;
-        seenGallery.add(doc.id);
         const data = doc.data();
+        if (!visibleToPortalClient(
+          { clientId: data.clientId, firebaseUid: data.firebaseUid, clientProfileId: data.clientProfileId, email: data.email, clientEmail: data.clientEmail },
+          identity,
+        )) continue;
+        seenGallery.add(doc.id);
+        const listingId = typeof data.listingId === "string" ? data.listingId : "";
         galleries.push({
           id: doc.id,
           title: data.title || addressText(data.address) || "Gallery",
           address: addressText(data.address),
           status: data.status || "pending_upload",
-          href: `/gallery/${doc.id}`,
+          href: listingId ? clientListingPath(listingId) : `/gallery/${doc.id}`,
         });
       }
-      if (invoiceSnap.size >= HOME_LIMIT) invoicesTruncated = true;
-      invoiceSnap.docs.forEach(pushInvoice);
-      if (projectSnap.size >= HOME_LIMIT) listingsTruncated = true;
-      projectSnap.docs.forEach(pushListing);
+      if (invoiceSnap.size >= HOME_LIMIT || invoiceByUid.size >= HOME_LIMIT || invoiceByProfile.size >= HOME_LIMIT) invoicesTruncated = true;
+      [...invoiceSnap.docs, ...invoiceByUid.docs, ...invoiceByProfile.docs].forEach(pushInvoice);
+      if (projectSnap.size >= HOME_LIMIT || projectByUid.size >= HOME_LIMIT || projectByProfile.size >= HOME_LIMIT) listingsTruncated = true;
+      [...projectSnap.docs, ...projectByUid.docs, ...projectByProfile.docs].forEach(pushListing);
 
       try {
         const appointmentSnap = await db().collection("appointments").where("clientId", "==", clientId).limit(HOME_LIMIT).get();
@@ -222,7 +246,7 @@ router.get("/me/home", requireAuth, async (req: AuthenticatedRequest, res) => {
       if (seenOrder.has(entry.id)) return;
       const data = entry.data();
       if (!visibleToPortalClient(
-        { clientId: data.clientId, email: data.email, clientEmail: data.clientEmail },
+        { clientId: data.clientId, firebaseUid: data.firebaseUid, clientProfileId: data.clientProfileId, email: data.email, clientEmail: data.clientEmail },
         { ids: identity.ids, email: identity.email },
       )) return;
       seenOrder.add(entry.id);
@@ -233,14 +257,19 @@ router.get("/me/home", requireAuth, async (req: AuthenticatedRequest, res) => {
         id: entry.id,
         address: addressText(data.address || data.shootLocation) || "Order",
         status: data.status || "new",
-        href: listingId ? `/studio/${listingId}` : "",
+        href: listingId ? clientListingPath(listingId) : "/portal/home?section=orders",
         orderNumber: stored.orderNumber ?? null,
       });
     };
     try {
       for (const clientId of identity.ids) {
-        const snap = await db().collection("orderRequests").where("clientId", "==", clientId).limit(HOME_LIMIT).get();
-        snap.docs.forEach(pushOrder);
+        const profileKey = profileId("client", clientId);
+        const [byId, byUid, byProfile] = await Promise.all([
+          db().collection("orderRequests").where("clientId", "==", clientId).limit(HOME_LIMIT).get(),
+          db().collection("orderRequests").where("firebaseUid", "==", clientId).limit(HOME_LIMIT).get(),
+          db().collection("orderRequests").where("clientProfileId", "==", profileKey).limit(HOME_LIMIT).get(),
+        ]);
+        [...byId.docs, ...byUid.docs, ...byProfile.docs].forEach(pushOrder);
       }
       if (identity.email) {
         const [byEmail, byClientEmail] = await Promise.all([

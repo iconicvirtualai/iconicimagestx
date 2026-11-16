@@ -17,11 +17,14 @@ import {
   hubImageUrl,
   normalizePermissions,
   pickCanonicalClientId,
+  preferencesFromClient,
   profileDisplayName,
   profileFromClient,
   sanitizeBilling,
   sanitizeContact,
+  sanitizePreferences,
   sanitizeProfilePatch,
+  type ClientPreferences,
   shareContactsFromListing,
   teamInviteDelivery,
   type AgentContactRecord,
@@ -233,6 +236,8 @@ async function clientDocsForLogin(uid: string, email: string): Promise<Array<{ i
   const linkedId = typeof direct?.linkedClientId === "string" ? direct.linkedClientId : "";
   if (redirectId) ids.add(redirectId);
   if (linkedId) ids.add(linkedId);
+  const byUid = await queryEqual("clients", "firebaseUid", uid);
+  byUid.slice(0, 10).forEach((row) => ids.add(row.id));
   const normalized = hubEmail(email || direct?.email);
   if (normalized) {
     const matches = await queryEqual("clients", "email", normalized);
@@ -337,36 +342,44 @@ function accessFor(actor: HubActor) {
 }
 
 export async function getProfile(actor: HubActor) {
-  return { profile: actor.profile, access: accessFor(actor) };
+  return { profile: actor.profile, access: accessFor(actor), preferences: preferencesFromClient(actor.client) };
 }
 
 export async function saveProfile(actor: HubActor, input: unknown) {
   if (containsRawCard(input)) throw new HubError(400, "Card numbers are not stored on the profile.");
   const profile = sanitizeProfilePatch(input, actor.email || actor.profile.email);
   if (!profile.firstName) throw new HubError(400, "First name is required.");
-  await writeProfileToMatches(actor, profile);
-  return { profile };
+  const posted = input && typeof input === "object" ? (input as { preferences?: unknown }).preferences : undefined;
+  const preferences = sanitizePreferences(posted) || preferencesFromClient(actor.client);
+  await writeProfileToMatches(actor, profile, preferences);
+  return { profile, preferences };
 }
 
-async function writeProfileToMatches(actor: HubActor, profile: ClientHubProfile) {
+async function writeProfileToMatches(actor: HubActor, profile: ClientHubProfile, preferences?: ClientPreferences) {
   const email = actor.email || actor.profile.email || profile.email;
   for (const id of actor.clientIds) {
-    const canonical = id === actor.clientId;
+    const existing = await readDoc("clients", id);
+    const currentSettings = asRecord(existing?.profileSettings);
+    const currentNotes = asRecord(currentSettings.notifications);
     await writeDoc("clients", id, {
-      ...(canonical ? {
-        firebaseUid: actor.uid,
-        firstName: profile.firstName,
-        lastName: profile.lastName,
-        phone: profile.phone,
-        email,
-        company: profile.brokerage,
-        portalAccess: true,
-        status: actor.client.status || "active",
-      } : {
-        firebaseUid: actor.uid,
-        linkedClientId: actor.clientId,
-      }),
+      firebaseUid: actor.uid,
+      firstName: profile.firstName,
+      lastName: profile.lastName,
+      phone: profile.phone,
+      email,
+      company: profile.brokerage,
+      portalAccess: true,
+      status: existing?.status || actor.client.status || "active",
+      ...(id !== actor.clientId ? { linkedClientId: actor.clientId } : {}),
       hubProfile: profile,
+      profileSettings: {
+        ...currentSettings,
+        ...(profile.headshotUrl ? { photoUrl: profile.headshotUrl } : {}),
+        displayName: profileDisplayName(profile) || String(currentSettings.displayName || ""),
+        notifications: preferences
+          ? { email: preferences.email, sms: preferences.sms, push: preferences.push }
+          : currentNotes,
+      },
       updatedAt: nowStamp(),
     });
     await stampOwnedListings(id, profile);

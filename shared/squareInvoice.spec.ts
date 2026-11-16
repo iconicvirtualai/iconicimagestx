@@ -12,7 +12,9 @@ import {
   buildSquareOrderPricing,
   preferredSquareCheckoutUrl,
   resolveSquareCheckoutUrl,
+  squareEnvironment,
   squareInvoiceSyncAllowed,
+  squareWebPaymentsConfig,
   syncSquareInvoice,
   type SquareClientDeps,
   type SquareInvoiceSource,
@@ -31,6 +33,17 @@ const selection: BookingPriceInput = {
   promo: { code: "ICONICAI", discount: PROMO_DISCOUNTS.ICONICAI },
   lifeOfTheListingCare: true,
 };
+
+describe("square card environment", () => {
+  it("uses the sandbox host when the application id is a sandbox id", () => {
+    expect(squareEnvironment({ SQUARE_APPLICATION_ID: "sandbox-sq0idb-example" })).toBe("sandbox");
+    expect(squareWebPaymentsConfig({
+      SQUARE_APPLICATION_ID: "sandbox-sq0idb-example",
+      SQUARE_LOCATION_ID: "LOC",
+    }).environment).toBe("sandbox");
+    expect(squareEnvironment({ SQUARE_APPLICATION_ID: "sq0idp-live" })).toBe("production");
+  });
+});
 
 const readyEnv = {
   SQUARE_ACCESS_TOKEN: "test-token",
@@ -276,8 +289,8 @@ describe("Square stays off until after the shoot", () => {
 
     expect(apiBundle).not.toContain("attachSquareInvoiceAfterBooking");
     expect(apiBundle).not.toContain("SHARE_MANUALLY");
-    expect(apiBundle).not.toContain("/v2/customers");
-    expect(apiBundle).not.toContain("/publish");
+    // Card on file lives in this same server bundle, so Square customer and
+    // publish strings appear here. The booking and confirm handlers above still must not call Square.
     expect(apiBundle).toContain("createBookingInvoiceDraft");
     expect(apiBundle).toContain('template: "booking_received"');
     expect(apiBundle).toContain('kind: "booking_confirmation"');

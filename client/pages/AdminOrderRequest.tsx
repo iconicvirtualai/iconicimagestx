@@ -22,6 +22,7 @@ import {
   orderScheduleTime,
 } from "@shared/listingWrite";
 import { formatChicagoDate } from "@shared/clientHome";
+import { OrderNumberMark } from "@/components/OrderNumberMark";
 import { recordAddressText } from "@shared/addressText";
 import { photographerPreferenceForNames } from "@shared/suggestedAppointments";
 import {
@@ -605,7 +606,7 @@ export default function AdminOrderRequest() {
                 <button onClick={() => navigate(`/admin/listing/${order.listingId}`)} className="px-3 py-1 rounded-full bg-[#0d9488]/10 text-[#0d9488] text-[9px] font-black uppercase tracking-widest hover:bg-[#0d9488]/20">View Project →</button>
               )}
             </div>
-            <span className="text-[10px] font-mono text-gray-400">{order.orderNumber || `#${(order.id || "").substring(0, 8)}`}</span>
+            <OrderNumberMark value={order.orderNumber} />
           </div>
 
           {/* ── CLIENT INFORMATION ── */}

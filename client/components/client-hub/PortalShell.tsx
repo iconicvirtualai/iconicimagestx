@@ -5,7 +5,7 @@ import { PortalFooter } from "@/components/portal/PortalFooter";
 import "@/styles/portal-v2.css";
 
 export type PortalHomeSection = "listings" | "schedule" | "messages" | "orders";
-export type PortalSettingsSection = "profile" | "team" | "clients" | "billing";
+export type PortalSettingsSection = "profile" | "team" | "clients" | "billing" | "files";
 export type PortalNavId = PortalHomeSection | PortalSettingsSection | "order";
 
 const HOME: { id: Exclude<PortalHomeSection, "orders">; label: string }[] = [
@@ -19,6 +19,7 @@ const SETTINGS: { id: PortalSettingsSection; label: string }[] = [
   { id: "team", label: "Team" },
   { id: "clients", label: "Clients" },
   { id: "billing", label: "Billing" },
+  { id: "files", label: "Files" },
 ];
 
 export function portalHref(path: string, example: boolean, section?: string): string {
@@ -64,7 +65,7 @@ function HubNav({
     const inner = (
       <>
         {label}
-        {count != null && count > 0 ? <span className="count">{count}</span> : null}
+        {count != null && count > 0 ? <span className={id === "messages" ? "count unread" : "count"}>{count}</span> : null}
       </>
     );
     if (onSection && id !== "orders") {

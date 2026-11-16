@@ -148,6 +148,30 @@ describe("people desk", () => {
     expect(drafts.data.threads.some((thread: { subject: string }) => thread.subject === "Schedule")).toBe(true);
   });
 
+  it("replies inside the app and does not add a lead admin to the group", async () => {
+    setPeopleActorForTests(riley);
+    const reply = await api("/api/people/inbox/preview-thread-admin/reply", {
+      method: "POST",
+      body: JSON.stringify({ body: "I can confirm it." }),
+    });
+    expect(reply.response.status).toBe(201);
+    expect(reply.data.external).toBe(false);
+    expect(reply.data.delivery).toBe("in-app");
+    expect(reply.data.thread.notifyUids.sort()).toEqual(["sample-cadi", "sample-cora", "sample-jane"]);
+    expect(reply.data.thread.participantUids).not.toContain("temp-admin-uid");
+    expect(reply.data.thread.messages.map((note: { body: string }) => note.body)).toContain("I can confirm it.");
+    expect(sendEmailMock).not.toHaveBeenCalled();
+    expect(sendSMSMock).not.toHaveBeenCalled();
+
+    setPeopleActorForTests(null);
+    const outsider = await api("/api/people/inbox/preview-thread-video/reply", {
+      method: "POST",
+      body: JSON.stringify({ body: "I am only reading this." }),
+    });
+    expect(outsider.response.status).toBe(404);
+    expect(sendSMSMock).not.toHaveBeenCalled();
+  });
+
   it("blocks a staff login whose messages permission is off", async () => {
     const locked: DeskActor = {
       uid: "sample-mike",

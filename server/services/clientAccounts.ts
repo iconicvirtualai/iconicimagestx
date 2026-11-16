@@ -68,6 +68,12 @@ export async function resolveClientIdentity(uid: string, email?: string) {
   const linkedId = typeof profile?.linkedClientId === "string" ? profile.linkedClientId : "";
   if (linkedId) ids.add(linkedId);
 
+  const byUid = await db().collection("clients").where("firebaseUid", "==", uid).limit(10).get();
+  for (const doc of byUid.docs) {
+    ids.add(doc.id);
+    if (!profile) profile = { id: doc.id, ...doc.data() };
+  }
+
   const normalized = normalizeEmail(email || (profile as { email?: string } | null)?.email);
   if (normalized) {
     const matches = await db().collection("clients").where("email", "==", normalized).limit(10).get();

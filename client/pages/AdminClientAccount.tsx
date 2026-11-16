@@ -7,7 +7,11 @@ import {
   Camera, Share2, Contact, Megaphone, Sparkles, Presentation, ExternalLink, Save,
 } from "lucide-react";
 import { db } from "@/lib/firebase";
-import { collection, doc, onSnapshot, updateDoc, serverTimestamp } from "firebase/firestore";
+import { collection, doc, onSnapshot, query, updateDoc, serverTimestamp, where } from "firebase/firestore";
+import { clientProfileIdsFor, linkIdsFor } from "@shared/clientLink";
+import { OrderNumberMark } from "@/components/OrderNumberMark";
+import { ClientFilesPanel } from "@/components/portal/ClientFilesPanel";
+import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import {
   asTags, belongsToClient, clientName, formatMoney, formatWhen, money, recordAddress,
@@ -28,6 +32,7 @@ const SECTIONS = [
   { id: "invoices", label: "Past invoices", icon: FileText },
   { id: "tax", label: "Tax", icon: Receipt },
   { id: "orders", label: "Order history", icon: ClipboardList },
+  { id: "files", label: "Files", icon: FileText },
   { id: "media", label: "Media & branding", icon: ImageIcon },
   { id: "studio", label: "Studio", icon: Camera },
   { id: "social", label: "Social media", icon: Share2 },
@@ -42,6 +47,7 @@ type SectionId = (typeof SECTIONS)[number]["id"];
 export default function AdminClientAccount() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [client, setClient] = React.useState<ClientRecord | null>(null);
   const [missing, setMissing] = React.useState(false);
   const [listings, setListings] = React.useState<any[]>([]);
@@ -69,20 +75,49 @@ export default function AdminClientAccount() {
     return () => unsub();
   }, [id]);
 
+  const linkKey = client ? [...linkIdsFor(client), ...clientProfileIdsFor(client)].join("|") : "";
   React.useEffect(() => {
-    const unsubs = [
-      onSnapshot(collection(db, "listings"), (snap) => {
-        setListings(snap.docs.map((entry) => ({ id: entry.id, ...entry.data() })));
-      }, () => setListings([])),
-      onSnapshot(collection(db, "orderRequests"), (snap) => {
-        setOrders(snap.docs.map((entry) => ({ id: entry.id, ...entry.data() })));
-      }, () => setOrders([])),
-      onSnapshot(collection(db, "invoices"), (snap) => {
-        setInvoices(snap.docs.map((entry) => ({ id: entry.id, ...entry.data() })));
-      }, () => setInvoices([])),
-    ];
+    if (!client) return;
+    const ids = linkIdsFor(client).slice(0, 8);
+    const profiles = clientProfileIdsFor(client).slice(0, 8);
+    const parts = new Map<string, Map<string, Record<string, unknown>>>();
+    const unsubs: Array<() => void> = [];
+    const publish = (bucket: "listings" | "orders" | "invoices") => {
+      const merged = new Map<string, Record<string, unknown>>();
+      for (const [key, rows] of parts) {
+        if (!key.startsWith(`${bucket}:`)) continue;
+        for (const [rowId, row] of rows) merged.set(rowId, row);
+      }
+      const list = [...merged.values()];
+      if (bucket === "listings") setListings(list);
+      if (bucket === "orders") setOrders(list);
+      if (bucket === "invoices") setInvoices(list);
+    };
+    const watch = (bucket: "listings" | "orders" | "invoices", collectionName: string, field: string, value: string) => {
+      const key = `${bucket}:${field}:${value}`;
+      unsubs.push(onSnapshot(query(collection(db, collectionName), where(field, "==", value)), (snap) => {
+        parts.set(key, new Map(snap.docs.map((entry) => [entry.id, { id: entry.id, ...entry.data() }])));
+        publish(bucket);
+      }, () => {
+        parts.set(key, new Map());
+        publish(bucket);
+      }));
+    };
+    for (const value of ids) {
+      watch("listings", "listings", "clientId", value);
+      watch("listings", "listings", "firebaseUid", value);
+      watch("orders", "orderRequests", "clientId", value);
+      watch("orders", "orderRequests", "firebaseUid", value);
+      watch("invoices", "invoices", "clientId", value);
+      watch("invoices", "invoices", "firebaseUid", value);
+    }
+    for (const value of profiles) {
+      watch("listings", "listings", "clientProfileId", value);
+      watch("orders", "orderRequests", "clientProfileId", value);
+      watch("invoices", "invoices", "clientProfileId", value);
+    }
     return () => unsubs.forEach((unsub) => unsub());
-  }, []);
+  }, [linkKey]);
 
   const save = async (patch: Record<string, unknown>, message = "Saved.") => {
     if (!id) return;
@@ -183,11 +218,11 @@ export default function AdminClientAccount() {
                   if (total === null) return null;
                   const paid = money(order.invoice?.amountPaid);
                   return (
-                    <Row key={order.id} title={recordAddress(order)} meta={`${formatWhen(order.createdAt)} · ${order.invoice?.status || order.status || "order"}`} value={formatMoney(total)} extra={paid === null ? undefined : `Paid ${formatMoney(paid)}`} href={`/admin/order-request/${order.id}`} />
+                    <Row key={order.id} title={recordAddress(order)} orderNumber={order.orderNumber} meta={`${formatWhen(order.createdAt)} · ${order.invoice?.status || order.status || "order"}`} value={formatMoney(total)} extra={paid === null ? undefined : `Paid ${formatMoney(paid)}`} href={`/admin/order-request/${order.id}`} />
                   );
                 })}
                 {projects.filter((project) => money(project.total) !== null).map((project) => (
-                  <Row key={project.id} title={recordAddress(project)} meta={project.invoiceStatus || project.status || "project"} value={formatMoney(project.total)} href={`/admin/listing/${project.id}`} />
+                  <Row key={project.id} title={recordAddress(project)} orderNumber={project.orderNumber} meta={project.invoiceStatus || project.status || "project"} value={formatMoney(project.total)} href={`/admin/listing/${project.id}`} />
                 ))}
               </div>
             )}
@@ -245,6 +280,17 @@ export default function AdminClientAccount() {
           </Section>
         )}
 
+        {section === "files" && user && id ? (
+          <Section title="Shared files" hint="Files you upload here show in this client's portal. Files they upload show here.">
+            <ClientFilesPanel
+              listUrl={`/api/clients/${id}/files`}
+              uploadUrl={`/api/clients/${id}/files`}
+              rawUrl={(fileId) => `/api/clients/${id}/files/${fileId}/raw`}
+              getToken={() => user.getIdToken()}
+            />
+          </Section>
+        ) : null}
+
         {section === "orders" && (
           <Section title="Order history">
             {history.length === 0 ? <Empty text="No orders match this client's email or id." /> : (
@@ -253,6 +299,7 @@ export default function AdminClientAccount() {
                   <Row
                     key={order.id}
                     title={recordAddress(order)}
+                    orderNumber={order.orderNumber}
                     meta={`${formatWhen(order.createdAt || order.submittedAt)} · ${order.status || "new"}`}
                     value={money(order.total) === null && money(order.pricing?.total) === null ? undefined : formatMoney(order.total ?? order.pricing?.total)}
                     href={`/admin/order-request/${order.id}`}
@@ -359,10 +406,11 @@ function Empty({ text }: { text: string }) {
   return <p className="rounded-2xl bg-gray-50 px-4 py-8 text-center text-xs font-black uppercase tracking-widest text-gray-400">{text}</p>;
 }
 
-function Row({ title, meta, value, extra, href, external }: { title: string; meta?: string; value?: string; extra?: string; href?: string; external?: boolean }) {
+function Row({ title, meta, value, extra, href, external, orderNumber }: { title: string; meta?: string; value?: string; extra?: string; href?: string; external?: boolean; orderNumber?: unknown }) {
   const body = (
     <div className="flex items-center justify-between gap-4 rounded-xl bg-gray-50 px-4 py-3">
       <div className="min-w-0">
+        <OrderNumberMark value={orderNumber} />
         <p className="truncate text-sm font-black text-black">{title}</p>
         {meta && <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">{meta}</p>}
         {extra && <p className="whitespace-nowrap text-xs font-bold text-gray-500">{extra}</p>}

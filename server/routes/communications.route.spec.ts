@@ -13,6 +13,7 @@ import { createServer } from "../index";
 import { sendEmail } from "../services/email";
 import { sendSMS } from "../services/sms";
 import { logCommunicationMessage, resetRememberedCommunications } from "../services/communicationLog";
+import { resetPortalFlagsForTests } from "../services/portalInboxFlags";
 import { GROK_API_URL, GROK_MISSING_MESSAGE, OPENAI_API_URL, setAssistantFetchForTests } from "../services/assistants";
 
 const sendEmailMock = vi.mocked(sendEmail);
@@ -58,6 +59,7 @@ afterAll(async () => {
 
 beforeEach(() => {
   resetRememberedCommunications();
+  resetPortalFlagsForTests();
   sendEmailMock.mockReset();
   sendSMSMock.mockReset();
   delete process.env.CLIENT_NOTIFY_LIVE;
@@ -249,5 +251,41 @@ describe("communications hub", () => {
     expect(rules).toContain("resource.data.photographerId == request.auth.uid");
     expect(rules).toContain("request.auth.uid in resource.data.participantIds");
     expect(rules).toContain("match /contactThreads/{threadId}");
+  });
+
+  it("stores archive and star flags for this login only", async () => {
+    await logCommunicationMessage({
+      threadId: "order:order-flag",
+      photographerId: "temp-admin-uid",
+      participantIds: ["temp-admin-uid"],
+      senderId: "client-a",
+      senderType: "client",
+      senderName: "Ada",
+      content: "Please archive this on my side only.",
+      channel: "in-app",
+      direction: "inbound",
+      delivery: "logged",
+    });
+    const hidden = await api("/api/communications/mine/flags", {
+      method: "POST",
+      body: JSON.stringify({ threadKey: "comm:order:someone-else", folder: "trash", starred: true }),
+    });
+    expect(hidden.response.status).toBe(404);
+
+    const saved = await api("/api/communications/mine/flags", {
+      method: "POST",
+      body: JSON.stringify({
+        updates: [{ threadKey: "comm:order:order-flag", folder: "archived", starred: true, forceUnread: true }],
+      }),
+    });
+    expect(saved.response.status).toBe(200);
+    expect(saved.data.flags).toEqual([
+      expect.objectContaining({ threadKey: "comm:order:order-flag", folder: "archived", starred: true, forceUnread: true }),
+    ]);
+    const mine = await api("/api/communications/mine/flags");
+    expect(mine.data.flags.map((flag: { threadKey: string }) => flag.threadKey)).toEqual(["comm:order:order-flag"]);
+    expect(JSON.stringify(saved.data)).not.toContain("CLIENT_NOTIFY_LIVE");
+    expect(sendEmailMock).not.toHaveBeenCalled();
+    expect(sendSMSMock).not.toHaveBeenCalled();
   });
 });

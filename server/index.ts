@@ -87,6 +87,11 @@ if (!admin.apps.length) {
       storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET ||
                      process.env.FIREBASE_STORAGE_BUCKET,
     });
+  } else if (process.env.FIRESTORE_EMULATOR_HOST) {
+    admin.initializeApp({
+      projectId: process.env.GCLOUD_PROJECT || process.env.FIREBASE_PROJECT_ID || "iconic-images-aicon",
+      storageBucket: process.env.FIREBASE_STORAGE_BUCKET || process.env.VITE_FIREBASE_STORAGE_BUCKET || "iconic-images-aicon.firebasestorage.app",
+    });
   } else {
     console.warn(
       "[Server] WARNING: No Firebase service account configured. " +
