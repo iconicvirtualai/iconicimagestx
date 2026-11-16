@@ -5,6 +5,7 @@
  * Does not send email or texts. Does not touch the Holy Grail sheet.
  */
 
+import { randomBytes } from "node:crypto";
 import admin from "firebase-admin";
 import { isActiveStaffRecord } from "../../shared/staffAccess.ts";
 import {
@@ -12,6 +13,7 @@ import {
   applyFolder,
   buildDraft,
   buildOutbound,
+  profileId,
   cardSummaryFrom,
   directoryHit,
   isStaffRole,
@@ -467,6 +469,56 @@ function sameSet(left: string[], right: string[]): boolean {
   const a = [...new Set(left)].sort().join("|");
   const b = [...new Set(right)].sort().join("|");
   return a === b;
+}
+
+export async function visibleInboxThread(actor: DeskActor, id: string): Promise<InboxThread | null> {
+  const thread = (await loadThreads()).find((item) => item.id === id);
+  if (!thread) return null;
+  const canSee = thread.ownerUid === actor.uid
+    || thread.participantUids.includes(actor.uid)
+    || (actor.leadAdmin && thread.kind === "group" && thread.status === "sent");
+  return canSee ? thread : null;
+}
+
+/**
+ * Append an in-app note. Group membership and notifyUids stay as they are.
+ * A lead admin who is only reading the thread is not added and is not notified.
+ */
+export async function replyInbox(actor: DeskActor, id: string, body: string) {
+  const blocked = deny(actor, "messages.compose");
+  if (blocked) return { error: blocked, status: 403 as const };
+  const text = body.trim();
+  if (!text) return { error: "Write a reply first.", status: 400 as const };
+  if (text.length > 2000) return { error: "Reply is too long. Please keep it under 2,000 characters.", status: 400 as const };
+  const thread = await visibleInboxThread(actor, id);
+  if (!thread || thread.status !== "sent" || !thread.participantUids.includes(actor.uid)) {
+    return { error: "Message not found.", status: 404 as const };
+  }
+  const profiles = await loadProfiles();
+  const sender = profiles.find((profile) => profile.uid === actor.uid) || null;
+  const now = new Date().toISOString();
+  const note = {
+    id: `note-${randomBytes(4).toString("hex")}`,
+    senderUid: actor.uid,
+    senderProfileId: sender?.id || profileId(actor.kind === "client" ? "client" : "staff", actor.uid),
+    senderName: sender?.displayName || actor.email || "Iconic",
+    body: text,
+    at: now,
+  };
+  const next: InboxThread = {
+    ...thread,
+    body: text,
+    messages: [...thread.messages, note],
+    notifyUids: thread.notifyUids,
+    participantUids: thread.participantUids,
+    updatedAt: now,
+  };
+  await persistThread(next);
+  return {
+    thread: { ...next, notified: next.notifyUids.includes(actor.uid) },
+    delivery: "in-app" as const,
+    external: false as const,
+  };
 }
 
 export async function moveInbox(actor: DeskActor, id: string, folder: "inbox" | "archived" | "trash" | "purge") {

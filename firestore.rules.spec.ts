@@ -60,6 +60,9 @@ describe("communications firestore rules", () => {
   it("keeps group delivery on the member list and lets a lead admin read", () => {
     expect(rules).toContain("match /peopleGroups/{groupId}");
     expect(rules).toContain("match /inboxThreads/{threadId}");
+    expect(rules).toContain("match /portalInboxFlags/{uid}");
+    expect(rules).toMatch(/match \/portalInboxFlags\/\{uid\}[\s\S]*allow read: if isAuthenticated\(\) && request\.auth\.uid == uid/);
+    expect(rules).toMatch(/match \/portalInboxFlags\/\{uid\}[\s\S]*allow delete: if false/);
     expect(rules).toContain("request.auth.uid in group.canMessageUids");
     expect(rules).toContain("group.memberUids.hasAll(request.resource.data.notifyUids)");
     expect(rules).toContain("request.resource.data.notifyUids.hasAll(group.memberUids)");
