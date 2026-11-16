@@ -11,6 +11,7 @@ import { db } from "@/lib/firebase";
 import AdminLayout from "@/components/AdminLayout";
 import {
   CheckCircle2,
+  ChevronLeft,
   CircleDashed,
   ExternalLink,
   Inbox,
@@ -36,6 +37,9 @@ import { CommunicationsTabBar, type CommunicationsTabId } from "@/components/com
 import { PeopleInbox } from "@/components/people/PeopleInbox";
 import { useAdminUnread } from "@/components/admin/AdminUnreadProvider";
 import { communicationTabUnreadKey } from "@shared/adminUnread";
+import { contactThreadIdFromSearch } from "@shared/contactThread";
+import { shortOrderNumber } from "@shared/orderProjectInvoice";
+import { OrderNumberMark } from "@/components/OrderNumberMark";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -61,6 +65,7 @@ interface Conversation {
   clientPhone: string;
   status: "active" | "closed";
   createdAt: { seconds: number } | null;
+  orderNumber?: string;
 }
 
 interface OrderThread {
@@ -147,6 +152,7 @@ export default function AdminMessages() {
   const unread = useAdminUnread();
   const location = useLocation();
   const [tab, setTab] = useState<Tab>(() => initialCommunicationsTab(location.pathname, location.search));
+  const focusContact = tab === "contact" && Boolean(contactThreadIdFromSearch(location.search));
   const [threads, setThreads] = useState<OrderThread[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConvo, setSelectedConvo] = useState<Conversation | null>(null);
@@ -307,13 +313,13 @@ export default function AdminMessages() {
 
   return (
     <AdminLayout title="Communications">
-      <div className="pb-8">
+      <div className={`comms-desk ${focusContact ? "max-lg:hidden" : "pb-8"}`}>
         <OperationsStatsGrid />
       </div>
-      <div className={`flex min-h-[32rem] flex-col overflow-hidden rounded-2xl border border-gray-800 lg:min-h-[calc(100vh-16rem)] ${tab === "botroom" ? "" : "lg:flex-row"}`}>
+      <div className={`comms-desk flex min-w-0 flex-col overflow-hidden rounded-2xl border border-gray-800 lg:min-h-[calc(100vh-16rem)] ${tab === "botroom" ? "" : "lg:flex-row"} ${focusContact ? "max-md:fixed max-md:inset-x-0 max-md:bottom-[var(--keyboard-overlap,0px)] max-md:top-[4.25rem] max-md:z-20 max-md:rounded-none max-md:border-0 md:max-lg:h-[calc(100dvh-6.5rem)] md:max-lg:min-h-0" : "min-h-[32rem]"}`}>
 
         {/* ─── Left sidebar: tabs + thread list ─────────────────────────── */}
-        <div className={`flex w-full min-w-0 flex-col border-b border-gray-700 bg-gray-900 ${tab === "botroom" ? "" : "lg:w-80 lg:shrink-0 lg:border-b-0 lg:border-r"}`}>
+        <div className={`flex w-full min-w-0 flex-col border-b border-gray-700 bg-gray-900 ${focusContact ? "max-md:hidden" : ""} ${tab === "botroom" ? "" : "lg:w-80 lg:shrink-0 lg:border-b-0 lg:border-r"}`}>
           {/* Tabs */}
           <CommunicationsTabBar tab={tab} isAdmin={isAdmin} counts={unread.counts} onSelect={setTab} />
 
@@ -337,7 +343,7 @@ export default function AdminMessages() {
 
           {/* SMS conversations list */}
           {tab === "sms" && (
-            <div className="flex-1 overflow-y-auto">
+            <div className={`flex-1 overflow-y-auto ${selectedConvo && !showNewConvo ? "max-md:hidden" : ""}`}>
               <div className="p-3 border-b border-gray-700">
                 <button
                   onClick={() => setShowNewConvo(true)}
@@ -362,8 +368,8 @@ export default function AdminMessages() {
                       selectedConvo?.id === convo.id ? "bg-gray-800" : ""
                     }`}
                   >
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-medium text-white truncate">
+                    <div className="mb-1 flex min-w-0 items-center justify-between gap-2">
+                      <span className="min-w-0 flex-1 truncate text-sm font-medium text-white">
                         {convo.photographerName || "Photographer"} ↔{" "}
                         {convo.clientName || "Client"}
                       </span>
@@ -377,7 +383,7 @@ export default function AdminMessages() {
                         {convo.status}
                       </span>
                     </div>
-                    <p className="text-xs text-gray-500">Order: #{convo.orderId.slice(0, 8)}</p>
+                    <p className="truncate text-xs text-gray-500">Record {convo.orderId}</p>
                     <p className="text-xs text-gray-600 flex items-center gap-1 mt-0.5">
                       <Phone className="w-3 h-3" /> Twilio masked number active
                     </p>
@@ -388,21 +394,21 @@ export default function AdminMessages() {
           )}
 
           {tab === "contact" && (
-            <div className="flex-1 p-4 text-sm text-gray-400 leading-relaxed">
+            <div className="hidden flex-1 p-4 text-sm leading-relaxed text-gray-400 md:block">
               Site contact chats are on the right. A reply stays in that thread and is not emailed or texted.
             </div>
           )}
 
           {/* Compose / Campaigns / Sweep — no list needed */}
           {(tab === "compose" || tab === "sweep") && (
-            <div className="flex-1 flex items-center justify-center p-4 text-gray-600 text-sm text-center">
+            <div className="hidden flex-1 items-center justify-center p-4 text-center text-sm text-gray-600 lg:flex">
               {tab === "sweep" ? "Automatic correspondence sweep overview →" : "Fill in the form on the right →"}
             </div>
           )}
         </div>
 
         {/* ─── Right panel ─────────────────────────────────────────────────── */}
-        <div className={`flex min-w-0 flex-1 flex-col ${tab === "botroom" ? "bg-[#f4f7f8]" : "bg-gray-950"}`}>
+        <div className={`flex min-h-0 min-w-0 flex-1 flex-col ${focusContact ? "max-lg:h-full" : ""} ${tab === "botroom" ? "bg-[#f4f7f8]" : "bg-gray-950"}`}>
 
           {tab === "botroom" && isAdmin ? <BotRoomPanel /> : null}
           {tab === "botroom" && !isAdmin ? (
@@ -413,7 +419,7 @@ export default function AdminMessages() {
 
           {/* ── Sweep tab ── */}
           {tab === "sweep" && (
-            <div className="flex-1 p-8 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto p-4 lg:p-8">
               <div className="w-full min-w-0 space-y-6">
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-[0.24em] text-teal-400 mb-2">
@@ -511,7 +517,7 @@ export default function AdminMessages() {
           {tab === "sms" && (
             <>
               {showNewConvo ? (
-                <div className="flex-1 p-8 overflow-y-auto">
+                <div className="flex-1 overflow-y-auto p-4 lg:p-8">
                   <div className="max-w-lg mx-auto">
                     <div className="flex items-center justify-between mb-6">
                       <h2 className="text-white text-xl font-semibold">
@@ -541,7 +547,7 @@ export default function AdminMessages() {
                         />
                       </div>
 
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div>
                           <label className="block text-gray-300 text-sm mb-1">Photographer Name</label>
                           <input
@@ -562,7 +568,7 @@ export default function AdminMessages() {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div>
                           <label className="block text-gray-300 text-sm mb-1">Client Name</label>
                           <input
@@ -595,24 +601,34 @@ export default function AdminMessages() {
                   </div>
                 </div>
               ) : selectedConvo ? (
-                <div className="flex-1 p-8 overflow-y-auto">
-                  <div className="max-w-lg mx-auto">
-                    <h2 className="text-white text-xl font-semibold mb-2">
+                <div className="flex-1 overflow-y-auto p-4 lg:p-8">
+                  <div className="mx-auto max-w-lg">
+                    <button
+                      type="button"
+                      className="mb-3 inline-flex min-h-11 items-center gap-1 text-sm font-bold text-gray-300 md:hidden"
+                      onClick={() => setSelectedConvo(null)}
+                    >
+                      <ChevronLeft className="h-4 w-4" /> Back to conversations
+                    </button>
+                    {shortOrderNumber(selectedConvo.orderNumber) ? (
+                      <OrderNumberMark value={selectedConvo.orderNumber} light />
+                    ) : null}
+                    <h2 className="mb-2 truncate text-xl font-semibold text-white">
                       {selectedConvo.photographerName} ↔ {selectedConvo.clientName}
                     </h2>
-                    <p className="text-gray-400 text-sm mb-6">
-                      Order #{selectedConvo.orderId.slice(0, 8)} • Twilio SID:{" "}
-                      {selectedConvo.conversationSid}
+                    <p className="mb-6 break-all text-sm text-gray-400">
+                      Record {selectedConvo.orderId}
+                      {selectedConvo.conversationSid ? ` · ${selectedConvo.conversationSid}` : ""}
                     </p>
 
                     <div className="bg-gray-900 rounded-2xl p-6 space-y-4 mb-6">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-400">Photographer</span>
-                        <span className="text-white">{selectedConvo.photographerPhone}</span>
+                      <div className="flex min-w-0 justify-between gap-3 text-sm">
+                        <span className="shrink-0 text-gray-400">Photographer</span>
+                        <span className="min-w-0 truncate text-white">{selectedConvo.photographerPhone}</span>
                       </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-400">Client</span>
-                        <span className="text-white">{selectedConvo.clientPhone}</span>
+                      <div className="flex min-w-0 justify-between gap-3 text-sm">
+                        <span className="shrink-0 text-gray-400">Client</span>
+                        <span className="min-w-0 truncate text-white">{selectedConvo.clientPhone}</span>
                       </div>
                       <div className="flex justify-between text-sm">
                         <span className="text-gray-400">Status</span>
@@ -651,7 +667,7 @@ export default function AdminMessages() {
 
           {/* ── Compose tab ── */}
           {tab === "compose" && (
-            <div className="flex-1 p-8 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto p-4 lg:p-8">
               <div className="max-w-lg mx-auto">
                 <h2 className="text-white text-2xl font-semibold mb-6">Send a Message</h2>
 

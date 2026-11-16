@@ -1,7 +1,7 @@
 import type { ContactThreadView } from "../contactThread.ts";
 import { shortOrderNumber } from "../orderProjectInvoice.ts";
 
-export type ThreadAudience = "clients" | "leads" | "photographers" | "socials";
+export type ThreadAudience = "clients" | "leads" | "photographers" | "socials" | "website";
 
 export type ThreadSource = "messages" | "conversations" | "sms" | "contact" | "orderRequest" | "social";
 
@@ -299,10 +299,10 @@ export function buildUnifiedThreads(snapshot: CommunicationsSnapshot): UnifiedTh
     const last = messages[messages.length - 1];
     ensure(threadShell({
       id: `contact:${contact.id}`,
-      audiences: ["leads"],
+      audiences: ["leads", "website"],
       source: "contact",
       title: contact.name || "Website chat",
-      subtitle: "Contact chat",
+      subtitle: "Website chat",
       preview: last?.body || "",
       updatedAt: contact.updatedAt || last?.createdAt || contact.createdAt,
       email: contact.email || "",

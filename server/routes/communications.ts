@@ -16,7 +16,7 @@ import admin from "firebase-admin";
 
 const router = Router();
 
-const AUDIENCES = new Set<ThreadAudience>(["clients", "leads", "photographers", "socials"]);
+const AUDIENCES = new Set<ThreadAudience>(["clients", "leads", "photographers", "socials", "website"]);
 
 function ownerEmails(): string[] {
   return ownerAllowlist(process.env.OWNER_EMAILS);

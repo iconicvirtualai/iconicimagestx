@@ -193,6 +193,25 @@ body:has(.iframe-safe-page.bg-\[\#f4f7f8\]) {
   background-color: #f4f7f8;
 }
 
+/* Order numbers on the staff Communications desk. Portal styles stay in the portal sheets. */
+.comms-desk .order-number span {
+  display: block;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  line-height: 1.2;
+  text-transform: uppercase;
+  color: #9ca3af;
+}
+.comms-desk .order-number strong {
+  display: block;
+  font-size: 1.75rem;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  color: #fff;
+}
+
 /* Phone viewports on these public pages were rendering labels under 12px. */
 @media (max-width: 767px) {
   body:has([data-site-page="portfolio"]) :is(.text-\[8px\], .text-\[9px\], .text-\[10px\], .text-\[11px\]),

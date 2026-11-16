@@ -7,7 +7,7 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { staffLoginAction } from "@shared/staffAccess";
+import { staffLoginAction, staffReturnPath } from "@shared/staffAccess";
 import { clientPortalEnabled } from "@shared/clientPortal";
 import { CHANGE_PASSWORD_PATH } from "@shared/passwordAccount";
 import { openOwnerSession, ownerLoginNext } from "@/lib/openOwnerSession";
@@ -38,8 +38,9 @@ export default function AdminLogin() {
     void (async () => {
       const owner = await openOwnerSession(user);
       if (cancelled) return;
+      const returnTo = staffReturnPath((location.state as { from?: unknown } | null)?.from);
       if (owner) {
-        navigate("/admin/owners", { replace: true });
+        navigate(returnTo || "/admin/owners", { replace: true });
         return;
       }
       // Sent here from an owner page: a non-owner gets the same 404 as before,
@@ -55,7 +56,7 @@ export default function AdminLogin() {
         role: staffProfile?.role,
       });
       if (action.type === "redirect") {
-        navigate(action.path);
+        navigate(returnTo || action.path, { replace: true });
         return;
       }
       if (action.type === "not-staff") {
@@ -68,7 +69,7 @@ export default function AdminLogin() {
     };
     // signOutUser identity changes each render; only the auth state should retrigger this.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, isStaff, staffProfile, loading, mustChangePassword, navigate, ownerNext]);
+  }, [user, isStaff, staffProfile, loading, mustChangePassword, navigate, ownerNext, location.state]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();

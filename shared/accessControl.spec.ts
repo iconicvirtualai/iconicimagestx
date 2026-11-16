@@ -12,6 +12,7 @@ import {
   sessionFromProfiles,
   staffHomePath,
   staffLoginAction,
+  staffReturnPath,
 } from "./staffAccess";
 import { isHostedDeployment, isLocalAdminHost, isTempAdminClientEnabled, isTempAdminEnabled } from "./tempAdmin";
 import {
@@ -70,6 +71,22 @@ describe("staff roles", () => {
     expect(staffHomePath("photographer")).toBe("/admin/photographer");
     expect(staffHomePath("editor")).toBe("/admin/editor");
     expect(staffHomePath("coordinator")).toBe("/admin/dashboard");
+  });
+});
+
+describe("staff return path", () => {
+  it("keeps an admin deep link and drops anything outside the admin app", () => {
+    const thread = "a1b2c3d4e5f60718293a4b5c6d7e8f90";
+    expect(staffReturnPath({
+      pathname: "/admin/messages",
+      search: `?tab=contact&thread=${thread}`,
+    })).toBe(`/admin/messages?tab=contact&thread=${thread}`);
+    expect(staffReturnPath({ pathname: "/admin/communications", search: "?tab=contact" })).toBe("/admin/communications?tab=contact");
+    expect(staffReturnPath({ pathname: "/portal/home", search: "" })).toBeNull();
+    expect(staffReturnPath({ pathname: "//evil.example/admin/messages" })).toBeNull();
+    expect(staffReturnPath({ pathname: "/admin/messages", search: "?next=https://evil.example" })).toBe("/admin/messages?next=https://evil.example");
+    expect(staffReturnPath({ pathname: "https://evil.example/admin/messages" })).toBeNull();
+    expect(staffReturnPath(null)).toBeNull();
   });
 });
 

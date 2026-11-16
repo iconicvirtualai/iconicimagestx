@@ -33,19 +33,19 @@ export default function OperationsStatsGrid() {
   ];
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+    <div className="mb-6 grid grid-cols-2 gap-3 lg:mb-10 lg:grid-cols-4 lg:gap-6">
       {stats.map((s) => (
         <Link
           key={s.label}
           to={s.href}
-          className="bg-white rounded-[2rem] p-6 border border-gray-100 shadow-sm hover:shadow-md transition-shadow group"
+          className="min-w-0 overflow-hidden rounded-[2rem] border border-gray-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md group lg:p-6"
         >
           <div className="flex items-center justify-between mb-4">
             <div className={`p-3 rounded-xl text-white ${s.color} shadow-lg`}>{s.icon}</div>
             <ArrowUpRight className="w-4 h-4 text-gray-300 group-hover:text-[#0d9488] transition-colors" />
           </div>
           <h3 className="text-2xl font-black text-black mb-1">{s.value}</h3>
-          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{s.label}</p>
+          <p className="break-words text-[10px] font-bold uppercase tracking-wide text-gray-400 lg:tracking-widest">{s.label}</p>
         </Link>
       ))}
     </div>

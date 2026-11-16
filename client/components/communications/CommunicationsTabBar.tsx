@@ -23,7 +23,7 @@ export type CommunicationsTabId =
 
 const TABS: { id: CommunicationsTabId; label: string; icon: ElementType; adminOnly?: boolean }[] = [
   { id: "sweep", label: "Sweep", icon: Bot },
-  { id: "contact", label: "Chat", icon: MessageCircle },
+  { id: "contact", label: "Website", icon: MessageCircle },
   { id: "inbox", label: "Inbox", icon: MessageSquare },
   { id: "direct", label: "Direct", icon: Users },
   { id: "sms", label: "SMS", icon: Smartphone },
@@ -56,7 +56,7 @@ export function CommunicationsTabBar({
             role="tab"
             aria-selected={tab === id}
             onClick={() => onSelect(id)}
-            className={`flex min-w-[4.5rem] flex-1 flex-col items-center gap-1 px-1 py-3 text-[10px] transition-colors ${
+            className={`flex min-h-11 min-w-[4.5rem] flex-1 flex-col items-center justify-center gap-1 px-1 py-2 text-[11px] transition-colors md:py-3 md:text-[10px] ${
               tab === id
                 ? "border-b-2 border-teal-400 text-teal-400"
                 : "text-gray-400 hover:text-gray-200"

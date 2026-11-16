@@ -19,6 +19,23 @@ export function staffHomePath(role: string | undefined): string {
   return "/admin/dashboard";
 }
 
+/**
+ * Where to send someone after they sign in, when a protected admin page
+ * sent them to login. Only in-app /admin paths are kept.
+ */
+export function staffReturnPath(from: unknown): string | null {
+  if (!from || typeof from !== "object") return null;
+  const loc = from as { pathname?: unknown; search?: unknown; hash?: unknown };
+  if (typeof loc.pathname !== "string") return null;
+  const path = loc.pathname;
+  if (!path.startsWith("/admin/") || path.startsWith("//") || path.includes("\\") || path.includes("?") || path.includes("#")) {
+    return null;
+  }
+  const search = typeof loc.search === "string" && /^\?[^?#]*$/.test(loc.search) ? loc.search : "";
+  const hash = typeof loc.hash === "string" && /^#[^?#]*$/.test(loc.hash) ? loc.hash : "";
+  return `${path}${search}${hash}`;
+}
+
 export type AuthUserType = "staff" | "client" | null;
 
 export const CLIENT_HOME_PATH = "/portal/home";

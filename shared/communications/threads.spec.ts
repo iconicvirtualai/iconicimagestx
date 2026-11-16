@@ -85,6 +85,10 @@ describe("unified communications threads", () => {
     const leads = filterThreads(threads, "leads");
     expect(leads.map((thread) => thread.title).sort()).toEqual(["+12815550222", "Bea Broker", "Cam Cole"].sort());
     expect(leads.find((thread) => thread.title === "+12815550222")?.preview).toBe("New lead text");
+    const website = filterThreads(threads, "website");
+    expect(website.map((thread) => thread.title)).toEqual(["Bea Broker"]);
+    expect(website[0]?.subtitle).toBe("Website chat");
+    expect(leads.find((thread) => thread.title === "Bea Broker")?.audiences).toContain("website");
     expect(filterThreads(threads, "photographers").some((thread) => thread.title.includes("Casey"))).toBe(true);
     const socials = filterThreads(threads, "socials");
     expect(socials.map((thread) => thread.title)).toEqual(["Instagram", "Facebook", "TikTok", "Google Business"]);

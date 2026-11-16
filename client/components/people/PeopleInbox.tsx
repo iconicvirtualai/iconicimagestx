@@ -142,8 +142,8 @@ export function PeopleInbox({
       ) : null}
       {error ? <p className="px-4 py-2 text-sm text-red-500">{error}</p> : null}
       {notice ? <p className="px-4 py-2 text-sm text-[#0d9488]">{notice}</p> : null}
-      <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
-        <div className={`flex gap-2 overflow-x-auto border-b p-3 lg:w-36 lg:flex-col lg:border-b-0 lg:border-r ${line}`} role="tablist" aria-label="Message folders">
+      <div className={`flex min-h-0 flex-1 flex-col lg:flex-row ${selected || compose ? "max-lg:min-h-[calc(100dvh-10rem)]" : ""}`}>
+        <div className={`flex gap-2 overflow-x-auto border-b p-3 lg:w-36 lg:flex-col lg:border-b-0 lg:border-r ${selected || compose ? "max-lg:hidden" : ""} ${line}`} role="tablist" aria-label="Message folders">
           {FOLDERS.filter((item) => !item.admin || leadAdmin).map((item) => (
             <button
               key={item.id}
@@ -157,7 +157,7 @@ export function PeopleInbox({
             </button>
           ))}
         </div>
-        <div className={`max-h-80 overflow-y-auto border-b lg:max-h-none lg:w-72 lg:border-b-0 lg:border-r ${line}`}>
+        <div className={`max-h-80 overflow-y-auto border-b lg:max-h-none lg:w-72 lg:border-b-0 lg:border-r ${selected || compose ? "max-lg:hidden" : ""} ${line}`}>
           {loading ? <p className={`p-4 text-sm ${muted}`}>Loading…</p> : null}
           {!loading && threads.length === 0 ? <p className={`p-4 text-sm ${muted}`}>Nothing in this folder.</p> : null}
           {threads.map((thread) => (
@@ -175,7 +175,12 @@ export function PeopleInbox({
             </button>
           ))}
         </div>
-        <div className="min-w-0 flex-1 p-4">
+        <div className={`min-w-0 flex-1 p-4 ${selected || compose ? "" : "max-lg:hidden"}`}>
+          {selected || compose ? (
+            <button type="button" className="mb-3 inline-flex min-h-11 items-center text-sm font-bold lg:hidden" onClick={() => { setSelectedId(""); setCompose(false); }}>
+              Back to conversations
+            </button>
+          ) : null}
           {compose ? (
             <ComposeForm
               dark={dark}
