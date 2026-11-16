@@ -64,7 +64,7 @@ function HubNav({
     const inner = (
       <>
         {label}
-        {count != null && count > 0 ? <span className="count">{count}</span> : null}
+        {count != null && count > 0 ? <span className={id === "messages" ? "count unread" : "count"}>{count}</span> : null}
       </>
     );
     if (onSection && id !== "orders") {

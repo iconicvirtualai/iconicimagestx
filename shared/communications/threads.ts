@@ -30,6 +30,10 @@ export interface UnifiedThread {
   orderId: string;
   /** Short order number such as #003, when this thread is tied to an order. */
   orderNumber?: string;
+  /** Set only when a message or order request stores a listing id. */
+  listingId?: string;
+  /** Address or title stored with that listing id. Empty when there is no id. */
+  listingLabel?: string;
   clientId: string;
   photographerId: string;
   photographerPhone: string;
@@ -146,6 +150,8 @@ function threadShell(partial: Partial<UnifiedThread> & Pick<UnifiedThread, "id" 
     phone: "",
     orderId: "",
     orderNumber: "",
+    listingId: "",
+    listingLabel: "",
     clientId: "",
     photographerId: "",
     photographerPhone: "",
@@ -174,6 +180,8 @@ export function buildUnifiedThreads(snapshot: CommunicationsSnapshot): UnifiedTh
     if (!current.photographerId && thread.photographerId) current.photographerId = thread.photographerId;
     if (!current.orderId && thread.orderId) current.orderId = thread.orderId;
     if (!current.orderNumber && thread.orderNumber) current.orderNumber = thread.orderNumber;
+    if (!current.listingId && thread.listingId) current.listingId = thread.listingId;
+    if (!current.listingLabel && thread.listingLabel) current.listingLabel = thread.listingLabel;
     for (const id of thread.participantIds) {
       if (id && !current.participantIds.includes(id)) current.participantIds.push(id);
     }
@@ -185,6 +193,8 @@ export function buildUnifiedThreads(snapshot: CommunicationsSnapshot): UnifiedTh
     if (!message.body && !message.senderName) continue;
     const orderId = text(raw.orderId);
     const orderNumber = shortOrderNumber(raw.orderNumber);
+    const listingId = text(raw.listingId);
+    const listingLabel = listingId ? (text(raw.listingAddress) || text(raw.listingLabel) || text(raw.address) || text(raw.propertyAddress)) : "";
     const explicit = text(raw.threadId);
     const id = explicit || (orderId ? `order:${orderId}` : `message:${message.id}`);
     const senderType = message.senderType;
@@ -207,6 +217,8 @@ export function buildUnifiedThreads(snapshot: CommunicationsSnapshot): UnifiedTh
       title: text(raw.clientName) || message.senderName || "Conversation",
       subtitle: orderNumber ? `Order ${orderNumber}` : text(raw.channel) || "Message",
       orderNumber,
+      listingId,
+      listingLabel,
       email: emailOf(text(raw.email) || text(raw.recipient)),
       phone: text(raw.phone),
       orderId,
@@ -302,6 +314,8 @@ export function buildUnifiedThreads(snapshot: CommunicationsSnapshot): UnifiedTh
 
   for (const raw of snapshot.orderRequests || []) {
     const id = `lead:${text(raw.id)}`;
+    const listingId = text(raw.listingId);
+    const listingLabel = listingId ? (text(raw.listingAddress) || text(raw.listingLabel) || text(raw.address) || text(raw.propertyAddress)) : "";
     const name = text(raw.clientName) || [text(raw.firstName), text(raw.lastName)].filter(Boolean).join(" ") || text(raw.name) || "Order request";
     const body = text(raw.message) || text(raw.notes) || text(raw.services) || text(raw.address) || text(raw.propertyAddress) || "New order request";
     const createdAt = timeOf(raw.createdAt) || timeOf(raw.submittedAt);
@@ -316,6 +330,9 @@ export function buildUnifiedThreads(snapshot: CommunicationsSnapshot): UnifiedTh
       email: text(raw.email) || text(raw.clientEmail),
       phone: text(raw.phone) || text(raw.clientPhone),
       orderId: text(raw.id),
+      orderNumber: shortOrderNumber(raw.orderNumber),
+      listingId,
+      listingLabel,
       clientId: text(raw.clientId),
       messages: [{
         id: `${id}-note`,

@@ -618,6 +618,27 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // Per-person inbox flags (star, unread, archive, trash) for portal threads.
+    // The path uid is the only person who can read or write that copy.
+    // These flags never delete another participant's conversation.
+    // Publish this file in the Firebase console. Vercel does not deploy rules.
+    match /portalInboxFlags/{uid} {
+      allow read, write: if false;
+      match /threads/{threadId} {
+        allow read: if isAuthenticated() && request.auth.uid == uid;
+        allow create, update: if isAuthenticated()
+          && request.auth.uid == uid
+          && request.resource.data.keys().hasOnly(['threadKey', 'folder', 'starred', 'readAt', 'forceUnread', 'updatedAt'])
+          && request.resource.data.threadKey == threadId
+          && request.resource.data.starred is bool
+          && request.resource.data.forceUnread is bool
+          && request.resource.data.updatedAt is string
+          && (request.resource.data.folder == null || request.resource.data.folder in ['inbox', 'archived', 'trash'])
+          && (request.resource.data.readAt == null || request.resource.data.readAt is string);
+        allow delete: if false;
+      }
+    }
+
     // ─── Catch-all: deny everything else ─────────────────────────────────────
     match /{document=**} {
       allow read, write: if false;
