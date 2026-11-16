@@ -20,6 +20,7 @@ import { usd } from "@shared/clientHome";
 import { OrderHistory } from "@/components/client-home/ClientHomeDashboard";
 import { MoneyAmount } from "@/components/MoneyAmount";
 import { MarketingAgentCard } from "@/components/client-hub/MarketingAgentCard";
+import { publishPortalAvatar } from "@/components/client-hub/PortalShell";
 import { prepareProfileImage } from "@/lib/profileImage";
 
 const fieldClass = "h-11 w-full min-w-0 max-w-full rounded-xl border border-gray-200 bg-white px-3 text-sm";
@@ -79,12 +80,16 @@ export function ProfileSettings({
     setSaving(true);
     try {
       const url = await uploadAsset(kind, file, example);
-      setDraft((current) => ({
-        ...current,
-        headshotUrl: kind === "headshot" ? url : current.headshotUrl,
-        companyLogoUrl: kind === "companyLogo" ? url : current.companyLogoUrl,
-        brokerageLogoUrl: kind === "brokerageLogo" ? url : current.brokerageLogoUrl,
-      }));
+      setDraft((current) => {
+        const next = {
+          ...current,
+          headshotUrl: kind === "headshot" ? url : current.headshotUrl,
+          companyLogoUrl: kind === "companyLogo" ? url : current.companyLogoUrl,
+          brokerageLogoUrl: kind === "brokerageLogo" ? url : current.brokerageLogoUrl,
+        };
+        publishPortalAvatar(next);
+        return next;
+      });
       const label = kind === "headshot" ? "Headshot" : kind === "companyLogo" ? "Company logo" : "Brokerage logo";
       setMessage(example ? `Sample preview — the ${label.toLowerCase()} stays on this page.` : `${label} saved.`);
     } catch (err) {
@@ -174,7 +179,7 @@ export function ProfileSettings({
         <label className="flex items-center gap-2 text-sm font-bold"><input type="checkbox" checked={prefs.push} onChange={(event) => setPrefs({ ...prefs, push: event.target.checked })} /> In-app updates</label>
       </fieldset>
       {message ? <p role="status" className="text-sm font-bold">{message}</p> : null}
-      <button type="submit" disabled={saving} className="min-h-12 rounded-2xl bg-black text-white px-5 text-xs font-black uppercase tracking-widest">
+      <button type="submit" disabled={saving} className="portal-primary">
         {saving ? "Saving" : "Save profile"}
       </button>
     </form>
@@ -189,14 +194,17 @@ export function ProfileSettings({
 }
 
 function ImageField({ label, url, onFile, monogram = "", hint = "" }: { label: string; url: string; onFile: (file: File | undefined) => void; monogram?: string; hint?: string }) {
+  const kind = label === "Headshot" ? "headshot" : "logo";
   return (
     <Field label={label}>
-      <div className="flex items-center gap-3 min-w-0">
-        {url ? <img src={url} alt="" className="h-14 w-14 shrink-0 rounded-full object-cover bg-gray-100" /> : <div className="av" style={{ width: 56, height: 56 }}>{monogram || " "}</div>}
+      <div className="image-field">
+        <span className="av" data-testid={`profile-image-${label.toLowerCase().replace(/\s+/g, "-")}`} data-avatar-kind={url ? kind : "initials"}>
+          {url ? <img src={url} alt="" /> : monogram || " "}
+        </span>
         <div className="min-w-0">
-          <label className="inline-flex min-h-11 min-w-0 items-center rounded-xl border border-gray-200 px-3 text-[10px] font-black uppercase tracking-widest">
+          <label className="upload-btn">
             Upload
-            <input type="file" accept="image/jpeg,image/png,image/webp" aria-label={label} className="sr-only" onChange={(event) => onFile(event.target.files?.[0])} />
+            <input type="file" accept="image/jpeg,image/png,image/webp" aria-label={label} onChange={(event) => onFile(event.target.files?.[0])} />
           </label>
           {hint ? <p className="mt-1 text-xs text-gray-500">{hint}</p> : null}
         </div>
@@ -261,7 +269,7 @@ export function TeamSettings({
           if (!file) return;
           void uploadAsset("teamLogo", file, example).then(setLogo).catch((err: Error) => setMessage(err.message));
         }} />
-        <button type="submit" className="sm:col-span-2 min-h-12 rounded-2xl bg-black text-white px-5 text-xs font-black uppercase tracking-widest w-fit">Save team</button>
+        <button type="submit" className="portal-primary sm:col-span-2 w-fit">Save team</button>
       </form>
       <ul className="space-y-3">
         {members.length === 0 ? <li className="text-sm text-gray-500">No teammates yet.</li> : null}
@@ -319,7 +327,7 @@ export function TeamSettings({
             ))}
           </div>
         </fieldset>
-        <button type="submit" className="min-h-12 rounded-2xl bg-[#0d9488] text-white px-5 text-xs font-black uppercase tracking-widest w-fit">Add teammate</button>
+        <button type="submit" className="portal-primary teal w-fit">Add teammate</button>
       </form>
       <section>
         <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-3">Team listings</h3>
@@ -463,7 +471,7 @@ export function ClientsSettings({
           <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Notes</span>
           <textarea className="mt-1 w-full rounded-xl border border-gray-200 p-3 text-sm" rows={3} value={draft.notes} onChange={(event) => setDraft({ ...draft, notes: event.target.value })} />
         </label>
-        <button type="submit" className="min-h-12 rounded-2xl bg-black text-white px-5 text-xs font-black uppercase tracking-widest w-fit">Save client</button>
+        <button type="submit" className="portal-primary w-fit">Save client</button>
       </form>
       <form
         className="bg-white rounded-2xl border border-gray-100 p-4"
@@ -533,7 +541,7 @@ export function BillingSettings({
         <Field label="State"><input className={fieldClass} value={draft.state} onChange={(event) => setDraft({ ...draft, state: event.target.value })} /></Field>
         <Field label="Postal code"><input className={fieldClass} value={draft.postalCode} onChange={(event) => setDraft({ ...draft, postalCode: event.target.value })} /></Field>
         <p className="text-sm text-gray-500 sm:col-span-2">Invoices and checkout use {billingAddressLine(draft) || "the billing address you save here"}.</p>
-        <button type="submit" className="min-h-12 rounded-2xl bg-black text-white px-5 text-xs font-black uppercase tracking-widest w-fit">Save billing</button>
+        <button type="submit" className="portal-primary w-fit">Save billing</button>
       </form>
       <CardOnFileControl
         square={billing.square}
@@ -671,7 +679,7 @@ function SquareCard({
       <button
         type="button"
         disabled={!ready}
-        className="min-h-11 rounded-xl bg-black text-white px-4 text-[10px] font-black uppercase tracking-widest disabled:opacity-50"
+        className="portal-primary disabled:opacity-50"
         onClick={() => {
           const card = (window as unknown as { iconicSquareCard?: { tokenize: () => Promise<{ status: string; token?: string }> } }).iconicSquareCard;
           if (!card) return;

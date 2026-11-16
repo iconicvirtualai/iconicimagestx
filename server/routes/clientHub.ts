@@ -25,6 +25,7 @@ import {
   saveBilling,
   saveCard,
   saveContact,
+  readProfileMedia,
   saveProfile,
   saveProfileAsset,
   saveStaffCard,
@@ -79,6 +80,20 @@ function coordinatorOrTest(req: AuthenticatedRequest, res: import("express").Res
   }
   return requireCoordinator(req, res, next);
 }
+
+router.get("/profile-media/:token", async (req, res) => {
+  try {
+    const media = await readProfileMedia(String(req.params.token || ""));
+    if (!media) return res.status(404).end();
+    res.setHeader("Content-Type", media.contentType);
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    return res.send(media.bytes);
+  } catch (err) {
+    console.error("[Client hub] Profile media", err);
+    return res.status(404).end();
+  }
+});
 
 router.get("/me/hub/profile", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");

@@ -130,15 +130,36 @@ export function ClientHomeView({
             />
           </>
         ) : section === "orders" ? (
-          invoices.length === 0 ? (
-            <div className="card">
-              <h2>Order history</h2>
-              <p>No invoices are stored on this account yet.</p>
-              <Link to={portalHref("/portal/settings/billing", example)} className="btn btn-ink btn-md" style={{ marginTop: 16 }}>Open billing</Link>
+          <div>
+            <div className="page-head">
+              <div>
+                <div className="kicker">Orders</div>
+                <h1>Order history</h1>
+              </div>
             </div>
-          ) : (
-            <OrderHistory invoices={invoices} truncated={invoicesTruncated} filterable exampleOpen={example} />
-          )
+            {orderedListings.length > 0 ? (
+              <div className="order-list">
+                {orderedListings.map((listing) => (
+                  <Link key={listing.id} to={listing.href || clientListingPath(listing.id)} data-testid="order-history-row">
+                    <div>
+                      <OrderNumberMark value={listing.orderNumber} />
+                      <h3>{listing.address}</h3>
+                      <p>{humanStatus(listing.status)}</p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            ) : null}
+            {invoices.length === 0 ? (
+              <div className="card">
+                <h2>Invoices</h2>
+                <p>No invoices are stored on this account yet.</p>
+                <Link to={portalHref("/portal/settings/billing", example)} className="btn btn-ink btn-md" style={{ marginTop: 16 }}>Open billing</Link>
+              </div>
+            ) : (
+              <OrderHistory invoices={invoices} truncated={invoicesTruncated} filterable exampleOpen={example} />
+            )}
+          </div>
         ) : section === "messages" ? (
           <PortalMessages example={example} onUnreadCount={onMessageCount} />
         ) : (

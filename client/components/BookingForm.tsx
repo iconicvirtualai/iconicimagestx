@@ -2059,7 +2059,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
               {step < 6 ? (
                 <Button
                   onClick={nextStep}
-                  className="h-16 w-full bg-black hover:bg-gray-800 text-white font-black uppercase tracking-[0.15em] text-[11px] rounded-2xl shadow-xl transition-all sm:flex-1 sm:hover:scale-[1.005] group"
+                  className="portal-primary h-16 w-full bg-black hover:bg-gray-800 text-white font-black uppercase tracking-[0.15em] text-[11px] rounded-2xl shadow-xl transition-all sm:flex-1 sm:hover:scale-[1.005] group"
                 >
                   Next Stage <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform ml-2" />
                 </Button>

@@ -21,6 +21,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { exampleThreads } from "@/lib/exampleHub";
 import { portalHref } from "@/components/client-hub/PortalShell";
+import { portalPortrait } from "@shared/portalAvatar";
 import { OrderNumberMark } from "@/components/OrderNumberMark";
 import { PersonChip } from "@/components/people/PersonChip";
 import type { UnifiedThread } from "@shared/communications/threads";
@@ -183,6 +184,8 @@ export function PortalMessages({
     patches: FlagPatch[];
   } | null>(null);
   const [mobileThread, setMobileThread] = useState(false);
+  const [selfPhoto, setSelfPhoto] = useState("");
+  const [photoById, setPhotoById] = useState<Record<string, string>>({});
 
   const items = useMemo(
     () => buildPortalInbox(conversations, direct, viewer, flags),
@@ -201,6 +204,44 @@ export function PortalMessages({
     if (loading) return;
     onUnreadCount?.(unread);
   }, [loading, unread, onUnreadCount]);
+
+  useEffect(() => {
+    if (example || !user) return;
+    let cancelled = false;
+    void (async () => {
+      const headers = await authHeaders(user);
+      const [profileRes, directoryRes] = await Promise.all([
+        fetch("/api/clients/me/hub/profile", { headers }),
+        fetch("/api/people/directory", { headers }),
+      ]);
+      if (cancelled) return;
+      if (profileRes.ok) {
+        const body = await profileRes.json().catch(() => ({}));
+        setSelfPhoto(portalPortrait(body.profile || {}).url);
+      }
+      if (directoryRes.ok) {
+        const body = await directoryRes.json().catch(() => ({}));
+        const next: Record<string, string> = {};
+        for (const profile of body.profiles || []) {
+          if (!profile?.photoUrl) continue;
+          if (profile.id) next[profile.id] = profile.photoUrl;
+          if (profile.uid) next[profile.uid] = profile.photoUrl;
+        }
+        setPhotoById(next);
+      }
+    })().catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [example, user]);
+
+  function rowPhoto(item: { direct: InboxThread | null }): string {
+    const direct = item.direct;
+    if (direct) {
+      const ids = [...(direct.recipientProfileIds || []), direct.senderProfileId].filter(Boolean);
+      const other = ids.map((id) => photoById[id]).find((url) => url && url !== selfPhoto);
+      if (other) return other;
+    }
+    return selfPhoto;
+  }
 
   useEffect(() => {
     if (loading || selectedKey || composeOpen) return;
@@ -434,13 +475,17 @@ export function PortalMessages({
       className={shellClass}
     >
       <div className="page-head">
-        <div>
+        <div className="who">
+          <span className="av" data-testid="portal-message-avatar" data-avatar-kind={selfPhoto ? "headshot" : "initials"}>
+            {selfPhoto ? <img src={selfPhoto} alt="" /> : initials(accountInitials(viewer.email))}
+          </span>
+          <div>
           <div className="kicker">Messages</div>
           <h1>Your messages</h1>
           <p className="sub">
-            You only see messages for this login. Choose a thread to read it and
-            reply, or start a new one.
+            You only see messages for this login. Choose a thread to read it and reply, or start a new one.
           </p>
+          </div>
         </div>
         <div className="head-actions">
           <button
@@ -545,6 +590,7 @@ export function PortalMessages({
                 <ThreadRow
                   key={item.key}
                   item={item}
+                  avatarUrl={rowPhoto(item)}
                   selected={item.key === selectedKey}
                   checked={picked.includes(item.key)}
                   example={example}
@@ -599,6 +645,7 @@ export function PortalMessages({
           ) : (
             <ReadingPane
               item={openItemInView}
+              avatarUrl={openItemInView ? rowPhoto(openItemInView) : ""}
               viewer={viewer}
               example={example}
               user={user}
@@ -748,8 +795,14 @@ function EmptyState({
   );
 }
 
+function accountInitials(email: string): string {
+  const local = email.split("@")[0] || "You";
+  return local;
+}
+
 function ThreadRow({
   item,
+  avatarUrl = "",
   selected,
   checked,
   example,
@@ -763,6 +816,7 @@ function ThreadRow({
   onMenu,
 }: {
   item: PortalInboxItem;
+  avatarUrl?: string;
   selected: boolean;
   checked: boolean;
   example: boolean;
@@ -796,7 +850,9 @@ function ThreadRow({
         {checked ? <Check className="ib-ico" /> : null}
       </button>
       <span className="ib-dot" aria-hidden="true" />
-      <span className="av">{initials(item.title)}</span>
+      <span className="av" data-testid="thread-avatar" data-avatar-kind={avatarUrl ? "headshot" : "initials"}>
+        {avatarUrl ? <img src={avatarUrl} alt="" /> : initials(item.title)}
+      </span>
       <div className="ib-main">
         <button type="button" className="ib-open" onClick={onOpen}>
           <span className="ib-row1">
@@ -881,6 +937,7 @@ function ThreadRow({
 
 function ReadingPane({
   item,
+  avatarUrl = "",
   viewer,
   example,
   user,
@@ -894,6 +951,7 @@ function ReadingPane({
   onExampleReply,
 }: {
   item: PortalInboxItem | null;
+  avatarUrl?: string;
   viewer: DeskActor;
   example: boolean;
   user: { getIdToken?: () => Promise<string> } | null;
@@ -991,7 +1049,9 @@ function ReadingPane({
         >
           <ChevronLeft className="ib-ico" />
         </button>
-        <span className="av">{initials(item.title)}</span>
+        <span className="av" data-avatar-kind={avatarUrl ? "headshot" : "initials"}>
+          {avatarUrl ? <img src={avatarUrl} alt="" /> : initials(item.title)}
+        </span>
         <div className="ib-who">
           {item.orderNumber ? (
             <OrderNumberMark value={item.orderNumber} />

@@ -339,9 +339,9 @@ function colorOf(value: unknown, fallback: string): string {
 }
 
 function photoOf(value: unknown): string {
-  const raw = text(value, 400);
+  const raw = text(value, 2000);
   if (!raw) return "";
-  if (raw.startsWith("https://") || raw.startsWith("/")) return raw;
+  if (raw.startsWith("https://") || raw.startsWith("http://") || raw.startsWith("/")) return raw;
   return "";
 }
 
@@ -495,7 +495,7 @@ export function profileFromClient(sourceId: string, data: Record<string, unknown
     displayName: settings.displayName,
     email: text(data.email || hub.email, 160).toLowerCase(),
     phone: text(data.phone || hub.phone, 40),
-    photoUrl: settings.photoUrl || photoOf(hub.headshotUrl),
+    photoUrl: photoOf(hub.headshotUrl) || settings.photoUrl || photoOf(hub.companyLogoUrl) || photoOf(hub.brokerageLogoUrl),
     color: settings.color,
     bio: "",
     brokerage,

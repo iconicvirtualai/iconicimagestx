@@ -36,6 +36,7 @@ import {
   type HubGrant,
   type TeamMemberRecord,
 } from "../../shared/clientHubSettings";
+import { isExpiringStorageUrl, storagePathFromUrl } from "../../shared/profileMedia";
 import { squareWebPaymentsConfig } from "../../shared/squareInvoice";
 import { sendEmail } from "./email";
 
@@ -342,7 +343,8 @@ function accessFor(actor: HubActor) {
 }
 
 export async function getProfile(actor: HubActor) {
-  return { profile: actor.profile, access: accessFor(actor), preferences: preferencesFromClient(actor.client) };
+  const profile = await refreshDurableImages(actor);
+  return { profile, access: accessFor(actor), preferences: preferencesFromClient(actor.client) };
 }
 
 export async function saveProfile(actor: HubActor, input: unknown) {
@@ -374,7 +376,11 @@ async function writeProfileToMatches(actor: HubActor, profile: ClientHubProfile,
       hubProfile: profile,
       profileSettings: {
         ...currentSettings,
-        ...(profile.headshotUrl ? { photoUrl: profile.headshotUrl } : {}),
+        ...(profile.headshotUrl || profile.companyLogoUrl || profile.brokerageLogoUrl
+          ? { photoUrl: profile.headshotUrl || profile.companyLogoUrl || profile.brokerageLogoUrl }
+          : {}),
+        companyLogoUrl: profile.companyLogoUrl,
+        brokerageLogoUrl: profile.brokerageLogoUrl,
         displayName: profileDisplayName(profile) || String(currentSettings.displayName || ""),
         notifications: preferences
           ? { email: preferences.email, sms: preferences.sms, push: preferences.push }
@@ -412,12 +418,13 @@ export async function saveProfileAsset(actor: HubActor, kind: string, dataUrl: s
   const allowed = new Set(["headshot", "companyLogo", "brokerageLogo", "teamLogo", "memberLogo"]);
   if (!allowed.has(kind)) throw new HubError(400, "That image is not a profile asset.");
   const parsed = parseImage(dataUrl);
-  const url = await storeImage(actor.clientId, kind, parsed);
+  const stored = await storeImage(actor.clientId, kind, parsed);
   const field = PROFILE_IMAGE_FIELDS[kind];
-  if (!field) return { url, profile: actor.profile };
-  const profile = { ...actor.profile, [field]: url };
+  if (!field) return { url: stored.url, profile: actor.profile };
+  const profile = { ...actor.profile, [field]: stored.url };
   await writeProfileToMatches(actor, profile);
-  return { url, profile };
+  await rememberAsset(actor.clientIds, kind, stored);
+  return { url: stored.url, profile };
 }
 
 export async function saveStaffProfileAsset(clientId: string, kind: string, dataUrl: string): Promise<{ url: string; profile: ClientHubProfile }> {
@@ -429,7 +436,8 @@ export async function saveStaffProfileAsset(clientId: string, kind: string, data
   if (!docs.some((doc) => doc.id === clientId)) docs.push({ id: clientId, data: start });
   const profile = { ...mergedProfile(docs, clientId, email) };
   const parsed = parseImage(dataUrl);
-  const url = await storeImage(clientId, kind, parsed);
+  const stored = await storeImage(clientId, kind, parsed);
+  const url = stored.url;
   const field = PROFILE_IMAGE_FIELDS[kind];
   if (!field) return { url, profile };
   const next = { ...profile, [field]: url };
@@ -444,6 +452,7 @@ export async function saveStaffProfileAsset(clientId: string, kind: string, data
     membership: null,
     grant: null,
   }, next);
+  await rememberAsset([...new Set([clientId, ...docs.map((doc) => doc.id)])].slice(0, 10), kind, stored);
   return { url, profile: next };
 }
 
@@ -458,23 +467,107 @@ function parseImage(dataUrl: string): { mime: string; bytes: Buffer } {
   return { mime: match[1].toLowerCase(), bytes };
 }
 
-async function storeImage(clientId: string, kind: string, image: { mime: string; bytes: Buffer }): Promise<string> {
+interface StoredImage {
+  url: string;
+  path: string;
+  contentType: string;
+  token: string;
+}
+
+async function storeImage(clientId: string, kind: string, image: { mime: string; bytes: Buffer }): Promise<StoredImage> {
   const ext = image.mime === "image/png" ? "png" : image.mime === "image/webp" ? "webp" : "jpg";
   const path = `client-hub/${clientId}/${kind}-${Date.now()}.${ext}`;
-  if (useMemory()) return `https://cdn.example.test/client-hub/${encodeURIComponent(clientId)}/${kind}.${ext}`;
+  if (useMemory()) {
+    return {
+      url: `https://cdn.example.test/client-hub/${encodeURIComponent(clientId)}/${kind}.${ext}`,
+      path,
+      contentType: image.mime,
+      token: "",
+    };
+  }
   try {
     const bucket = admin.storage().bucket();
-    const token = randomBytes(16).toString("hex");
+    const downloadToken = randomBytes(16).toString("hex");
     const file = bucket.file(path);
     await file.save(image.bytes, {
       contentType: image.mime,
-      metadata: { metadata: { firebaseStorageDownloadTokens: token } },
+      metadata: { metadata: { firebaseStorageDownloadTokens: downloadToken } },
     });
-    return `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(path)}?alt=media&token=${token}`;
+    const token = randomBytes(16).toString("hex");
+    await admin.firestore().collection("profileMedia").doc(token).set({
+      path,
+      contentType: image.mime,
+      clientId,
+      kind,
+      createdAt: new Date().toISOString(),
+    });
+    return { url: `/api/clients/profile-media/${token}`, path, contentType: image.mime, token };
   } catch (err) {
     console.error("[Client hub] Image upload failed", err);
     throw new HubError(503, "Image storage is not configured yet.");
   }
+}
+
+async function rememberAsset(clientIds: string[], kind: string, stored: StoredImage) {
+  for (const id of clientIds) {
+    const existing = asRecord((await readDoc("clients", id))?.profileAssets);
+    await writeDoc("clients", id, {
+      profileAssets: {
+        ...existing,
+        [kind]: { path: stored.path, contentType: stored.contentType, token: stored.token },
+      },
+    });
+  }
+}
+
+const ASSET_FIELDS = [
+  ["headshotUrl", "headshot"],
+  ["companyLogoUrl", "companyLogo"],
+  ["brokerageLogoUrl", "brokerageLogo"],
+] as const;
+
+/** Replace an expiring signed URL with the app path that streams the stored file. */
+async function refreshDurableImages(actor: HubActor): Promise<ClientHubProfile> {
+  if (useMemory()) return actor.profile;
+  const rawHub = asRecord(actor.client.hubProfile);
+  const assets = asRecord(actor.client.profileAssets);
+  const profile = { ...actor.profile };
+  let changed = false;
+  for (const [field, kind] of ASSET_FIELDS) {
+    const rawUrl = typeof rawHub[field] === "string" ? rawHub[field] : "";
+    const current = profile[field] || rawUrl;
+    if (profile[field] && !isExpiringStorageUrl(rawUrl)) continue;
+    const stored = asRecord(assets[kind]);
+    const path = typeof stored.path === "string" && stored.path.startsWith("client-hub/")
+      ? stored.path
+      : storagePathFromUrl(current);
+    if (!path.startsWith("client-hub/")) continue;
+    const contentType = typeof stored.contentType === "string" ? stored.contentType : "image/jpeg";
+    const token = randomBytes(16).toString("hex");
+    await admin.firestore().collection("profileMedia").doc(token).set({
+      path,
+      contentType,
+      clientId: actor.clientId,
+      kind,
+      createdAt: new Date().toISOString(),
+    });
+    profile[field] = `/api/clients/profile-media/${token}`;
+    changed = true;
+  }
+  if (changed) await writeProfileToMatches(actor, profile);
+  return profile;
+}
+
+export async function readProfileMedia(token: string): Promise<{ bytes: Buffer; contentType: string } | null> {
+  if (!/^[a-f0-9]{32}$/.test(token) || useMemory() || !admin.apps.length) return null;
+  const snap = await admin.firestore().collection("profileMedia").doc(token).get();
+  if (!snap.exists) return null;
+  const data = snap.data() || {};
+  const path = typeof data.path === "string" ? data.path : "";
+  if (!path.startsWith("client-hub/") || path.includes("..")) return null;
+  const contentType = typeof data.contentType === "string" ? data.contentType : "image/jpeg";
+  const [bytes] = await admin.storage().bucket().file(path).download();
+  return { bytes, contentType };
 }
 
 async function membersOf(teamId: string): Promise<TeamMemberRecord[]> {

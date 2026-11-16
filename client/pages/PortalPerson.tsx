@@ -1,6 +1,8 @@
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { previewProfiles, ROLE_LABEL, type PersonProfile } from "@shared/peopleProfiles";
+import { portalPortrait } from "@shared/portalAvatar";
+import { PortalShell, portalHref } from "@/components/client-hub/PortalShell";
 import { useAuth } from "@/contexts/AuthContext";
 
 /** Limited profile inside the portal. The portal flag still gates the route. */
@@ -8,7 +10,7 @@ export default function PortalPerson() {
   const { kind = "", id = "" } = useParams();
   const [params] = useSearchParams();
   const example = params.get("example") === "1";
-  const { user } = useAuth();
+  const { user, signOutUser } = useAuth();
   const [profile, setProfile] = useState<PersonProfile | null>(() => example
     ? previewProfiles().find((item) => item.kind === kind && item.sourceId === id) || null
     : null);
@@ -26,20 +28,39 @@ export default function PortalPerson() {
     return () => { cancelled = true; };
   }, [example, user, kind, id]);
 
+  const portrait = portalPortrait({ photoUrl: profile?.photoUrl, headshotUrl: profile?.photoUrl });
+  const name = profile?.displayName || "Profile";
+  const letters = name.split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase() || "").join("") || "II";
+
   return (
-    <main className="min-h-screen bg-[#f4f7f8] px-4 py-8 text-slate-900">
-      <div className="mx-auto max-w-lg rounded-[2rem] bg-white p-6 shadow-sm">
-        <Link to={example ? "/portal/home?example=1&section=messages" : "/portal/home?section=messages"} className="text-xs font-bold text-[#0d9488]">Messages</Link>
-        {error ? <p className="mt-4 text-sm text-red-600">{error}</p> : null}
-        {profile ? (
-          <div className="mt-4" data-testid="portal-person">
-            <h1 className="text-2xl font-black">{profile.displayName}</h1>
-            <p className="text-xs font-bold uppercase tracking-widest text-slate-400">{ROLE_LABEL[profile.role]}</p>
-            {profile.brokerage ? <p className="mt-3 text-sm">{profile.brokerage}</p> : null}
-            {profile.bio ? <p className="mt-3 text-sm text-slate-600">{profile.bio}</p> : null}
-          </div>
-        ) : <p className="mt-4 text-sm text-slate-500">Loading profile…</p>}
+    <PortalShell
+      firstName={name.split(" ")[0] || "there"}
+      accountName={profile?.displayName}
+      active="messages"
+      example={example}
+      onSignOut={user ? () => void signOutUser() : undefined}
+    >
+      <div className="page-head">
+        <div>
+          <Link className="back" to={portalHref("/portal/home", example, "messages")}>Messages</Link>
+          <h1>{name}</h1>
+        </div>
       </div>
-    </main>
+      <article className="card" data-testid="portal-person" style={{ display: "flex", gap: 16, alignItems: "center" }}>
+        <span className="av" data-testid="portal-person-avatar" data-avatar-kind={portrait.kind} style={{ width: 72, height: 72, fontSize: 22 }}>
+          {portrait.url ? <img src={portrait.url} alt="" /> : letters}
+        </span>
+        <div>
+          {error ? <p className="text-sm text-red-600">{error}</p> : null}
+          {profile ? (
+            <>
+              <p className="kicker">{ROLE_LABEL[profile.role]}</p>
+              {profile.brokerage ? <p>{profile.brokerage}</p> : null}
+              {profile.bio ? <p className="ink3">{profile.bio}</p> : null}
+            </>
+          ) : <p className="ink3">Loading profile…</p>}
+        </div>
+      </article>
+    </PortalShell>
   );
 }

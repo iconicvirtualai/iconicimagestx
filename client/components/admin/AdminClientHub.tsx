@@ -3,6 +3,7 @@ import { cardLabel, type BillingProfile, type ClientHubProfile } from "@shared/c
 import { CardOnFileControl } from "@/components/client-hub/SettingsPages";
 import { auth } from "@/lib/firebase";
 import { prepareProfileImage } from "@/lib/profileImage";
+import { portalPortrait } from "@shared/portalAvatar";
 import type { ClientRecord } from "@/lib/clientRecords";
 
 type SquareConfig = { applicationId?: string; locationId?: string; environment?: string; missing?: string[] };
@@ -24,7 +25,13 @@ async function staffFetch<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export function AdminClientHeadshot({ client }: { client: ClientRecord }) {
-  const url = client.hubProfile?.headshotUrl || "";
+  const portrait = portalPortrait({
+    headshotUrl: client.hubProfile?.headshotUrl,
+    photoUrl: client.profileSettings?.photoUrl,
+    companyLogoUrl: client.hubProfile?.companyLogoUrl,
+    brokerageLogoUrl: client.hubProfile?.brokerageLogoUrl,
+  });
+  const url = portrait.url;
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -49,9 +56,9 @@ export function AdminClientHeadshot({ client }: { client: ClientRecord }) {
   return (
     <div className="mt-4 flex items-center gap-3" data-testid="admin-client-headshot">
       {url ? (
-        <img src={url} alt="" className="h-16 w-16 rounded-full object-cover bg-white/10" />
+        <img src={url} alt="" data-avatar-kind={portrait.kind} className="h-16 w-16 rounded-full object-cover bg-white/10" />
       ) : (
-        <div className="grid h-16 w-16 place-items-center rounded-full bg-white/10 text-xs font-black">Photo</div>
+        <div className="grid h-16 w-16 place-items-center rounded-full bg-white/10 text-xs font-black" data-avatar-kind="initials">Photo</div>
       )}
       <div>
         <label className="inline-flex min-h-10 cursor-pointer items-center rounded-xl bg-white px-3 text-[10px] font-black uppercase tracking-widest text-black">
