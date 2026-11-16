@@ -14089,14 +14089,14 @@ function readCookie(header2, name) {
   }
   return null;
 }
-const memory$4 = /* @__PURE__ */ new Map();
+const memory$5 = /* @__PURE__ */ new Map();
 function useMemoryStore() {
   return !admin.apps.length || process.env.NODE_ENV === "test" || process.env.ORDER_APPROVAL_STORE === "memory";
 }
 async function writeOrderApproval(id, approval) {
   if (useMemoryStore()) {
-    if (!memory$4.has(id)) return null;
-    memory$4.set(id, { approval });
+    if (!memory$5.has(id)) return null;
+    memory$5.set(id, { approval });
     return approval;
   }
   const ref = admin.firestore().collection("orders").doc(id);
@@ -16560,7 +16560,7 @@ function finite$1(value) {
   return Number.isFinite(number) ? number : null;
 }
 const db$u = () => admin.firestore();
-const bucket$3 = () => admin.storage().bucket();
+const bucket$4 = () => admin.storage().bucket();
 const BROWSER_ORIGINS = [
   "https://iconicimagestx.vercel.app",
   "https://iconicimagestx.com",
@@ -16571,7 +16571,7 @@ const BROWSER_ORIGINS = [
 let corsAttempt = null;
 function ensureBucketCors() {
   if (!corsAttempt) {
-    corsAttempt = bucket$3().setCorsConfiguration([{
+    corsAttempt = bucket$4().setCorsConfiguration([{
       origin: BROWSER_ORIGINS,
       method: ["GET", "HEAD", "PUT", "POST", "DELETE", "OPTIONS"],
       responseHeader: ["Content-Type", "Authorization", "Content-Length", "x-goog-resumable"],
@@ -16593,7 +16593,7 @@ async function createListingUploadUrl(listingId, fileName2, contentType, folder)
   const safeName = safeStorageFileName(fileName2);
   const resolvedType = contentTypeForUpload(safeName, contentType);
   const storagePath = `listings/${listingId}/${folder}/${Date.now()}_${safeName}`;
-  const file = bucket$3().file(storagePath);
+  const file = bucket$4().file(storagePath);
   const [uploadUrl] = await file.getSignedUrl({
     version: "v4",
     action: "write",
@@ -16607,7 +16607,7 @@ async function saveListingBytes(listingId, fileName2, contentType, folder, bytes
   const resolvedType = contentTypeForUpload(safeName, contentType);
   const storagePath = `listings/${listingId}/${folder}/${Date.now()}_${safeName}`;
   const token = randomUUID();
-  const file = bucket$3().file(storagePath);
+  const file = bucket$4().file(storagePath);
   await file.save(bytes, {
     resumable: false,
     metadata: {
@@ -16615,7 +16615,7 @@ async function saveListingBytes(listingId, fileName2, contentType, folder, bytes
       metadata: { firebaseStorageDownloadTokens: token }
     }
   });
-  const url = firebaseDownloadUrl(bucket$3().name, storagePath, token);
+  const url = firebaseDownloadUrl(bucket$4().name, storagePath, token);
   return { storagePath, contentType: resolvedType, url, token };
 }
 async function registerListingPhoto(options) {
@@ -16628,7 +16628,7 @@ async function registerListingPhoto(options) {
   if (!listingSnap.exists) {
     throw Object.assign(new Error("Listing not found."), { status: 404 });
   }
-  const file = bucket$3().file(storagePath);
+  const file = bucket$4().file(storagePath);
   const [exists] = await file.exists();
   if (!exists) {
     throw Object.assign(new Error("Uploaded file was not found in storage."), { status: 400 });
@@ -16644,7 +16644,7 @@ async function registerListingPhoto(options) {
         contentType: contentTypeForUpload(fileName2, options.contentType || metadata.contentType)
       });
     }
-    url = firebaseDownloadUrl(bucket$3().name, storagePath, token);
+    url = firebaseDownloadUrl(bucket$4().name, storagePath, token);
   }
   const listing = listingSnap.data() || {};
   const images = Array.isArray(listing.images) ? listing.images : [];
@@ -17154,7 +17154,7 @@ async function inspectFinishedListingJpeg(input) {
   return parseDeliveryInspection(body) || deliveryInspection("flag", [INSPECTION_FAILED_NOTE]);
 }
 const db$t = () => admin.firestore();
-const bucket$2 = () => admin.storage().bucket();
+const bucket$3 = () => admin.storage().bucket();
 function httpError$5(status2, message) {
   return Object.assign(new Error(message), { status: status2 });
 }
@@ -17262,7 +17262,7 @@ async function downloadListingImage(listingId, sourcePath, fileName2, contentTyp
   if (!isStudioPreviewable(fileName2, contentType)) {
     throw new OpenAiEditError("OpenAI can edit a JPEG, PNG, or WebP. RAW files stay in the queue until a preview exists.");
   }
-  const file = bucket$2().file(sourcePath);
+  const file = bucket$3().file(sourcePath);
   const [exists] = await file.exists();
   if (!exists) throw new OpenAiEditError("Source photo was not found in storage.");
   const [metadata] = await file.getMetadata();
@@ -17695,7 +17695,7 @@ async function copyToFinals(listingId, sourcePath, fileName2) {
     throw httpError$5(400, "That file is not stored on this listing.");
   }
   if (sourcePath.includes("/finals/")) {
-    const file = bucket$2().file(sourcePath);
+    const file = bucket$3().file(sourcePath);
     const [exists2] = await file.exists();
     if (!exists2) throw httpError$5(400, "Final file was not found in storage.");
     const [metadata2] = await file.getMetadata();
@@ -17703,7 +17703,7 @@ async function copyToFinals(listingId, sourcePath, fileName2) {
     const token2 = typeof current === "string" && current ? current.split(",")[0] : randomUUID();
     return {
       storagePath: sourcePath,
-      url: firebaseDownloadUrl(bucket$2().name, sourcePath, token2),
+      url: firebaseDownloadUrl(bucket$3().name, sourcePath, token2),
       contentType: metadata2.contentType || "image/jpeg",
       copied: false
     };
@@ -17715,10 +17715,10 @@ async function copyToFinals(listingId, sourcePath, fileName2) {
     throw httpError$5(400, "Approve a JPEG, PNG, or WebP. RAW stays in the AI queue.");
   }
   const destPath = finalsObjectPath(listingId, fileName2);
-  const source = bucket$2().file(sourcePath);
+  const source = bucket$3().file(sourcePath);
   const [exists] = await source.exists();
   if (!exists) throw httpError$5(400, "Source file was not found in storage.");
-  const dest = bucket$2().file(destPath);
+  const dest = bucket$3().file(destPath);
   await source.copy(dest);
   const [metadata] = await source.getMetadata();
   const token = randomUUID();
@@ -17729,7 +17729,7 @@ async function copyToFinals(listingId, sourcePath, fileName2) {
   });
   return {
     storagePath: destPath,
-    url: firebaseDownloadUrl(bucket$2().name, destPath, token),
+    url: firebaseDownloadUrl(bucket$3().name, destPath, token),
     contentType,
     copied: true
   };
@@ -22813,7 +22813,7 @@ function rejectionCopy(kind) {
   if (kind === "social") return "Upload an image, reel, or graphic (JPG, PNG, WebP, GIF, HEIC, SVG, MP4, or MOV).";
   return "Upload a PDF, Word document, or text file.";
 }
-const bucket$1 = () => admin.storage().bucket();
+const bucket$2 = () => admin.storage().bucket();
 class PortalUploadError extends Error {
   status;
   constructor(status2, message) {
@@ -22826,7 +22826,7 @@ async function createPortalClientUploadUrl(input) {
   if (decision.ok === false) throw new PortalUploadError(400, decision.error);
   await ensureBucketCors();
   const storagePath = portalUploadStoragePath(input.listingId, decision.kind, decision.fileName);
-  const file = bucket$1().file(storagePath);
+  const file = bucket$2().file(storagePath);
   const [uploadUrl] = await file.getSignedUrl({
     version: "v4",
     action: "write",
@@ -22842,7 +22842,7 @@ async function registerPortalClientUpload(input) {
     throw new PortalUploadError(400, "That file is not in this listing's upload folder.");
   }
   const storagePath = input.storagePath;
-  const file = bucket$1().file(storagePath);
+  const file = bucket$2().file(storagePath);
   const [exists] = await file.exists();
   if (!exists) throw new PortalUploadError(400, "The upload did not finish. Try that file again.");
   const [metadata] = await file.getMetadata();
@@ -22857,7 +22857,7 @@ async function registerPortalClientUpload(input) {
     contentType: decision.contentType,
     metadata: { firebaseStorageDownloadTokens: token }
   });
-  const url = firebaseDownloadUrl(bucket$1().name, storagePath, token);
+  const url = firebaseDownloadUrl(bucket$2().name, storagePath, token);
   const uploadedAt = (/* @__PURE__ */ new Date()).toISOString();
   const record2 = {
     id: randomUUID(),
@@ -23718,7 +23718,7 @@ class HubError extends Error {
     this.status = status2;
   }
 }
-const memory$3 = {
+const memory$4 = {
   clients: /* @__PURE__ */ new Map(),
   teams: /* @__PURE__ */ new Map(),
   members: /* @__PURE__ */ new Map(),
@@ -23744,13 +23744,13 @@ function asRecord$4(value) {
   return value && typeof value === "object" ? value : {};
 }
 async function readDoc(collection, id) {
-  if (useMemory$1()) return memory$3[collection].get(id) || null;
+  if (useMemory$1()) return memory$4[collection].get(id) || null;
   const snap = await db$h().collection(collectionName(collection)).doc(id).get();
   return snap.exists ? { ...snap.data() || {} } : null;
 }
 async function writeDoc(collection, id, data, merge = true) {
   if (useMemory$1()) {
-    memory$3[collection].set(id, merge ? { ...memory$3[collection].get(id) || {}, ...data } : { ...data });
+    memory$4[collection].set(id, merge ? { ...memory$4[collection].get(id) || {}, ...data } : { ...data });
     return;
   }
   await db$h().collection(collectionName(collection)).doc(id).set(data, { merge });
@@ -23765,7 +23765,7 @@ function collectionName(collection) {
 }
 async function queryEqual(collection, field, value) {
   if (useMemory$1()) {
-    return [...memory$3[collection].entries()].filter(([, row]) => row[field] === value).map(([id, row]) => ({ id, data: row }));
+    return [...memory$4[collection].entries()].filter(([, row]) => row[field] === value).map(([id, row]) => ({ id, data: row }));
   }
   const snap = await db$h().collection(collectionName(collection)).where(field, "==", value).limit(50).get();
   return snap.docs.map((doc) => ({ id: doc.id, data: doc.data() || {} }));
@@ -24204,7 +24204,7 @@ async function removeTeamMember(actor2, memberId) {
   if (!existing) throw new HubError(404, "Teammate not found.");
   const member = memberFrom(memberId, existing);
   requireTeamAdmin(actor2, member.ownerClientId);
-  if (useMemory$1()) memory$3.members.delete(memberId);
+  if (useMemory$1()) memory$4.members.delete(memberId);
   else await db$h().collection("customerTeamMembers").doc(memberId).delete();
   await refreshGrant(member.teamId, member.ownerClientId);
   return getTeam(await loadActor(actor2.uid, actor2.email));
@@ -24286,7 +24286,7 @@ async function deleteContact(actor2, contactId) {
   const scope = assertCrm(actor2, "write");
   const existing = await readDoc("contacts", contactId);
   if (!existing || existing.ownerClientId !== scope.ownerClientId) throw new HubError(404, "Contact not found.");
-  if (useMemory$1()) memory$3.contacts.delete(contactId);
+  if (useMemory$1()) memory$4.contacts.delete(contactId);
   else await db$h().collection("agentContacts").doc(contactId).delete();
   return { ok: true };
 }
@@ -35161,6 +35161,8 @@ function threadShell(partial) {
     phone: "",
     orderId: "",
     orderNumber: "",
+    listingId: "",
+    listingLabel: "",
     clientId: "",
     photographerId: "",
     photographerPhone: "",
@@ -35187,6 +35189,8 @@ function buildUnifiedThreads(snapshot) {
     if (!current.photographerId && thread.photographerId) current.photographerId = thread.photographerId;
     if (!current.orderId && thread.orderId) current.orderId = thread.orderId;
     if (!current.orderNumber && thread.orderNumber) current.orderNumber = thread.orderNumber;
+    if (!current.listingId && thread.listingId) current.listingId = thread.listingId;
+    if (!current.listingLabel && thread.listingLabel) current.listingLabel = thread.listingLabel;
     for (const id of thread.participantIds) {
       if (id && !current.participantIds.includes(id)) current.participantIds.push(id);
     }
@@ -35197,6 +35201,8 @@ function buildUnifiedThreads(snapshot) {
     if (!message.body && !message.senderName) continue;
     const orderId = text$5(raw.orderId);
     const orderNumber2 = shortOrderNumber(raw.orderNumber);
+    const listingId = text$5(raw.listingId);
+    const listingLabel = listingId ? text$5(raw.listingAddress) || text$5(raw.listingLabel) || text$5(raw.address) || text$5(raw.propertyAddress) : "";
     const explicit = text$5(raw.threadId);
     const id = explicit || (orderId ? `order:${orderId}` : `message:${message.id}`);
     const senderType = message.senderType;
@@ -35219,6 +35225,8 @@ function buildUnifiedThreads(snapshot) {
       title: text$5(raw.clientName) || message.senderName || "Conversation",
       subtitle: orderNumber2 ? `Order ${orderNumber2}` : text$5(raw.channel) || "Message",
       orderNumber: orderNumber2,
+      listingId,
+      listingLabel,
       email: emailOf(text$5(raw.email) || text$5(raw.recipient)),
       phone: text$5(raw.phone),
       orderId,
@@ -35310,6 +35318,8 @@ function buildUnifiedThreads(snapshot) {
   }
   for (const raw of snapshot.orderRequests || []) {
     const id = `lead:${text$5(raw.id)}`;
+    const listingId = text$5(raw.listingId);
+    const listingLabel = listingId ? text$5(raw.listingAddress) || text$5(raw.listingLabel) || text$5(raw.address) || text$5(raw.propertyAddress) : "";
     const name = text$5(raw.clientName) || [text$5(raw.firstName), text$5(raw.lastName)].filter(Boolean).join(" ") || text$5(raw.name) || "Order request";
     const body = text$5(raw.message) || text$5(raw.notes) || text$5(raw.services) || text$5(raw.address) || text$5(raw.propertyAddress) || "New order request";
     const createdAt = timeOf(raw.createdAt) || timeOf(raw.submittedAt);
@@ -35324,6 +35334,9 @@ function buildUnifiedThreads(snapshot) {
       email: text$5(raw.email) || text$5(raw.clientEmail),
       phone: text$5(raw.phone) || text$5(raw.clientPhone),
       orderId: text$5(raw.id),
+      orderNumber: shortOrderNumber(raw.orderNumber),
+      listingId,
+      listingLabel,
       clientId: text$5(raw.clientId),
       messages: [{
         id: `${id}-note`,
@@ -35564,206 +35577,126 @@ async function findUnifiedThread(id) {
 function threadsForPortal(threads, scope) {
   return threads.filter((thread) => threadVisibleTo(thread, scope));
 }
-const router$a = Router();
-const AUDIENCES = /* @__PURE__ */ new Set(["clients", "leads", "photographers", "socials"]);
-function ownerEmails() {
-  return ownerAllowlist(process.env.OWNER_EMAILS);
+const THREAD_KEY = /^(comm|direct):[A-Za-z0-9_.:-]{1,180}$/;
+function emptyFlag(key) {
+  return {
+    threadKey: key,
+    folder: null,
+    starred: false,
+    readAt: null,
+    forceUnread: false,
+    updatedAt: ""
+  };
 }
-async function requireOwnerOrAdmin(req, res, next) {
-  await requireStaff(req, res, () => {
-    if (!canUseAssistants({ role: req.staffRole, email: req.user?.email, ownerEmails: ownerEmails() })) {
-      res.status(403).json({ error: "Owner or admin access required." });
-      return;
+function parseFlagPatch(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const row = raw;
+  const key = typeof row.threadKey === "string" ? row.threadKey.trim() : "";
+  if (!THREAD_KEY.test(key)) return null;
+  const patch = { threadKey: key };
+  if ("folder" in row) {
+    if (row.folder === null) patch.folder = null;
+    else if (row.folder === "inbox" || row.folder === "archived" || row.folder === "trash")
+      patch.folder = row.folder;
+    else return null;
+  }
+  if ("starred" in row) {
+    if (typeof row.starred !== "boolean") return null;
+    patch.starred = row.starred;
+  }
+  if ("forceUnread" in row) {
+    if (typeof row.forceUnread !== "boolean") return null;
+    patch.forceUnread = row.forceUnread;
+  }
+  if ("readAt" in row) {
+    if (row.readAt === null) patch.readAt = null;
+    else if (typeof row.readAt === "string" && row.readAt.length > 0 && row.readAt.length <= 40)
+      patch.readAt = row.readAt;
+    else return null;
+  }
+  if (patch.folder === void 0 && patch.starred === void 0 && patch.forceUnread === void 0 && patch.readAt === void 0) {
+    return null;
+  }
+  return patch;
+}
+function mergeFlag(current, patch, now) {
+  const base = current && current.threadKey === patch.threadKey ? current : emptyFlag(patch.threadKey);
+  return {
+    threadKey: patch.threadKey,
+    folder: patch.folder !== void 0 ? patch.folder : base.folder,
+    starred: patch.starred !== void 0 ? patch.starred : base.starred,
+    readAt: patch.readAt !== void 0 ? patch.readAt : base.readAt,
+    forceUnread: patch.forceUnread !== void 0 ? patch.forceUnread : base.forceUnread,
+    updatedAt: now
+  };
+}
+function flagDocId(threadKeyValue) {
+  return threadKeyValue.replace(/\//g, "_");
+}
+const memory$3 = /* @__PURE__ */ new Map();
+function firestoreOn$1() {
+  return admin.apps.length > 0 && process.env.NODE_ENV !== "test";
+}
+function bucket$1(uid) {
+  const found = memory$3.get(uid);
+  if (found) return found;
+  const created = /* @__PURE__ */ new Map();
+  memory$3.set(uid, created);
+  return created;
+}
+async function listFlags(uid) {
+  if (!uid) return [];
+  if (!firestoreOn$1()) return [...bucket$1(uid).values()];
+  const snap = await admin.firestore().collection("portalInboxFlags").doc(uid).collection("threads").limit(200).get();
+  return snap.docs.map(
+    (doc) => normalizeStored(doc.id, doc.data())
+  ).filter((flag2) => Boolean(flag2));
+}
+async function saveFlags(uid, patches, now = (/* @__PURE__ */ new Date()).toISOString()) {
+  if (!uid) return [];
+  const existing = new Map(
+    (await listFlags(uid)).map((flag2) => [flag2.threadKey, flag2])
+  );
+  const saved = [];
+  for (const patch of patches) {
+    const next = mergeFlag(existing.get(patch.threadKey), patch, now);
+    saved.push(next);
+    existing.set(next.threadKey, next);
+    if (firestoreOn$1()) {
+      await admin.firestore().collection("portalInboxFlags").doc(uid).collection("threads").doc(flagDocId(next.threadKey)).set(next);
+    } else {
+      bucket$1(uid).set(next.threadKey, next);
     }
-    next();
+  }
+  return saved;
+}
+function patchesFromBody(body) {
+  const rows = Array.isArray(body) ? body : body && typeof body === "object" && Array.isArray(body.updates) ? body.updates : body && typeof body === "object" ? [body] : null;
+  if (!rows || rows.length === 0 || rows.length > 40) return null;
+  const patches = [];
+  for (const row of rows) {
+    const patch = parseFlagPatch(row);
+    if (!patch) return null;
+    patches.push(patch);
+  }
+  return patches;
+}
+function normalizeStored(id, data) {
+  const threadKey = typeof data.threadKey === "string" ? data.threadKey : id;
+  const patch = parseFlagPatch({
+    threadKey,
+    folder: data.folder ?? null,
+    starred: data.starred === true,
+    readAt: typeof data.readAt === "string" ? data.readAt : null,
+    forceUnread: data.forceUnread === true
   });
+  if (!patch) return null;
+  return mergeFlag(
+    void 0,
+    patch,
+    typeof data.updatedAt === "string" ? data.updatedAt : ""
+  );
 }
-async function portalScope(req) {
-  const uid = req.user?.uid || "";
-  const email = (req.user?.email || "").trim().toLowerCase();
-  if (!admin.apps.length) {
-    if (uid === "temp-admin-uid" || req.staffRole) {
-      return { kind: "photographer", uid, email, phone: "" };
-    }
-    return { kind: "client", uid, email, phone: "" };
-  }
-  try {
-    const staffDoc = await admin.firestore().collection("staff").doc(uid).get();
-    if (staffDoc.exists) {
-      const data = staffDoc.data() || {};
-      return {
-        kind: "photographer",
-        uid,
-        email,
-        phone: typeof data.phone === "string" ? data.phone : ""
-      };
-    }
-    const clientDoc = await admin.firestore().collection("clients").doc(uid).get();
-    const client = clientDoc.exists ? clientDoc.data() || {} : {};
-    let clientIds = [uid];
-    try {
-      const identity = await resolveClientIdentity(uid, email || (typeof client.email === "string" ? client.email : ""));
-      if (identity.ids.length) clientIds = identity.ids;
-    } catch (identityError) {
-      console.warn("[Communications] Client identity lookup failed.", identityError);
-    }
-    return {
-      kind: "client",
-      uid,
-      email: email || (typeof client.email === "string" ? client.email.trim().toLowerCase() : ""),
-      phone: typeof client.phone === "string" ? client.phone : "",
-      clientIds
-    };
-  } catch (error) {
-    console.warn("[Communications] Portal scope lookup failed.", error);
-    return { kind: "client", uid, email, phone: "" };
-  }
-}
-router$a.get("/threads", requireCoordinator, async (req, res) => {
-  const audience = typeof req.query.audience === "string" ? req.query.audience : "";
-  const q = typeof req.query.q === "string" ? req.query.q : "";
-  try {
-    const threads = await listUnifiedThreads();
-    const filtered = AUDIENCES.has(audience) ? filterThreads(threads, audience, q) : threads;
-    return res.json({ threads: filtered });
-  } catch (error) {
-    console.error("[Communications] Thread list failed.", error);
-    return res.status(500).json({ error: "Couldn't load conversations." });
-  }
-});
-router$a.get("/mine", requireAuth, async (req, res) => {
-  try {
-    const scope = await portalScope(req);
-    const threads = threadsForPortal(await listUnifiedThreads(), scope);
-    return res.json({ threads, unreadCount: portalUnreadCount(threads) });
-  } catch (error) {
-    console.error("[Communications] Portal threads failed.", error);
-    return res.status(500).json({ error: "Couldn't load your messages." });
-  }
-});
-router$a.post("/mine/reply", requireAuth, async (req, res) => {
-  const threadId = typeof req.body?.threadId === "string" ? req.body.threadId.trim() : "";
-  const content = typeof req.body?.body === "string" ? req.body.body.trim() : "";
-  if (!threadId || !content) return res.status(400).json({ error: "Choose a thread and enter a reply." });
-  if (content.length > 2e3) return res.status(400).json({ error: "Reply is too long. Please keep it under 2,000 characters." });
-  try {
-    const scope = await portalScope(req);
-    const thread = await findUnifiedThread(threadId);
-    if (!thread || !threadVisibleTo(thread, scope)) {
-      return res.status(404).json({ error: "Conversation not found." });
-    }
-    const senderType = scope.kind === "photographer" ? "photographer" : "client";
-    await logCommunicationMessage({
-      threadId: thread.id,
-      orderId: thread.orderId,
-      clientId: scope.kind === "client" ? scope.uid : thread.clientId,
-      photographerId: scope.kind === "photographer" ? scope.uid : thread.photographerId,
-      participantIds: [.../* @__PURE__ */ new Set([...thread.participantIds, scope.uid])],
-      senderId: scope.uid,
-      senderType,
-      senderName: req.user?.email || (scope.kind === "photographer" ? "Photographer" : "Client"),
-      email: thread.email,
-      phone: thread.phone,
-      content,
-      channel: "in-app",
-      direction: "inbound",
-      delivery: "logged",
-      isRead: false
-    });
-    return res.status(201).json({ ok: true });
-  } catch (error) {
-    console.error("[Communications] Portal reply failed.", error);
-    return res.status(500).json({ error: "Couldn't save the reply." });
-  }
-});
-router$a.post("/reply", requireCoordinator, async (req, res) => {
-  const threadId = typeof req.body?.threadId === "string" ? req.body.threadId.trim() : "";
-  const channel = req.body?.channel === "sms" ? "sms" : req.body?.channel === "email" ? "email" : "";
-  const content = typeof req.body?.body === "string" ? req.body.body.trim() : "";
-  const subject = typeof req.body?.subject === "string" && req.body.subject.trim() ? req.body.subject.trim() : "Message from Iconic Images";
-  if (!threadId || !channel || !content) {
-    return res.status(400).json({ error: "Choose a thread, a channel, and a message." });
-  }
-  if (content.length > 2e3) return res.status(400).json({ error: "Reply is too long. Please keep it under 2,000 characters." });
-  try {
-    const thread = await findUnifiedThread(threadId);
-    if (!thread) return res.status(404).json({ error: "Conversation not found." });
-    if (thread.connectorNeeded) {
-      return res.status(400).json({ error: "Connector needed. Instagram, Facebook, TikTok, and Google Business are not connected." });
-    }
-    const baseLog = {
-      threadId: thread.id,
-      orderId: thread.orderId,
-      clientId: thread.clientId,
-      photographerId: thread.photographerId,
-      participantIds: thread.participantIds,
-      senderId: req.user.uid,
-      senderType: "staff",
-      senderName: req.user?.email || "Iconic Images",
-      email: thread.email,
-      phone: thread.phone,
-      content
-    };
-    if (channel === "email") {
-      if (!thread.email) return res.status(400).json({ error: "This thread has no email address." });
-      const result2 = await sendEmail({
-        to: thread.email,
-        template: "manual_message",
-        subject,
-        variables: { message: content }
-      });
-      const delivery2 = result2.sent ? result2.delivery === "allowlist" ? "allowlist" : "sent" : "suppressed";
-      await logCommunicationMessage({
-        ...baseLog,
-        recipient: thread.email,
-        channel: "email",
-        direction: "outbound",
-        delivery: delivery2,
-        isRead: true
-      });
-      if (!result2.sent) {
-        return res.status(503).json({ error: "Client notifications are off.", suppressed: true });
-      }
-      return res.status(201).json({ ok: true, delivery: delivery2 });
-    }
-    if (!thread.phone) return res.status(400).json({ error: "This thread has no phone number." });
-    const result = await sendSMS({ to: thread.phone, body: content });
-    const delivery = result.suppressed ? "suppressed" : "sent";
-    await logCommunicationMessage({
-      ...baseLog,
-      recipient: thread.phone,
-      channel: "sms",
-      direction: "outbound",
-      delivery,
-      isRead: true
-    });
-    if (result.suppressed) {
-      return res.status(503).json({ error: "Client notifications are off.", suppressed: true });
-    }
-    return res.status(201).json({ ok: true, sid: result.sid, delivery });
-  } catch (error) {
-    console.error("[Communications] Reply failed.", error);
-    return res.status(500).json({ error: "Couldn't send the reply." });
-  }
-});
-router$a.get("/assist/status", requireOwnerOrAdmin, (_req, res) => {
-  const status2 = assistantStatus();
-  return res.json({
-    openai: status2.openai,
-    grok: status2.grok,
-    grokNotice: status2.grokNotice,
-    openaiNotice: status2.openaiNotice
-  });
-});
-router$a.post("/assist", requireOwnerOrAdmin, async (req, res) => {
-  const provider = req.body?.provider === "grok" ? "grok" : req.body?.provider === "openai" ? "openai" : "";
-  if (!provider) return res.status(400).json({ error: "Choose Grok or OpenAI." });
-  const messages = parseAssistantTurns(req.body);
-  if (!messages) return res.status(400).json({ error: "Enter a message to send." });
-  const result = await completeAssistant({ provider, messages });
-  if (result.ok === false) return res.status(result.status).json({ error: result.message, enabled: false });
-  return res.json({ reply: result.reply });
-});
 const PERSON_KINDS = ["staff", "client", "agent"];
 const STAFF_ROLES = ["admin", "coordinator", "photographer", "editor"];
 const CAPABILITIES = [
@@ -36755,6 +36688,48 @@ function sameSet(left, right) {
   const b = [...new Set(right)].sort().join("|");
   return a === b;
 }
+async function visibleInboxThread(actor2, id) {
+  const thread = (await loadThreads()).find((item) => item.id === id);
+  if (!thread) return null;
+  const canSee = thread.ownerUid === actor2.uid || thread.participantUids.includes(actor2.uid) || actor2.leadAdmin && thread.kind === "group" && thread.status === "sent";
+  return canSee ? thread : null;
+}
+async function replyInbox(actor2, id, body) {
+  const blocked = deny(actor2, "messages.compose");
+  if (blocked) return { error: blocked, status: 403 };
+  const text2 = body.trim();
+  if (!text2) return { error: "Write a reply first.", status: 400 };
+  if (text2.length > 2e3) return { error: "Reply is too long. Please keep it under 2,000 characters.", status: 400 };
+  const thread = await visibleInboxThread(actor2, id);
+  if (!thread || thread.status !== "sent" || !thread.participantUids.includes(actor2.uid)) {
+    return { error: "Message not found.", status: 404 };
+  }
+  const profiles = await loadProfiles();
+  const sender = profiles.find((profile) => profile.uid === actor2.uid) || null;
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  const note = {
+    id: `note-${randomBytes$1(4).toString("hex")}`,
+    senderUid: actor2.uid,
+    senderProfileId: sender?.id || profileId(actor2.kind === "client" ? "client" : "staff", actor2.uid),
+    senderName: sender?.displayName || actor2.email || "Iconic",
+    body: text2,
+    at: now
+  };
+  const next = {
+    ...thread,
+    body: text2,
+    messages: [...thread.messages, note],
+    notifyUids: thread.notifyUids,
+    participantUids: thread.participantUids,
+    updatedAt: now
+  };
+  await persistThread(next);
+  return {
+    thread: { ...next, notified: next.notifyUids.includes(actor2.uid) },
+    delivery: "in-app",
+    external: false
+  };
+}
 async function moveInbox(actor2, id, folder) {
   const blocked = deny(actor2, "messages.view");
   if (blocked) return { error: blocked, status: 403 };
@@ -36820,6 +36795,259 @@ function actorFromClient(uid, email) {
     permissions: null
   };
 }
+const router$a = Router();
+const AUDIENCES = /* @__PURE__ */ new Set(["clients", "leads", "photographers", "socials"]);
+function ownerEmails() {
+  return ownerAllowlist(process.env.OWNER_EMAILS);
+}
+async function requireOwnerOrAdmin(req, res, next) {
+  await requireStaff(req, res, () => {
+    if (!canUseAssistants({ role: req.staffRole, email: req.user?.email, ownerEmails: ownerEmails() })) {
+      res.status(403).json({ error: "Owner or admin access required." });
+      return;
+    }
+    next();
+  });
+}
+async function portalScope(req) {
+  const uid = req.user?.uid || "";
+  const email = (req.user?.email || "").trim().toLowerCase();
+  if (!admin.apps.length) {
+    if (uid === "temp-admin-uid" || req.staffRole) {
+      return { kind: "photographer", uid, email, phone: "" };
+    }
+    return { kind: "client", uid, email, phone: "" };
+  }
+  try {
+    const staffDoc = await admin.firestore().collection("staff").doc(uid).get();
+    if (staffDoc.exists) {
+      const data = staffDoc.data() || {};
+      return {
+        kind: "photographer",
+        uid,
+        email,
+        phone: typeof data.phone === "string" ? data.phone : ""
+      };
+    }
+    const clientDoc = await admin.firestore().collection("clients").doc(uid).get();
+    const client = clientDoc.exists ? clientDoc.data() || {} : {};
+    let clientIds = [uid];
+    try {
+      const identity = await resolveClientIdentity(uid, email || (typeof client.email === "string" ? client.email : ""));
+      if (identity.ids.length) clientIds = identity.ids;
+    } catch (identityError) {
+      console.warn("[Communications] Client identity lookup failed.", identityError);
+    }
+    return {
+      kind: "client",
+      uid,
+      email: email || (typeof client.email === "string" ? client.email.trim().toLowerCase() : ""),
+      phone: typeof client.phone === "string" ? client.phone : "",
+      clientIds
+    };
+  } catch (error) {
+    console.warn("[Communications] Portal scope lookup failed.", error);
+    return { kind: "client", uid, email, phone: "" };
+  }
+}
+router$a.get("/threads", requireCoordinator, async (req, res) => {
+  const audience = typeof req.query.audience === "string" ? req.query.audience : "";
+  const q = typeof req.query.q === "string" ? req.query.q : "";
+  try {
+    const threads = await listUnifiedThreads();
+    const filtered = AUDIENCES.has(audience) ? filterThreads(threads, audience, q) : threads;
+    return res.json({ threads: filtered });
+  } catch (error) {
+    console.error("[Communications] Thread list failed.", error);
+    return res.status(500).json({ error: "Couldn't load conversations." });
+  }
+});
+router$a.get("/mine", requireAuth, async (req, res) => {
+  try {
+    const scope = await portalScope(req);
+    const threads = threadsForPortal(await listUnifiedThreads(), scope);
+    return res.json({ threads, unreadCount: portalUnreadCount(threads) });
+  } catch (error) {
+    console.error("[Communications] Portal threads failed.", error);
+    return res.status(500).json({ error: "Couldn't load your messages." });
+  }
+});
+router$a.post("/mine/reply", requireAuth, async (req, res) => {
+  const threadId = typeof req.body?.threadId === "string" ? req.body.threadId.trim() : "";
+  const content = typeof req.body?.body === "string" ? req.body.body.trim() : "";
+  if (!threadId || !content) return res.status(400).json({ error: "Choose a thread and enter a reply." });
+  if (content.length > 2e3) return res.status(400).json({ error: "Reply is too long. Please keep it under 2,000 characters." });
+  try {
+    const scope = await portalScope(req);
+    const thread = await findUnifiedThread(threadId);
+    if (!thread || !threadVisibleTo(thread, scope)) {
+      return res.status(404).json({ error: "Conversation not found." });
+    }
+    const senderType = scope.kind === "photographer" ? "photographer" : "client";
+    await logCommunicationMessage({
+      threadId: thread.id,
+      orderId: thread.orderId,
+      clientId: scope.kind === "client" ? scope.uid : thread.clientId,
+      photographerId: scope.kind === "photographer" ? scope.uid : thread.photographerId,
+      participantIds: [.../* @__PURE__ */ new Set([...thread.participantIds, scope.uid])],
+      senderId: scope.uid,
+      senderType,
+      senderName: req.user?.email || (scope.kind === "photographer" ? "Photographer" : "Client"),
+      email: thread.email,
+      phone: thread.phone,
+      content,
+      channel: "in-app",
+      direction: "inbound",
+      delivery: "logged",
+      isRead: false
+    });
+    return res.status(201).json({ ok: true });
+  } catch (error) {
+    console.error("[Communications] Portal reply failed.", error);
+    return res.status(500).json({ error: "Couldn't save the reply." });
+  }
+});
+router$a.get("/mine/flags", requireAuth, async (req, res) => {
+  try {
+    const who = await resolveDeskActor(req.user?.uid || "", req.user?.email || "");
+    if (!who) return res.status(403).json({ error: "Sign in to see messages." });
+    const flags = await listFlags(who.uid);
+    return res.json({ flags });
+  } catch (error) {
+    console.error("[Communications] Portal flags failed.", error);
+    return res.status(500).json({ error: "Couldn't load your message folders." });
+  }
+});
+router$a.post("/mine/flags", requireAuth, async (req, res) => {
+  const patches = patchesFromBody(req.body);
+  if (!patches) return res.status(400).json({ error: "Choose a conversation to update." });
+  try {
+    const who = await resolveDeskActor(req.user?.uid || "", req.user?.email || "");
+    if (!who) return res.status(403).json({ error: "Sign in to update a conversation." });
+    const scope = await portalScope(req);
+    const flagPatches = [];
+    for (const patch of patches) {
+      if (patch.threadKey.startsWith("direct:")) {
+        const id = patch.threadKey.slice("direct:".length);
+        const thread = await visibleInboxThread(who, id);
+        if (!thread) return res.status(404).json({ error: "Conversation not found." });
+        if (patch.folder) {
+          const moved = await moveInbox(who, id, patch.folder);
+          if ("error" in moved && moved.error) return res.status(moved.status).json({ error: moved.error });
+        }
+        if (patch.starred !== void 0 || patch.forceUnread !== void 0 || patch.readAt !== void 0) {
+          flagPatches.push({
+            threadKey: patch.threadKey,
+            starred: patch.starred,
+            forceUnread: patch.forceUnread,
+            readAt: patch.readAt
+          });
+        }
+        continue;
+      }
+      const visible = await conversationVisible(scope, patch.threadKey.slice("comm:".length));
+      if (!visible) return res.status(404).json({ error: "Conversation not found." });
+      flagPatches.push(patch);
+    }
+    const flags = flagPatches.length ? await saveFlags(who.uid, flagPatches) : await listFlags(who.uid);
+    return res.json({ flags });
+  } catch (error) {
+    console.error("[Communications] Portal flag save failed.", error);
+    return res.status(500).json({ error: "Couldn't update that conversation." });
+  }
+});
+async function conversationVisible(scope, id) {
+  const thread = await findUnifiedThread(id);
+  return Boolean(thread && threadVisibleTo(thread, scope));
+}
+router$a.post("/reply", requireCoordinator, async (req, res) => {
+  const threadId = typeof req.body?.threadId === "string" ? req.body.threadId.trim() : "";
+  const channel = req.body?.channel === "sms" ? "sms" : req.body?.channel === "email" ? "email" : "";
+  const content = typeof req.body?.body === "string" ? req.body.body.trim() : "";
+  const subject = typeof req.body?.subject === "string" && req.body.subject.trim() ? req.body.subject.trim() : "Message from Iconic Images";
+  if (!threadId || !channel || !content) {
+    return res.status(400).json({ error: "Choose a thread, a channel, and a message." });
+  }
+  if (content.length > 2e3) return res.status(400).json({ error: "Reply is too long. Please keep it under 2,000 characters." });
+  try {
+    const thread = await findUnifiedThread(threadId);
+    if (!thread) return res.status(404).json({ error: "Conversation not found." });
+    if (thread.connectorNeeded) {
+      return res.status(400).json({ error: "Connector needed. Instagram, Facebook, TikTok, and Google Business are not connected." });
+    }
+    const baseLog = {
+      threadId: thread.id,
+      orderId: thread.orderId,
+      clientId: thread.clientId,
+      photographerId: thread.photographerId,
+      participantIds: thread.participantIds,
+      senderId: req.user.uid,
+      senderType: "staff",
+      senderName: req.user?.email || "Iconic Images",
+      email: thread.email,
+      phone: thread.phone,
+      content
+    };
+    if (channel === "email") {
+      if (!thread.email) return res.status(400).json({ error: "This thread has no email address." });
+      const result2 = await sendEmail({
+        to: thread.email,
+        template: "manual_message",
+        subject,
+        variables: { message: content }
+      });
+      const delivery2 = result2.sent ? result2.delivery === "allowlist" ? "allowlist" : "sent" : "suppressed";
+      await logCommunicationMessage({
+        ...baseLog,
+        recipient: thread.email,
+        channel: "email",
+        direction: "outbound",
+        delivery: delivery2,
+        isRead: true
+      });
+      if (!result2.sent) {
+        return res.status(503).json({ error: "Client notifications are off.", suppressed: true });
+      }
+      return res.status(201).json({ ok: true, delivery: delivery2 });
+    }
+    if (!thread.phone) return res.status(400).json({ error: "This thread has no phone number." });
+    const result = await sendSMS({ to: thread.phone, body: content });
+    const delivery = result.suppressed ? "suppressed" : "sent";
+    await logCommunicationMessage({
+      ...baseLog,
+      recipient: thread.phone,
+      channel: "sms",
+      direction: "outbound",
+      delivery,
+      isRead: true
+    });
+    if (result.suppressed) {
+      return res.status(503).json({ error: "Client notifications are off.", suppressed: true });
+    }
+    return res.status(201).json({ ok: true, sid: result.sid, delivery });
+  } catch (error) {
+    console.error("[Communications] Reply failed.", error);
+    return res.status(500).json({ error: "Couldn't send the reply." });
+  }
+});
+router$a.get("/assist/status", requireOwnerOrAdmin, (_req, res) => {
+  const status2 = assistantStatus();
+  return res.json({
+    openai: status2.openai,
+    grok: status2.grok,
+    grokNotice: status2.grokNotice,
+    openaiNotice: status2.openaiNotice
+  });
+});
+router$a.post("/assist", requireOwnerOrAdmin, async (req, res) => {
+  const provider = req.body?.provider === "grok" ? "grok" : req.body?.provider === "openai" ? "openai" : "";
+  if (!provider) return res.status(400).json({ error: "Choose Grok or OpenAI." });
+  const messages = parseAssistantTurns(req.body);
+  if (!messages) return res.status(400).json({ error: "Enter a message to send." });
+  const result = await completeAssistant({ provider, messages });
+  if (result.ok === false) return res.status(result.status).json({ error: result.message, enabled: false });
+  return res.json({ reply: result.reply });
+});
 const router$9 = Router();
 function kindOf(value) {
   return PERSON_KINDS.includes(value) ? value : null;
@@ -36898,6 +37126,14 @@ router$9.post("/inbox/send", requireAuth, async (req, res) => {
   const who = await actor$2(req);
   if (!who) return res.status(403).json({ error: "Sign in to send a message." });
   const result = await sendInbox(who, req.body || {});
+  if ("error" in result && result.error) return res.status(result.status).json({ error: result.error });
+  return res.status(201).json(result);
+});
+router$9.post("/inbox/:id/reply", requireAuth, async (req, res) => {
+  const who = await actor$2(req);
+  if (!who) return res.status(403).json({ error: "Sign in to reply." });
+  const body = typeof req.body?.body === "string" ? req.body.body : "";
+  const result = await replyInbox(who, req.params.id, body);
   if ("error" in result && result.error) return res.status(result.status).json({ error: result.error });
   return res.status(201).json(result);
 });
