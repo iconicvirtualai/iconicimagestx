@@ -14,6 +14,8 @@ import {
   injectPublicPage,
   isNoIndexPath,
   metaPlan,
+  stampCanonical,
+  stampOgUrl,
   robotsTxt,
   sitemapXml,
   stripPublicMeta,
@@ -94,6 +96,40 @@ describe("public page meta", () => {
     expect(`${page?.title} ${page?.description}`.toLowerCase()).not.toContain(
       ["sun", "dale"].join(""),
     );
+  });
+
+  it("defaults canonical, og:url, and og:image to www on every public route", () => {
+    for (const page of PUBLIC_PAGES) {
+      const plan = metaPlan(page.path);
+      const url = canonicalUrl(page.path);
+      expect(plan).toMatchObject({ kind: "public", canonical: url, image: `${CANONICAL_WWW_ORIGIN}${OG_IMAGE_PATH}` });
+      expect(url.startsWith(`${CANONICAL_WWW_ORIGIN}/`) || url === `${CANONICAL_WWW_ORIGIN}/`).toBe(true);
+      const html = injectPublicPage(shell, page);
+      expect(html).toContain(`<link rel="canonical" href="${url}" />`);
+      expect(html).toContain(`<meta property="og:url" content="${url}" />`);
+      expect(html).toContain(`<meta property="og:image" content="${CANONICAL_WWW_ORIGIN}${OG_IMAGE_PATH}" />`);
+      expect(html).not.toContain("vercel.app");
+    }
+    expect(metaPlan("/studio-105/rooms")).toMatchObject({
+      kind: "public",
+      canonical: `${CANONICAL_WWW_ORIGIN}/studio-105/rooms`,
+      image: `${CANONICAL_WWW_ORIGIN}${OG_IMAGE_PATH}`,
+    });
+    expect(metaPlan("/studio-105/noir")).toMatchObject({ canonical: `${CANONICAL_WWW_ORIGIN}/studio-105/noir` });
+    expect(metaPlan("/studio-105/blanc")).toMatchObject({ canonical: `${CANONICAL_WWW_ORIGIN}/studio-105/blanc` });
+    expect(metaPlan("/studio-105/rates")).toMatchObject({ canonical: `${CANONICAL_WWW_ORIGIN}/studio-105/rates` });
+    expect(metaPlan("/studio-105/faq")).toMatchObject({ canonical: `${CANONICAL_WWW_ORIGIN}/studio-105/faq` });
+    expect(metaPlan("/studio-105/location")).toMatchObject({ canonical: `${CANONICAL_WWW_ORIGIN}/studio-105/location` });
+    expect(metaPlan("/studio-105/book")).toMatchObject({ canonical: `${CANONICAL_WWW_ORIGIN}/studio-105/book` });
+    const pay = metaPlan("/pay-at-close");
+    expect(pay).toMatchObject({
+      kind: "public",
+      canonical: `${CANONICAL_WWW_ORIGIN}/pay-at-close`,
+    });
+    if (pay.kind === "public") expect(pay.image.startsWith(`${CANONICAL_WWW_ORIGIN}/`)).toBe(true);
+    const holiday = stampOgUrl(stampCanonical("<head></head>", `${CANONICAL_WWW_ORIGIN}/thankful`), `${CANONICAL_WWW_ORIGIN}/thankful`);
+    expect(holiday).toContain(`<link rel="canonical" href="${CANONICAL_WWW_ORIGIN}/thankful" />`);
+    expect(holiday).toContain(`<meta property="og:url" content="${CANONICAL_WWW_ORIGIN}/thankful" />`);
   });
 
   it("injects title, description, canonical, and social tags into the shell", () => {

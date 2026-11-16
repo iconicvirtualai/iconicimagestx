@@ -10,11 +10,12 @@ const netlify = readFileSync(new URL("../../netlify.toml", import.meta.url), "ut
 const nodeBuild = readFileSync(new URL("../node-build.ts", import.meta.url), "utf8");
 const galleryLink = readFileSync(new URL("../../shared/clientGalleryLink.ts", import.meta.url), "utf8");
 
-const BARE = ["/studio", "/studio/", "/gallery", "/gallery/"];
+const BARE = ["/studio", "/studio/", "/studios", "/studios/", "/gallery", "/gallery/"];
 
 describe("bare /studio and /gallery", () => {
   it("sends bare studio to Studio 105 and bare gallery to the client portal", () => {
     expect(app).toContain('<Route path="/studio" element={<Navigate to="/studio-105" replace />} />');
+    expect(app).toContain('<Route path="/studios" element={<Navigate to="/studio-105" replace />} />');
     expect(app).toContain('<Route path="/gallery" element={<Navigate to="/portal" replace />} />');
     expect(app).toContain('<Route path="/studio-105" element={<Studio105 />} />');
     expect(app).toContain('<Route path="/studio/:listingId" element={<ClientStudio />} />');
@@ -31,6 +32,8 @@ describe("bare /studio and /gallery", () => {
       expect(rule.source.includes(":") || rule.source.includes("*") || rule.source.includes("(")).toBe(false);
     }
     expect(redirects.filter((rule) => rule.source.startsWith("/studio")).map((rule) => rule.destination)).toEqual([
+      "/studio-105",
+      "/studio-105",
       "/studio-105",
       "/studio-105",
     ]);

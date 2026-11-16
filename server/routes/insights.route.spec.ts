@@ -75,7 +75,9 @@ describe("insights API", () => {
     expect(page.status).toBe(200);
     const html = await page.text();
     expect(html).toContain("Twilight porch | Iconic Insights");
-    expect(html).toContain("https://iconicimagestx.vercel.app/media/photos/drone-hero.jpg");
+    expect(html).toContain("https://www.iconicimagestx.com/media/photos/drone-hero.jpg");
+    expect(html).toContain('rel="canonical" href="https://www.iconicimagestx.com/insights/twilight-porch"');
+    expect(html).toContain('property="og:url" content="https://www.iconicimagestx.com/insights/twilight-porch"');
     expect(html).toContain('property="og:image"');
 
     const removed = await fetch(`${baseUrl}/api/insights/admin/posts/${draft.id}/unpublish`, {

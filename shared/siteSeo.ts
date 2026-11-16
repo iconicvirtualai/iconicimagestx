@@ -1,11 +1,11 @@
 /**
  * Public SEO for the Vite SPA.
  *
- * iconicimagestx.vercel.app stays the default origin, including every
- * *.vercel.app preview host. www.iconicimagestx.com is the primary custom
- * domain. Apex iconicimagestx.com redirects to www. Canonical, sitemap, and
- * robots use the www origin only when the request host is one of those two
- * custom domains.
+ * Canonical, og:url, and og:image use https://www.iconicimagestx.com on every
+ * host, including iconicimagestx.vercel.app. That host still serves the pages
+ * with status 200. It is not redirected. Apex iconicimagestx.com redirects to
+ * www. Sitemap and robots stay host-aware: the two custom domains use www,
+ * and every other host, including *.vercel.app previews, keeps the app origin.
  */
 
 import { LEGAL_BUSINESS_NAME } from "./businessContact.ts";
@@ -17,7 +17,7 @@ export const DEFAULT_SITE_ORIGIN = "https://iconicimagestx.vercel.app";
 /** Primary custom-domain origin. Apex redirects here and must not be used as the canonical host. */
 export const CANONICAL_WWW_ORIGIN = "https://www.iconicimagestx.com";
 
-/** Hosts that receive www canonicals. vercel.app hosts are never included. */
+/** Custom domains. Sitemap and robots use www for these hosts only. */
 export const CUSTOM_DOMAIN_HOSTS = ["iconicimagestx.com", "www.iconicimagestx.com"] as const;
 
 /** Drone still already used on the public marketing pages. */
@@ -184,9 +184,10 @@ export function isCustomDomainHost(host: string | null | undefined): boolean {
 }
 
 /**
- * Origin for canonical URLs, sitemap, and robots.
+ * Origin for sitemap and robots.
  * Custom-domain hosts always use www. Every other host, including
  * iconicimagestx.vercel.app and preview *.vercel.app hosts, keeps `fallback`.
+ * Page canonicals do not use this. They always use CANONICAL_WWW_ORIGIN.
  */
 export function originForHost(host: string | null | undefined, fallback = SITE_ORIGIN): string {
   return isCustomDomainHost(host) ? CANONICAL_WWW_ORIGIN : fallback;
@@ -199,14 +200,22 @@ export function wwwShellFile(pageFile: string): string {
   return `seo/www/${pageFile}`;
 }
 
+function stampHeadTag(html: string, tag: string, pattern: RegExp): string {
+  if (pattern.test(html)) return html.replace(pattern, tag);
+  if (html.includes("</head>")) return html.replace("</head>", `    ${tag}\n  </head>`);
+  return `${tag}\n${html}`;
+}
+
 /** Insert or replace the canonical link. Leaves every other tag alone. */
 export function stampCanonical(html: string, href: string): string {
   const tag = `<link rel="canonical" href="${escapeHtml(href)}" />`;
-  if (/<link\b[^>]*rel=["']canonical["'][^>]*>/i.test(html)) {
-    return html.replace(/<link\b[^>]*rel=["']canonical["'][^>]*>/i, tag);
-  }
-  if (html.includes("</head>")) return html.replace("</head>", `    ${tag}\n  </head>`);
-  return `${tag}\n${html}`;
+  return stampHeadTag(html, tag, /<link\b[^>]*rel=["']canonical["'][^>]*>/i);
+}
+
+/** Insert or replace og:url. Leaves every other tag alone. */
+export function stampOgUrl(html: string, href: string): string {
+  const tag = `<meta property="og:url" content="${escapeHtml(href)}" />`;
+  return stampHeadTag(html, tag, /<meta\b[^>]*property=["']og:url["'][^>]*>/i);
 }
 
 export function normalizePath(pathname: string): string {
@@ -215,11 +224,11 @@ export function normalizePath(pathname: string): string {
   return path || "/";
 }
 
-export function canonicalUrl(path: string, origin = SITE_ORIGIN): string {
+export function canonicalUrl(path: string, origin = CANONICAL_WWW_ORIGIN): string {
   return path === "/" ? `${origin}/` : `${origin}${path}`;
 }
 
-export function ogImageUrl(origin = SITE_ORIGIN): string {
+export function ogImageUrl(origin = CANONICAL_WWW_ORIGIN): string {
   return `${origin}${OG_IMAGE_PATH}`;
 }
 
@@ -244,7 +253,7 @@ export type MetaPlan =
   | { kind: "preserve-title" }
   | { kind: "hands-off" };
 
-export function metaPlan(pathname: string, origin = SITE_ORIGIN): MetaPlan {
+export function metaPlan(pathname: string, origin = CANONICAL_WWW_ORIGIN): MetaPlan {
   const path = normalizePath(pathname);
   if (path === "/realestate-75" || path.startsWith("/realestate-75/")) {
     return {
@@ -312,7 +321,7 @@ export function stripPublicMeta(html: string): string {
     .replace(/<meta\b[^>]*\/?>\s*/gi, (tag) => (isPublicMetaTag(tag) ? "" : tag));
 }
 
-export function pageHeadTags(page: PublicPage, origin = SITE_ORIGIN): string {
+export function pageHeadTags(page: PublicPage, origin = CANONICAL_WWW_ORIGIN): string {
   const image = ogImageUrl(origin);
   const url = canonicalUrl(page.path, origin);
   const title = escapeHtml(page.title);
@@ -341,7 +350,7 @@ export function injectHead(html: string, tags: string): string {
   return `${tags}\n${next}`;
 }
 
-export function injectPublicPage(html: string, page: PublicPage, origin = SITE_ORIGIN): string {
+export function injectPublicPage(html: string, page: PublicPage, origin = CANONICAL_WWW_ORIGIN): string {
   return injectHead(html, pageHeadTags(page, origin));
 }
 

@@ -77,6 +77,16 @@
       "permanent": false
     },
     {
+      "source": "/studios",
+      "destination": "/studio-105",
+      "permanent": false
+    },
+    {
+      "source": "/studios/",
+      "destination": "/studio-105",
+      "permanent": false
+    },
+    {
       "source": "/gallery",
       "destination": "/portal",
       "permanent": false

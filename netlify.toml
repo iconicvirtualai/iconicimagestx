@@ -69,6 +69,16 @@
   to = "/studio-105"
 
 [[redirects]]
+  from = "/studios"
+  status = 302
+  to = "/studio-105"
+
+[[redirects]]
+  from = "/studios/"
+  status = 302
+  to = "/studio-105"
+
+[[redirects]]
   from = "/gallery"
   status = 302
   to = "/portal"
@@ -78,7 +88,7 @@
   status = 302
   to = "/portal"
 
-# Public aliases. /studios and /forgot-password are left for other PRs.
+# Public aliases. /forgot-password is left for the photographer password page.
 [[redirects]]
   from = "/booking"
   status = 301

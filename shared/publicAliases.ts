@@ -1,8 +1,9 @@
 /**
  * Public paths that 404 on iconicimagestx.vercel.app and are not in the Wix map.
  * Each one hops once to a page that already exists.
- * /studios is left alone for PR #161. /forgot-password is left alone for the
- * photographer password page. A redirect here would conflict with those.
+ * /studios uses the same temporary redirect as /studio (to /studio-105).
+ * /forgot-password is left alone for the photographer password page.
+ * A redirect here would conflict with that page.
  */
 
 export type PublicAlias = {

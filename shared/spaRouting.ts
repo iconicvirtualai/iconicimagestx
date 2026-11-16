@@ -154,6 +154,8 @@ export function buildVercelRedirects(): Redirect[] {
     { source: "/pricing-v1/", destination: "/pricing", statusCode: 301 },
     { source: "/studio", destination: "/studio-105", permanent: false },
     { source: "/studio/", destination: "/studio-105", permanent: false },
+    { source: "/studios", destination: "/studio-105", permanent: false },
+    { source: "/studios/", destination: "/studio-105", permanent: false },
     { source: "/gallery", destination: "/portal", permanent: false },
     { source: "/gallery/", destination: "/portal", permanent: false },
     ...publicAliasRedirects(),
