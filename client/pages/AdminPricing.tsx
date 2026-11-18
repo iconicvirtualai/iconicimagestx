@@ -47,6 +47,7 @@ interface PackageFields {
   description: string;
   active: boolean;
   sortOrder: string;
+  extraPhotoPrice: string;
 }
 
 interface LegacySheetRow {
@@ -139,6 +140,7 @@ export default function AdminPricing() {
       description: item.description,
       active: item.isActive,
       sortOrder: String(item.sortOrder),
+      extraPhotoPrice: item.extraPhotoPrice == null ? "" : String(item.extraPhotoPrice),
     }])));
     setAdjustmentDraft(Object.fromEntries(rates.map((item) => [item.id, item])));
   }, []);
@@ -166,6 +168,7 @@ export default function AdminPricing() {
       description: draft.description,
       isActive: draft.active,
       sortOrder: Number(draft.sortOrder),
+      extraPhotoPrice: draft.extraPhotoPrice.trim() === "" ? null : Number(draft.extraPhotoPrice),
     });
     if (result.ok === false) {
       toast.error(result.error);
@@ -521,7 +524,14 @@ function PackageRow({
   onSave: () => void;
   onRemove: () => void;
 }) {
-  const fields = draft || { name: item.name, price: String(item.price), description: item.description, active: item.isActive, sortOrder: String(item.sortOrder) };
+  const fields = draft || {
+    name: item.name,
+    price: String(item.price),
+    description: item.description,
+    active: item.isActive,
+    sortOrder: String(item.sortOrder),
+    extraPhotoPrice: item.extraPhotoPrice == null ? "" : String(item.extraPhotoPrice),
+  };
   return (
     <div data-testid={`price-package-${item.id}`} className="flex flex-col gap-3 rounded-2xl border border-gray-100 bg-gray-50 p-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0 flex-1">
@@ -529,6 +539,7 @@ function PackageRow({
         <p className="text-[11px] font-medium text-gray-500">
           {BOOKING_PACKAGE_CATEGORY_LABELS[item.category]} · {BOOKING_CATALOG_KIND_LABELS[item.bookingKind]} · {item.id}
           {item.price > 0 ? ` · ${money(item.price)}` : " · No price yet"}
+          {item.extraPhotoPrice != null ? ` · Extra photo ${money(item.extraPhotoPrice)}` : ""}
         </p>
         {apprenticeshipPackages.some((pkg) => pkg.id === item.id) ? (
           <p className="mt-2 max-w-md text-xs font-medium text-slate-500 whitespace-normal">
@@ -543,6 +554,17 @@ function PackageRow({
             <label className="flex items-center gap-2 text-xs font-bold">
               <input type="checkbox" checked={fields.active} onChange={(event) => onDraft({ ...fields, active: event.target.checked })} />
               Show on the booking form
+            </label>
+            <label className="block sm:col-span-2">
+              <span className={labelCls}>Extra photo</span>
+              <input
+                aria-label={`${item.name} extra photo price`}
+                inputMode="decimal"
+                placeholder="Blank until set"
+                className={`${inputCls} mt-1`}
+                value={fields.extraPhotoPrice}
+                onChange={(event) => onDraft({ ...fields, extraPhotoPrice: event.target.value })}
+              />
             </label>
             <textarea aria-label={`${item.name} description`} className={`${inputCls} sm:col-span-2 whitespace-normal`} rows={3} value={fields.description} onChange={(event) => onDraft({ ...fields, description: event.target.value })} />
           </div>

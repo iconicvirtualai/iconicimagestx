@@ -22,10 +22,13 @@ import { galleryStatusNeedsReleaseGate } from "../../shared/galleryRelease";
 import { deliverGalleryToClient } from "../services/galleryDeliver";
 import { loadGalleryReleaseForGallery } from "../services/galleryReleaseGate";
 import { handlePublicGalleryLink } from "./galleryLink";
+import { createRateLimiter } from "../lib/rateLimit";
+import { liveGallerySelectionService, SelectionError } from "../services/gallerySelections";
 
 const router = Router();
 const db = () => admin.firestore();
 const storage = () => admin.storage().bucket();
+const selectionWrites = createRateLimiter({ windowMs: 60_000, max: 40 });
 
 function cleanPosterUrl(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -102,12 +105,14 @@ async function downloadGateForGallery(gallery: Record<string, unknown>): Promise
 function clientGalleryPayload(id: string, gallery: Record<string, unknown>, gate: GalleryDownloadGate & { invoice: Record<string, unknown> | null }) {
   const unlocked = clientGalleryDownloadsUnlocked(gate);
   const invoice = gate.invoice;
-  const showMedia = ["delivered", "approved"].includes(String(gallery.status || ""));
-  const media = orderedGalleryMedia([
+  const selectionVisible = gallery.selectionEnabled === true;
+  const showMedia = ["delivered", "approved"].includes(String(gallery.status || "")) || selectionVisible;
+  const visibleItems = [
     ...(Array.isArray(gallery.mediaItems) ? gallery.mediaItems : []),
     ...(Array.isArray(gallery.videoLinks) ? gallery.videoLinks : []),
     ...(Array.isArray(gallery.tourLinks) ? gallery.tourLinks : []),
-  ]);
+  ].filter((item) => !item || typeof item !== "object" || (item as { archived?: unknown }).archived !== true);
+  const media = orderedGalleryMedia(visibleItems);
   return {
     id,
     title: gallery.title,
@@ -208,6 +213,7 @@ router.get("/public/:id/photos.zip", async (req, res) => {
       return res.status(403).json({ error: ICONIC_DOWNLOAD_LOCK.message });
     }
     const photos = orderedGalleryMedia(Array.isArray(gallery.mediaItems) ? gallery.mediaItems : [])
+      .filter((item) => (item as { archived?: unknown }).archived !== true)
       .filter((item) => {
         const type = String(item.type || "photo").toLowerCase();
         return type === "photo" || type === "aerial" || type === "mls" || type === "image";
@@ -254,7 +260,8 @@ router.get("/public/:id", async (req, res) => {
 
     const gallery = doc.data()!;
     const gate = await downloadGateForGallery(gallery);
-    return res.json(clientGalleryPayload(doc.id, gallery, gate));
+    const selection = await liveGallerySelectionService()?.publicState(doc.id) || null;
+    return res.json({ ...clientGalleryPayload(doc.id, gallery, gate), selection });
   } catch (err) {
     console.error("[Galleries] Public fetch error:", err);
     const code = (err as { code?: unknown }).code;
@@ -262,6 +269,110 @@ router.get("/public/:id", async (req, res) => {
       return publicGalleryNotFound(res);
     }
     return res.status(500).json({ error: "We couldn't open this gallery." });
+  }
+});
+
+function selectionService(res: { status: (code: number) => { json: (body: unknown) => unknown } }) {
+  const service = liveGallerySelectionService();
+  if (service) return service;
+  res.status(503).json({
+    error: "Firebase Admin is not configured. Set FIREBASE_SERVICE_ACCOUNT and FIREBASE_STORAGE_BUCKET.",
+  });
+  return null;
+}
+
+function selectionFailure(err: unknown, res: { status: (code: number) => { json: (body: unknown) => unknown } }) {
+  if (err instanceof SelectionError) return res.status(err.status).json({ error: err.message });
+  console.error("[Galleries] Selection error:", err instanceof Error ? err.message : "selection failed");
+  return res.status(500).json({ error: "Could not save these selections." });
+}
+
+function selectionMediaIds(body: unknown): string[] | null {
+  if (!body || typeof body !== "object" || !Array.isArray((body as { mediaIds?: unknown }).mediaIds)) return null;
+  return (body as { mediaIds: unknown[] }).mediaIds.map((id) => (typeof id === "string" ? id : ""));
+}
+
+function selectionWriteAllowed(req: { ip?: string; params: { id?: string } }, res: { status: (code: number) => { json: (body: unknown) => unknown } }) {
+  const key = `${req.ip || "gallery"}:${req.params.id || ""}`;
+  const limit = selectionWrites.check(key);
+  if (limit.allowed) return true;
+  res.status(429).json({ error: "Please wait a moment and try again." });
+  return false;
+}
+
+// Client hearts. The gallery link is the same door as viewing the gallery.
+// These routes do not send email or SMS.
+
+router.put("/public/:id/selections", async (req, res) => {
+  const id = typeof req.params.id === "string" ? req.params.id : "";
+  if (malformedPublicGalleryId(id) || !admin.apps.length) return publicGalleryNotFound(res);
+  if (!selectionWriteAllowed(req, res)) return;
+  const service = liveGallerySelectionService();
+  if (!service) return publicGalleryNotFound(res);
+  const mediaIds = selectionMediaIds(req.body);
+  if (!mediaIds) return res.status(400).json({ error: "Choose the photos to save." });
+  try {
+    return res.json(await service.savePicks(id, mediaIds));
+  } catch (err) {
+    if (err instanceof SelectionError && err.status === 404) return publicGalleryNotFound(res);
+    return selectionFailure(err, res);
+  }
+});
+
+router.post("/public/:id/selections/submit", async (req, res) => {
+  const id = typeof req.params.id === "string" ? req.params.id : "";
+  if (malformedPublicGalleryId(id) || !admin.apps.length) return publicGalleryNotFound(res);
+  if (!selectionWriteAllowed(req, res)) return;
+  const service = liveGallerySelectionService();
+  if (!service) return publicGalleryNotFound(res);
+  const mediaIds = selectionMediaIds(req.body);
+  if (!mediaIds) return res.status(400).json({ error: "Choose the photos to submit." });
+  try {
+    return res.json(await service.submit(id, mediaIds));
+  } catch (err) {
+    if (err instanceof SelectionError && err.status === 404) return publicGalleryNotFound(res);
+    return selectionFailure(err, res);
+  }
+});
+
+router.get("/:id/selections", requireCoordinator, async (req, res) => {
+  const service = selectionService(res);
+  if (!service) return;
+  try {
+    return res.json(await service.staffState(req.params.id));
+  } catch (err) {
+    return selectionFailure(err, res);
+  }
+});
+
+router.patch("/:id/selections", requireCoordinator, async (req, res) => {
+  const service = selectionService(res);
+  if (!service) return;
+  try {
+    const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+    return res.json(await service.saveSettings(req.params.id, body));
+  } catch (err) {
+    return selectionFailure(err, res);
+  }
+});
+
+router.post("/:id/selections/archive", requireCoordinator, async (req, res) => {
+  const service = selectionService(res);
+  if (!service) return;
+  try {
+    return res.json(await service.archiveRest(req.params.id));
+  } catch (err) {
+    return selectionFailure(err, res);
+  }
+});
+
+router.post("/:id/selections/seen", requireCoordinator, async (req, res) => {
+  const service = selectionService(res);
+  if (!service) return;
+  try {
+    return res.json(await service.markSeen(req.params.id));
+  } catch (err) {
+    return selectionFailure(err, res);
   }
 });
 
