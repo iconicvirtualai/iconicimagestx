@@ -2,6 +2,7 @@
  * Hardcoded public copy. The live site keeps these strings until a page is published.
  */
 
+import { ABOUT_OWNER, ABOUT_TEAM, ABOUT_TEAM_KICKER, ABOUT_TEAM_LINE, ABOUT_TEAM_TITLE } from "./aboutTeam.ts";
 import { LEGAL_BUSINESS_NAME } from "./businessContact.ts";
 import { CLIENT_REVIEWS } from "./clientReviews.ts";
 import { DECADE_MASHUPS } from "./decadeMashups.ts";
@@ -385,6 +386,28 @@ const PAGES: ContentPage[] = [
       textField("philosophyTitle", "Philosophy title", "THE ICONIC PHILOSOPHY"),
       areaField("philosophy", "Philosophy", "We believe the agent is the architect of the deal, but the media is the fuel."),
     ]),
+    block("owner", "About the owner", [
+      textField("kicker", "Kicker", ABOUT_OWNER.kicker),
+      textField("name", "Name", ABOUT_OWNER.name),
+      textField("role", "Role", ABOUT_OWNER.role),
+      imageField("photo", "Photo", ABOUT_OWNER.photo),
+      areaField("bodyLead", "First paragraph", ABOUT_OWNER.bodyLead),
+      areaField("bodyFollow", "Second paragraph", ABOUT_OWNER.bodyFollow),
+    ]),
+    block("team", "Meet the team", [
+      textField("kicker", "Kicker", ABOUT_TEAM_KICKER),
+      textField("title", "Headline", ABOUT_TEAM_TITLE),
+      areaField("line", "Intro", ABOUT_TEAM_LINE),
+    ], ABOUT_TEAM.map((member) => ({
+      id: member.id,
+      fields: [
+        textField("name", "Name", member.name),
+        textField("role", "Role", member.role),
+        areaField("bio", "Bio", member.bio),
+        imageField("photo", "Photo", member.photo),
+        textField("order", "Order", String(member.order)),
+      ],
+    }))),
   ]),
 
   page("whatWeDo", "/what-we-do", "What we do", [
