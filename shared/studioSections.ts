@@ -1,32 +1,33 @@
 /**
- * Staff Studio information architecture.
- * One Studio home, three subsections. Photo editing is the existing scratch pad.
- * Job links open /admin/studio/editing. Old Iconic Studio and operations URLs redirect there.
+ * Staff Studio is the scratch pad at /admin/studio.
+ * Delivery and client projects stay reachable from that desk.
+ * The old marketing-kit placeholder is retired.
  */
 
-import { STUDIO_SCRATCH_PATH } from "./studioScratch";
+import { STUDIO_EDITOR_PATH } from "./studioEditorHref";
 
-export const STUDIO_HOME_PATH = "/admin/studio";
+export const STUDIO_HOME_PATH = STUDIO_EDITOR_PATH;
 export const STUDIO_PHOTO_EDITING_ALIAS = "/admin/studio/editing";
+/** Retired route. It redirects to Studio. */
 export const STUDIO_PROJECTS_PATH = "/admin/studio/projects";
+/** Retired route. It redirects to Studio. */
 export const STUDIO_MARKETING_PATH = "/admin/studio/marketing";
 
-/** Previous operations upload screen. The route redirects to the editor. */
+/** Previous operations upload screen. The route redirects to Studio. */
 export const STUDIO_OPERATIONS_PATH = "/admin/studio/operations";
 
 export const STUDIO_DELIVERY_PATH = "/admin/delivery";
 export const STUDIO_LISTINGS_PATH = "/admin/listings";
 
-/** Previous Iconic Studio index. The route redirects to the editor. */
+/** Previous Iconic Studio index. The route redirects to Studio. */
 export const ICONIC_STUDIO_INDEX_PATH = "/admin/iconic-studio";
 
-export type StudioSectionId = "editing" | "projects" | "marketing";
+export type StudioSectionId = "editing";
 
 export interface StudioSection {
   id: StudioSectionId;
   label: string;
   href: string;
-  /** Pathnames that belong to this subsection, including aliases. */
   match: readonly string[];
   detail: string;
 }
@@ -34,24 +35,10 @@ export interface StudioSection {
 export const STUDIO_SECTIONS: readonly StudioSection[] = [
   {
     id: "editing",
-    label: "Photo editing",
-    href: STUDIO_SCRATCH_PATH,
-    match: [STUDIO_SCRATCH_PATH, STUDIO_PHOTO_EDITING_ALIAS],
-    detail: "Scratch pad. The editor on this path is unchanged.",
-  },
-  {
-    id: "projects",
-    label: "Projects",
-    href: STUDIO_PROJECTS_PATH,
-    match: [STUDIO_PROJECTS_PATH],
-    detail: "Client jobs after approve and submit. Galleries and the delivery hold stay on the existing screens.",
-  },
-  {
-    id: "marketing",
-    label: "Marketing kits",
-    href: STUDIO_MARKETING_PATH,
-    match: [STUDIO_MARKETING_PATH],
-    detail: "Social graphics, listing-site packs, and extras. Not wired yet.",
+    label: "Studio",
+    href: STUDIO_HOME_PATH,
+    match: [STUDIO_HOME_PATH, "/admin/studio/scratch", STUDIO_PHOTO_EDITING_ALIAS],
+    detail: "Edits, media, and the export to the client gallery.",
   },
 ] as const;
 
@@ -67,26 +54,21 @@ export const STUDIO_PROJECT_PATHWAYS: readonly StudioPathway[] = [
     id: "delivery",
     label: "Delivery",
     href: STUDIO_DELIVERY_PATH,
-    detail: "Gallery hold and the download gate. Pending, undelivered, and delivered stay on this queue.",
+    detail: "Gallery hold and the download gate.",
   },
   {
     id: "listings",
     label: "Client projects",
     href: STUDIO_LISTINGS_PATH,
-    detail: "Open a job to manage the gallery lock and the rest of the project file.",
+    detail: "Open a job to manage the project file.",
   },
-] as const;
-
-export const STUDIO_MARKETING_KITS = [
-  { id: "social", label: "Social graphics", detail: "Posts and stories for a listing." },
-  { id: "listing-sites", label: "Listing-site packs", detail: "Graphics sized for listing sites." },
-  { id: "extras", label: "Extras", detail: "Other marketing files that are not the photo edit." },
 ] as const;
 
 export function studioSectionForPath(pathname: string): StudioSectionId | null {
   const path = pathname.split("?")[0].split("#")[0];
+  if (path === STUDIO_PROJECTS_PATH || path === STUDIO_MARKETING_PATH) return null;
   const match = STUDIO_SECTIONS.find((section) =>
-    section.match.some((href) => path === href || path.startsWith(`${href}/`)),
+    section.match.some((href) => path === href || (href !== STUDIO_HOME_PATH && path.startsWith(`${href}/`))),
   );
   return match?.id ?? null;
 }

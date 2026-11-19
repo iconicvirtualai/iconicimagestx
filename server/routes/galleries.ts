@@ -13,6 +13,7 @@ import {
   type GalleryDownloadGate,
 } from "../../shared/paymentAccess";
 import { addressSlug, deliveryFileName, orderedGalleryMedia } from "../../shared/gallerySequence";
+import sharp from "sharp";
 import { lockedClientGalleryMedia } from "../../shared/lockedClientMedia";
 import { zipStored } from "../../shared/zipStore";
 import { recordAddressText } from "../../shared/addressText";
@@ -112,6 +113,8 @@ function clientGalleryPayload(id: string, gallery: Record<string, unknown>, gate
     id,
     title: gallery.title,
     address: recordAddressText(gallery),
+    clientName: typeof gallery.clientName === "string" ? gallery.clientName : "",
+    orderNumber: typeof gallery.orderNumber === "string" ? gallery.orderNumber : "",
     status: gallery.status,
     deliveredAt: gallery.deliveredAt || null,
     expiresAt: gallery.expiresAt || null,
@@ -152,6 +155,16 @@ router.get("/", requireStaff, async (req, res) => {
 // Client-facing copy only. Staff detail stays in the server log.
 const PUBLIC_GALLERY_NOT_FOUND = "We couldn't find this gallery.";
 
+function galleryFetchAllowed(url: string): boolean {
+  if (url.startsWith("https://")) return true;
+  try {
+    const host = new URL(url).hostname;
+    return host === "127.0.0.1" || host === "localhost";
+  } catch {
+    return false;
+  }
+}
+
 function publicGalleryNotFound(res: { status: (code: number) => { json: (body: unknown) => unknown } }) {
   return res.status(404).json({ error: PUBLIC_GALLERY_NOT_FOUND });
 }
@@ -176,7 +189,7 @@ async function readGalleryPhotoBytes(item: Record<string, unknown>): Promise<Buf
     }
   }
   const url = typeof item.shareUrl === "string" ? item.shareUrl : typeof item.url === "string" ? item.url : "";
-  if (!url.startsWith("https://")) return null;
+  if (!galleryFetchAllowed(url)) return null;
   try {
     const response = await fetch(url);
     if (!response.ok) return null;
@@ -213,10 +226,23 @@ router.get("/public/:id/photos.zip", async (req, res) => {
         return type === "photo" || type === "aerial" || type === "mls" || type === "image";
       })
       .slice(0, 80);
+    const size = req.query.size === "web" ? "web" : req.query.size === "print" ? "print" : "all";
     const entries: Array<{ name: string; data: Uint8Array }> = [];
     for (const item of photos) {
-      const bytes = await readGalleryPhotoBytes(item as Record<string, unknown>);
+      let bytes = await readGalleryPhotoBytes(item as Record<string, unknown>);
       if (!bytes?.length) continue;
+      if (size === "web") {
+        try {
+          bytes = await sharp(bytes).rotate().resize({
+            width: 2048,
+            height: 2048,
+            fit: "inside",
+            withoutEnlargement: true,
+          }).jpeg({ quality: 82 }).toBuffer();
+        } catch {
+          // Keep the original bytes when a file is not a photo sharp can resize.
+        }
+      }
       entries.push({
         name: deliveryFileName(item),
         data: new Uint8Array(bytes),
@@ -224,11 +250,54 @@ router.get("/public/:id/photos.zip", async (req, res) => {
     }
     if (!entries.length) return res.status(404).json({ error: "No photos are ready to download." });
     const slug = addressSlug(recordAddressText(gallery) || "gallery");
+    const filename = size === "web" ? `${slug}-web.zip` : size === "print" ? `${slug}-print.zip` : `${slug}-photos.zip`;
     res.setHeader("Content-Type", "application/zip");
-    res.setHeader("Content-Disposition", `attachment; filename="${slug}-photos.zip"`);
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     return res.send(Buffer.from(zipStored(entries)));
   } catch (err) {
     console.error("[Galleries] Photo zip error:", err instanceof Error ? err.message : "zip failed");
+    return res.status(500).json({ error: "We couldn't build that download." });
+  }
+});
+
+router.get("/public/:id/media/:mediaId", async (req, res) => {
+  const id = typeof req.params.id === "string" ? req.params.id : "";
+  const mediaId = typeof req.params.mediaId === "string" ? req.params.mediaId : "";
+  if (malformedPublicGalleryId(id) || !mediaId || mediaId.length > 200) return publicGalleryNotFound(res);
+  if (!admin.apps.length) return publicGalleryNotFound(res);
+  try {
+    const doc = await db().collection("galleries").doc(id).get();
+    if (!doc.exists) return publicGalleryNotFound(res);
+    const gallery = doc.data() || {};
+    if (!["delivered", "approved"].includes(String(gallery.status || ""))) {
+      return res.status(403).json({ error: "Gallery not yet available." });
+    }
+    const gate = await downloadGateForGallery(gallery);
+    if (!clientGalleryDownloadsUnlocked(gate)) {
+      return res.status(403).json({ error: ICONIC_DOWNLOAD_LOCK.message });
+    }
+    const item = (Array.isArray(gallery.mediaItems) ? gallery.mediaItems : [])
+      .find((entry: { id?: string }) => entry?.id === mediaId);
+    if (!item) return res.status(404).json({ error: "That photo is not in this gallery." });
+    let bytes = await readGalleryPhotoBytes(item as Record<string, unknown>);
+    if (!bytes?.length) return res.status(404).json({ error: "That photo is not ready to download." });
+    if (req.query.size === "web") {
+      try {
+        bytes = await sharp(bytes).rotate().resize({
+          width: 2048,
+          height: 2048,
+          fit: "inside",
+          withoutEnlargement: true,
+        }).jpeg({ quality: 82 }).toBuffer();
+      } catch {
+        // Send the original when the file is not a JPEG sharp can resize.
+      }
+    }
+    res.setHeader("Content-Type", "image/jpeg");
+    res.setHeader("Content-Disposition", `attachment; filename="${deliveryFileName(item)}"`);
+    return res.send(bytes);
+  } catch (err) {
+    console.error("[Galleries] Photo download error:", err instanceof Error ? err.message : "download failed");
     return res.status(500).json({ error: "We couldn't build that download." });
   }
 });
@@ -294,6 +363,7 @@ router.get("/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
       return res.json({
         ...clientGalleryPayload(doc.id, gallery, gate),
         clientName: gallery.clientName || null,
+        orderNumber: gallery.orderNumber || null,
       });
     }
 

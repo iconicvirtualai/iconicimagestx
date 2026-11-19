@@ -1,12 +1,19 @@
 /**
- * Staff photo editor. Old Iconic Studio and operations URLs land here.
+ * Staff Studio. The scratch pad is the Studio landing.
+ * Older editor, projects, marketing, Iconic Studio, and operations URLs land here.
  * Public client galleries stay on /studio/:listingId.
  */
 
-export const STUDIO_EDITOR_PATH = "/admin/studio/editing";
+export const STUDIO_EDITOR_PATH = "/admin/studio";
 
 const LEGACY_ICONIC = "/admin/iconic-studio";
 const LEGACY_OPERATIONS = "/admin/studio/operations";
+const STUDIO_ALIASES = new Set([
+  "/admin/studio/editing",
+  "/admin/studio/scratch",
+  "/admin/studio/projects",
+  "/admin/studio/marketing",
+]);
 
 export function studioEditorHref(listingId?: string): string {
   const id = listingId?.trim();
@@ -27,6 +34,10 @@ export function studioEditorListingId(search: string): string {
  */
 export function legacyStudioRedirect(pathname: string, search = ""): string | null {
   const path = pathname.split("?")[0].split("#")[0].replace(/\/+$/, "") || "/";
+  if (STUDIO_ALIASES.has(path)) {
+    const id = studioEditorListingId(search);
+    return studioEditorHref(id || undefined);
+  }
   const iconic = path.match(/^\/admin\/iconic-studio(?:\/([^/]+))?$/);
   if (!iconic && path !== LEGACY_OPERATIONS) return null;
   let fromPath = "";

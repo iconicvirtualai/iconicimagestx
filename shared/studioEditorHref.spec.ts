@@ -10,11 +10,11 @@ import {
 
 describe("studio editor links", () => {
   it("opens the editor and keeps a listing id on the query", () => {
-    expect(STUDIO_EDITOR_PATH).toBe("/admin/studio/editing");
-    expect(studioEditorHref()).toBe("/admin/studio/editing");
-    expect(studioEditorHref("  ")).toBe("/admin/studio/editing");
-    expect(studioEditorHref("job_12345678")).toBe("/admin/studio/editing?listingId=job_12345678");
-    expect(studioEditorHref("job 1")).toBe("/admin/studio/editing?listingId=job%201");
+    expect(STUDIO_EDITOR_PATH).toBe("/admin/studio");
+    expect(studioEditorHref()).toBe("/admin/studio");
+    expect(studioEditorHref("  ")).toBe("/admin/studio");
+    expect(studioEditorHref("job_12345678")).toBe("/admin/studio?listingId=job_12345678");
+    expect(studioEditorHref("job 1")).toBe("/admin/studio?listingId=job%201");
   });
 
   it("reads listing, project, and listingId query names", () => {
@@ -27,25 +27,31 @@ describe("studio editor links", () => {
   it("redirects old staff studio routes and leaves the public gallery", () => {
     expect(LEGACY_ICONIC_STUDIO_PATH).toBe("/admin/iconic-studio");
     expect(LEGACY_STUDIO_OPERATIONS_PATH).toBe("/admin/studio/operations");
-    expect(legacyStudioRedirect("/admin/iconic-studio")).toBe("/admin/studio/editing");
-    expect(legacyStudioRedirect("/admin/iconic-studio/")).toBe("/admin/studio/editing");
+    expect(legacyStudioRedirect("/admin/iconic-studio")).toBe("/admin/studio");
+    expect(legacyStudioRedirect("/admin/iconic-studio/")).toBe("/admin/studio");
     expect(legacyStudioRedirect("/admin/iconic-studio/job_12345678")).toBe(
-      "/admin/studio/editing?listingId=job_12345678",
+      "/admin/studio?listingId=job_12345678",
     );
     expect(legacyStudioRedirect("/admin/iconic-studio/job%201")).toBe(
-      "/admin/studio/editing?listingId=job%201",
+      "/admin/studio?listingId=job%201",
     );
-    expect(legacyStudioRedirect("/admin/studio/operations")).toBe("/admin/studio/editing");
+    expect(legacyStudioRedirect("/admin/studio/operations")).toBe("/admin/studio");
     expect(legacyStudioRedirect("/admin/studio/operations", "?listingId=listingReady001")).toBe(
-      "/admin/studio/editing?listingId=listingReady001",
+      "/admin/studio?listingId=listingReady001",
     );
     expect(legacyStudioRedirect("/admin/studio/operations", "?project=proj-9")).toBe(
-      "/admin/studio/editing?listingId=proj-9",
+      "/admin/studio?listingId=proj-9",
+    );
+    expect(legacyStudioRedirect("/admin/studio/editing")).toBe("/admin/studio");
+    expect(legacyStudioRedirect("/admin/studio/editing", "?listingId=job_12345678")).toBe(
+      "/admin/studio?listingId=job_12345678",
+    );
+    expect(legacyStudioRedirect("/admin/studio/scratch")).toBe("/admin/studio");
+    expect(legacyStudioRedirect("/admin/studio/projects")).toBe("/admin/studio");
+    expect(legacyStudioRedirect("/admin/studio/marketing", "?listing=listingReady001")).toBe(
+      "/admin/studio?listingId=listingReady001",
     );
     expect(legacyStudioRedirect("/studio/job_12345678")).toBeNull();
     expect(legacyStudioRedirect("/admin/studio")).toBeNull();
-    expect(legacyStudioRedirect("/admin/studio/editing")).toBeNull();
-    expect(legacyStudioRedirect("/admin/studio/scratch")).toBeNull();
-    expect(legacyStudioRedirect("/admin/studio/projects")).toBeNull();
   });
 });

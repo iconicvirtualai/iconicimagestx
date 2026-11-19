@@ -15,6 +15,7 @@
 import { Router } from "express";
 import admin from "firebase-admin";
 import { parseAiEditRequest, resolveStudioApprovePath } from "../../shared/iconicStudio";
+import { parseStudioExportFrames } from "../../shared/studioPipeline";
 import { isMediaDeliveryStatus } from "../../shared/mediaDelivery";
 import { requireCoordinator, requireStaff, type AuthenticatedRequest } from "../middleware/auth";
 import { loadGalleryReleaseReport } from "../services/galleryReleaseGate";
@@ -32,6 +33,7 @@ import {
   saveAdjustedJpeg,
   setIconicPolish,
 } from "../services/studioJobs";
+import { exportStudioGallery } from "../services/studioExport";
 
 const router = Router();
 
@@ -90,6 +92,27 @@ router.get("/workspace", requireStaff, async (req: AuthenticatedRequest, res) =>
     return res.json(payload);
   } catch (err) {
     return sendKnownError(res, err, "Failed to load Studio.");
+  }
+});
+
+router.post("/export-gallery", requireStaff, async (req: AuthenticatedRequest, res) => {
+  const listingId = String(req.body?.listingId || "").trim();
+  if (!/^[A-Za-z0-9_-]{8,128}$/.test(listingId)) {
+    return res.status(400).json({ error: "A valid listing id is required." });
+  }
+  const parsed = parseStudioExportFrames(req.body);
+  if (parsed.ok === false) return res.status(400).json({ error: parsed.error });
+  if (!adminReady(res)) return;
+  try {
+    await assertStudioAccess(req.user!.uid, req.staffRole || "", listingId);
+    const result = await exportStudioGallery({
+      listingId,
+      uploadedBy: req.user!.uid,
+      frames: parsed.frames,
+    });
+    return res.status(201).json({ success: true, ...result });
+  } catch (err) {
+    return sendKnownError(res, err, "Failed to export this order to the gallery.");
   }
 });
 
