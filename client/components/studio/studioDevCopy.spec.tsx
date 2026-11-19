@@ -6,7 +6,7 @@ import { sampleStudioFrames } from "@shared/iconicStudio";
 import type { StudioOrderTrayJob } from "@shared/studioOrderTray";
 import IconicStudioWorkspace from "@/components/iconic-studio/IconicStudioWorkspace";
 import StudioScratchPad, { type ScratchDeskMode } from "@/components/studio-scratch/StudioScratchPad";
-import { StudioHomePanel, StudioMarketingPanel, StudioProjectsPanel } from "./StudioShell";
+import { StudioDeskLinks } from "./StudioShell";
 
 const DEV_NOTE = "TODO: OPENAI_API_KEY is set, but Iconic Studio does not call the images API in this version.";
 
@@ -103,8 +103,6 @@ describe("rendered studio surfaces", () => {
     expect(workspace).toContain("Approve final");
     expect(workspace).toContain("Reject");
 
-    assertNoDevCopy(shell(<StudioHomePanel />));
-    assertNoDevCopy(shell(<StudioProjectsPanel />));
-    assertNoDevCopy(shell(<StudioMarketingPanel />));
+    assertNoDevCopy(shell(<StudioDeskLinks />));
   });
 });

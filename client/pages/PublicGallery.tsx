@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import Footer from "@/components/Footer";
 import { toast } from "sonner";
 import { addressText } from "@shared/addressText";
+import { shortOrderNumber } from "@shared/orderProjectInvoice";
 import { isGuessableInvoiceId } from "@shared/invoicePayLink";
 import { ICONIC_DOWNLOAD_LOCK } from "@shared/paymentAccess";
 import { GalleryDownloadLockNotice } from "@/components/GalleryDownloadLock";
@@ -17,6 +18,7 @@ export interface PublicGalleryModel {
   address?: unknown;
   title?: string;
   clientName?: string;
+  orderNumber?: string;
   status?: string;
   paymentRequired?: boolean;
   lockTitle?: string | null;
@@ -47,22 +49,42 @@ export function PublicGalleryView({
   const needsPayment = Boolean(gallery.paymentRequired);
   const released =
     gallery.status === "delivered" || gallery.status === "approved";
+  const orderLabel = shortOrderNumber(gallery.orderNumber);
+  const sharePath = galleryId ? `/gallery/${encodeURIComponent(galleryId)}` : "";
+  const zipBase = galleryId && !needsPayment ? `/api/galleries/public/${encodeURIComponent(galleryId)}/photos.zip` : undefined;
 
   return (
-    <div className="iframe-safe-page overflow-x-hidden bg-white">
-      <header className="bg-black text-white">
-        <div className="mx-auto max-w-6xl px-4 py-10">
-          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">
-            Iconic Images
-          </p>
-          <h1 className="mt-2 break-words text-2xl font-black sm:text-3xl">
-            {addressText(gallery.address) || gallery.title || "Your Gallery"}
-          </h1>
-          {gallery.clientName && (
-            <p className="mt-1 break-words text-gray-400">
-              {gallery.clientName}
+    <div className="iframe-safe-page overflow-x-hidden bg-[#f6f4f1]">
+      <header className="bg-[#070b0c] text-white">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-end justify-between gap-4 px-4 py-6 sm:py-8">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#5eead4]">
+              Iconic Images
             </p>
-          )}
+            <h1 className="mt-2 break-words text-2xl font-semibold tracking-tight sm:text-4xl">
+              {addressText(gallery.address) || gallery.title || "Your Gallery"}
+            </h1>
+            {gallery.clientName && (
+              <p className="mt-1 break-words text-sm text-white/70">
+                {gallery.clientName}
+              </p>
+            )}
+            {orderLabel ? (
+              <p data-testid="gallery-order-number" className="mt-3 text-[15px] font-semibold tracking-wide text-white/85">
+                Order {orderLabel}
+              </p>
+            ) : null}
+          </div>
+          {sharePath && onCopyLink ? (
+            <button
+              type="button"
+              data-testid="gallery-share"
+              onClick={() => onCopyLink(sharePath)}
+              className="inline-flex min-h-11 items-center rounded-full bg-white px-4 text-[11px] font-semibold uppercase tracking-widest text-black"
+            >
+              Share link
+            </button>
+          ) : null}
         </div>
       </header>
 
@@ -109,7 +131,9 @@ export function PublicGalleryView({
           <ClientGalleryBoard
             items={media}
             onCopyLink={onCopyLink}
-            zipHref={galleryId && !needsPayment ? `/api/galleries/public/${encodeURIComponent(galleryId)}/photos.zip` : undefined}
+            zipHref={zipBase}
+            webZipHref={zipBase ? `${zipBase}?size=web` : undefined}
+            printZipHref={zipBase ? `${zipBase}?size=print` : undefined}
           />
         )}
       </main>

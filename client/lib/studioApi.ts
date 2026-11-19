@@ -12,13 +12,16 @@ export interface StudioWorkspaceResponse {
     outsidePhotographerSaas: boolean;
     canvaBrand: boolean;
   };
-  listings: Array<{ id: string; address: string; status: string; imageCount: number }>;
+  listings: Array<{ id: string; address: string; status: string; imageCount: number; orderNumber?: string }>;
   jobs: Array<Record<string, unknown>>;
   listing: {
     id: string;
     address: string;
     status: string;
     galleryId?: string;
+    orderNumber?: string;
+    orderId?: string;
+    orderStatus?: string;
     iconicPolish?: boolean;
     editPlan?: OrderEditPlan | null;
     release?: GalleryReleaseReport | null;
@@ -73,6 +76,37 @@ export async function fetchStudioWorkspace(listingId: string | undefined, getTok
   const query = listingId ? `?listingId=${encodeURIComponent(listingId)}` : "";
   const res = await fetch(`/api/studio/workspace${query}`, { headers });
   return readJson(res) as Promise<StudioWorkspaceResponse>;
+}
+
+export async function postStudioExport(
+  getToken: TokenGetter,
+  body: { listingId: string; frames: Array<{ id?: string; path?: string; name?: string; bytesBase64?: string }> },
+) {
+  const headers = await authorizedHeaders(getToken);
+  const res = await fetch("/api/studio/export-gallery", {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+  });
+  return readJson(res) as Promise<{
+    galleryId: string;
+    galleryStatus: string;
+    orderStatus: string;
+    listingStatus: string;
+    deliveryUrl: string;
+    count: number;
+    note: string;
+  }>;
+}
+
+export async function postGalleryDeliver(getToken: TokenGetter, galleryId: string) {
+  const headers = await authorizedHeaders(getToken);
+  const res = await fetch(`/api/galleries/${encodeURIComponent(galleryId)}/deliver`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({}),
+  });
+  return readJson(res) as Promise<{ success: boolean; deliveryUrl: string }>;
 }
 
 export async function postStudioOrderEdits(getToken: TokenGetter, listingId: string) {

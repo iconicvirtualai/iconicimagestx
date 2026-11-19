@@ -843,10 +843,19 @@ export async function loadStudioWorkspace(input: {
     } catch (err) {
       console.error("[Studio AI] Order plan failed:", err instanceof Error ? err.message : err);
     }
+    let orderStatus = "";
+    const orderId = typeof loaded.data.orderId === "string" ? loaded.data.orderId : "";
+    if (orderId) {
+      const orderSnap = await db().collection("orders").doc(orderId).get();
+      if (orderSnap.exists) orderStatus = String(orderSnap.data()?.status || "");
+    }
     listing = {
       id: loaded.id,
       address: listingAddressLabel(loaded.data),
       status: loaded.data.status || "",
+      orderNumber: typeof loaded.data.orderNumber === "string" ? loaded.data.orderNumber : "",
+      orderId,
+      orderStatus,
       galleryId: loaded.data.galleryId || loaded.data.playtestGalleryId || "",
       iconicPolish: loaded.data.iconicPolish === true,
       images,
@@ -866,6 +875,7 @@ export async function loadStudioWorkspace(input: {
       id: item.id,
       address: listingAddressLabel(item.data),
       status: item.data.status || "",
+      orderNumber: typeof item.data.orderNumber === "string" ? item.data.orderNumber : "",
       imageCount: Array.isArray(item.data.images) ? item.data.images.length : 0,
     })),
     jobs,

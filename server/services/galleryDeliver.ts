@@ -120,6 +120,28 @@ export async function deliverGalleryToClient(
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
   }
+  const listingId = typeof gallery.listingId === "string" ? gallery.listingId.trim() : "";
+  if (listingId) {
+    const listingRef = db().collection("listings").doc(listingId);
+    const listingSnap = await listingRef.get();
+    if (listingSnap.exists) {
+      await listingRef.update({
+        status: "delivered",
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      const requestId = listingSnap.data()?.orderRequestId;
+      if (typeof requestId === "string" && requestId.trim()) {
+        const requestRef = db().collection("orderRequests").doc(requestId.trim());
+        const requestSnap = await requestRef.get();
+        if (requestSnap.exists) {
+          await requestRef.update({
+            status: "delivered",
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        }
+      }
+    }
+  }
 
   const clientId = typeof gallery.clientId === "string" ? gallery.clientId : "";
   const clientDoc = clientId ? await db().collection("clients").doc(clientId).get() : null;

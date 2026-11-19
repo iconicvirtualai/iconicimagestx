@@ -117,6 +117,15 @@ export default function StudioScratchPad({
   onDownload,
   onExport,
   onRemove,
+  orders = [],
+  orderNumber = "",
+  pipelineLabel = "",
+  onOpenOrder,
+  onReorder,
+  onDeliver,
+  canDeliver = false,
+  galleryHref = "",
+  listingId = "",
 }: {
   frames: ScratchFrameView[];
   busy: boolean;
@@ -148,6 +157,15 @@ export default function StudioScratchPad({
   onDownload: () => void;
   onExport: (destination: ScratchExportDestination) => void;
   onRemove: (id: string) => void;
+  orders?: Array<{ id: string; address: string; status?: string; orderNumber?: string }>;
+  orderNumber?: string;
+  pipelineLabel?: string;
+  onOpenOrder?: (listingId: string) => void;
+  onReorder?: (id: string, direction: -1 | 1) => void;
+  onDeliver?: () => void;
+  canDeliver?: boolean;
+  galleryHref?: string;
+  listingId?: string;
 }) {
   const photoInput = useRef<HTMLInputElement>(null);
   const floorInput = useRef<HTMLInputElement>(null);
@@ -322,16 +340,70 @@ export default function StudioScratchPad({
       data-mode={mode}
       className="flex h-[100vh] min-h-[640px] flex-col overflow-hidden bg-[#070b0c] text-white"
     >
-      <header className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
         <div className="min-w-0">
-          <p className="text-sm font-black uppercase tracking-[0.18em] text-white">Scratch pad</p>
+          <p className="text-sm font-black uppercase tracking-[0.18em] text-white">Studio</p>
           {listingLabel ? (
             <p data-testid="scratch-listing" className="truncate text-[10px] font-bold uppercase tracking-widest text-teal-200">
               {listingLabel}
             </p>
+          ) : (
+            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Edits, media, and delivery</p>
+          )}
+          {orderNumber ? (
+            <p data-testid="studio-order-number" className="mt-1 text-[15px] font-semibold tracking-wide text-white/85">Order {orderNumber}</p>
+          ) : null}
+          {pipelineLabel ? (
+            <p data-testid="studio-pipeline-status" className="mt-1 text-[11px] font-semibold text-teal-100">{pipelineLabel}</p>
           ) : null}
         </div>
-        <div data-testid="scratch-modes" className="flex items-center gap-1 rounded-full border border-white/10 bg-black/40 p-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
+            Order
+            <select
+              data-testid="studio-order-pick"
+              className="ml-2 max-w-[220px] rounded-lg border border-white/15 bg-black px-2 py-1 text-[11px] font-semibold text-white"
+              value={listingId}
+              onChange={(event) => {
+                if (event.target.value) onOpenOrder?.(event.target.value);
+              }}
+            >
+              <option value="">Choose an order</option>
+              {orders.map((order) => (
+                <option key={order.id} value={order.id}>
+                  {(order.orderNumber ? `${order.orderNumber} · ` : "") + order.address}
+                </option>
+              ))}
+            </select>
+          </label>
+          <a href="/admin/delivery" data-testid="studio-pathway-delivery" className="rounded-full border border-white/15 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-gray-200">Delivery</a>
+          <a href="/admin/listings" data-testid="studio-pathway-listings" className="rounded-full border border-white/15 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-gray-200">Projects</a>
+          <button
+            type="button"
+            data-testid="studio-export-gallery"
+            disabled={busy}
+            onClick={() => onExport("gallery")}
+            className="rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-white disabled:opacity-40"
+            style={{ backgroundColor: teal }}
+          >
+            Export to Gallery
+          </button>
+          <button
+            type="button"
+            data-testid="studio-deliver"
+            disabled={busy || !canDeliver}
+            onClick={() => onDeliver?.()}
+            className="rounded-full border border-white/20 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-white disabled:opacity-40"
+          >
+            Deliver
+          </button>
+          {galleryHref ? (
+            <a data-testid="studio-open-gallery" href={galleryHref} target="_blank" rel="noopener noreferrer" className="rounded-full border border-white/15 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-teal-200">
+              Open gallery
+            </a>
+          ) : null}
+        </div>
+        <div data-testid="scratch-modes" className="flex flex-wrap items-center gap-1 rounded-2xl border border-white/10 bg-black/40 p-1">
           {MODES.map((item) => (
             <button
               key={item.id}
@@ -674,6 +746,12 @@ export default function StudioScratchPad({
         <div className="scrollbar-hide flex items-center gap-2 overflow-x-auto">
           {frames.map((frame) => (
             <div key={frame.id} className="relative h-16 w-24 shrink-0">
+              {onReorder ? (
+                <span className="absolute right-1 top-1 z-[1] flex gap-0.5">
+                  <button type="button" data-testid={`scratch-move-earlier-${frame.id}`} aria-label={`Move ${frame.name} earlier`} onClick={() => onReorder(frame.id, -1)} className="rounded bg-black/80 px-1 text-[9px] font-black text-white">←</button>
+                  <button type="button" data-testid={`scratch-move-later-${frame.id}`} aria-label={`Move ${frame.name} later`} onClick={() => onReorder(frame.id, 1)} className="rounded bg-black/80 px-1 text-[9px] font-black text-white">→</button>
+                </span>
+              ) : null}
               <button
                 type="button"
                 data-testid={`scratch-frame-${frame.id}`}
@@ -809,7 +887,7 @@ function UploadWorkspace({
         )
       ) : null}
       <p className="mt-3 text-[11px] leading-snug text-gray-500">
-        Photos stay in this browser. Nothing is added to an order or a gallery. JPEG and PNG enter the edit queue. RAW and TIFF wait for a JPEG.
+        Drop photos for this order. Export to Gallery sends the selected set. JPEG and PNG can be edited here. RAW and TIFF wait for a JPEG.
       </p>
       <p className="mt-1 text-right text-[10px] font-bold uppercase tracking-widest text-teal-200">{readyNote}</p>
     </div>

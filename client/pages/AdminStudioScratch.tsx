@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import AdminLayout from "@/components/AdminLayout";
 import StudioScratchPad, {
   type ScratchEditStep,
@@ -15,9 +15,12 @@ import { fetchScratchStatus, postScratchEdit } from "@/lib/scratchApi";
 import {
   drainOrderEditQueue,
   fetchStudioWorkspace,
+  postGalleryDeliver,
   postStudioApprove,
+  postStudioExport,
   postStudioOrderEdits,
   postStudioReject,
+  type StudioWorkspaceResponse,
 } from "@/lib/studioApi";
 import { pollVsaiJob } from "@/lib/scratchStaging";
 import { compressScratchJpeg, readJpegShotTime } from "@/lib/scratchPhoto";
@@ -33,6 +36,7 @@ import {
   type StudioFrame,
 } from "@shared/iconicStudio";
 import { studioEditorListingId } from "@shared/studioEditorHref";
+import { shortOrderNumber } from "@shared/orderProjectInvoice";
 import {
   listingOrderQueuePending,
   studioOrderTrayJobs,
@@ -57,6 +61,7 @@ interface FinetuneSnapshot {
 
 interface ScratchItem {
   id: string;
+  path: string;
   name: string;
   beforeUrl: string;
   source: Blob;
@@ -111,6 +116,7 @@ function revokeScratchItem(item: ScratchItem) {
 async function listingPhotoItem(frame: StudioFrame, uploadIndex: number): Promise<ScratchItem> {
   const base: ScratchItem = {
     id: frame.id || crypto.randomUUID(),
+    path: frame.path || "",
     name: frame.name,
     status: "ready",
     uploadIndex,
@@ -145,7 +151,17 @@ function fileCard(name: string) {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
+}
+
 export default function AdminStudioScratch() {
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const listingId = studioEditorListingId(searchParams.toString());
   const { user } = useAuth();
@@ -173,6 +189,11 @@ export default function AdminStudioScratch() {
   const [emptyNote, setEmptyNote] = useState("");
   const [orderJobs, setOrderJobs] = useState<StudioOrderTrayJob[]>([]);
   const [orderBusy, setOrderBusy] = useState(false);
+  const [orders, setOrders] = useState<StudioWorkspaceResponse["listings"]>([]);
+  const [orderNumber, setOrderNumber] = useState("");
+  const [orderStatus, setOrderStatus] = useState("");
+  const [galleryId, setGalleryId] = useState("");
+  const [galleryStatus, setGalleryStatus] = useState("");
   const sortModeRef = useRef(sortMode);
   sortModeRef.current = sortMode;
   const loadedListing = useRef("");
@@ -189,11 +210,27 @@ export default function AdminStudioScratch() {
   }, [getToken, listingId]);
 
   useEffect(() => {
+    let cancel = false;
+    void fetchStudioWorkspace(undefined, getToken)
+      .then((data) => {
+        if (!cancel) setOrders(data.listings || []);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancel = true;
+    };
+  }, [getToken]);
+
+  useEffect(() => {
     if (!listingId) {
       loadedListing.current = "";
       setListingLabel("");
       setEmptyNote("");
       setOrderJobs([]);
+      setOrderNumber("");
+      setOrderStatus("");
+      setGalleryId("");
+      setGalleryStatus("");
       setProgress((current) => (current === "Loading listing photos…" ? "" : current));
       return;
     }
@@ -209,6 +246,11 @@ export default function AdminStudioScratch() {
       .then(async (data) => {
         if (cancel) return;
         setOrderJobs(studioOrderTrayJobs(data.jobs, listingId));
+        setOrders(data.listings || []);
+        setOrderNumber(shortOrderNumber(data.listing?.orderNumber) || "");
+        setOrderStatus(String(data.listing?.orderStatus || data.listing?.status || ""));
+        setGalleryId(data.listing?.delivery?.galleryId || data.listing?.galleryId || "");
+        setGalleryStatus(data.listing?.delivery?.galleryStatus || "");
         const address = recordAddressText(data.listing) || listingId;
         const frames = framesFromListingImages(data.listing?.images);
         const slice = frames.slice(0, SCRATCH_MAX_FILES);
@@ -235,6 +277,7 @@ export default function AdminStudioScratch() {
           uploadSeq.current += 1;
           return {
             id: frame.id,
+            path: frame.path || "",
             name: frame.name,
             status: "ready",
             uploadIndex,
@@ -382,6 +425,7 @@ export default function AdminStudioScratch() {
       const shotAt = (await readJpegShotTime(file).catch(() => null)) ?? file.lastModified;
       const base = {
         id: crypto.randomUUID(),
+        path: "",
         name: file.name,
         status: "ready" as const,
         uploadIndex,
@@ -715,18 +759,83 @@ export default function AdminStudioScratch() {
     downloadBytes("scratch-edits.zip", zip, "application/zip");
   };
 
+  const onReorder = (id: string, direction: -1 | 1) => {
+    setItems((current) => {
+      const index = current.findIndex((item) => item.id === id);
+      const next = index + direction;
+      if (index < 0 || next < 0 || next >= current.length) return current;
+      const copy = current.slice();
+      const [row] = copy.splice(index, 1);
+      copy.splice(next, 0, row);
+      return copy;
+    });
+  };
+
   const onExport = (destination: ScratchExportDestination) => {
     if (destination === "zip") {
       onDownloadZip();
       return;
     }
-    const description =
-      destination === "gallery"
-        ? "Gallery export is not connected on the scratch pad. Photos stay in this browser."
-        : destination === "dropbox"
-          ? "Dropbox export is not connected yet. Download the JPEG or the edited zip instead."
-          : "Google Drive export is not connected yet. Download the JPEG or the edited zip instead.";
-    toast.message("Export to…", { description });
+    if (destination !== "gallery") {
+      const description = destination === "dropbox"
+        ? "Dropbox export is not connected yet. Download the JPEG or the edited zip instead."
+        : "Google Drive export is not connected yet. Download the JPEG or the edited zip instead.";
+      toast.message("Export to…", { description });
+      return;
+    }
+    if (!listingId) {
+      toast.error("Open an order before exporting to the gallery.");
+      return;
+    }
+    const chosen = items.filter((item) => selectedIds.includes(item.id));
+    if (!chosen.length) {
+      toast.error("Select the photos to export.");
+      return;
+    }
+    setBusy(true);
+    setProgress("Exporting to the gallery…");
+    void (async () => {
+      try {
+        const frames = chosen.map((item) => ({
+          id: item.id,
+          path: item.path,
+          name: item.downloadName || item.name,
+          ...(item.afterBytes ? { bytesBase64: bytesToBase64(item.afterBytes) } : {}),
+        }));
+        const result = await postStudioExport(getToken, { listingId, frames });
+        setGalleryId(result.galleryId);
+        setGalleryStatus(result.galleryStatus);
+        setOrderStatus(result.orderStatus || result.listingStatus);
+        toast.success(result.note || "Exported to the gallery.");
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Gallery export failed.");
+      } finally {
+        setProgress("");
+        setBusy(false);
+      }
+    })();
+  };
+
+  const onDeliver = () => {
+    if (!galleryId) {
+      toast.error("Export to the gallery before delivering.");
+      return;
+    }
+    setBusy(true);
+    setProgress("Delivering the gallery…");
+    void (async () => {
+      try {
+        await postGalleryDeliver(getToken, galleryId);
+        setGalleryStatus("delivered");
+        setOrderStatus("delivered");
+        toast.success("Gallery delivered.");
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Delivery did not finish.");
+      } finally {
+        setProgress("");
+        setBusy(false);
+      }
+    })();
   };
 
   const commitJpeg = (dataUrl: string, frameId: string, label: string) => {
@@ -876,6 +985,20 @@ export default function AdminStudioScratch() {
         onDownload={onDownload}
         onExport={onExport}
         onRemove={onRemove}
+        orders={orders.map((order) => ({
+          id: order.id,
+          address: order.address,
+          status: order.status,
+          orderNumber: shortOrderNumber(order.orderNumber) || order.orderNumber,
+        }))}
+        orderNumber={orderNumber}
+        listingId={listingId}
+        pipelineLabel={listingId ? `Order ${orderStatus || "open"} · Gallery ${galleryStatus || "not exported"}` : ""}
+        galleryHref={(galleryStatus === "delivered" || galleryStatus === "approved") && galleryId ? `/gallery/${galleryId}` : ""}
+        canDeliver={Boolean(galleryId) && galleryStatus !== "delivered" && galleryStatus !== "pending_upload"}
+        onOpenOrder={(id) => navigate(`/admin/studio?listingId=${encodeURIComponent(id)}`)}
+        onReorder={onReorder}
+        onDeliver={onDeliver}
       />
     </AdminLayout>
   );
