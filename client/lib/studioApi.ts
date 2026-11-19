@@ -11,6 +11,7 @@ export interface StudioWorkspaceResponse {
     agentUpsell: boolean;
     outsidePhotographerSaas: boolean;
     canvaBrand: boolean;
+    aiConfigured?: boolean;
   };
   listings: Array<{ id: string; address: string; status: string; imageCount: number; orderNumber?: string }>;
   jobs: Array<Record<string, unknown>>;
@@ -40,6 +41,7 @@ export interface OrderQueueTickResult {
   remaining: number;
   waiting: number;
   shouldFollowUp: boolean;
+  aiConfigured?: boolean;
   ran: {
     jobId: string;
     status: string;

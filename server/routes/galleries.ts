@@ -155,6 +155,16 @@ router.get("/", requireStaff, async (req, res) => {
 // Client-facing copy only. Staff detail stays in the server log.
 const PUBLIC_GALLERY_NOT_FOUND = "We couldn't find this gallery.";
 
+function galleryFetchAllowed(url: string): boolean {
+  if (url.startsWith("https://")) return true;
+  try {
+    const host = new URL(url).hostname;
+    return host === "127.0.0.1" || host === "localhost";
+  } catch {
+    return false;
+  }
+}
+
 function publicGalleryNotFound(res: { status: (code: number) => { json: (body: unknown) => unknown } }) {
   return res.status(404).json({ error: PUBLIC_GALLERY_NOT_FOUND });
 }
@@ -179,7 +189,7 @@ async function readGalleryPhotoBytes(item: Record<string, unknown>): Promise<Buf
     }
   }
   const url = typeof item.shareUrl === "string" ? item.shareUrl : typeof item.url === "string" ? item.url : "";
-  if (!url.startsWith("https://")) return null;
+  if (!galleryFetchAllowed(url)) return null;
   try {
     const response = await fetch(url);
     if (!response.ok) return null;
@@ -246,6 +256,48 @@ router.get("/public/:id/photos.zip", async (req, res) => {
     return res.send(Buffer.from(zipStored(entries)));
   } catch (err) {
     console.error("[Galleries] Photo zip error:", err instanceof Error ? err.message : "zip failed");
+    return res.status(500).json({ error: "We couldn't build that download." });
+  }
+});
+
+router.get("/public/:id/media/:mediaId", async (req, res) => {
+  const id = typeof req.params.id === "string" ? req.params.id : "";
+  const mediaId = typeof req.params.mediaId === "string" ? req.params.mediaId : "";
+  if (malformedPublicGalleryId(id) || !mediaId || mediaId.length > 200) return publicGalleryNotFound(res);
+  if (!admin.apps.length) return publicGalleryNotFound(res);
+  try {
+    const doc = await db().collection("galleries").doc(id).get();
+    if (!doc.exists) return publicGalleryNotFound(res);
+    const gallery = doc.data() || {};
+    if (!["delivered", "approved"].includes(String(gallery.status || ""))) {
+      return res.status(403).json({ error: "Gallery not yet available." });
+    }
+    const gate = await downloadGateForGallery(gallery);
+    if (!clientGalleryDownloadsUnlocked(gate)) {
+      return res.status(403).json({ error: ICONIC_DOWNLOAD_LOCK.message });
+    }
+    const item = (Array.isArray(gallery.mediaItems) ? gallery.mediaItems : [])
+      .find((entry: { id?: string }) => entry?.id === mediaId);
+    if (!item) return res.status(404).json({ error: "That photo is not in this gallery." });
+    let bytes = await readGalleryPhotoBytes(item as Record<string, unknown>);
+    if (!bytes?.length) return res.status(404).json({ error: "That photo is not ready to download." });
+    if (req.query.size === "web") {
+      try {
+        bytes = await sharp(bytes).rotate().resize({
+          width: 2048,
+          height: 2048,
+          fit: "inside",
+          withoutEnlargement: true,
+        }).jpeg({ quality: 82 }).toBuffer();
+      } catch {
+        // Send the original when the file is not a JPEG sharp can resize.
+      }
+    }
+    res.setHeader("Content-Type", "image/jpeg");
+    res.setHeader("Content-Disposition", `attachment; filename="${deliveryFileName(item)}"`);
+    return res.send(bytes);
+  } catch (err) {
+    console.error("[Galleries] Photo download error:", err instanceof Error ? err.message : "download failed");
     return res.status(500).json({ error: "We couldn't build that download." });
   }
 });

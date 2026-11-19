@@ -10,7 +10,7 @@ import { isGuessableInvoiceId } from "@shared/invoicePayLink";
 import { ICONIC_DOWNLOAD_LOCK } from "@shared/paymentAccess";
 import { GalleryDownloadLockNotice } from "@/components/GalleryDownloadLock";
 import { DoorsOpenDeliveryNote } from "@/components/DoorsOpenTour";
-import { ClientGalleryBoard } from "@/components/gallery/ClientGalleryMedia";
+import { DeliveryGallery } from "@/components/gallery/DeliveryGallery";
 import type { ClientGalleryItem } from "@/components/gallery/clientGalleryMedia";
 import { clientPortalEnabled } from "@shared/clientPortal";
 
@@ -128,9 +128,9 @@ export function PublicGalleryView({
             </p>
           </div>
         ) : (
-          <ClientGalleryBoard
+          <DeliveryGallery
             items={media}
-            onCopyLink={onCopyLink}
+            galleryId={galleryId}
             zipHref={zipBase}
             webZipHref={zipBase ? `${zipBase}?size=web` : undefined}
             printZipHref={zipBase ? `${zipBase}?size=print` : undefined}

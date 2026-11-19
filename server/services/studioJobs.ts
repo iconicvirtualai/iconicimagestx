@@ -394,6 +394,18 @@ export async function advanceOrderEditQueue(input: { listingId: string; createdB
     };
   }
 
+  if (!readOpenAiApiKey(process.env)) {
+    return {
+      plan: prepared.plan,
+      prepared: prepared.prepared,
+      ran: null,
+      remaining: advance.runnable,
+      waiting,
+      shouldFollowUp: false,
+      aiConfigured: false,
+    };
+  }
+
   const claimed = await claimOrderEdit(next.ref);
   if (!claimed) {
     const still = Math.max(0, advance.runnable - 1);
@@ -870,6 +882,7 @@ export async function loadStudioWorkspace(input: {
       agentUpsell: false,
       outsidePhotographerSaas: false,
       canvaBrand: false,
+      aiConfigured: Boolean(readOpenAiApiKey(process.env)),
     },
     listings: listings.map((item) => ({
       id: item.id,

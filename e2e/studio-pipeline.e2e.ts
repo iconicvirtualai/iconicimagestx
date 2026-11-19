@@ -40,17 +40,27 @@ test.beforeEach(() => {
 });
 
 test("photographer upload reaches a delivered client gallery", async ({ page }) => {
-  test.setTimeout(240_000);
-  const front = await readFile("public/media/photos/listing-living-01.jpg");
-  const yard = await readFile("public/media/portal-v2/deliver-yard.jpg");
+  test.setTimeout(180_000);
+  const photoNames = [
+    "listing-living-01.jpg",
+    "listing-living-02.jpg",
+    "listing-living-03.jpg",
+    "listing-living-04.jpg",
+    "luxury-exterior.jpg",
+    "luxury-interior.jpg",
+    "forest-heights-twilight-front.jpg",
+    "lifestyle-mtz04802.jpg",
+  ];
+  const uploads = await Promise.all(photoNames.map(async (name) => ({
+    name,
+    mimeType: "image/jpeg",
+    buffer: await readFile(`public/media/photos/${name}`),
+  })));
 
   await signIn(page, "/admin/login", photographerEmail, photographerPassword);
   await page.goto(`/admin/photographer?job=${listingId}`);
   await expect(page.getByTestId("shoot-uploader")).toBeVisible();
-  await page.getByTestId("shoot-uploader").locator("input[type=file]").setInputFiles([
-    { name: "front.jpg", mimeType: "image/jpeg", buffer: front },
-    { name: "yard.jpg", mimeType: "image/jpeg", buffer: yard },
-  ]);
+  await page.getByTestId("shoot-uploader").locator("input[type=file]").setInputFiles(uploads);
   await page.getByTestId("shoot-uploader").getByRole("button", { name: /Upload the shoot/ }).click();
   await expect(page.getByText(/file.*uploaded|Studio is editing/i).first()).toBeVisible({ timeout: 30_000 });
 
@@ -65,24 +75,24 @@ test("photographer upload reaches a delivered client gallery", async ({ page }) 
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.getByTestId("studio-order-pick").selectOption(listingId);
   await expect(page.getByTestId("scratch-listing")).toContainText("221 Test Studio Lane");
-  await expect(page.getByTestId("studio-pipeline-status")).toContainText("editing");
-  await expect(page.getByText("front.jpg").first()).toBeVisible();
-  await expect(page.getByText("yard.jpg").first()).toBeVisible();
+  await expect(page.locator("[data-testid='studio-pipeline-status'] [data-current='true']")).toHaveText("Editing");
+  await expect(page.getByText("listing-living-01.jpg").first()).toBeVisible();
+  await expect(page.getByTestId("studio-ai-note")).toBeVisible();
+  await expect(page.getByText(/· failed/i)).toHaveCount(0);
   await shot(page, "order-media", 1440);
   await shot(page, "order-media", 390);
 
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.getByRole("checkbox", { name: "Include yard.jpg" }).check();
-  await page.getByRole("checkbox", { name: "Include front.jpg" }).check();
-  await page.getByRole("button", { name: "Move yard.jpg earlier" }).click();
+  await page.getByTestId("scratch-select-all").click();
+  await page.getByRole("button", { name: "Move listing-living-02.jpg earlier" }).click();
   await page.getByTestId("studio-export-gallery").click();
-  await expect(page.getByTestId("studio-pipeline-status")).toContainText("ready_for_review", { timeout: 30_000 });
+  await expect(page.locator("[data-testid='studio-pipeline-status'] [data-current='true']")).toHaveText("Ready for review", { timeout: 30_000 });
   await shot(page, "export", 1440);
   await shot(page, "export", 390);
 
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.getByTestId("studio-deliver").click({ timeout: 15_000 });
-  await expect(page.getByTestId("studio-pipeline-status")).toContainText("delivered", { timeout: 30_000 });
+  await expect(page.locator("[data-testid='studio-pipeline-status'] [data-current='true']")).toHaveText("Delivered", { timeout: 30_000 });
   await expect(page.getByTestId("studio-open-gallery")).toBeVisible();
   await shot(page, "deliver", 1440);
   await shot(page, "deliver", 390);
@@ -96,8 +106,11 @@ test("photographer upload reaches a delivered client gallery", async ({ page }) 
   await expect(page.getByTestId("gallery-download-web")).toBeVisible();
   await expect(page.getByTestId("gallery-download-print")).toBeVisible();
   await page.getByTestId("gallery-share").click();
-  await page.getByRole("button", { name: /View full screen/ }).first().click();
+  await expect(page.getByRole("button", { name: "View full screen" })).toHaveCount(0);
+  await page.getByTestId("gallery-hero").click();
   await expect(page.getByTestId("gallery-lightbox")).toBeVisible();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByTestId("gallery-lightbox-web")).toBeVisible();
   await page.getByTestId("gallery-lightbox-close").click();
   const orderSize = await page.getByTestId("gallery-order-number").evaluate((node) => getComputedStyle(node).fontSize);
   expect(parseFloat(orderSize)).toBeLessThan(24);

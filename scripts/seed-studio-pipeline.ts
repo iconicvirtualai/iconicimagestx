@@ -104,7 +104,11 @@ await db.collection("orderRequests").doc(STUDIO_PIPELINE.requestId).set({
   firebaseUid: STUDIO_PIPELINE.clientUid,
   clientProfileId: `client:${STUDIO_PIPELINE.clientId}`,
 });
+const oldGalleries = await db.collection("galleries").where("listingId", "==", STUDIO_PIPELINE.listingId).get();
+for (const gallery of oldGalleries.docs) await gallery.ref.delete();
 await db.collection("galleries").doc(`gal${STUDIO_PIPELINE.listingId}`).delete().catch(() => undefined);
+const oldJobs = await db.collection("editJobs").where("listingId", "==", STUDIO_PIPELINE.listingId).get();
+for (const job of oldJobs.docs) await job.ref.delete();
 await db.collection("listings").doc(STUDIO_PIPELINE.listingId).set({
   orderId: STUDIO_PIPELINE.orderId,
   orderRequestId: STUDIO_PIPELINE.requestId,

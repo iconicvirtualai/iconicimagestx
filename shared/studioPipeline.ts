@@ -5,6 +5,24 @@
 
 export type StudioPipelineStep = "upload" | "export" | "deliver";
 
+export const STUDIO_PIPELINE_LABELS = ["Uploaded", "Editing", "Ready for review", "Delivered"] as const;
+
+/** One step for the desk. A delivered gallery wins over an order that is still marked editing. */
+export function studioPipelineIndex(input: {
+  orderStatus?: unknown;
+  listingStatus?: unknown;
+  galleryStatus?: unknown;
+  fileCount?: number;
+}): number {
+  const blob = [input.orderStatus, input.listingStatus, input.galleryStatus]
+    .map((value) => (typeof value === "string" ? value.toLowerCase() : ""))
+    .join(" ");
+  if (/delivered|completed/.test(blob)) return 3;
+  if (/ready_for_review|approved/.test(blob)) return 2;
+  if (/editing|uploaded|raw_uploaded/.test(blob) || (input.fileCount || 0) > 0) return 1;
+  return 0;
+}
+
 const STOPPED = new Set(["cancelled", "canceled", "archived", "declined", "no_show"]);
 
 function rank(status: string): number {

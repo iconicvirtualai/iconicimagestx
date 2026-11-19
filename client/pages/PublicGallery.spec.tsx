@@ -164,6 +164,7 @@ function page(gallery: PublicGalleryModel) {
 
 describe("public delivery gallery", () => {
   it("renders every delivered media type on the gallery route view", () => {
+    delete process.env.CLIENT_PORTAL_ENABLED;
     const html = page(delivered);
     expect(html).toContain("18 Oak Hollow");
     expect(html).toContain("TEST - Delivery QA");
@@ -188,6 +189,10 @@ describe("public delivery gallery", () => {
     expect(html).toContain("Open floor plan");
     expect(html).toContain("PDF · 4 KB");
     expect(html).toContain("ZIP · 8.8 KB");
+    expect(html).toContain('data-testid="gallery-hero"');
+    expect(html).not.toContain(">PHOTO<");
+    expect(html).not.toContain("View full screen");
+    expect(html).not.toContain("Client Login");
     expect(html).not.toContain("gallery-download-lock");
   });
 

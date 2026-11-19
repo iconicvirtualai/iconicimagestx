@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { visibleStudioNote } from "@shared/iconicStudio";
+import { STUDIO_PIPELINE_LABELS } from "@shared/studioPipeline";
 import { ICONIC_POLISH_TREATMENTS } from "@shared/orderEditPlan";
 import type { StudioOrderTrayJob } from "@shared/studioOrderTray";
 import { SCRATCH_SORT_DEFAULT, type ScratchSortMode } from "@/lib/scratchSort";
@@ -119,7 +120,8 @@ export default function StudioScratchPad({
   onRemove,
   orders = [],
   orderNumber = "",
-  pipelineLabel = "",
+  pipelineIndex = 0,
+  aiConfigured = true,
   onOpenOrder,
   onReorder,
   onDeliver,
@@ -159,7 +161,8 @@ export default function StudioScratchPad({
   onRemove: (id: string) => void;
   orders?: Array<{ id: string; address: string; status?: string; orderNumber?: string }>;
   orderNumber?: string;
-  pipelineLabel?: string;
+  pipelineIndex?: number;
+  aiConfigured?: boolean;
   onOpenOrder?: (listingId: string) => void;
   onReorder?: (id: string, direction: -1 | 1) => void;
   onDeliver?: () => void;
@@ -353,8 +356,18 @@ export default function StudioScratchPad({
           {orderNumber ? (
             <p data-testid="studio-order-number" className="mt-1 text-[15px] font-semibold tracking-wide text-white/85">Order {orderNumber}</p>
           ) : null}
-          {pipelineLabel ? (
-            <p data-testid="studio-pipeline-status" className="mt-1 text-[11px] font-semibold text-teal-100">{pipelineLabel}</p>
+          {listingLabel ? (
+            <ol data-testid="studio-pipeline-status" className="mt-2 flex flex-wrap gap-1.5">
+              {STUDIO_PIPELINE_LABELS.map((label, index) => (
+                <li
+                  key={label}
+                  data-current={index === pipelineIndex ? "true" : "false"}
+                  className={`rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-wide ${index === pipelineIndex ? "bg-white text-black" : index < pipelineIndex ? "text-teal-200" : "text-white/35"}`}
+                >
+                  {label}
+                </li>
+              ))}
+            </ol>
           ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -383,7 +396,8 @@ export default function StudioScratchPad({
             data-testid="studio-export-gallery"
             disabled={busy}
             onClick={() => onExport("gallery")}
-            className="rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-white disabled:opacity-40"
+            data-next={pipelineIndex < 2 ? "true" : "false"}
+            className={`rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-white disabled:opacity-40 ${pipelineIndex < 2 ? "ring-2 ring-white" : ""}`}
             style={{ backgroundColor: teal }}
           >
             Export to Gallery
@@ -391,14 +405,15 @@ export default function StudioScratchPad({
           <button
             type="button"
             data-testid="studio-deliver"
+            data-next={pipelineIndex === 2 ? "true" : "false"}
             disabled={busy || !canDeliver}
             onClick={() => onDeliver?.()}
-            className="rounded-full border border-white/20 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-white disabled:opacity-40"
+            className={`rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-widest disabled:opacity-40 ${pipelineIndex === 2 ? "bg-white text-black" : "border border-white/20 text-white"}`}
           >
             Deliver
           </button>
           {galleryHref ? (
-            <a data-testid="studio-open-gallery" href={galleryHref} target="_blank" rel="noopener noreferrer" className="rounded-full border border-white/15 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-teal-200">
+            <a data-testid="studio-open-gallery" data-next={pipelineIndex >= 3 ? "true" : "false"} href={galleryHref} target="_blank" rel="noopener noreferrer" className={`rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-widest ${pipelineIndex >= 3 ? "bg-white text-black" : "border border-white/15 text-teal-200"}`}>
               Open gallery
             </a>
           ) : null}
@@ -422,9 +437,14 @@ export default function StudioScratchPad({
           {frames.length} files · {checked} selected{progress ? ` · ${progress}` : ""}
         </p>
       </header>
-      {orderJobs.length > 0 ? (
+      {aiConfigured === false && orderJobs.some((job) => job.status === "pending" || job.status === "failed" || job.status === "processing") ? (
+        <p data-testid="studio-ai-note" className="border-b border-white/10 bg-[#101618] px-4 py-2 text-xs text-gray-400">
+          Automatic edits are off. These photos are ready to select and export.
+        </p>
+      ) : null}
+      {(aiConfigured ? orderJobs : orderJobs.filter((job) => job.status === "review" || job.status === "rejected")).length > 0 ? (
         <div data-testid="scratch-order-tray" className="flex max-h-36 shrink-0 gap-2 overflow-x-auto border-b border-white/10 bg-[#101618] px-3 py-2">
-          {orderJobs.some((job) => job.origin === "order" && job.status === "pending" && job.sourcePath) ? (
+          {aiConfigured && orderJobs.some((job) => job.origin === "order" && job.status === "pending" && job.sourcePath) ? (
             <button
               type="button"
               data-testid="scratch-order-run"
@@ -436,7 +456,7 @@ export default function StudioScratchPad({
               {orderBusy ? "Editing…" : "Run next order edit"}
             </button>
           ) : null}
-          {orderJobs.map((job) => {
+          {(aiConfigured ? orderJobs : orderJobs.filter((job) => job.status === "review" || job.status === "rejected")).map((job) => {
             const note = visibleStudioNote(job.note);
             return (
             <article key={job.id} data-testid={`scratch-order-${job.id}`} className="w-56 shrink-0 rounded-xl border border-white/10 bg-black/40 p-2">
@@ -886,9 +906,11 @@ function UploadWorkspace({
           </div>
         )
       ) : null}
-      <p className="mt-3 text-[11px] leading-snug text-gray-500">
-        Drop photos for this order. Export to Gallery sends the selected set. JPEG and PNG can be edited here. RAW and TIFF wait for a JPEG.
-      </p>
+      {compact ? null : (
+        <p className="mt-3 text-[11px] leading-snug text-gray-500">
+          Drop photos for this order. Export to Gallery sends the selected set. JPEG and PNG can be edited here. RAW and TIFF wait for a JPEG.
+        </p>
+      )}
       <p className="mt-1 text-right text-[10px] font-bold uppercase tracking-widest text-teal-200">{readyNote}</p>
     </div>
   );

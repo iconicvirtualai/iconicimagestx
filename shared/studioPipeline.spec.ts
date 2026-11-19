@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { nextOrderPipelineStatus, parseStudioExportFrames } from "./studioPipeline";
+import { nextOrderPipelineStatus, parseStudioExportFrames, studioPipelineIndex } from "./studioPipeline";
 
 describe("studio order pipeline", () => {
   it("moves an order forward at upload, export, and deliver", () => {
@@ -14,6 +14,13 @@ describe("studio order pipeline", () => {
     expect(nextOrderPipelineStatus("approved", "export")).toBe("approved");
     expect(nextOrderPipelineStatus("cancelled", "deliver")).toBe("cancelled");
     expect(nextOrderPipelineStatus("ready_for_review", "upload")).toBe("ready_for_review");
+  });
+
+  it("shows one step when the order and the gallery disagree", () => {
+    expect(studioPipelineIndex({ orderStatus: "editing", galleryStatus: "delivered" })).toBe(3);
+    expect(studioPipelineIndex({ orderStatus: "editing", galleryStatus: "ready_for_review" })).toBe(2);
+    expect(studioPipelineIndex({ orderStatus: "scheduled", fileCount: 2 })).toBe(1);
+    expect(studioPipelineIndex({ orderStatus: "scheduled", fileCount: 0 })).toBe(0);
   });
 
   it("requires a selected photo and rejects an oversized edit", () => {

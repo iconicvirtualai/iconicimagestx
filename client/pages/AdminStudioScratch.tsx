@@ -37,6 +37,7 @@ import {
 } from "@shared/iconicStudio";
 import { studioEditorListingId } from "@shared/studioEditorHref";
 import { shortOrderNumber } from "@shared/orderProjectInvoice";
+import { studioPipelineIndex } from "@shared/studioPipeline";
 import {
   listingOrderQueuePending,
   studioOrderTrayJobs,
@@ -194,6 +195,7 @@ export default function AdminStudioScratch() {
   const [orderStatus, setOrderStatus] = useState("");
   const [galleryId, setGalleryId] = useState("");
   const [galleryStatus, setGalleryStatus] = useState("");
+  const [aiConfigured, setAiConfigured] = useState(true);
   const sortModeRef = useRef(sortMode);
   sortModeRef.current = sortMode;
   const loadedListing = useRef("");
@@ -213,7 +215,10 @@ export default function AdminStudioScratch() {
     let cancel = false;
     void fetchStudioWorkspace(undefined, getToken)
       .then((data) => {
-        if (!cancel) setOrders(data.listings || []);
+        if (!cancel) {
+          setOrders(data.listings || []);
+          setAiConfigured(data.flags?.aiConfigured !== false);
+        }
       })
       .catch(() => undefined);
     return () => {
@@ -251,6 +256,7 @@ export default function AdminStudioScratch() {
         setOrderStatus(String(data.listing?.orderStatus || data.listing?.status || ""));
         setGalleryId(data.listing?.delivery?.galleryId || data.listing?.galleryId || "");
         setGalleryStatus(data.listing?.delivery?.galleryStatus || "");
+        setAiConfigured(data.flags?.aiConfigured !== false);
         const address = recordAddressText(data.listing) || listingId;
         const frames = framesFromListingImages(data.listing?.images);
         const slice = frames.slice(0, SCRATCH_MAX_FILES);
@@ -993,7 +999,8 @@ export default function AdminStudioScratch() {
         }))}
         orderNumber={orderNumber}
         listingId={listingId}
-        pipelineLabel={listingId ? `Order ${orderStatus || "open"} · Gallery ${galleryStatus || "not exported"}` : ""}
+        pipelineIndex={listingId ? studioPipelineIndex({ orderStatus, listingStatus: orderStatus, galleryStatus, fileCount: items.length }) : 0}
+        aiConfigured={aiConfigured}
         galleryHref={(galleryStatus === "delivered" || galleryStatus === "approved") && galleryId ? `/gallery/${galleryId}` : ""}
         canDeliver={Boolean(galleryId) && galleryStatus !== "delivered" && galleryStatus !== "pending_upload"}
         onOpenOrder={(id) => navigate(`/admin/studio?listingId=${encodeURIComponent(id)}`)}
