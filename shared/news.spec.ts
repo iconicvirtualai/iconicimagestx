@@ -43,10 +43,11 @@ describe("news issues", () => {
     expect(parsed.title).toBe("HOLYYY SMOKES");
     expect(parsed.category).toBe("newsletter");
     expect(parsed.date).toBe("2026-11-23");
-    expect(newsIssuePath(parsed)).toBe("/insights/news/holysmokes");
-    expect(newsIssuePath({ slug: "jan2027", category: "promo" })).toBe("/insights/news/promos/jan2027");
-    expect(legacyNewsRedirect("/news/holysmokes")).toBe("/insights/news/holysmokes");
-    expect(legacyNewsRedirect("/news/promos/jan2027")).toBe("/insights/news/promos/jan2027");
+    expect(newsIssuePath(parsed)).toBe("/news/holysmokes");
+    expect(newsIssuePath({ slug: "jan2027", category: "promo" })).toBe("/news/promos/jan2027");
+    expect(legacyNewsRedirect("/news")).toBe("/");
+    expect(legacyNewsRedirect("/insights/news/holysmokes")).toBe("/news/holysmokes");
+    expect(legacyNewsRedirect("/insights/news/promos/jan2027")).toBe("/news/promos/jan2027");
   });
 
   it("keeps send-ready image URLs on the www asset host", () => {
@@ -63,7 +64,7 @@ describe("news issues", () => {
     const tags = newsHeadTags(parseNewsMeta(meta, "holysmokes"), CANONICAL_WWW_ORIGIN);
     expect(tags).toContain("<title>HOLYYY SMOKES | Iconic Images</title>");
     expect(tags).toContain(`property="og:image" content="${CANONICAL_WWW_ORIGIN}/marketing/email/holy-smokes-2026/hero.jpg"`);
-    expect(tags).toContain(`href="${CANONICAL_WWW_ORIGIN}/insights/news/holysmokes"`);
+    expect(tags).toContain(`href="${CANONICAL_WWW_ORIGIN}/news/holysmokes"`);
     expect(email).toContain("https://www.iconicimagestx.com/flash-sale?bundle=5");
     expect(email).toContain("https://www.iconicimagestx.com/flash-sale?bundle=10");
     expect(email).toContain("Cadi, Mike, Armando, Daniel, Steven, Pedro and David");
@@ -122,10 +123,10 @@ describe("news issues", () => {
       newsSummary: "A short January offer.",
     });
     const merged = mergeNewsCards(
-      [{ ...parseNewsMeta(meta, "holysmokes"), path: "/insights/news/holysmokes", source: "folder" }],
+      [{ ...parseNewsMeta(meta, "holysmokes"), path: "/news/holysmokes", source: "folder" }],
       [
         card!,
-        { ...card!, slug: "holysmokes", path: "/insights/news/holysmokes" },
+        { ...card!, slug: "holysmokes", path: "/news/holysmokes" },
       ],
     );
     expect(merged.map((item) => item.slug)).toEqual(["jan2027", "holysmokes"]);

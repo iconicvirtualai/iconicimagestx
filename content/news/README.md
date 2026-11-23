@@ -1,6 +1,6 @@
 # News issues
 
-One folder here is one staff-only page. Nothing else has to be registered. The archive lives at `/insights/news` behind the same staff sign-in as the rest of the admin site. `/news` redirects there and is `noindex`.
+One folder here is one unlisted page. Nothing else has to be registered. A direct link such as `/news/holysmokes` opens the issue with no sign-in. Those pages are not in the header, footer, or sitemap, and they send `noindex, nofollow`. `/news` itself redirects home. Staff still browse the archive at `/insights/news`, and those cards open the public `/news/<slug>` link.
 
 ```
 content/news/<slug>/
@@ -31,12 +31,12 @@ content/news/<slug>/
 
 | Category | URL |
 |---|---|
-| newsletter | `/insights/news/<slug>` |
-| promo | `/insights/news/promos/<slug>` |
+| newsletter | `/news/<slug>` |
+| promo | `/news/promos/<slug>` |
 
-The first issue is `/insights/news/holysmokes`. A future January promo would be a folder `content/news/jan2027/` with `"category": "promo"`, and the page would be `/insights/news/promos/jan2027`.
+The first issue is `/news/holysmokes`. A future January promo would be a folder `content/news/jan2027/` with `"category": "promo"`, and the page would be `/news/promos/jan2027`.
 
-The index is `/insights/news`, with All / Newsletters / Promos filters. These folders are the source of truth. Old `/news` URLs redirect to this archive.
+Staff can list every issue at `/insights/news`. There is no public index.
 
 The web page shows the email in an iframe so its CSS stays inside the message. Animated GIFs, including `05-podcast-vote.gif`, play in that frame. On a preview host, that render loads `/marketing/email/...` from the preview so new images are not requested from production before they ship. The file itself keeps absolute `https://www.iconicimagestx.com/marketing/email/...` image URLs.
 

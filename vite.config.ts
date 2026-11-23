@@ -68,6 +68,9 @@ function expressPlugin(): Plugin {
           res.end();
           return;
         }
+        if (pathOnly === "/news" || pathOnly.startsWith("/news/")) {
+          res.setHeader("X-Robots-Tag", "noindex, nofollow");
+        }
         const launchRedirect = matchingRedirect(pathOnly, devHostname(req.headers.host));
         if (launchRedirect) {
           res.statusCode = redirectStatus(launchRedirect);

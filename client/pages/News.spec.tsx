@@ -51,7 +51,7 @@ describe("staff news index", () => {
             date: "2026-11-23",
             summary: "Not in real estate.",
             heroImage: "/marketing/email/holy-smokes-2026/hero.jpg",
-            path: "/insights/news/holysmokes",
+            path: "/news/holysmokes",
             source: "folder",
           }],
         }), { status: 200, headers: { "Content-Type": "application/json" } });
@@ -73,7 +73,7 @@ describe("staff news index", () => {
       await new Promise((resolve) => setTimeout(resolve, 20));
     });
     expect(container.textContent).toContain("HOLYYY SMOKES");
-    expect(container.querySelector("[data-testid='news-card']")?.getAttribute("href")).toBe("/insights/news/holysmokes");
+    expect(container.querySelector("[data-testid='news-card']")?.getAttribute("href")).toBe("/news/holysmokes");
     const promos = [...container.querySelectorAll("button")].find((button) => button.textContent === "Promos");
     await act(async () => {
       promos?.click();

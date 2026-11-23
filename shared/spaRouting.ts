@@ -72,9 +72,9 @@ const RESERVED: Rewrite[] = [
   // Prep stays on the app shell. A post slug is rendered by the API so the
   // first HTML response can carry the cover image and the SEO title.
   { source: "/insights/prep", destination: APP_SHELL },
-  { source: "/insights/news/promos/:slug", destination: PRIVATE_SHELL },
-  { source: "/insights/news/:slug", destination: PRIVATE_SHELL },
   { source: "/insights/news", destination: PRIVATE_SHELL },
+  { source: "/news/promos/:slug", destination: PRIVATE_SHELL },
+  { source: "/news/:slug", destination: PRIVATE_SHELL },
   { source: "/insights/:slug", destination: "/api/index" },
 ];
 
@@ -160,12 +160,12 @@ export function buildVercelRedirects(): Redirect[] {
     { source: "/studio/", destination: "/studio-105", permanent: false },
     { source: "/gallery", destination: "/portal", permanent: false },
     { source: "/gallery/", destination: "/portal", permanent: false },
-    { source: "/news", destination: "/insights/news", statusCode: 302 },
-    { source: "/news/", destination: "/insights/news", statusCode: 302 },
-    { source: "/news/promos/:slug", destination: "/insights/news/promos/:slug", statusCode: 302 },
-    { source: "/news/promos/:slug/", destination: "/insights/news/promos/:slug", statusCode: 302 },
-    { source: "/news/:slug", destination: "/insights/news/:slug", statusCode: 302 },
-    { source: "/news/:slug/", destination: "/insights/news/:slug", statusCode: 302 },
+    { source: "/news", destination: "/", statusCode: 302 },
+    { source: "/news/", destination: "/", statusCode: 302 },
+    { source: "/insights/news/promos/:slug", destination: "/news/promos/:slug", statusCode: 302 },
+    { source: "/insights/news/promos/:slug/", destination: "/news/promos/:slug", statusCode: 302 },
+    { source: "/insights/news/:slug", destination: "/news/:slug", statusCode: 302 },
+    { source: "/insights/news/:slug/", destination: "/news/:slug", statusCode: 302 },
     ...publicAliasRedirects(),
     ...wixPathRedirects(),
   ];
