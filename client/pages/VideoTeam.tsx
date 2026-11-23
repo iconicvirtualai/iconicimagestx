@@ -121,7 +121,6 @@ function TeamReelCard({
           </button>
         </div>
       </div>
-      <figcaption className="mt-3 px-1 text-sm font-bold leading-snug text-[#141414]">{reel.title}</figcaption>
     </figure>
   );
 }
@@ -187,8 +186,8 @@ function CrewPortrait({ person }: { person: CrewMember }) {
   const [failed, setFailed] = useState(!person.image);
 
   return (
-    <li className="flex w-[42%] flex-col items-center text-center sm:w-36">
-      <div className="flex h-28 w-28 items-center justify-center overflow-hidden rounded-full bg-[#0f8f80]/10 ring-2 ring-white sm:h-32 sm:w-32">
+    <li className="flex w-28 shrink-0 snap-start flex-col items-center text-center lg:w-auto">
+      <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-[#0f8f80]/10 ring-2 ring-white lg:h-[6.5rem] lg:w-[6.5rem]">
         {failed ? (
           <span className="text-2xl font-extrabold tracking-wide text-[#0f8f80]" aria-hidden="true">{person.initials}</span>
         ) : (
@@ -202,7 +201,7 @@ function CrewPortrait({ person }: { person: CrewMember }) {
           />
         )}
       </div>
-      <p className="mt-3 text-sm font-bold leading-tight text-[#141414]">{person.name}</p>
+      <p className="mt-3 whitespace-nowrap text-xs font-bold leading-tight text-[#141414] lg:text-sm">{person.name}</p>
     </li>
   );
 }
@@ -239,7 +238,7 @@ export default function VideoTeam() {
         <section className="mx-auto max-w-6xl px-4 pb-16 sm:px-6" aria-labelledby="video-crew-heading">
           <h2 id="video-crew-heading" className="text-3xl font-extrabold tracking-tight sm:text-4xl">The crew</h2>
           <p className="mt-3 max-w-xl text-base leading-relaxed text-[#5b5249]">The people who film with Iconic Images.</p>
-          <ul className="mt-8 flex flex-wrap justify-center gap-x-4 gap-y-8 sm:justify-start sm:gap-x-8">
+          <ul className="mt-8 flex snap-x gap-4 overflow-x-auto pb-2 [scrollbar-width:none] lg:grid lg:grid-cols-7 lg:gap-3 lg:overflow-visible [&::-webkit-scrollbar]:hidden">
             {CREW.map((person) => (
               <CrewPortrait key={person.name} person={person} />
             ))}

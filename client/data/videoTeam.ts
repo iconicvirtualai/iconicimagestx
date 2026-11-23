@@ -63,72 +63,12 @@ export const TEAM_REELS: readonly TeamReel[] = [
 
 export const SAMPLE_CATEGORIES: readonly SampleCategory[] = [
   {
-    id: "real-estate",
-    label: "Real Estate",
-    samples: [
-      {
-        id: "re-nubenbrook",
-        title: "13718 Nubenbrook Lake Dr — luxury listing film",
-        src: `${MEDIA}/samples/real-estate/nubenbrook-lake-listing.mp4`,
-        poster: `${MEDIA}/samples/real-estate/nubenbrook-lake-listing.jpg`,
-        width: 1080,
-        height: 608,
-      },
-      {
-        id: "re-chateau",
-        title: "4430 Chateau Creek — unbranded listing reel",
-        src: `${MEDIA}/samples/real-estate/chateau-creek-unbranded.mp4`,
-        poster: `${MEDIA}/samples/real-estate/chateau-creek-unbranded.jpg`,
-        width: 608,
-        height: 1080,
-      },
-      {
-        id: "re-bluelake",
-        title: "2102 E Blue Lake — unbranded listing video",
-        src: `${MEDIA}/samples/real-estate/blue-lake-unbranded.mp4`,
-        poster: `${MEDIA}/samples/real-estate/blue-lake-unbranded.jpg`,
-        width: 608,
-        height: 1080,
-      },
-      {
-        id: "re-fawn",
-        title: "430 Fawn Rd — lakefront aerial",
-        src: `${MEDIA}/samples/real-estate/fawn-rd-aerial.mp4`,
-        poster: `${MEDIA}/samples/real-estate/fawn-rd-aerial.jpg`,
-        width: 1080,
-        height: 608,
-      },
-    ],
-  },
-  {
-    id: "commercial",
-    label: "Commercial",
-    samples: [
-      {
-        id: "co-a1",
-        title: "A1 Commercial — official Iconic commercial film",
-        src: `${MEDIA}/samples/commercial/a1-commercial.mp4`,
-        poster: `${MEDIA}/samples/commercial/a1-commercial.jpg`,
-        width: 1080,
-        height: 608,
-      },
-      {
-        id: "co-king",
-        title: "King Metals and Cores — commercial property film",
-        src: `${MEDIA}/samples/commercial/king-metals.mp4`,
-        poster: `${MEDIA}/samples/commercial/king-metals.jpg`,
-        width: 1080,
-        height: 608,
-      },
-    ],
-  },
-  {
     id: "on-camera",
     label: "On Camera",
     samples: [
       {
         id: "oc-emily",
-        title: "Emily Aguilar — 126 Stonecrop Pl on-camera reel",
+        title: "Emily Aguilar",
         src: `${MEDIA}/samples/on-camera/emily-aguilar-stonecrop.mp4`,
         poster: `${MEDIA}/samples/on-camera/emily-aguilar-stonecrop.jpg`,
         width: 608,
@@ -136,7 +76,7 @@ export const SAMPLE_CATEGORIES: readonly SampleCategory[] = [
       },
       {
         id: "oc-brittany",
-        title: "Brittany Cabrera — 14503 Ivy Wood Ct on-camera reel",
+        title: "Brittany Cabrera",
         src: `${MEDIA}/samples/on-camera/brittany-cabrera-ivy-wood.mp4`,
         poster: `${MEDIA}/samples/on-camera/brittany-cabrera-ivy-wood.jpg`,
         width: 608,
@@ -144,11 +84,25 @@ export const SAMPLE_CATEGORIES: readonly SampleCategory[] = [
       },
       {
         id: "oc-catie",
-        title: "Catie Fuller — Spring Trails community reel",
+        title: "Catie Fuller",
         src: `${MEDIA}/samples/on-camera/catie-fuller-spring-trails.mp4`,
         poster: `${MEDIA}/samples/on-camera/catie-fuller-spring-trails.jpg`,
         width: 608,
         height: 1080,
+      },
+    ],
+  },
+  {
+    id: "branding",
+    label: "Branding",
+    samples: [
+      {
+        id: "pr-branding",
+        title: "Branding Web Clip",
+        src: `${MEDIA}/samples/branding/branding-web-clip.mp4`,
+        poster: `${MEDIA}/samples/branding/branding-web-clip.jpg`,
+        width: 1080,
+        height: 608,
       },
     ],
   },
@@ -158,7 +112,7 @@ export const SAMPLE_CATEGORIES: readonly SampleCategory[] = [
     samples: [
       {
         id: "ev-webclip",
-        title: "Events Web Clip — official Iconic events film",
+        title: "Events Web Clip",
         src: `${MEDIA}/samples/events/events-web-clip.mp4`,
         poster: `${MEDIA}/samples/events/events-web-clip.jpg`,
         width: 1080,
@@ -183,12 +137,72 @@ export const SAMPLE_CATEGORIES: readonly SampleCategory[] = [
     ],
   },
   {
+    id: "real-estate",
+    label: "Real Estate",
+    samples: [
+      {
+        id: "re-nubenbrook",
+        title: "Nubenbrook Lake",
+        src: `${MEDIA}/samples/real-estate/nubenbrook-lake-listing.mp4`,
+        poster: `${MEDIA}/samples/real-estate/nubenbrook-lake-listing.jpg`,
+        width: 1080,
+        height: 608,
+      },
+      {
+        id: "re-chateau",
+        title: "Chateau Creek",
+        src: `${MEDIA}/samples/real-estate/chateau-creek-unbranded.mp4`,
+        poster: `${MEDIA}/samples/real-estate/chateau-creek-unbranded.jpg`,
+        width: 608,
+        height: 1080,
+      },
+      {
+        id: "re-bluelake",
+        title: "Blue Lake",
+        src: `${MEDIA}/samples/real-estate/blue-lake-unbranded.mp4`,
+        poster: `${MEDIA}/samples/real-estate/blue-lake-unbranded.jpg`,
+        width: 608,
+        height: 1080,
+      },
+      {
+        id: "re-fawn",
+        title: "Lakefront Aerial",
+        src: `${MEDIA}/samples/real-estate/fawn-rd-aerial.mp4`,
+        poster: `${MEDIA}/samples/real-estate/fawn-rd-aerial.jpg`,
+        width: 1080,
+        height: 608,
+      },
+    ],
+  },
+  {
+    id: "commercial",
+    label: "Commercial",
+    samples: [
+      {
+        id: "co-a1",
+        title: "A1 Commercial",
+        src: `${MEDIA}/samples/commercial/a1-commercial.mp4`,
+        poster: `${MEDIA}/samples/commercial/a1-commercial.jpg`,
+        width: 1080,
+        height: 608,
+      },
+      {
+        id: "co-king",
+        title: "King Metals and Cores",
+        src: `${MEDIA}/samples/commercial/king-metals.mp4`,
+        poster: `${MEDIA}/samples/commercial/king-metals.jpg`,
+        width: 1080,
+        height: 608,
+      },
+    ],
+  },
+  {
     id: "product",
     label: "Product",
     samples: [
       {
         id: "pr-product",
-        title: "Product Photography — official Iconic product film",
+        title: "Product Photography",
         src: `${MEDIA}/samples/product/product-photography.mp4`,
         poster: `${MEDIA}/samples/product/product-photography.jpg`,
         width: 1080,
@@ -202,23 +216,9 @@ export const SAMPLE_CATEGORIES: readonly SampleCategory[] = [
     samples: [
       {
         id: "pr-twilight",
-        title: "Product Twilight Video V2 — official Iconic twilight film",
+        title: "Product Twilight",
         src: `${MEDIA}/samples/twilight/product-twilight-video-v2.mp4`,
         poster: `${MEDIA}/samples/twilight/product-twilight-video-v2.jpg`,
-        width: 1080,
-        height: 608,
-      },
-    ],
-  },
-  {
-    id: "branding",
-    label: "Branding",
-    samples: [
-      {
-        id: "pr-branding",
-        title: "Branding Web Clip — official Iconic branding film",
-        src: `${MEDIA}/samples/branding/branding-web-clip.mp4`,
-        poster: `${MEDIA}/samples/branding/branding-web-clip.jpg`,
         width: 1080,
         height: 608,
       },

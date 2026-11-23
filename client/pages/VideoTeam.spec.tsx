@@ -30,9 +30,23 @@ describe("Meet our Video Team", () => {
       expect(html).toContain(person.image);
     }
 
+    expect(SAMPLE_CATEGORIES.map((category) => category.label)).toEqual([
+      "On Camera",
+      "Branding",
+      "Events",
+      "Real Estate",
+      "Commercial",
+      "Product",
+      "Twilight",
+    ]);
     for (const category of SAMPLE_CATEGORIES) {
       expect(html).toContain(category.label);
     }
+    expect(html).toContain("Emily Aguilar");
+    expect(html).not.toContain("13718");
+    expect(html).not.toContain("Stonecrop");
+    expect(html).not.toContain("luxury listing");
+    expect(html).not.toContain(">Your Video Team Is Here<");
     for (const sample of SAMPLE_CATEGORIES[0].samples) {
       expect(html).toContain(sample.title);
       expect(html).toContain(sample.poster);
@@ -51,6 +65,7 @@ describe("Meet our Video Team", () => {
     }
 
     const source = readFileSync(new URL("./VideoTeam.tsx", import.meta.url), "utf8");
+    expect(source).toContain("lg:grid-cols-7");
     expect(source).toContain('preload="none"');
     expect(source).toContain('loading="lazy"');
     expect(source).not.toMatch(/jazmin/i);
