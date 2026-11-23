@@ -15,6 +15,7 @@ import twilio from "twilio";
 import {
   sendSMS,
   sendSMSCampaign,
+  deliverCampaignSms,
   createMaskedConversation,
   sendConversationMessage,
   closeConversation,
@@ -28,9 +29,34 @@ import { clientNotifyBlockReason, clientNotifyLive } from "../../shared/clientNo
 import { refuseQaStaffPhone } from "../services/qaStaffAssign";
 import { bumpAdminUnreadChannel } from "../services/adminUnread";
 import { noteCampaignSmsInbound } from "../services/channelCampaignStore";
+import { clientIp } from "../lib/clientIp";
+import { createRateLimiter } from "../lib/rateLimit";
+import { campaignSendLive, isStopKeyword } from "../../shared/channelCampaigns";
+import {
+  MARKETING_OPT_IN_CONFIRMATION,
+  SMS_HELP_REPLY,
+  isHelpKeyword,
+  phoneDigits10,
+  twimlEmpty,
+  twimlMessage,
+} from "../../shared/a2p";
+import { isSmsStopped, marketingRecipientAllowed, optOutEverywhere, saveMarketingOptIn } from "../services/smsProgram";
 
 const router = Router();
 const db = () => admin.firestore();
+const marketingOptInLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 8 });
+
+async function applyInboundKeyword(from: string, body: string): Promise<"stop" | "help" | "other"> {
+  if (from && body) {
+    try { await noteCampaignSmsInbound(from, body); } catch { /* campaign index is optional */ }
+  }
+  if (isStopKeyword(body)) {
+    await optOutEverywhere(from);
+    return "stop";
+  }
+  if (isHelpKeyword(body)) return "help";
+  return "other";
+}
 
 async function findOrderLikeDocument(id: string) {
   const orderRequestDoc = await db().collection("orderRequests").doc(id).get();
@@ -125,6 +151,12 @@ router.post("/remind/:orderId", requireStaff, async (req: AuthenticatedRequest, 
     const order = orderDoc.data()!;
     const phone = order.phone || order.clientPhone;
     if (!phone) return res.status(400).json({ error: "No phone number on order." });
+    if (order.smsConsent !== true) {
+      return res.status(409).json({ error: "This booking does not have SMS consent.", skipped: "no_sms_consent" });
+    }
+    if (await isSmsStopped(String(phone))) {
+      return res.status(409).json({ error: "This number opted out.", skipped: "sms_stopped" });
+    }
 
     const name = order.firstName || order.clientName?.split(" ")[0] || "there";
     const date = bookingDateLabel(order.scheduledDate, "your scheduled date");
@@ -290,16 +322,20 @@ router.post("/webhook", express_raw_or_json, async (req: Request, res: Response)
       ConversationSid,
       Body,
       Author,
-      ParticipantSid,
+      From,
       MessageSid,
     } = req.body;
 
-    if (Author && Body) {
-      try { await noteCampaignSmsInbound(String(Author), String(Body)); } catch { /* campaign index is optional */ }
-    }
+    const inboundFrom = String(From || Author || "");
+    const inboundBody = String(Body || "");
+    const keyword = await applyInboundKeyword(inboundFrom, inboundBody);
 
     if (!ConversationSid || !Body) {
-      return res.status(200).send("OK"); // Twilio expects 200
+      if (keyword === "help") {
+        res.type("text/xml");
+        return res.status(200).send(twimlMessage(SMS_HELP_REPLY));
+      }
+      return res.status(200).send("OK");
     }
 
     // Find the conversation in Firestore
@@ -351,6 +387,10 @@ router.post("/webhook", express_raw_or_json, async (req: Request, res: Response)
 
     if (senderType !== "staff") await bumpAdminUnreadChannel("sms");
 
+    if (keyword === "help") {
+      res.type("text/xml");
+      return res.status(200).send(twimlMessage(SMS_HELP_REPLY));
+    }
     // Twilio Conversations expects empty 200
     return res.status(200).send("");
   } catch (err) {
@@ -374,23 +414,30 @@ router.post("/campaign/:id/send", requireCoordinator, async (req: AuthenticatedR
       return res.status(503).json({ error: "Client notifications are off.", suppressed: true });
     }
 
-    // Get recipients
-    const clientsSnap = await db().collection("clients")
-      .where("smsOptIn", "==", true)
-      .get();
-
-    let clients = clientsSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Record<string, unknown>));
+    const [bySmsOptIn, byMarketingOptIn] = await Promise.all([
+      db().collection("clients").where("smsOptIn", "==", true).get(),
+      db().collection("clients").where("marketingSmsOptIn", "==", true).get(),
+    ]);
+    const byId = new Map<string, Record<string, unknown>>();
+    for (const doc of [...bySmsOptIn.docs, ...byMarketingOptIn.docs]) {
+      byId.set(doc.id, { id: doc.id, ...doc.data() });
+    }
+    let clients = [...byId.values()];
 
     if (campaign.audience === "custom" && campaign.audienceIds?.length) {
       clients = clients.filter((c) => campaign.audienceIds.includes(c.id));
     }
 
-    const recipients = clients
-      .filter((c) => c.phone)
-      .map((c) => ({
-        phone: c.phone as string,
-        name: ((c.firstName as string) || "") + " " + ((c.lastName as string) || ""),
-      }));
+    const recipients = [];
+    for (const client of clients) {
+      if (!marketingRecipientAllowed(client)) continue;
+      if (await isSmsStopped(String(client.phone))) continue;
+      recipients.push({
+        phone: client.phone as string,
+        name: ((client.firstName as string) || "") + " " + ((client.lastName as string) || ""),
+        marketingOptIn: true,
+      });
+    }
 
     await campaignDoc.ref.update({ status: "sending" });
 
@@ -424,25 +471,68 @@ router.post("/campaign/:id/send", requireCoordinator, async (req: AuthenticatedR
 
 router.post("/opt-out", async (req: Request, res: Response) => {
   try {
-    const { From, Body } = req.body;
-    if (!From) return res.status(200).send("");
+    const from = String(req.body?.From || "");
+    const body = String(req.body?.Body || "");
+    res.type("text/xml");
+    if (!from) return res.status(200).send(twimlEmpty());
+    const keyword = await applyInboundKeyword(from, body);
+    if (keyword === "help") return res.status(200).send(twimlMessage(SMS_HELP_REPLY));
+    return res.status(200).send(twimlEmpty());
+  } catch (err) {
+    res.type("text/xml");
+    return res.status(200).send(twimlEmpty());
+  }
+});
 
-    const keyword = (Body || "").trim().toUpperCase();
-    if (["STOP", "STOPALL", "UNSUBSCRIBE", "CANCEL", "END", "QUIT"].includes(keyword)) {
-      try { await noteCampaignSmsInbound(String(From), String(Body || keyword)); } catch { /* campaign index is optional */ }
-      // Find client by phone and mark opted out
-      const snap = await db().collection("clients")
-        .where("phone", "==", From)
-        .limit(1)
-        .get();
-      if (!snap.empty) {
-        await snap.docs[0].ref.update({ smsOptIn: false });
+router.post("/marketing-opt-in", async (req: Request, res: Response) => {
+  const limit = marketingOptInLimiter.check(clientIp(req));
+  if (!limit.allowed) {
+    res.setHeader("Retry-After", String(limit.retryAfterSec));
+    return res.status(429).json({ error: "Too many signups. Please wait and try again." });
+  }
+  const name = String(req.body?.name || "").trim();
+  const phone = String(req.body?.phone || "").trim();
+  const consent = req.body?.consent === true || req.body?.consent === "yes" || req.body?.consent === "on";
+  const source = String(req.body?.source || "/sms");
+  if (!name || !phoneDigits10(phone)) {
+    return res.status(400).json({ error: "Name and a mobile number are required." });
+  }
+  if (!consent) {
+    return res.status(400).json({ error: "Check the box to agree to promotional texts." });
+  }
+  if (source !== "/sms") {
+    return res.status(400).json({ error: "Unknown opt-in source." });
+  }
+  try {
+    const record = await saveMarketingOptIn({
+      name,
+      phone,
+      ip: clientIp(req),
+      userAgent: String(req.headers["user-agent"] || ""),
+    });
+    let confirmation: "skipped" | "sent" | "failed" = "skipped";
+    if (campaignSendLive()) {
+      try {
+        await deliverCampaignSms(phone, MARKETING_OPT_IN_CONFIRMATION, true);
+        confirmation = "sent";
+      } catch (error) {
+        console.error("[SMS] Opt-in confirmation failed:", error);
+        confirmation = "failed";
       }
     }
-
-    return res.status(200).send("<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response/>");
-  } catch (err) {
-    return res.status(200).send("<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response/>");
+    const accept = String(req.headers.accept || "");
+    const formPost = req.is("application/x-www-form-urlencoded") && !accept.includes("application/json");
+    if (formPost) return res.redirect(303, "/sms?joined=1");
+    return res.status(201).json({
+      ok: true,
+      phone: record.phone,
+      consentTextVersion: record.consentTextVersion,
+      source: record.source,
+      confirmation,
+    });
+  } catch (error) {
+    console.error("[SMS] Marketing opt-in failed:", error);
+    return res.status(500).json({ error: "Could not save your opt-in." });
   }
 });
 

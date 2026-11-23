@@ -170,6 +170,8 @@ describe("spa rewrite coverage", () => {
       "/podcast-guest-prep/",
       "/dev/invoice-template",
       "/dev/invoice-template/",
+      "/dev/listing-style-shots",
+      "/dev/listing-style-shots/",
       "/forgot-password",
       "/forgot-password/",
       "/change-password",

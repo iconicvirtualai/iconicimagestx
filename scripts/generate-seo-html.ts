@@ -1,10 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
+import { crawlableBodyForPath } from "../shared/a2pPages";
 import {
   CANONICAL_WWW_ORIGIN,
   PUBLIC_PAGES,
   injectNoIndex,
   injectPublicPage,
+  injectRootHtml,
   stampCanonical,
   wwwShellFile,
   SITE_ORIGIN,
@@ -24,11 +26,12 @@ fs.writeFileSync(path.join(dist, "seo/app.html"), shell);
 fs.writeFileSync(path.join(dist, "seo/private.html"), injectNoIndex(shell));
 
 for (const page of PUBLIC_PAGES) {
-  const html = injectPublicPage(shell, page, SITE_ORIGIN);
+  const body = crawlableBodyForPath(page.path);
+  const html = injectRootHtml(injectPublicPage(shell, page, SITE_ORIGIN), body);
   const target = path.join(dist, page.file);
   fs.mkdirSync(path.dirname(target), { recursive: true });
   fs.writeFileSync(target, html);
-  const wwwHtml = injectPublicPage(shell, page, CANONICAL_WWW_ORIGIN);
+  const wwwHtml = injectRootHtml(injectPublicPage(shell, page, CANONICAL_WWW_ORIGIN), body);
   const wwwTarget = path.join(dist, wwwShellFile(page.file));
   fs.mkdirSync(path.dirname(wwwTarget), { recursive: true });
   fs.writeFileSync(wwwTarget, wwwHtml);

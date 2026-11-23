@@ -17,6 +17,7 @@ import CampaignFrame, { buttonCls, cardCls, ghostCls, inputCls, labelCls } from 
 interface Audience {
   emailCount: number;
   smsCount: number;
+  smsOptedIn?: number;
   unsubscribe: number;
   bounce: number;
   doNotContact: number;
@@ -412,7 +413,7 @@ export default function CampaignDetailPage() {
             <div>
               <p className="text-3xl font-black text-gray-900" data-testid="audience-count">{audience ? audience.emailCount : "—"}</p>
               <p className="text-xs font-semibold text-gray-500">
-                email recipients · {audience?.smsCount ?? "—"} texts · {audience?.unsubscribe ?? 0} unsubscribed · {audience?.bounce ?? 0} bounced · {audience?.doNotContact ?? 0} do not contact
+                email recipients · {audience?.smsOptedIn ?? "—"} marketing SMS opted in · {audience?.smsCount ?? "—"} texts · {audience?.unsubscribe ?? 0} unsubscribed · {audience?.bounce ?? 0} bounced · {audience?.doNotContact ?? 0} do not contact
               </p>
               <p className="mt-1 text-xs text-gray-400">{audience?.sheetNote}{audience?.truncated ? " The count stopped at the page limit." : ""}</p>
             </div>

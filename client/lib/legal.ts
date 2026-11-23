@@ -1,5 +1,6 @@
 import { BUSINESS_CONTACT, LEGAL_BUSINESS_NAME } from "@shared/businessContact";
 import { ICONIC_BUSINESS } from "@shared/iconicBusiness";
+import { LEGAL_LAST_UPDATED } from "@shared/a2p";
 
 /** Public legal identity. Contact fields come from the shared business contact. */
 export const LEGAL = {
@@ -13,5 +14,5 @@ export const LEGAL = {
   addressLine1: BUSINESS_CONTACT.streetAddress,
   addressLine2: BUSINESS_CONTACT.addressLine2,
   line: BUSINESS_CONTACT.line,
-  lastUpdated: "October 1, 2026",
+  lastUpdated: LEGAL_LAST_UPDATED,
 } as const;

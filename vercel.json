@@ -1093,6 +1093,26 @@
       ]
     },
     {
+      "source": "/sms",
+      "destination": "/seo/www/sms.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/sms/",
+      "destination": "/seo/www/sms.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.iconicimagestx.com"
+        }
+      ]
+    },
+    {
       "source": "/login",
       "destination": "/seo/www/login.html",
       "has": [
@@ -1483,6 +1503,26 @@
       ]
     },
     {
+      "source": "/sms",
+      "destination": "/seo/www/sms.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/sms/",
+      "destination": "/seo/www/sms.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "iconicimagestx.com"
+        }
+      ]
+    },
+    {
       "source": "/login",
       "destination": "/seo/www/login.html",
       "has": [
@@ -1827,6 +1867,14 @@
       "destination": "/seo/terms.html"
     },
     {
+      "source": "/sms",
+      "destination": "/seo/sms.html"
+    },
+    {
+      "source": "/sms/",
+      "destination": "/seo/sms.html"
+    },
+    {
       "source": "/login",
       "destination": "/seo/login.html"
     },
@@ -1936,6 +1984,14 @@
     },
     {
       "source": "/dev/invoice-template/",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/dev/listing-style-shots",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/dev/listing-style-shots/",
       "destination": "/seo/app.html"
     },
     {
@@ -2260,6 +2316,24 @@
     },
     {
       "source": "/dev/invoice-template/",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/dev/listing-style-shots",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/dev/listing-style-shots/",
       "headers": [
         {
           "key": "X-Robots-Tag",

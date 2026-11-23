@@ -154,6 +154,13 @@ export const PUBLIC_PAGES: readonly PublicPage[] = [
     description: "Terms and Conditions for photography, video, and listing media from Iconic Images in Texas.",
   },
   {
+    path: "/sms",
+    file: "seo/sms.html",
+    title: "Text Updates | Iconic Images",
+    description:
+      "Opt in to promotional text messages from Iconic Images about photography services, offers, and events.",
+  },
+  {
     path: "/login",
     file: "seo/login.html",
     title: "Client Login | Iconic Images",
@@ -365,6 +372,15 @@ export function injectHead(html: string, tags: string): string {
 
 export function injectPublicPage(html: string, page: PublicPage, origin = SITE_ORIGIN): string {
   return injectHead(html, pageHeadTags(page, origin));
+}
+
+/** Put crawlable markup inside #root so the first HTML response is not an empty shell. */
+export function injectRootHtml(html: string, inner: string): string {
+  if (!inner) return html;
+  if (/<div id="root"><\/div>/.test(html)) {
+    return html.replace(/<div id="root"><\/div>/, `<div id="root">${inner}</div>`);
+  }
+  return html;
 }
 
 export function injectNoIndex(html: string): string {

@@ -10,6 +10,7 @@ import crypto from "crypto";
 import { requireCoordinator, type AuthenticatedRequest } from "../middleware/auth";
 import { sendEmail } from "../services/email";
 import { sendSMSCampaign } from "../services/sms";
+import { isSmsStopped, marketingRecipientAllowed } from "../services/smsProgram";
 import { clientNotifyBlockReason, clientNotifyLive } from "../../shared/clientNotify";
 
 const router = Router();
@@ -224,13 +225,17 @@ router.post("/:id/send", requireCoordinator, async (req, res) => {
     let sentCount = 0;
 
     if (campaign.type === "sms") {
-      // SMS campaign
-      const recipients = clients
-        .filter((c) => c.phone && c.smsOptIn !== false)
-        .map((c) => ({
-          phone: c.phone as string,
-          name: `${c.firstName || ""} ${c.lastName || ""}`.trim() || "there",
-        }));
+      const eligible = [];
+      for (const client of clients) {
+        if (!marketingRecipientAllowed(client)) continue;
+        if (await isSmsStopped(String(client.phone))) continue;
+        eligible.push(client);
+      }
+      const recipients = eligible.map((c) => ({
+        phone: c.phone as string,
+        name: `${c.firstName || ""} ${c.lastName || ""}`.trim() || "there",
+        marketingOptIn: true,
+      }));
 
       const results = await sendSMSCampaign(
         recipients,

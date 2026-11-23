@@ -72,6 +72,7 @@ describe("public page meta", () => {
       "/senior-living",
       "/privacy",
       "/terms",
+      "/sms",
       "/login",
     ]);
     for (const page of PUBLIC_PAGES) {

@@ -25,11 +25,15 @@ export default function Footer() {
         { label: "Insights", href: "/insights" },
         { label: "Studio 105", href: "/studio-105" },
         { label: "Contact Us", href: "/contact" },
+        { label: "Text updates", href: "/sms" },
         { label: "Client Login", href: "/login" },
       ];
-  const visibleFooterLinks = clientPortalEnabled()
+  const withTextUpdates = footerLinks.some((item) => item.href === "/sms")
     ? footerLinks
-    : footerLinks.filter((item) => !isClientLoginChrome(item.href, item.label));
+    : [...footerLinks, { label: "Text updates", href: "/sms" }];
+  const visibleFooterLinks = clientPortalEnabled()
+    ? withTextUpdates
+    : withTextUpdates.filter((item) => !isClientLoginChrome(item.href, item.label));
   const socials = socialItems
     ? socialItems.map((item) => ({ label: itemText(item, "link"), href: itemLink(item, "link") }))
     : [

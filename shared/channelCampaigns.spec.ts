@@ -30,6 +30,7 @@ function person(partial: Partial<ChannelPerson>): ChannelPerson {
     emailVerified: true,
     source: "import",
     doNotContact: false,
+    marketingSmsOptIn: false,
     ...partial,
   };
 }
@@ -96,11 +97,12 @@ describe("sms", () => {
 
 describe("audience", () => {
   const people = [
-    person({ email: "ada@example.com", firstName: "Ada", lastName: "Lovelace", phone: "(281) 555-0101", tags: ["past-client"] }),
-    person({ email: "sam@example.com", firstName: "Sam", lastName: "Rivera", phone: "2815550144", tags: ["prospect"] }),
-    person({ email: "bounce@example.com", firstName: "Bo", lastName: "Unced", phone: "2815550199" }),
+    person({ email: "ada@example.com", firstName: "Ada", lastName: "Lovelace", phone: "(281) 555-0101", tags: ["past-client"], marketingSmsOptIn: true }),
+    person({ email: "sam@example.com", firstName: "Sam", lastName: "Rivera", phone: "2815550144", tags: ["prospect"], marketingSmsOptIn: true }),
+    person({ email: "bounce@example.com", firstName: "Bo", lastName: "Unced", phone: "2815550199", marketingSmsOptIn: true }),
+    person({ email: "nora@example.com", firstName: "Nora", lastName: "Plain", phone: "2815550188" }),
     person({ email: "unsub@example.com", firstName: "Una", lastName: "Subbed" }),
-    person({ email: "dnc@example.com", firstName: "Dana", lastName: "Quiet", phone: "2815550177", doNotContact: true }),
+    person({ email: "dnc@example.com", firstName: "Dana", lastName: "Quiet", phone: "2815550177", doNotContact: true, marketingSmsOptIn: true }),
   ];
   const suppression = [
     buildSuppression(now, { kind: "email", value: "bounce@example.com", reason: "bounced", note: "bounced", source: "manual" })!,
@@ -109,12 +111,14 @@ describe("audience", () => {
 
   it("counts recipients and holds unsubscribes, bounces, and do-not-contact", () => {
     const preview = buildChannelAudience({ people, suppression, phoneStops: [], segment: null });
-    expect(preview.emailCount).toBe(2);
+    expect(preview.emailCount).toBe(3);
+    expect(preview.smsOptedIn).toBe(4);
     expect(preview.smsCount).toBe(3);
+    expect(preview.smsPeople.some((item) => item.email === "nora@example.com")).toBe(false);
     expect(preview.unsubscribe).toBe(1);
     expect(preview.bounce).toBe(1);
     expect(preview.doNotContact).toBe(1);
-    expect(preview.emailPeople.map((item) => item.email).sort()).toEqual(["ada@example.com", "sam@example.com"]);
+    expect(preview.emailPeople.map((item) => item.email).sort()).toEqual(["ada@example.com", "nora@example.com", "sam@example.com"]);
     expect(preview.smsPeople.map((item) => item.email).sort()).toEqual(["ada@example.com", "bounce@example.com", "sam@example.com"]);
   });
 
@@ -160,7 +164,7 @@ describe("email and calendar", () => {
   it("plans a dry run without dropping the STOP line", () => {
     const item = campaign();
     const audience = buildChannelAudience({
-      people: [person({ email: "ada@example.com", firstName: "Ada", lastName: "Lovelace", phone: "2815550101" })],
+      people: [person({ email: "ada@example.com", firstName: "Ada", lastName: "Lovelace", phone: "2815550101", marketingSmsOptIn: true })],
       suppression: [],
       phoneStops: [],
       segment: null,

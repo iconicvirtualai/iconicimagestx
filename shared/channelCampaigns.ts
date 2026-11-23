@@ -140,11 +140,15 @@ export interface ChannelPerson {
   emailVerified: boolean;
   source: "client" | "import" | "manual" | "sheet";
   doNotContact: boolean;
+  /** Explicit promotional SMS consent. Missing or false is not an opt-in. */
+  marketingSmsOptIn: boolean;
 }
 
 export interface AudienceCounts {
   emailCount: number;
   smsCount: number;
+  /** People with a phone and an explicit marketing SMS opt-in, before STOP and do-not-contact. */
+  smsOptedIn: number;
   unsubscribe: number;
   bounce: number;
   doNotContact: number;
@@ -364,7 +368,7 @@ export function buildChannelAudience(input: {
     ? input.people.filter((person) => contactMatchesFilter(toMarketingContact(person, now), input.segment!.filter))
     : input.people;
 
-  const counts: AudienceCounts = { emailCount: 0, smsCount: 0, unsubscribe: 0, bounce: 0, doNotContact: 0, held: 0 };
+  const counts: AudienceCounts = { emailCount: 0, smsCount: 0, smsOptedIn: 0, unsubscribe: 0, bounce: 0, doNotContact: 0, held: 0 };
   const removed: AudiencePreview["removed"] = [];
   const emailCandidates: ChannelPerson[] = [];
   const smsPeople: ChannelPerson[] = [];
@@ -380,7 +384,8 @@ export function buildChannelAudience(input: {
     }
     if (bucket === "ok" && isValidEmail(person.email)) emailCandidates.push({ ...person, email: normalizeEmail(person.email) });
     const phone = phoneDigits(person.phone);
-    const smsBlocked = bucket === "doNotContact" || (phone && stops.has(phone));
+    if (phone && person.marketingSmsOptIn) counts.smsOptedIn += 1;
+    const smsBlocked = !person.marketingSmsOptIn || bucket === "doNotContact" || (phone && stops.has(phone));
     if (phone && !smsBlocked) smsPeople.push(person);
   }
 
@@ -587,6 +592,7 @@ export function publicAudience(preview: AudiencePreview) {
   return {
     emailCount: preview.emailCount,
     smsCount: preview.smsCount,
+    smsOptedIn: preview.smsOptedIn,
     unsubscribe: preview.unsubscribe,
     bounce: preview.bounce,
     doNotContact: preview.doNotContact,

@@ -20,6 +20,8 @@ import { loadGalleryReleaseForGallery } from "./galleryReleaseGate";
 import { sendEmail } from "./email";
 import { sendSMS, SMS_TEMPLATES } from "./sms";
 import { dispatchClientEmailNotifications } from "./aryeoEmailNotify";
+import { isSmsStopped } from "./smsProgram";
+import { transactionalSmsBlockReason } from "../../shared/a2p";
 
 const db = () => admin.firestore();
 
@@ -206,10 +208,22 @@ export async function deliverGalleryToClient(
   }
 
   if (client?.phone) {
-    await sendSMS({
-      to: client.phone,
-      body: SMS_TEMPLATES.photosDelivered(gallery.clientName || client.name || "there", deliveryUrl),
-    }).catch((err) => console.error("[Galleries] Delivery SMS failed:", err));
+    const orderSnap = gallery.orderId
+      ? await db().collection("orders").doc(String(gallery.orderId)).get()
+      : null;
+    const order = orderSnap?.exists ? orderSnap.data() : null;
+    const consentBlock = transactionalSmsBlockReason({
+      smsConsent: order?.smsConsent === true || gallery.smsConsent === true,
+      stopped: await isSmsStopped(String(client.phone)),
+    });
+    if (consentBlock) {
+      console.info(`[Galleries] Delivery SMS skipped for ${galleryId}. ${consentBlock}. No message sent.`);
+    } else {
+      await sendSMS({
+        to: client.phone,
+        body: SMS_TEMPLATES.photosDelivered(gallery.clientName || client.name || "there", deliveryUrl),
+      }).catch((err) => console.error("[Galleries] Delivery SMS failed:", err));
+    }
   }
 
   return { deliveryUrl, galleryStatus: "delivered" as const };
