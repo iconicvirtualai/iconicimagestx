@@ -138,9 +138,9 @@ function LegacyMarketingRedirect() {
   return <Navigate to={`${next}${location.search}`} replace />;
 }
 
-function LegacyNewsSlugRedirect({ promo = false }: { promo?: boolean }) {
+function InsightsNewsSlugRedirect({ promo = false }: { promo?: boolean }) {
   const { slug = "" } = useParams();
-  return <Navigate to={promo ? `/insights/news/promos/${slug}` : `/insights/news/${slug}`} replace />;
+  return <Navigate to={promo ? `/news/promos/${slug}` : `/news/${slug}`} replace />;
 }
 
 function PortalQueryRedirect({ to }: { to: string }) {
@@ -221,12 +221,12 @@ const App = () => (
             <Route path="/insights" element={<Insights />} />
             <Route path="/insights/prep" element={<Navigate to="/" replace />} />
             <Route path="/insights/news" element={<ProtectedRoute requiredRole="staff"><News /></ProtectedRoute>} />
-            <Route path="/insights/news/promos/:slug" element={<ProtectedRoute requiredRole="staff"><NewsIssue category="promo" /></ProtectedRoute>} />
-            <Route path="/insights/news/:slug" element={<ProtectedRoute requiredRole="staff"><NewsIssue category="newsletter" /></ProtectedRoute>} />
+            <Route path="/insights/news/promos/:slug" element={<InsightsNewsSlugRedirect promo />} />
+            <Route path="/insights/news/:slug" element={<InsightsNewsSlugRedirect />} />
             <Route path="/insights/:slug" element={<InsightPost />} />
-            <Route path="/news" element={<Navigate to="/insights/news" replace />} />
-            <Route path="/news/promos/:slug" element={<LegacyNewsSlugRedirect promo />} />
-            <Route path="/news/:slug" element={<LegacyNewsSlugRedirect />} />
+            <Route path="/news" element={<Navigate to="/" replace />} />
+            <Route path="/news/promos/:slug" element={<NewsIssue category="promo" />} />
+            <Route path="/news/:slug" element={<NewsIssue category="newsletter" />} />
             <Route path="/flash-sale" element={<FlashSale />} />
             <Route path="/stock-footage" element={<StockFootage />} />
             <Route path="/privacy" element={<Privacy />} />

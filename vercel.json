@@ -88,32 +88,32 @@
     },
     {
       "source": "/news",
-      "destination": "/insights/news",
+      "destination": "/",
       "statusCode": 302
     },
     {
       "source": "/news/",
-      "destination": "/insights/news",
+      "destination": "/",
       "statusCode": 302
     },
     {
-      "source": "/news/promos/:slug",
-      "destination": "/insights/news/promos/:slug",
+      "source": "/insights/news/promos/:slug",
+      "destination": "/news/promos/:slug",
       "statusCode": 302
     },
     {
-      "source": "/news/promos/:slug/",
-      "destination": "/insights/news/promos/:slug",
+      "source": "/insights/news/promos/:slug/",
+      "destination": "/news/promos/:slug",
       "statusCode": 302
     },
     {
-      "source": "/news/:slug",
-      "destination": "/insights/news/:slug",
+      "source": "/insights/news/:slug",
+      "destination": "/news/:slug",
       "statusCode": 302
     },
     {
-      "source": "/news/:slug/",
-      "destination": "/insights/news/:slug",
+      "source": "/insights/news/:slug/",
+      "destination": "/news/:slug",
       "statusCode": 302
     },
     {
@@ -1609,27 +1609,27 @@
       "destination": "/seo/app.html"
     },
     {
-      "source": "/insights/news/promos/:slug",
-      "destination": "/seo/private.html"
-    },
-    {
-      "source": "/insights/news/promos/:slug/",
-      "destination": "/seo/private.html"
-    },
-    {
-      "source": "/insights/news/:slug",
-      "destination": "/seo/private.html"
-    },
-    {
-      "source": "/insights/news/:slug/",
-      "destination": "/seo/private.html"
-    },
-    {
       "source": "/insights/news",
       "destination": "/seo/private.html"
     },
     {
       "source": "/insights/news/",
+      "destination": "/seo/private.html"
+    },
+    {
+      "source": "/news/promos/:slug",
+      "destination": "/seo/private.html"
+    },
+    {
+      "source": "/news/promos/:slug/",
+      "destination": "/seo/private.html"
+    },
+    {
+      "source": "/news/:slug",
+      "destination": "/seo/private.html"
+    },
+    {
+      "source": "/news/:slug/",
       "destination": "/seo/private.html"
     },
     {

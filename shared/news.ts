@@ -83,20 +83,21 @@ export function slugifyNews(value: string): string {
     .replace(/-+$/g, "");
 }
 
+/** Staff list only. Issue pages themselves are unlisted public links. */
 export const NEWS_INDEX_PATH = "/insights/news";
 
 export function newsIssuePath(meta: Pick<NewsMeta, "slug" | "category">): string {
-  return meta.category === "promo" ? `${NEWS_INDEX_PATH}/promos/${meta.slug}` : `${NEWS_INDEX_PATH}/${meta.slug}`;
+  return meta.category === "promo" ? `/news/promos/${meta.slug}` : `/news/${meta.slug}`;
 }
 
-/** Old public URLs. They redirect to the staff archive and stay out of search results. */
+/** /news has no public index. Staff issue URLs open the unlisted public page. */
 export function legacyNewsRedirect(pathname: string): string | null {
   const path = (pathname || "/").split("?")[0].split("#")[0].replace(/\/+$/, "") || "/";
-  if (path === "/news") return NEWS_INDEX_PATH;
-  const promo = /^\/news\/promos\/([a-z0-9]+(?:-[a-z0-9]+)*)$/.exec(path);
-  if (promo) return `${NEWS_INDEX_PATH}/promos/${promo[1]}`;
-  const issue = /^\/news\/([a-z0-9]+(?:-[a-z0-9]+)*)$/.exec(path);
-  if (issue && issue[1] !== "promos") return `${NEWS_INDEX_PATH}/${issue[1]}`;
+  if (path === "/news") return "/";
+  const staffPromo = /^\/insights\/news\/promos\/([a-z0-9]+(?:-[a-z0-9]+)*)$/.exec(path);
+  if (staffPromo) return `/news/promos/${staffPromo[1]}`;
+  const staffIssue = /^\/insights\/news\/([a-z0-9]+(?:-[a-z0-9]+)*)$/.exec(path);
+  if (staffIssue && staffIssue[1] !== "promos") return `/news/${staffIssue[1]}`;
   return null;
 }
 
