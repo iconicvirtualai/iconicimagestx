@@ -39,6 +39,7 @@ export default function Header() {
         { label: "Studio 105", href: "/studio-105" },
         { label: "Portfolio", href: "/portfolio" },
         { label: "Insights", href: "/insights" },
+        { label: "News", href: "/news" },
         { label: "Stock Footage", href: "/stock-footage" },
         { label: "Contact Us", href: "/contact" },
       ]
