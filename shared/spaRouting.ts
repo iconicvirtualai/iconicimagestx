@@ -39,6 +39,7 @@ const APP_SHELL_SOURCES = [
   "/services/virtual-staging/select",
   "/services/virtual-staging/ai-tool",
   "/services/virtual-staging/pro-order",
+  "/flash-sale",
   "/dev/invoice-template",
   ...STUDIO105_APP_SOURCES,
 ];
@@ -71,10 +72,10 @@ const RESERVED: Rewrite[] = [
   // Prep stays on the app shell. A post slug is rendered by the API so the
   // first HTML response can carry the cover image and the SEO title.
   { source: "/insights/prep", destination: APP_SHELL },
+  { source: "/insights/news/promos/:slug", destination: PRIVATE_SHELL },
+  { source: "/insights/news/:slug", destination: PRIVATE_SHELL },
+  { source: "/insights/news", destination: PRIVATE_SHELL },
   { source: "/insights/:slug", destination: "/api/index" },
-  // Issue HTML is rendered by the API so the first response carries the title and hero.
-  { source: "/news/promos/:slug", destination: "/api/index" },
-  { source: "/news/:slug", destination: "/api/index" },
 ];
 
 function withSlashVariants(rules: Rewrite[]): Rewrite[] {
@@ -159,6 +160,12 @@ export function buildVercelRedirects(): Redirect[] {
     { source: "/studio/", destination: "/studio-105", permanent: false },
     { source: "/gallery", destination: "/portal", permanent: false },
     { source: "/gallery/", destination: "/portal", permanent: false },
+    { source: "/news", destination: "/insights/news", statusCode: 302 },
+    { source: "/news/", destination: "/insights/news", statusCode: 302 },
+    { source: "/news/promos/:slug", destination: "/insights/news/promos/:slug", statusCode: 302 },
+    { source: "/news/promos/:slug/", destination: "/insights/news/promos/:slug", statusCode: 302 },
+    { source: "/news/:slug", destination: "/insights/news/:slug", statusCode: 302 },
+    { source: "/news/:slug/", destination: "/insights/news/:slug", statusCode: 302 },
     ...publicAliasRedirects(),
     ...wixPathRedirects(),
   ];
@@ -186,6 +193,12 @@ export const NOINDEX_HEADER_SOURCES = [
   "/change-password/",
   ...RE75_PREVIEW_SOURCES.flatMap((source) => [source, `${source}/`]),
   ...HEADSHOT_PREVIEW_SOURCES.flatMap((source) => [source, `${source}/`]),
+  "/news",
+  "/news/",
+  "/news/(.*)",
+  "/insights/news",
+  "/insights/news/",
+  "/insights/news/(.*)",
 ];
 
 export function buildVercelHeaders(): HeaderRule[] {
@@ -249,6 +262,29 @@ export function redirectLocation(rule: Redirect, pathname: string, originalUrl =
   if (dest.includes(":path*")) {
     const captured = pathname.startsWith("/") ? pathname.slice(1) : pathname;
     dest = dest.split(":path*").join(captured);
+  } else if (dest.includes(":")) {
+    const names: string[] = [];
+    let regex = "";
+    let i = 0;
+    while (i < rule.source.length) {
+      const ch = rule.source[i];
+      if (ch === ":") {
+        const match = /^:([A-Za-z0-9_]+)/.exec(rule.source.slice(i));
+        if (!match) break;
+        names.push(match[1]);
+        regex += "([^/]+)";
+        i += match[0].length;
+        continue;
+      }
+      regex += "\\^$+?.*|[]{}".includes(ch) ? `\\${ch}` : ch;
+      i += 1;
+    }
+    const found = new RegExp(`^${regex}$`).exec(pathname);
+    if (found) {
+      names.forEach((name, index) => {
+        dest = dest.split(`:${name}`).join(found[index + 1] || "");
+      });
+    }
   }
   const queryAt = originalUrl.indexOf("?");
   if (queryAt >= 0 && !dest.includes("?")) {

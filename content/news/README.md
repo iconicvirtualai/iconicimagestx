@@ -1,6 +1,6 @@
 # News issues
 
-One folder here is one public page. Nothing else has to be registered.
+One folder here is one staff-only page. Nothing else has to be registered. The archive lives at `/insights/news` behind the same staff sign-in as the rest of the admin site. `/news` redirects there and is `noindex`.
 
 ```
 content/news/<slug>/
@@ -31,12 +31,12 @@ content/news/<slug>/
 
 | Category | URL |
 |---|---|
-| newsletter | `/news/<slug>` |
-| promo | `/news/promos/<slug>` |
+| newsletter | `/insights/news/<slug>` |
+| promo | `/insights/news/promos/<slug>` |
 
-The first issue is `/news/holysmokes`. A future January promo would be a folder `content/news/jan2027/` with `"category": "promo"`, and the page would be `/news/promos/jan2027`.
+The first issue is `/insights/news/holysmokes`. A future January promo would be a folder `content/news/jan2027/` with `"category": "promo"`, and the page would be `/insights/news/promos/jan2027`.
 
-The index is `/news`, with All / Newsletters / Promos filters. These folders are the source of truth. A page exists when the folder is on the deployed site.
+The index is `/insights/news`, with All / Newsletters / Promos filters. These folders are the source of truth. Old `/news` URLs redirect to this archive.
 
 The web page shows the email in an iframe so its CSS stays inside the message. Animated GIFs, including `05-podcast-vote.gif`, play in that frame. On a preview host, that render loads `/marketing/email/...` from the preview so new images are not requested from production before they ship. The file itself keeps absolute `https://www.iconicimagestx.com/marketing/email/...` image URLs.
 

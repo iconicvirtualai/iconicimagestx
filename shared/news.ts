@@ -83,8 +83,21 @@ export function slugifyNews(value: string): string {
     .replace(/-+$/g, "");
 }
 
+export const NEWS_INDEX_PATH = "/insights/news";
+
 export function newsIssuePath(meta: Pick<NewsMeta, "slug" | "category">): string {
-  return meta.category === "promo" ? `/news/promos/${meta.slug}` : `/news/${meta.slug}`;
+  return meta.category === "promo" ? `${NEWS_INDEX_PATH}/promos/${meta.slug}` : `${NEWS_INDEX_PATH}/${meta.slug}`;
+}
+
+/** Old public URLs. They redirect to the staff archive and stay out of search results. */
+export function legacyNewsRedirect(pathname: string): string | null {
+  const path = (pathname || "/").split("?")[0].split("#")[0].replace(/\/+$/, "") || "/";
+  if (path === "/news") return NEWS_INDEX_PATH;
+  const promo = /^\/news\/promos\/([a-z0-9]+(?:-[a-z0-9]+)*)$/.exec(path);
+  if (promo) return `${NEWS_INDEX_PATH}/promos/${promo[1]}`;
+  const issue = /^\/news\/([a-z0-9]+(?:-[a-z0-9]+)*)$/.exec(path);
+  if (issue && issue[1] !== "promos") return `${NEWS_INDEX_PATH}/${issue[1]}`;
+  return null;
 }
 
 export function newsCategoryLabel(category: NewsCategory): string {
@@ -165,11 +178,35 @@ export function emailImageSrcs(html: string): string[] {
   return [...String(html || "").matchAll(/<img\b[^>]*\bsrc=["']([^"']+)["']/gi)].map((match) => match[1]);
 }
 
+const FRAME_FIT_STYLE =
+  "<style>html,body{overflow:hidden!important;height:auto!important;margin:0!important;}</style>";
+
+const FRAME_FIT_SCRIPT = `<script>
+(function () {
+  function height() {
+    var body = document.body;
+    var root = document.documentElement;
+    return Math.max(body ? body.scrollHeight : 0, body ? body.offsetHeight : 0, root ? root.scrollHeight : 0, root ? root.offsetHeight : 0);
+  }
+  function post() {
+    parent.postMessage({ type: "news-email-height", height: height() }, "*");
+  }
+  window.addEventListener("load", post);
+  if (document.body && window.ResizeObserver) new ResizeObserver(post).observe(document.body);
+  Array.prototype.forEach.call(document.images || [], function (img) {
+    if (!img.complete) img.addEventListener("load", post);
+  });
+  post();
+})();
+</script>`;
+
 /**
  * Isolate a send-ready email inside a page.
- * Script tags are removed. The unsubscribe merge tag becomes the site page.
- * When pageOrigin is another host (a preview), marketing image URLs follow that host
- * so the images shipped with the issue load. The file on disk keeps the www URLs.
+ * Script tags from the email are removed, then a height reporter is added so the
+ * iframe can grow to the message and the page is the only scroller.
+ * The unsubscribe merge tag becomes the site page.
+ * When pageOrigin is another host (a preview), marketing images and flash-sale
+ * links follow that host. The file on disk keeps the www URLs.
  */
 export function prepareEmailSrcDoc(html: string, pageOrigin = ""): string {
   let next = String(html || "").replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "");
@@ -180,7 +217,10 @@ export function prepareEmailSrcDoc(html: string, pageOrigin = ""): string {
       /(<img\b[^>]*\bsrc=["'])https:\/\/www\.iconicimagestx\.com\//gi,
       `$1${origin}/`,
     );
+    next = next.split(`${NEWS_ASSET_ORIGIN}/flash-sale`).join(`${origin}/flash-sale`);
   }
+  if (next.includes("</head>")) next = next.replace("</head>", `${FRAME_FIT_STYLE}</head>`);
+  if (next.includes("</body>")) next = next.replace("</body>", `${FRAME_FIT_SCRIPT}</body>`);
   return next;
 }
 
