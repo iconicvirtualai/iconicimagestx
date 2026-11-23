@@ -375,13 +375,13 @@ function galleryDeliveredHistoryEntry(input) {
   };
 }
 function staffLabel(actor2) {
-  const email = clean$1(actor2?.email);
-  const name = clean$1(actor2?.name);
-  const uid = clean$1(actor2?.uid);
+  const email = clean$2(actor2?.email);
+  const name = clean$2(actor2?.name);
+  const uid = clean$2(actor2?.uid);
   if (name && email) return `${name} (${email})`;
   return email || name || uid || "staff";
 }
-function clean$1(value) {
+function clean$2(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 const STUDIO105_LEAD_SOURCE = "Studio 105";
@@ -5398,7 +5398,7 @@ function buildDraft(actor2, input, now = (/* @__PURE__ */ new Date()).toISOStrin
     preview: true
   };
 }
-function clean(value) {
+function clean$1(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function clientLinkStamp(uid, canonicalId = uid) {
@@ -5412,7 +5412,7 @@ function clientLinkStamp(uid, canonicalId = uid) {
 }
 function identityIds(identity) {
   const ids = new Set(identity.ids.map((id) => id.trim()).filter(Boolean));
-  const uid = clean(identity.firebaseUid);
+  const uid = clean$1(identity.firebaseUid);
   if (uid) ids.add(uid);
   return ids;
 }
@@ -5424,16 +5424,16 @@ function recordVisibleToIdentity(record2, identity) {
   if (!record2) return false;
   const ids = identityIds(identity);
   const profiles = identityProfiles(identity, ids);
-  const clientId2 = clean(record2.clientId);
-  const firebaseUid = clean(record2.firebaseUid);
-  const profile = clean(record2.clientProfileId);
+  const clientId2 = clean$1(record2.clientId);
+  const firebaseUid = clean$1(record2.firebaseUid);
+  const profile = clean$1(record2.clientProfileId);
   if (clientId2 && ids.has(clientId2)) return true;
   if (firebaseUid && ids.has(firebaseUid)) return true;
   if (profile && profiles.has(profile)) return true;
   if (clientId2 || firebaseUid || profile) return false;
-  const email = clean(identity.email).toLowerCase();
+  const email = clean$1(identity.email).toLowerCase();
   if (!email) return false;
-  return [record2.email, record2.clientEmail].some((value) => clean(value).toLowerCase() === email);
+  return [record2.email, record2.clientEmail].some((value) => clean$1(value).toLowerCase() === email);
 }
 const PORTAL_LISTING_ID$1 = /^[A-Za-z0-9_-]{4,128}$/;
 const NEVER_FILL = /* @__PURE__ */ new Set([
@@ -11801,7 +11801,7 @@ function createRateLimiter(options) {
     }
   };
 }
-const router$E = Router();
+const router$F = Router();
 const db$z = () => admin.firestore();
 async function portalOrderLink(header2, source) {
   if (source !== "portal" || !header2?.startsWith("Bearer ") || !admin.apps.length) return null;
@@ -11860,7 +11860,7 @@ async function loadBookingCatalog() {
     return packagesForStaffEditor([]);
   }
 }
-router$E.post("/", async (req, res) => {
+router$F.post("/", async (req, res) => {
   const limit = bookingSubmitLimiter.check(clientIp(req));
   if (!limit.allowed) {
     res.setHeader("Retry-After", String(limit.retryAfterSec));
@@ -12677,13 +12677,13 @@ async function socialRateCaller(req) {
     return { role: null, email: null };
   }
 }
-router$E.get("/social-rate", async (req, res) => {
+router$F.get("/social-rate", async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   const requested = typeof req.query.date === "string" ? req.query.date : "";
   const previewAllowed = requested ? socialRatePreviewAllowed(await socialRateCaller(req)) : false;
   return res.json(socialRateView(/* @__PURE__ */ new Date(), requested || null, previewAllowed));
 });
-router$E.post("/holiday-calendar-backfill", requireAdmin, async (_req, res) => {
+router$F.post("/holiday-calendar-backfill", requireAdmin, async (_req, res) => {
   try {
     return res.json(await backfillHolidayCalendarEvents());
   } catch (err) {
@@ -12691,7 +12691,7 @@ router$E.post("/holiday-calendar-backfill", requireAdmin, async (_req, res) => {
     return res.status(500).json({ error: "Holiday calendar backfill failed." });
   }
 });
-router$E.get("/holiday-slots", async (_req, res) => {
+router$F.get("/holiday-slots", async (_req, res) => {
   res.setHeader("Cache-Control", "no-store");
   try {
     return res.json(holidayTakenFromOrders(await loadHolidaySlotOrders()));
@@ -12700,13 +12700,13 @@ router$E.get("/holiday-slots", async (_req, res) => {
     return res.status(500).json({ error: "Holiday slots are unavailable." });
   }
 });
-router$E.get("/photographers", (_req, res) => {
+router$F.get("/photographers", (_req, res) => {
   return res.json({
     noPreference: { id: NO_PREFERENCE_ID, name: NO_PREFERENCE_NAME },
     photographers: publicBookingPhotographers()
   });
 });
-router$E.get("/realestate-75/slots", async (req, res) => {
+router$F.get("/realestate-75/slots", async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   const pkg = realEstate75Package(typeof req.query.package === "string" ? req.query.package : "");
   try {
@@ -12730,7 +12730,7 @@ function postedDurationMinutes(value) {
   if (!Number.isInteger(parsed) || parsed < 15 || parsed > 24 * 60) return void 0;
   return parsed;
 }
-router$E.get("/slots", async (req, res) => {
+router$F.get("/slots", async (req, res) => {
   const basics = typeof req.query.basics === "string" ? req.query.basics.split(",").map((id) => id.trim()).filter(Boolean) : [];
   const preferenceId = preferenceFromRequest(req.query.photographer, "");
   try {
@@ -12755,7 +12755,7 @@ router$E.get("/slots", async (req, res) => {
     return res.json({ live: false, durationMinutes: 90, slots: [], suggestions: [] });
   }
 });
-router$E.get("/catalog", async (_req, res) => {
+router$F.get("/catalog", async (_req, res) => {
   const catalog = await loadBookingCatalog();
   const adjustments = await loadPricingAdjustments();
   const rates = pricingRates(adjustments);
@@ -12772,7 +12772,7 @@ router$E.get("/catalog", async (_req, res) => {
     payAtClose: payAtClosePublicOffer(process.env, adjustments)
   });
 });
-router$E.get("/", requireCoordinator, async (_req, res) => {
+router$F.get("/", requireCoordinator, async (_req, res) => {
   try {
     const snapshot = await db$z().collection("orderRequests").orderBy("createdAt", "desc").limit(100).get();
     const requests = snapshot.docs.map((doc) => ({
@@ -12785,7 +12785,7 @@ router$E.get("/", requireCoordinator, async (_req, res) => {
     return res.status(500).json({ error: "Failed to fetch booking requests." });
   }
 });
-router$E.get("/:id", requireCoordinator, async (req, res) => {
+router$F.get("/:id", requireCoordinator, async (req, res) => {
   try {
     const doc = await db$z().collection("orderRequests").doc(req.params.id).get();
     if (!doc.exists) {
@@ -12797,7 +12797,7 @@ router$E.get("/:id", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch booking request." });
   }
 });
-router$E.post("/:id/assign-photographer", requireCoordinator, async (req, res) => {
+router$F.post("/:id/assign-photographer", requireCoordinator, async (req, res) => {
   try {
     const requestDoc = await db$z().collection("orderRequests").doc(req.params.id).get();
     if (!requestDoc.exists) return res.status(404).json({ error: "Booking request not found." });
@@ -12812,7 +12812,7 @@ router$E.post("/:id/assign-photographer", requireCoordinator, async (req, res) =
     return res.status(500).json({ error: "Could not assign the photographer." });
   }
 });
-router$E.patch("/:id/confirm", requireCoordinator, async (req, res) => {
+router$F.patch("/:id/confirm", requireCoordinator, async (req, res) => {
   try {
     const { assignedPhotographerId, assignedPhotographerName: postedPhotographerName, scheduledDate, scheduledTime, internalNotes } = req.body;
     const requestDoc = await db$z().collection("orderRequests").doc(req.params.id).get();
@@ -13239,7 +13239,7 @@ async function releaseOrderCalendar(data) {
     return calendarHoldFailureMessage(err);
   }
 }
-router$E.patch("/:id/cancel", requireCoordinator, async (req, res) => {
+router$F.patch("/:id/cancel", requireCoordinator, async (req, res) => {
   try {
     const doc = await db$z().collection("orderRequests").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Not found." });
@@ -13268,7 +13268,7 @@ router$E.patch("/:id/cancel", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to cancel booking." });
   }
 });
-router$E.patch("/:id/decline", requireCoordinator, async (req, res) => {
+router$F.patch("/:id/decline", requireCoordinator, async (req, res) => {
   try {
     const { reason } = req.body;
     const doc = await db$z().collection("orderRequests").doc(req.params.id).get();
@@ -13935,8 +13935,8 @@ async function resolveLateHeadshotPayment(orderId) {
   }
   return "flagged";
 }
-const router$D = Router();
-const limiter$3 = createRateLimiter({ windowMs: 15 * 60 * 1e3, max: 8 });
+const router$E = Router();
+const limiter$4 = createRateLimiter({ windowMs: 15 * 60 * 1e3, max: 8 });
 const db$x = () => admin.firestore();
 async function nextInvoiceNumber$2() {
   const year = (/* @__PURE__ */ new Date()).getFullYear();
@@ -13948,7 +13948,7 @@ async function nextInvoiceNumber$2() {
     return `INV-${year}-${String(Date.now()).slice(-6)}`;
   }
 }
-router$D.get("/config", (_req, res) => {
+router$E.get("/config", (_req, res) => {
   const config = headshotConfig(process.env);
   res.json({
     ...config,
@@ -13959,7 +13959,7 @@ router$D.get("/config", (_req, res) => {
     holdMinutes: 60
   });
 });
-router$D.get("/slots", async (req, res) => {
+router$E.get("/slots", async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   const config = headshotConfig(process.env);
   const quantity = Number(req.query.quantity);
@@ -13985,8 +13985,8 @@ router$D.get("/slots", async (req, res) => {
     });
   }
 });
-router$D.post("/order", async (req, res) => {
-  const limit = limiter$3.check(clientIp(req));
+router$E.post("/order", async (req, res) => {
+  const limit = limiter$4.check(clientIp(req));
   if (!limit.allowed) {
     res.setHeader("Retry-After", String(limit.retryAfterSec));
     return res.status(429).json({
@@ -14397,7 +14397,7 @@ async function loadRevenueDocs(id) {
 function text$g(value) {
   return typeof value === "string" ? value.trim() : "";
 }
-const router$C = Router();
+const router$D = Router();
 const db$v = () => admin.firestore();
 const dotOptInLimiter = createRateLimiter({ windowMs: 10 * 60 * 1e3, max: 30 });
 function sendDotOptInPage(res, status2, ok) {
@@ -14410,7 +14410,7 @@ function sendDotOptInPage(res, status2, ok) {
   });
   res.send(dotOptInResultHtml(ok));
 }
-router$C.get("/dot-opt-in", async (req, res) => {
+router$D.get("/dot-opt-in", async (req, res) => {
   const limit = dotOptInLimiter.check(clientIp(req));
   if (!limit.allowed) {
     res.set("Retry-After", String(limit.retryAfterSec));
@@ -14426,7 +14426,7 @@ router$C.get("/dot-opt-in", async (req, res) => {
     sendDotOptInPage(res, 500, false);
   }
 });
-router$C.get("/", requireStaff, async (req, res) => {
+router$D.get("/", requireStaff, async (req, res) => {
   try {
     const { status: status2, photographerId, limit = "50", startAfter } = req.query;
     let query = db$v().collection("orders").orderBy("createdAt", "desc");
@@ -14454,7 +14454,7 @@ router$C.get("/", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch orders." });
   }
 });
-router$C.get("/dashboard", requireStaff, async (_req, res) => {
+router$D.get("/dashboard", requireStaff, async (_req, res) => {
   try {
     const now = /* @__PURE__ */ new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -14484,7 +14484,7 @@ router$C.get("/dashboard", requireStaff, async (_req, res) => {
     return res.status(500).json({ error: "Failed to fetch dashboard stats." });
   }
 });
-router$C.get("/:id", requireStaff, async (req, res) => {
+router$D.get("/:id", requireStaff, async (req, res) => {
   try {
     const orderDoc = await db$v().collection("orders").doc(req.params.id).get();
     if (!orderDoc.exists) return res.status(404).json({ error: "Order not found." });
@@ -14519,7 +14519,7 @@ router$C.get("/:id", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch order." });
   }
 });
-router$C.patch("/:id/revenue", requireCoordinator, async (req, res) => {
+router$D.patch("/:id/revenue", requireCoordinator, async (req, res) => {
   if (typeof req.body?.countsTowardRevenue !== "boolean") {
     return res.status(400).json({ error: "countsTowardRevenue must be true or false." });
   }
@@ -14548,7 +14548,7 @@ router$C.patch("/:id/revenue", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Could not update revenue acceptance." });
   }
 });
-router$C.patch("/:id", requireCoordinator, async (req, res) => {
+router$D.patch("/:id", requireCoordinator, async (req, res) => {
   try {
     const allowed = [
       "status",
@@ -14599,7 +14599,7 @@ const VALID_TRANSITIONS = {
   completed: [],
   cancelled: []
 };
-router$C.patch("/:id/status", requireCoordinator, async (req, res) => {
+router$D.patch("/:id/status", requireCoordinator, async (req, res) => {
   try {
     const { status: status2, note } = req.body;
     const orderDoc = await db$v().collection("orders").doc(req.params.id).get();
@@ -14645,7 +14645,7 @@ router$C.patch("/:id/status", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to update order status." });
   }
 });
-router$C.get("/:id/timeline", requireStaff, async (req, res) => {
+router$D.get("/:id/timeline", requireStaff, async (req, res) => {
   try {
     const [messages, editRequests, agentLogs] = await Promise.all([
       db$v().collection("messages").where("orderId", "==", req.params.id).orderBy("createdAt", "asc").get(),
@@ -14791,14 +14791,14 @@ function readCookie(header2, name) {
   }
   return null;
 }
-const memory$6 = /* @__PURE__ */ new Map();
+const memory$7 = /* @__PURE__ */ new Map();
 function useMemoryStore() {
   return !admin.apps.length || process.env.NODE_ENV === "test" || process.env.ORDER_APPROVAL_STORE === "memory";
 }
 async function writeOrderApproval(id, approval) {
   if (useMemoryStore()) {
-    if (!memory$6.has(id)) return null;
-    memory$6.set(id, { approval });
+    if (!memory$7.has(id)) return null;
+    memory$7.set(id, { approval });
     return approval;
   }
   const ref = admin.firestore().collection("orders").doc(id);
@@ -19084,7 +19084,7 @@ const handlePublicGalleryLink = async (req, res) => {
     return res.status(500).json({ code: "lookup_failed", error: message, message });
   }
 };
-const router$B = Router();
+const router$C = Router();
 const db$p = () => admin.firestore();
 const storage = () => admin.storage().bucket();
 function cleanPosterUrl(value) {
@@ -19180,7 +19180,7 @@ function clientGalleryPayload(id, gallery, gate2) {
     mediaItems: showMedia ? lockedClientGalleryMedia(id, media, unlocked) : []
   };
 }
-router$B.get("/", requireStaff, async (req, res) => {
+router$C.get("/", requireStaff, async (req, res) => {
   try {
     const { status: status2, orderId } = req.query;
     let query = db$p().collection("galleries").orderBy("createdAt", "desc");
@@ -19226,7 +19226,7 @@ async function readGalleryPhotoBytes(item) {
     return null;
   }
 }
-router$B.get("/public/:id/photos.zip", async (req, res) => {
+router$C.get("/public/:id/photos.zip", async (req, res) => {
   const id = typeof req.params.id === "string" ? req.params.id : "";
   if (malformedPublicGalleryId(id)) return publicGalleryNotFound(res);
   if (!admin.apps.length) return publicGalleryNotFound(res);
@@ -19264,7 +19264,7 @@ router$B.get("/public/:id/photos.zip", async (req, res) => {
     return res.status(500).json({ error: "We couldn't build that download." });
   }
 });
-router$B.get("/public/:id", async (req, res) => {
+router$C.get("/public/:id", async (req, res) => {
   const id = typeof req.params.id === "string" ? req.params.id : "";
   if (malformedPublicGalleryId(id)) {
     console.warn("[Galleries] Public gallery id rejected.");
@@ -19292,8 +19292,8 @@ router$B.get("/public/:id", async (req, res) => {
     return res.status(500).json({ error: "We couldn't open this gallery." });
   }
 });
-router$B.get("/link/:id", handlePublicGalleryLink);
-router$B.get("/:id", requireAuth, async (req, res) => {
+router$C.get("/link/:id", handlePublicGalleryLink);
+router$C.get("/:id", requireAuth, async (req, res) => {
   try {
     const doc = await db$p().collection("galleries").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Gallery not found." });
@@ -19317,7 +19317,7 @@ router$B.get("/:id", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch gallery." });
   }
 });
-router$B.post("/:id/upload-url", requirePhotographer, async (req, res) => {
+router$C.post("/:id/upload-url", requirePhotographer, async (req, res) => {
   try {
     const { fileName: fileName2, fileType, isRaw: isRaw2 = false } = req.body;
     if (!fileName2 || !fileType) {
@@ -19342,7 +19342,7 @@ router$B.post("/:id/upload-url", requirePhotographer, async (req, res) => {
     return res.status(500).json({ error: "Failed to generate upload URL." });
   }
 });
-router$B.post("/:id/media", requirePhotographer, async (req, res) => {
+router$C.post("/:id/media", requirePhotographer, async (req, res) => {
   try {
     const {
       storagePath,
@@ -19396,7 +19396,7 @@ router$B.post("/:id/media", requirePhotographer, async (req, res) => {
     return res.status(500).json({ error: "Failed to register media." });
   }
 });
-router$B.post("/:id/media-link", requireCoordinator, async (req, res) => {
+router$C.post("/:id/media-link", requireCoordinator, async (req, res) => {
   try {
     const { url, title, type = "video", embedUrl, thumbnailUrl, downloadable = false, poster, posterUrl } = req.body;
     if (!url) return res.status(400).json({ error: "url required." });
@@ -19432,7 +19432,7 @@ router$B.post("/:id/media-link", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to register media link." });
   }
 });
-router$B.get("/:id/release", requireCoordinator, async (req, res) => {
+router$C.get("/:id/release", requireCoordinator, async (req, res) => {
   if (!adminReady$5(res)) return;
   try {
     const report = await loadGalleryReleaseForGallery(req.params.id);
@@ -19444,7 +19444,7 @@ router$B.get("/:id/release", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to check gallery release." });
   }
 });
-router$B.patch("/:id/status", requireCoordinator, async (req, res) => {
+router$C.patch("/:id/status", requireCoordinator, async (req, res) => {
   try {
     const { status: status2 } = req.body;
     const validStatuses = ["pending_upload", "raw_uploaded", "editing", "ready_for_review", "approved", "delivered"];
@@ -19466,7 +19466,7 @@ router$B.patch("/:id/status", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to update gallery status." });
   }
 });
-router$B.post("/:id/deliver", requireCoordinator, async (req, res) => {
+router$C.post("/:id/deliver", requireCoordinator, async (req, res) => {
   try {
     if (!adminReady$5(res)) return;
     const result = await deliverGalleryToClient(req.params.id, {
@@ -19495,7 +19495,7 @@ router$B.post("/:id/deliver", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to deliver gallery." });
   }
 });
-router$B.patch("/:id/downloads", requireCoordinator, async (req, res) => {
+router$C.patch("/:id/downloads", requireCoordinator, async (req, res) => {
   if (!adminReady$5(res)) return;
   try {
     if (typeof req.body?.released !== "boolean") {
@@ -19532,7 +19532,7 @@ router$B.patch("/:id/downloads", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to update gallery downloads." });
   }
 });
-router$B.delete("/:id/media/:mediaId", requireCoordinator, async (req, res) => {
+router$C.delete("/:id/media/:mediaId", requireCoordinator, async (req, res) => {
   try {
     const galleryDoc = await db$p().collection("galleries").doc(req.params.id).get();
     if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
@@ -19993,7 +19993,7 @@ async function resolveLateApprenticeshipPayment(orderId) {
   });
   return "flagged";
 }
-const router$A = Router();
+const router$B = Router();
 const db$n = () => appFirestore();
 const stripe$1 = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
   apiVersion: "2024-06-20"
@@ -20551,7 +20551,7 @@ async function applyDepositPayment({
     }
   }
 }
-router$A.post("/create-intent", requireAuth, async (req, res) => {
+router$B.post("/create-intent", requireAuth, async (req, res) => {
   try {
     if (!stripeReady()) {
       return res.status(503).json({ error: "Studio Noir Stripe payments are not configured yet." });
@@ -20589,7 +20589,7 @@ router$A.post("/create-intent", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to create payment intent." });
   }
 });
-router$A.post("/send-invoice", requireCoordinator, async (req, res) => {
+router$B.post("/send-invoice", requireCoordinator, async (req, res) => {
   try {
     const { invoiceId } = req.body;
     if (!invoiceId) return res.status(400).json({ error: "invoiceId required." });
@@ -20632,7 +20632,7 @@ router$A.post("/send-invoice", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to send invoice." });
   }
 });
-router$A.post("/send-receipt", requireCoordinator, async (req, res) => {
+router$B.post("/send-receipt", requireCoordinator, async (req, res) => {
   try {
     const { invoiceId } = req.body;
     if (!invoiceId) return res.status(400).json({ error: "invoiceId required." });
@@ -20655,7 +20655,7 @@ router$A.post("/send-receipt", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to send receipt." });
   }
 });
-router$A.get("/pay-at-close", async (_req, res) => {
+router$B.get("/pay-at-close", async (_req, res) => {
   res.setHeader("Cache-Control", "no-store");
   const adjustments = await loadPricingAdjustments();
   const offer = payAtCloseOfferFromAdjustments(process.env, adjustments);
@@ -20751,7 +20751,7 @@ async function beginPayAtCloseCheckout(invoiceDoc) {
   }
   return { status: 200, body: { checkoutUrl: created.checkoutUrl, provider: PAY_AT_CLOSE_METHOD } };
 }
-router$A.post("/invoice/:id/pay-at-close", async (req, res) => {
+router$B.post("/invoice/:id/pay-at-close", async (req, res) => {
   try {
     const invoiceDoc = await loadInvoice(req.params.id);
     if (!invoiceDoc) return invoiceNotFound(res);
@@ -20772,7 +20772,7 @@ router$A.post("/invoice/:id/pay-at-close", async (req, res) => {
     return res.status(500).json({ error: "Pay at Close checkout could not be started." });
   }
 });
-router$A.post("/pay-at-close-webhook", async (req, res) => {
+router$B.post("/pay-at-close-webhook", async (req, res) => {
   try {
     const rawBody = await readSquareWebhookRawBody(req);
     if (rawBody === null) return res.status(400).json({ error: "Pay at Close webhook raw body is unavailable." });
@@ -20861,7 +20861,7 @@ router$A.post("/pay-at-close-webhook", async (req, res) => {
     return res.status(500).json({ error: "Pay at Close webhook handler failed." });
   }
 });
-router$A.get("/invoice/:id", async (req, res) => {
+router$B.get("/invoice/:id", async (req, res) => {
   try {
     const invoiceDoc = await loadInvoice(req.params.id);
     if (!invoiceDoc) return invoiceNotFound(res);
@@ -20937,7 +20937,7 @@ router$A.get("/invoice/:id", async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch invoice." });
   }
 });
-router$A.post("/invoice/:id/checkout", async (req, res) => {
+router$B.post("/invoice/:id/checkout", async (req, res) => {
   try {
     const invoiceDoc = await loadInvoice(req.params.id);
     if (!invoiceDoc) return invoiceNotFound(res);
@@ -21075,7 +21075,7 @@ router$A.post("/invoice/:id/checkout", async (req, res) => {
     return res.status(500).json({ error: "Failed to start checkout." });
   }
 });
-router$A.post("/invoice/:id/deposit-checkout", async (req, res) => {
+router$B.post("/invoice/:id/deposit-checkout", async (req, res) => {
   try {
     if (!seniorDepositCheckoutLive()) return invoiceNotFound(res);
     const invoiceDoc = await loadInvoice(req.params.id);
@@ -21156,7 +21156,7 @@ router$A.post("/invoice/:id/deposit-checkout", async (req, res) => {
     return res.status(500).json({ error: SQUARE_DEPOSIT_CHECKOUT_FAILURE });
   }
 });
-router$A.post("/webhook", async (req, res) => {
+router$B.post("/webhook", async (req, res) => {
   const sig = req.headers["stripe-signature"];
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || "";
   let event;
@@ -21223,7 +21223,7 @@ async function findInvoiceForSquarePayment(payment) {
   const snap = await db$n().collection("invoices").doc(hit.id).get();
   return snap.exists ? snap : null;
 }
-router$A.post("/square-webhook", async (req, res) => {
+router$B.post("/square-webhook", async (req, res) => {
   try {
     const signatureKey = process.env.SQUARE_WEBHOOK_SIGNATURE_KEY;
     if (!signatureKey) {
@@ -21303,7 +21303,7 @@ router$A.post("/square-webhook", async (req, res) => {
     return res.status(500).json({ error: "Square webhook handler failed." });
   }
 });
-router$A.get("/transactions", requireCoordinator, async (req, res) => {
+router$B.get("/transactions", requireCoordinator, async (req, res) => {
   try {
     const { startDate, endDate, limit = "50" } = req.query;
     let query = db$n().collection("transactions").orderBy("createdAt", "desc");
@@ -21389,7 +21389,7 @@ async function handleStripeRefund(charge) {
     createdAt: admin.firestore.FieldValue.serverTimestamp()
   });
 }
-const router$z = Router();
+const router$A = Router();
 const db$m = () => admin.firestore();
 const VSAI_API_BASE = "https://api.virtualstagingai.app/v1";
 const VSAI_API_KEY = process.env.VSAI_API_KEY || process.env.VIRTUAL_STAGING_AI_API_KEY || "";
@@ -21397,7 +21397,7 @@ const VSAI_PRICE_CENTS = parseInt(process.env.VSAI_PRICE_CENTS || "1500", 10);
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
   apiVersion: "2024-06-20"
 });
-router$z.post("/create", requireAuth, async (req, res) => {
+router$A.post("/create", requireAuth, async (req, res) => {
   try {
     if (!VSAI_API_KEY) {
       console.error("[VSAI] VSAI_API_KEY is not set");
@@ -21472,7 +21472,7 @@ router$z.post("/create", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$z.get("/result/:jobId", requireAuth, async (req, res) => {
+router$A.get("/result/:jobId", requireAuth, async (req, res) => {
   try {
     const jobDoc = await db$m().collection("vsaiJobs").doc(req.params.jobId).get();
     if (!jobDoc.exists) return res.status(404).json({ error: "Job not found." });
@@ -21547,7 +21547,7 @@ router$z.get("/result/:jobId", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$z.get("/result/:jobId/file", requireAuth, async (req, res) => {
+router$A.get("/result/:jobId/file", requireAuth, async (req, res) => {
   try {
     const jobDoc = await db$m().collection("vsaiJobs").doc(req.params.jobId).get();
     if (!jobDoc.exists) return res.status(404).json({ error: "Job not found." });
@@ -21569,7 +21569,7 @@ router$z.get("/result/:jobId/file", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$z.post("/variation", requireAuth, async (req, res) => {
+router$A.post("/variation", requireAuth, async (req, res) => {
   try {
     const { jobId, style: newStyle, roomType: newRoomType } = req.body;
     if (!jobId) {
@@ -21653,7 +21653,7 @@ router$z.post("/variation", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$z.post("/checkout", requireAuth, async (req, res) => {
+router$A.post("/checkout", requireAuth, async (req, res) => {
   try {
     const { jobIds, successUrl, cancelUrl } = req.body;
     if (!jobIds || !Array.isArray(jobIds) || jobIds.length === 0) {
@@ -21722,7 +21722,7 @@ router$z.post("/checkout", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$z.post(
+router$A.post(
   "/webhook/stripe",
   // Raw body needed — mount before express.json() parses it
   async (req, res) => {
@@ -21760,7 +21760,7 @@ router$z.post(
     res.json({ received: true });
   }
 );
-router$z.get("/options", (_req, res) => {
+router$A.get("/options", (_req, res) => {
   return res.json({
     roomTypes: [
       { value: "living", label: "Living Room" },
@@ -21790,9 +21790,9 @@ router$z.get("/options", (_req, res) => {
 function capitalize(s) {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : "";
 }
-const router$y = Router();
+const router$z = Router();
 const db$l = () => admin.firestore();
-router$y.post("/email", requireStaff, async (req, res) => {
+router$z.post("/email", requireStaff, async (req, res) => {
   try {
     const { to, subject, body, orderId, clientId: clientId2 } = req.body;
     if (!to || !body?.trim()) {
@@ -21832,7 +21832,7 @@ router$y.post("/email", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to send email." });
   }
 });
-router$y.get("/:orderId", requireAuth, async (req, res) => {
+router$z.get("/:orderId", requireAuth, async (req, res) => {
   try {
     const orderDoc = await db$l().collection("orders").doc(req.params.orderId).get();
     if (!orderDoc.exists) return res.status(404).json({ error: "Order not found." });
@@ -21861,7 +21861,7 @@ router$y.get("/:orderId", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch messages." });
   }
 });
-router$y.post("/:orderId", requireAuth, async (req, res) => {
+router$z.post("/:orderId", requireAuth, async (req, res) => {
   try {
     const { content, attachments } = req.body;
     if (!content?.trim()) {
@@ -21917,7 +21917,7 @@ router$y.post("/:orderId", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to send message." });
   }
 });
-router$y.get("/unread/count", requireStaff, async (_req, res) => {
+router$z.get("/unread/count", requireStaff, async (_req, res) => {
   try {
     const snapshot = await db$l().collection("messages").where("isRead", "==", false).where("senderType", "==", "client").get();
     return res.json({ unreadCount: snapshot.size });
@@ -23971,13 +23971,13 @@ const handlePatchPortalWebsite = async (req, res) => {
     return sendKnownError$3(res, err, "Could not save the listing site.");
   }
 };
-const router$x = Router();
+const router$y = Router();
 const db$i = () => admin.firestore();
 const HOME_LIMIT = 100;
 function asRecord$4(value) {
   return value && typeof value === "object" ? value : {};
 }
-router$x.get("/", requireStaff, async (req, res) => {
+router$y.get("/", requireStaff, async (req, res) => {
   try {
     const { status: status2, search, limit = "50" } = req.query;
     let query = db$i().collection("clients").orderBy("createdAt", "desc");
@@ -24004,7 +24004,7 @@ function adminReady$3(res) {
   });
   return false;
 }
-router$x.post("/register", async (req, res) => {
+router$y.post("/register", async (req, res) => {
   if (!clientPortalEnabled()) {
     return res.status(403).json({
       error: "Client portal signup is not available yet. Email photos@iconicimagestx.com for access to your media.",
@@ -24072,7 +24072,7 @@ router$x.post("/register", async (req, res) => {
     return res.status(500).json({ error: "Could not create the client account." });
   }
 });
-router$x.get("/me/home", requireAuth, async (req, res) => {
+router$y.get("/me/home", requireAuth, async (req, res) => {
   if (!adminReady$3(res)) return;
   try {
     const identity = await resolveClientIdentity(req.user.uid, req.user.email);
@@ -24259,14 +24259,14 @@ router$x.get("/me/home", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to load your portal." });
   }
 });
-router$x.get("/me/listings/:id", requireAuth, handleGetPortalListing);
-router$x.patch("/me/listings/:id/data", requireAuth, handlePatchPortalData);
-router$x.patch("/me/listings/:id/media", requireAuth, handlePatchPortalMedia);
-router$x.patch("/me/listings/:id/website", requireAuth, handlePatchPortalWebsite);
-router$x.post("/me/listings/:id/photo-edit-requests", requireAuth, handleCreatePhotoEditRequest);
-router$x.post("/me/listings/:id/uploads/url", requireAuth, handleCreatePortalUploadUrl);
-router$x.post("/me/listings/:id/uploads", requireAuth, handleRegisterPortalUpload);
-router$x.get("/me", requireAuth, async (req, res) => {
+router$y.get("/me/listings/:id", requireAuth, handleGetPortalListing);
+router$y.patch("/me/listings/:id/data", requireAuth, handlePatchPortalData);
+router$y.patch("/me/listings/:id/media", requireAuth, handlePatchPortalMedia);
+router$y.patch("/me/listings/:id/website", requireAuth, handlePatchPortalWebsite);
+router$y.post("/me/listings/:id/photo-edit-requests", requireAuth, handleCreatePhotoEditRequest);
+router$y.post("/me/listings/:id/uploads/url", requireAuth, handleCreatePortalUploadUrl);
+router$y.post("/me/listings/:id/uploads", requireAuth, handleRegisterPortalUpload);
+router$y.get("/me", requireAuth, async (req, res) => {
   try {
     const directDoc = await db$i().collection("clients").doc(req.user.uid).get();
     if (directDoc.exists) {
@@ -24282,7 +24282,7 @@ router$x.get("/me", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch profile." });
   }
 });
-router$x.get("/:id", requireStaff, async (req, res) => {
+router$y.get("/:id", requireStaff, async (req, res) => {
   try {
     const doc = await db$i().collection("clients").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Client not found." });
@@ -24299,7 +24299,7 @@ router$x.get("/:id", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch client." });
   }
 });
-router$x.post("/", requireCoordinator, async (req, res) => {
+router$y.post("/", requireCoordinator, async (req, res) => {
   try {
     const { firstName, lastName, email, phone, address, notes, tags } = req.body;
     if (!firstName || !lastName || !email) {
@@ -24329,7 +24329,7 @@ router$x.post("/", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to create client." });
   }
 });
-router$x.patch("/:id", requireCoordinator, async (req, res) => {
+router$y.patch("/:id", requireCoordinator, async (req, res) => {
   try {
     const allowed = ["firstName", "lastName", "phone", "address", "status", "notes", "tags", "company"];
     const updates = { updatedAt: admin.firestore.FieldValue.serverTimestamp() };
@@ -24447,7 +24447,7 @@ class HubError extends Error {
     this.status = status2;
   }
 }
-const memory$5 = {
+const memory$6 = {
   clients: /* @__PURE__ */ new Map(),
   teams: /* @__PURE__ */ new Map(),
   members: /* @__PURE__ */ new Map(),
@@ -24458,7 +24458,7 @@ const memory$5 = {
   invoices: /* @__PURE__ */ new Map()
 };
 function readClientHubMemory(collection, id) {
-  const row = memory$5[collection].get(id);
+  const row = memory$6[collection].get(id);
   return row ? { ...row } : null;
 }
 function useMemory$2() {
@@ -24477,13 +24477,13 @@ function asRecord$3(value) {
   return value && typeof value === "object" ? value : {};
 }
 async function readDoc(collection, id) {
-  if (useMemory$2()) return memory$5[collection].get(id) || null;
+  if (useMemory$2()) return memory$6[collection].get(id) || null;
   const snap = await db$h().collection(collectionName(collection)).doc(id).get();
   return snap.exists ? { ...snap.data() || {} } : null;
 }
 async function writeDoc(collection, id, data, merge = true) {
   if (useMemory$2()) {
-    memory$5[collection].set(id, merge ? { ...memory$5[collection].get(id) || {}, ...data } : { ...data });
+    memory$6[collection].set(id, merge ? { ...memory$6[collection].get(id) || {}, ...data } : { ...data });
     return;
   }
   await db$h().collection(collectionName(collection)).doc(id).set(data, { merge });
@@ -24498,7 +24498,7 @@ function collectionName(collection) {
 }
 async function queryEqual(collection, field, value) {
   if (useMemory$2()) {
-    return [...memory$5[collection].entries()].filter(([, row]) => row[field] === value).map(([id, row]) => ({ id, data: row }));
+    return [...memory$6[collection].entries()].filter(([, row]) => row[field] === value).map(([id, row]) => ({ id, data: row }));
   }
   const snap = await db$h().collection(collectionName(collection)).where(field, "==", value).limit(50).get();
   return snap.docs.map((doc) => ({ id: doc.id, data: doc.data() || {} }));
@@ -24945,7 +24945,7 @@ async function removeTeamMember(actor2, memberId) {
   if (!existing) throw new HubError(404, "Teammate not found.");
   const member = memberFrom(memberId, existing);
   requireTeamAdmin(actor2, member.ownerClientId);
-  if (useMemory$2()) memory$5.members.delete(memberId);
+  if (useMemory$2()) memory$6.members.delete(memberId);
   else await db$h().collection("customerTeamMembers").doc(memberId).delete();
   await refreshGrant(member.teamId, member.ownerClientId);
   return getTeam(await loadActor(actor2.uid, actor2.email));
@@ -25027,7 +25027,7 @@ async function deleteContact(actor2, contactId) {
   const scope = assertCrm(actor2, "write");
   const existing = await readDoc("contacts", contactId);
   if (!existing || existing.ownerClientId !== scope.ownerClientId) throw new HubError(404, "Contact not found.");
-  if (useMemory$2()) memory$5.contacts.delete(contactId);
+  if (useMemory$2()) memory$6.contacts.delete(contactId);
   else await db$h().collection("agentContacts").doc(contactId).delete();
   return { ok: true };
 }
@@ -25181,7 +25181,7 @@ async function saveCard(actor2, requestedOwner, card) {
   await writeCard(ownerClientId, card, actor2.clientIds);
   return getBilling(actor2, ownerClientId === actor2.clientId ? "" : ownerClientId);
 }
-const memory$4 = /* @__PURE__ */ new Map();
+const memory$5 = /* @__PURE__ */ new Map();
 const MAX_BYTES = 5e6;
 const ALLOWED = /* @__PURE__ */ new Map([
   ["application/pdf", "pdf"],
@@ -25218,7 +25218,7 @@ function visible(file, scope) {
   return uids.has(file.firebaseUid) || ids.has(file.clientId) || ids.has(file.firebaseUid);
 }
 async function listClientFiles(scope) {
-  const rows = useMemory$1() ? [...memory$4.values()] : await listedFromFirestore(scope);
+  const rows = useMemory$1() ? [...memory$5.values()] : await listedFromFirestore(scope);
   return rows.filter((file) => visible(file, scope)).sort((a, b) => a.createdAt < b.createdAt ? 1 : -1).map(publicFile);
 }
 async function listedFromFirestore(scope) {
@@ -25257,7 +25257,7 @@ async function addClientFile(input) {
     createdAt
   };
   if (useMemory$1()) {
-    memory$4.set(id, { ...record2, bytes: parsed.bytes });
+    memory$5.set(id, { ...record2, bytes: parsed.bytes });
     return publicFile(record2);
   }
   const token = randomBytes$1(16).toString("hex");
@@ -25273,7 +25273,7 @@ async function addClientFile(input) {
 }
 async function readClientFile(fileId, scope) {
   if (useMemory$1()) {
-    const stored = memory$4.get(fileId);
+    const stored = memory$5.get(fileId);
     if (!stored || !visible(stored, scope) || !stored.bytes) return null;
     return { file: publicFile(stored), bytes: stored.bytes };
   }
@@ -25299,7 +25299,7 @@ function publicFile(file) {
     createdAt: file.createdAt
   };
 }
-const router$w = Router();
+const router$x = Router();
 function guard(handler) {
   return async (req, res) => {
     try {
@@ -25317,7 +25317,7 @@ function testClient(req) {
 function testStaff(req) {
   return process.env.CLIENT_HUB_TEST_AUTH === "1" && typeof req.headers["x-staff-uid"] === "string";
 }
-router$w.use((req, res, next) => {
+router$x.use((req, res, next) => {
   const clientPath = req.path.startsWith("/me/hub") || req.path.startsWith("/me/files");
   if (clientPath && testClient(req)) {
     req.user = {
@@ -25339,60 +25339,60 @@ function coordinatorOrTest(req, res, next) {
   }
   return requireCoordinator(req, res, next);
 }
-router$w.get("/me/hub/profile", guard(async (req, res) => {
+router$x.get("/me/hub/profile", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   res.json(await getProfile(await loadActor(req.user.uid, req.user.email || "")));
 }));
-router$w.patch("/me/hub/profile", guard(async (req, res) => {
+router$x.patch("/me/hub/profile", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   res.json(await saveProfile(await loadActor(req.user.uid, req.user.email || ""), req.body));
 }));
-router$w.post("/me/hub/profile/asset", guard(async (req, res) => {
+router$x.post("/me/hub/profile/asset", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   const kind = typeof req.body?.kind === "string" ? req.body.kind : "";
   const dataUrl = typeof req.body?.dataUrl === "string" ? req.body.dataUrl : "";
   res.json(await saveProfileAsset(await loadActor(req.user.uid, req.user.email || ""), kind, dataUrl));
 }));
-router$w.get("/me/hub/team", guard(async (req, res) => {
+router$x.get("/me/hub/team", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   res.json(await getTeam(await loadActor(req.user.uid, req.user.email || "")));
 }));
-router$w.post("/me/hub/team", guard(async (req, res) => {
+router$x.post("/me/hub/team", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   res.json(await saveTeam(await loadActor(req.user.uid, req.user.email || ""), req.body));
 }));
-router$w.patch("/me/hub/team", guard(async (req, res) => {
+router$x.patch("/me/hub/team", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   res.json(await saveTeam(await loadActor(req.user.uid, req.user.email || ""), req.body));
 }));
-router$w.post("/me/hub/team/members", guard(async (req, res) => {
+router$x.post("/me/hub/team/members", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   res.status(201).json(await addTeamMember(await loadActor(req.user.uid, req.user.email || ""), req.body, req.body?.invite === true));
 }));
-router$w.patch("/me/hub/team/members/:id", guard(async (req, res) => {
+router$x.patch("/me/hub/team/members/:id", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   res.json(await updateTeamMember(await loadActor(req.user.uid, req.user.email || ""), req.params.id, req.body));
 }));
-router$w.delete("/me/hub/team/members/:id", guard(async (req, res) => {
+router$x.delete("/me/hub/team/members/:id", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   res.json(await removeTeamMember(await loadActor(req.user.uid, req.user.email || ""), req.params.id));
 }));
-router$w.post("/me/hub/team/members/:id/invite", guard(async (req, res) => {
+router$x.post("/me/hub/team/members/:id/invite", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   res.json(await sendTeamInvite(await loadActor(req.user.uid, req.user.email || ""), req.params.id));
 }));
-router$w.get("/me/hub/clients.csv", guard(async (req, res) => {
+router$x.get("/me/hub/clients.csv", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   const { contacts } = await listContacts(await loadActor(req.user.uid, req.user.email || ""));
   res.setHeader("Content-Type", "text/csv; charset=utf-8");
   res.setHeader("Content-Disposition", 'attachment; filename="example-clients.csv"');
   res.send(contactsToCsv(contacts));
 }));
-router$w.get("/me/hub/clients", guard(async (req, res) => {
+router$x.get("/me/hub/clients", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   res.json(await listContacts(await loadActor(req.user.uid, req.user.email || "")));
 }));
-router$w.post("/me/hub/clients/import", guard(async (req, res) => {
+router$x.post("/me/hub/clients/import", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   const csv = typeof req.body?.csv === "string" ? req.body.csv : "";
   const parsed = parseContactsCsv(csv);
@@ -25401,35 +25401,35 @@ router$w.post("/me/hub/clients/import", guard(async (req, res) => {
   const saved = await importContacts(actor2, parsed.contacts.map((contact2) => ({ ...contact2, ownerClientId: actor2.clientId, teamId: "" })));
   res.status(201).json({ ...saved, errors: parsed.errors });
 }));
-router$w.post("/me/hub/clients", guard(async (req, res) => {
+router$x.post("/me/hub/clients", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   res.status(201).json(await saveContact(await loadActor(req.user.uid, req.user.email || ""), null, req.body));
 }));
-router$w.patch("/me/hub/clients/:id", guard(async (req, res) => {
+router$x.patch("/me/hub/clients/:id", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   res.json(await saveContact(await loadActor(req.user.uid, req.user.email || ""), req.params.id, req.body));
 }));
-router$w.delete("/me/hub/clients/:id", guard(async (req, res) => {
+router$x.delete("/me/hub/clients/:id", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   res.json(await deleteContact(await loadActor(req.user.uid, req.user.email || ""), req.params.id));
 }));
-router$w.get("/me/hub/billing", guard(async (req, res) => {
+router$x.get("/me/hub/billing", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   const owner = typeof req.query.account === "string" ? req.query.account : "";
   res.json(await getBilling(await loadActor(req.user.uid, req.user.email || ""), owner));
 }));
-router$w.patch("/me/hub/billing", guard(async (req, res) => {
+router$x.patch("/me/hub/billing", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   const owner = typeof req.query.account === "string" ? req.query.account : "";
   res.json(await saveBilling(await loadActor(req.user.uid, req.user.email || ""), owner, req.body));
 }));
-router$w.get("/me/files", guard(async (req, res) => {
+router$x.get("/me/files", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open your files.");
   const actor2 = await loadActor(req.user.uid, req.user.email || "");
   const files = await listClientFiles({ firebaseUids: [actor2.uid, ...actor2.clientIds], clientIds: actor2.clientIds });
   res.json({ files });
 }));
-router$w.post("/me/files", guard(async (req, res) => {
+router$x.post("/me/files", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to upload a file.");
   const actor2 = await loadActor(req.user.uid, req.user.email || "");
   const file = await addClientFile({
@@ -25443,7 +25443,7 @@ router$w.post("/me/files", guard(async (req, res) => {
   });
   res.status(201).json({ file });
 }));
-router$w.get("/me/files/:fileId/raw", guard(async (req, res) => {
+router$x.get("/me/files/:fileId/raw", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open your files.");
   const actor2 = await loadActor(req.user.uid, req.user.email || "");
   const found = await readClientFile(req.params.fileId, { firebaseUids: [actor2.uid, ...actor2.clientIds], clientIds: actor2.clientIds });
@@ -25452,7 +25452,7 @@ router$w.get("/me/files/:fileId/raw", guard(async (req, res) => {
   res.setHeader("Content-Disposition", `inline; filename="${found.file.name.replace(/"/g, "")}"`);
   res.send(found.bytes);
 }));
-router$w.post("/me/hub/billing/card", guard(async (req, res) => {
+router$x.post("/me/hub/billing/card", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   if (containsRawCard(req.body)) throw new HubError(400, "Card numbers are not stored. Use the Square card form.");
   const sourceId = typeof req.body?.sourceId === "string" ? req.body.sourceId : "";
@@ -25476,16 +25476,16 @@ function clientIdParam(value) {
   if (!/^[A-Za-z0-9_-]{4,128}$/.test(id)) throw new HubError(400, "Client not found.");
   return id;
 }
-router$w.get("/:id/hub/profile", requireCoordinator, guard(async (req, res) => {
+router$x.get("/:id/hub/profile", requireCoordinator, guard(async (req, res) => {
   const billing = await getStaffBilling(clientIdParam(req.params.id));
   res.json({ profile: billing.profile });
 }));
-router$w.post("/:id/hub/profile/asset", requireCoordinator, guard(async (req, res) => {
+router$x.post("/:id/hub/profile/asset", requireCoordinator, guard(async (req, res) => {
   const kind = typeof req.body?.kind === "string" ? req.body.kind : "";
   const dataUrl = typeof req.body?.dataUrl === "string" ? req.body.dataUrl : "";
   res.json(await saveStaffProfileAsset(clientIdParam(req.params.id), kind, dataUrl));
 }));
-router$w.get("/:id/hub/billing", requireCoordinator, guard(async (req, res) => {
+router$x.get("/:id/hub/billing", requireCoordinator, guard(async (req, res) => {
   res.json(await getStaffBilling(clientIdParam(req.params.id)));
 }));
 async function staffFileScope(clientId2) {
@@ -25506,11 +25506,11 @@ async function staffFileScope(clientId2) {
     clientId: clientId2
   };
 }
-router$w.get("/:id/files", coordinatorOrTest, guard(async (req, res) => {
+router$x.get("/:id/files", coordinatorOrTest, guard(async (req, res) => {
   const scope = await staffFileScope(clientIdParam(req.params.id));
   res.json({ files: await listClientFiles(scope) });
 }));
-router$w.post("/:id/files", coordinatorOrTest, guard(async (req, res) => {
+router$x.post("/:id/files", coordinatorOrTest, guard(async (req, res) => {
   const scope = await staffFileScope(clientIdParam(req.params.id));
   const file = await addClientFile({
     firebaseUid: scope.firebaseUid,
@@ -25523,7 +25523,7 @@ router$w.post("/:id/files", coordinatorOrTest, guard(async (req, res) => {
   });
   res.status(201).json({ file });
 }));
-router$w.get("/:id/files/:fileId/raw", coordinatorOrTest, guard(async (req, res) => {
+router$x.get("/:id/files/:fileId/raw", coordinatorOrTest, guard(async (req, res) => {
   const scope = await staffFileScope(clientIdParam(req.params.id));
   const found = await readClientFile(req.params.fileId, scope);
   if (!found) throw new HubError(404, "That file is not on this client.");
@@ -25531,7 +25531,7 @@ router$w.get("/:id/files/:fileId/raw", coordinatorOrTest, guard(async (req, res)
   res.setHeader("Content-Disposition", `inline; filename="${found.file.name.replace(/"/g, "")}"`);
   res.send(found.bytes);
 }));
-router$w.post("/:id/hub/billing/card", requireCoordinator, guard(async (req, res) => {
+router$x.post("/:id/hub/billing/card", requireCoordinator, guard(async (req, res) => {
   if (containsRawCard(req.body)) throw new HubError(400, "Card numbers are not stored. Use the Square card form.");
   const clientId2 = clientIdParam(req.params.id);
   const sourceId = typeof req.body?.sourceId === "string" ? req.body.sourceId : "";
@@ -25547,7 +25547,7 @@ router$w.post("/:id/hub/billing/card", requireCoordinator, guard(async (req, res
   if ("error" in saved) throw new HubError(502, saved.error);
   res.json(await saveStaffCard(clientId2, saved.card));
 }));
-router$w.use((req, res, next) => {
+router$x.use((req, res, next) => {
   if (req.path.startsWith("/me/hub") || req.path.startsWith("/me/files")) {
     return res.status(404).json({ error: "Settings path not found." });
   }
@@ -26163,9 +26163,9 @@ async function setStaffPassword(staffId, password, actor2, replaceExisting) {
   await deleteManualDuplicates(email, uid);
   return { uid, mustChangePassword: true };
 }
-const router$v = Router();
+const router$w = Router();
 const db$f = () => admin.firestore();
-router$v.get("/", requireStaff, async (_req, res) => {
+router$w.get("/", requireStaff, async (_req, res) => {
   try {
     const snapshot = await db$f().collection("staff").where("isActive", "==", true).orderBy("firstName").get();
     return res.json(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
@@ -26183,7 +26183,7 @@ function staffLoginFailure(err, res, fallback) {
   console.error("[Staff] Login provision error.");
   return res.status(500).json({ error: fallback });
 }
-router$v.post("/", requireAdmin, async (req, res) => {
+router$w.post("/", requireAdmin, async (req, res) => {
   try {
     const result = await provisionStaffLogin(req.body || {}, actingAdmin(req));
     return res.status(result.created ? 201 : 200).json({
@@ -26197,7 +26197,7 @@ router$v.post("/", requireAdmin, async (req, res) => {
     return staffLoginFailure(err, res, "Failed to create staff member.");
   }
 });
-router$v.post("/:id/password", requireAdmin, async (req, res) => {
+router$w.post("/:id/password", requireAdmin, async (req, res) => {
   try {
     const result = await setStaffPassword(
       String(req.params.id || ""),
@@ -26210,7 +26210,7 @@ router$v.post("/:id/password", requireAdmin, async (req, res) => {
     return staffLoginFailure(err, res, "Failed to set the password.");
   }
 });
-router$v.patch("/:id", requireAdmin, async (req, res) => {
+router$w.patch("/:id", requireAdmin, async (req, res) => {
   try {
     const allowed = ["firstName", "lastName", "phone", "role", "isActive"];
     const updates = { updatedAt: admin.firestore.FieldValue.serverTimestamp() };
@@ -26250,7 +26250,7 @@ function requireSetupSecret(req, res) {
   }
   return true;
 }
-router$v.post("/playtest", async (req, res) => {
+router$w.post("/playtest", async (req, res) => {
   if (!requireSetupSecret(req, res)) return;
   if (!admin.apps.length) {
     return res.status(503).json({
@@ -26269,7 +26269,7 @@ router$v.post("/playtest", async (req, res) => {
     return res.status(500).json({ error: "Playtest setup failed." });
   }
 });
-router$v.post("/setup", async (req, res) => {
+router$w.post("/setup", async (req, res) => {
   try {
     if (isHostedDeployment(liveServerEnv())) {
       const secret2 = process.env.STAFF_SETUP_SECRET;
@@ -26312,7 +26312,7 @@ router$v.post("/setup", async (req, res) => {
     return res.status(500).json({ error: "Setup failed." });
   }
 });
-const router$u = Router();
+const router$v = Router();
 async function clearMustChangeFlag(uid) {
   const db2 = admin.firestore();
   const now = admin.firestore.FieldValue.serverTimestamp();
@@ -26328,7 +26328,7 @@ async function clearMustChangeFlag(uid) {
   await admin.auth().setCustomUserClaims(uid, claims);
   await admin.auth().revokeRefreshTokens(uid);
 }
-router$u.post("/password", requireAuth, async (req, res) => {
+router$v.post("/password", requireAuth, async (req, res) => {
   const password = String(req.body?.password || "");
   const problem = passwordPolicyError(password);
   if (problem) return res.status(400).json({ error: problem });
@@ -26370,7 +26370,7 @@ function kickStudioQueue(listingId, env = process.env) {
   });
   return { dispatched: true };
 }
-const router$t = Router();
+const router$u = Router();
 const db$e = () => admin.firestore();
 const DIRECT_UPLOAD_LIMIT = 3e6;
 function adminReady$2(res) {
@@ -26438,7 +26438,7 @@ function sendKnownError$2(res, err, fallback) {
   console.error("[Listings]", err);
   return res.status(500).json({ error: fallback });
 }
-router$t.get("/assigned", requirePhotographer, async (req, res) => {
+router$u.get("/assigned", requirePhotographer, async (req, res) => {
   if (!adminReady$2(res)) return;
   try {
     const uid = req.user.uid;
@@ -26467,7 +26467,7 @@ router$t.get("/assigned", requirePhotographer, async (req, res) => {
     return res.status(500).json({ error: "Failed to load assigned jobs." });
   }
 });
-router$t.get("/:id", requireAuth, async (req, res) => {
+router$u.get("/:id", requireAuth, async (req, res) => {
   if (!adminReady$2(res)) return;
   try {
     const listing = await assertListingAccess(req, req.params.id);
@@ -26482,7 +26482,7 @@ router$t.get("/:id", requireAuth, async (req, res) => {
     return sendKnownError$2(res, err, "Failed to load listing.");
   }
 });
-router$t.post("/:id/photos/upload-url", requirePhotographer, async (req, res) => {
+router$u.post("/:id/photos/upload-url", requirePhotographer, async (req, res) => {
   if (!adminReady$2(res)) return;
   try {
     const fileName2 = safeStorageFileName(req.body?.fileName);
@@ -26500,7 +26500,7 @@ router$t.post("/:id/photos/upload-url", requirePhotographer, async (req, res) =>
     return sendKnownError$2(res, err, "Failed to prepare the upload. Check FIREBASE_STORAGE_BUCKET.");
   }
 });
-router$t.post("/:id/photos", requirePhotographer, async (req, res) => {
+router$u.post("/:id/photos", requirePhotographer, async (req, res) => {
   if (!adminReady$2(res)) return;
   try {
     const listingId = req.params.id;
@@ -26548,7 +26548,7 @@ router$t.post("/:id/photos", requirePhotographer, async (req, res) => {
     return sendKnownError$2(res, err, "Failed to save the uploaded photo.");
   }
 });
-router$t.patch("/:id/photo-order", requirePhotographer, async (req, res) => {
+router$u.patch("/:id/photo-order", requirePhotographer, async (req, res) => {
   if (!adminReady$2(res)) return;
   try {
     await assertListingAccess(req, req.params.id);
@@ -26566,7 +26566,7 @@ router$t.patch("/:id/photo-order", requirePhotographer, async (req, res) => {
     return sendKnownError$2(res, err, "Failed to save the photo order.");
   }
 });
-router$t.patch("/:id/media-arrangement", requireStaff, async (req, res) => {
+router$u.patch("/:id/media-arrangement", requireStaff, async (req, res) => {
   if (!adminReady$2(res)) return;
   try {
     await assertListingAccess(req, req.params.id);
@@ -26576,7 +26576,7 @@ router$t.patch("/:id/media-arrangement", requireStaff, async (req, res) => {
     return sendKnownError$2(res, err, "Failed to save the media order.");
   }
 });
-router$t.post("/:id/gallery-sequence", requirePhotographer, async (req, res) => {
+router$u.post("/:id/gallery-sequence", requirePhotographer, async (req, res) => {
   if (!adminReady$2(res)) return;
   try {
     await assertListingAccess(req, req.params.id);
@@ -26587,7 +26587,7 @@ router$t.post("/:id/gallery-sequence", requirePhotographer, async (req, res) => 
     return sendKnownError$2(res, err, "Failed to upload the gallery in order.");
   }
 });
-const router$s = Router();
+const router$t = Router();
 const db$d = () => admin.firestore();
 function mailchimpConfig() {
   const apiKey = process.env.MAILCHIMP_API_KEY || "";
@@ -26615,7 +26615,7 @@ async function mailchimpRequest(path2, init = {}) {
   }
   return data;
 }
-router$s.get("/", requireCoordinator, async (_req, res) => {
+router$t.get("/", requireCoordinator, async (_req, res) => {
   try {
     const snapshot = await db$d().collection("campaigns").orderBy("createdAt", "desc").limit(50).get();
     return res.json(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
@@ -26623,7 +26623,7 @@ router$s.get("/", requireCoordinator, async (_req, res) => {
     return res.status(500).json({ error: "Failed to fetch campaigns." });
   }
 });
-router$s.get("/mailchimp/status", requireCoordinator, async (_req, res) => {
+router$t.get("/mailchimp/status", requireCoordinator, async (_req, res) => {
   try {
     const { apiKey, serverPrefix } = mailchimpConfig();
     if (!apiKey || !serverPrefix) {
@@ -26654,7 +26654,7 @@ router$s.get("/mailchimp/status", requireCoordinator, async (_req, res) => {
     });
   }
 });
-router$s.post("/mailchimp/sync", requireCoordinator, async (req, res) => {
+router$t.post("/mailchimp/sync", requireCoordinator, async (req, res) => {
   try {
     const { listId, audience = "all" } = req.body;
     if (!listId) return res.status(400).json({ error: "listId required." });
@@ -26717,7 +26717,7 @@ router$s.post("/mailchimp/sync", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: err instanceof Error ? err.message : "Failed to sync Mailchimp." });
   }
 });
-router$s.post("/", requireCoordinator, async (req, res) => {
+router$t.post("/", requireCoordinator, async (req, res) => {
   try {
     const { name, type, subject, body, audience, audienceIds, scheduledAt } = req.body;
     if (!name || !body || !audience) {
@@ -26742,7 +26742,7 @@ router$s.post("/", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to create campaign." });
   }
 });
-router$s.post("/:id/send", requireCoordinator, async (req, res) => {
+router$t.post("/:id/send", requireCoordinator, async (req, res) => {
   try {
     const campaignDoc = await db$d().collection("campaigns").doc(req.params.id).get();
     if (!campaignDoc.exists) return res.status(404).json({ error: "Campaign not found." });
@@ -28993,7 +28993,7 @@ function parseTabularUpload(input) {
   }
   return parseCsv(input.text || "");
 }
-const router$r = Router();
+const router$s = Router();
 const MAX_ROWS = 1e4;
 const unsubscribeLimit = createRateLimiter({ windowMs: 60 * 60 * 1e3, max: 20 });
 function requireMarketing$1(permission) {
@@ -29030,7 +29030,7 @@ function publicContact(contact2, suppression) {
     suppressed: blocked ? reasonLabel(blocked.reason, blocked.hold) : ""
   };
 }
-router$r.get("/overview", requireMarketing$1("view"), async (_req, res) => {
+router$s.get("/overview", requireMarketing$1("view"), async (_req, res) => {
   const store = getMarketingStore();
   await store.ensureSeed();
   const [contacts, suppression, segments] = await Promise.all([
@@ -29046,7 +29046,7 @@ router$r.get("/overview", requireMarketing$1("view"), async (_req, res) => {
     segments: segments.length
   });
 });
-router$r.get("/contacts", requireMarketing$1("view"), async (req, res) => {
+router$s.get("/contacts", requireMarketing$1("view"), async (req, res) => {
   const store = getMarketingStore();
   await store.ensureSeed();
   const [contacts, suppression] = await Promise.all([store.listContacts(), store.listSuppression()]);
@@ -29062,7 +29062,7 @@ router$r.get("/contacts", requireMarketing$1("view"), async (req, res) => {
   const tags = [...new Set(contacts.flatMap((contact2) => contact2.tags))].sort((a, b) => a.localeCompare(b));
   res.json({ contacts: filtered, tags, total: contacts.length });
 });
-router$r.get("/contacts/detail", requireMarketing$1("view"), async (req, res) => {
+router$s.get("/contacts/detail", requireMarketing$1("view"), async (req, res) => {
   const email = normalizeEmail(req.query.email);
   if (!isValidEmail(email)) return res.status(400).json({ error: "A valid email is required." });
   const store = getMarketingStore();
@@ -29079,7 +29079,7 @@ router$r.get("/contacts/detail", requireMarketing$1("view"), async (req, res) =>
     activity: events.sort((a, b) => b.at.localeCompare(a.at))
   });
 });
-router$r.post("/contacts", requireMarketing$1("manage"), async (req, res) => {
+router$s.post("/contacts", requireMarketing$1("manage"), async (req, res) => {
   const email = normalizeEmail(req.body?.email);
   if (!isValidEmail(email)) return res.status(400).json({ error: "A valid email is required." });
   const store = getMarketingStore();
@@ -29104,7 +29104,7 @@ router$r.post("/contacts", requireMarketing$1("manage"), async (req, res) => {
   await store.saveContacts([contact2]);
   res.json({ contact: contact2 });
 });
-router$r.post("/contacts/tags", requireMarketing$1("manage"), async (req, res) => {
+router$s.post("/contacts/tags", requireMarketing$1("manage"), async (req, res) => {
   const emails = Array.isArray(req.body?.emails) ? req.body.emails.map((email) => normalizeEmail(email)) : [];
   const add = Array.isArray(req.body?.add) ? req.body.add.map(String) : [];
   const remove = Array.isArray(req.body?.remove) ? req.body.remove.map(String) : [];
@@ -29117,11 +29117,11 @@ router$r.post("/contacts/tags", requireMarketing$1("manage"), async (req, res) =
   await store.saveContacts(next);
   res.json({ updated: next.length });
 });
-router$r.post("/contacts/sync", requireMarketing$1("manage"), async (_req, res) => {
+router$s.post("/contacts/sync", requireMarketing$1("manage"), async (_req, res) => {
   const result = await syncCustomerContacts();
   res.json(result);
 });
-router$r.post("/imports/parse", requireMarketing$1("manage"), async (req, res) => {
+router$s.post("/imports/parse", requireMarketing$1("manage"), async (req, res) => {
   try {
     const table = parseTabularUpload({
       text: typeof req.body?.text === "string" ? req.body.text : "",
@@ -29141,7 +29141,7 @@ router$r.post("/imports/parse", requireMarketing$1("manage"), async (req, res) =
     res.status(400).json({ error: err instanceof Error ? err.message : "Could not read that file." });
   }
 });
-router$r.post("/imports/commit", requireMarketing$1("manage"), async (req, res) => {
+router$s.post("/imports/commit", requireMarketing$1("manage"), async (req, res) => {
   const headers = Array.isArray(req.body?.headers) ? req.body.headers.map(String) : [];
   const rows = Array.isArray(req.body?.rows) ? req.body.rows.map((row) => Array.isArray(row) ? row.map(String) : []) : [];
   const mapping = req.body?.mapping && typeof req.body.mapping === "object" ? req.body.mapping : {};
@@ -29159,7 +29159,7 @@ router$r.post("/imports/commit", requireMarketing$1("manage"), async (req, res) 
   await store.saveContacts(plan.upserts);
   res.json({ summary: plan.summary });
 });
-router$r.get("/segments", requireMarketing$1("view"), async (_req, res) => {
+router$s.get("/segments", requireMarketing$1("view"), async (_req, res) => {
   const store = getMarketingStore();
   const [segments, contacts] = await Promise.all([store.listSegments(), store.listContacts()]);
   res.json({
@@ -29169,7 +29169,7 @@ router$r.get("/segments", requireMarketing$1("view"), async (_req, res) => {
     }))
   });
 });
-router$r.post("/segments", requireMarketing$1("manage"), async (req, res) => {
+router$s.post("/segments", requireMarketing$1("manage"), async (req, res) => {
   const name = String(req.body?.name || "").trim();
   if (!name) return res.status(400).json({ error: "Name the segment." });
   const store = getMarketingStore();
@@ -29186,11 +29186,11 @@ router$r.post("/segments", requireMarketing$1("manage"), async (req, res) => {
   await store.saveSegment(segment);
   res.json({ segment });
 });
-router$r.delete("/segments/:id", requireMarketing$1("manage"), async (req, res) => {
+router$s.delete("/segments/:id", requireMarketing$1("manage"), async (req, res) => {
   await getMarketingStore().deleteSegment(req.params.id);
   res.json({ ok: true });
 });
-router$r.get("/suppression", requireMarketing$1("view"), async (_req, res) => {
+router$s.get("/suppression", requireMarketing$1("view"), async (_req, res) => {
   const store = getMarketingStore();
   await store.ensureSeed();
   const entries = await store.listSuppression();
@@ -29198,7 +29198,7 @@ router$r.get("/suppression", requireMarketing$1("view"), async (_req, res) => {
     entries: entries.sort((a, b) => a.value.localeCompare(b.value))
   });
 });
-router$r.post("/suppression", requireMarketing$1("manage"), async (req, res) => {
+router$s.post("/suppression", requireMarketing$1("manage"), async (req, res) => {
   const now = (/* @__PURE__ */ new Date()).toISOString();
   const entry2 = buildSuppression(now, {
     kind: req.body?.kind === "domain" || req.body?.kind === "name" ? req.body.kind : "email",
@@ -29217,11 +29217,11 @@ router$r.post("/suppression", requireMarketing$1("manage"), async (req, res) => 
   await store.saveSuppression({ ...entry2, createdAt: existing?.createdAt || now, source: existing?.source || "manual" });
   res.json({ entry: entry2 });
 });
-router$r.delete("/suppression/:id", requireMarketing$1("manage"), async (req, res) => {
+router$s.delete("/suppression/:id", requireMarketing$1("manage"), async (req, res) => {
   await getMarketingStore().deleteSuppression(decodeURIComponent(req.params.id));
   res.json({ ok: true });
 });
-router$r.post("/unsubscribe", async (req, res) => {
+router$s.post("/unsubscribe", async (req, res) => {
   const limit = unsubscribeLimit.check(clientIp(req));
   if (!limit.allowed) return res.status(429).json({ error: "Too many attempts. Try again later." });
   const email = normalizeEmail(req.body?.email);
@@ -29563,7 +29563,7 @@ function createGmassClient(env = process.env, fetchImpl = fetch) {
 function getGmassClient() {
   return createGmassClient();
 }
-const router$q = Router();
+const router$r = Router();
 function requireMarketing(permission) {
   return async (req, res, next) => {
     await requireStaff(req, res, () => {
@@ -29709,7 +29709,7 @@ function sendBlocked(res, gmass) {
   }
   return false;
 }
-router$q.get("/dashboard", requireMarketing("view"), async (_req, res) => {
+router$r.get("/dashboard", requireMarketing("view"), async (_req, res) => {
   const store = getMarketingStore();
   await store.ensureSeed();
   const [contacts, suppression, segments, campaigns, reports] = await Promise.all([
@@ -29744,11 +29744,11 @@ router$q.get("/dashboard", requireMarketing("view"), async (_req, res) => {
     alerts: rows.filter((row) => row.stats?.pauseRecommended)
   });
 });
-router$q.get("/campaigns", requireMarketing("view"), async (_req, res) => {
+router$r.get("/campaigns", requireMarketing("view"), async (_req, res) => {
   const campaigns = await getMarketingStore().listCampaigns();
   res.json({ campaigns: campaigns.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)) });
 });
-router$q.post("/campaigns", requireMarketing("manage"), async (req, res) => {
+router$r.post("/campaigns", requireMarketing("manage"), async (req, res) => {
   const store = getMarketingStore();
   const now = (/* @__PURE__ */ new Date()).toISOString();
   const settings = await store.getSettings();
@@ -29761,12 +29761,12 @@ router$q.post("/campaigns", requireMarketing("manage"), async (req, res) => {
   await store.saveCampaign(campaign);
   res.status(201).json({ campaign });
 });
-router$q.get("/campaigns/:id", requireMarketing("view"), async (req, res) => {
+router$r.get("/campaigns/:id", requireMarketing("view"), async (req, res) => {
   const campaign = await getMarketingStore().getCampaign(req.params.id);
   if (!campaign) return res.status(404).json({ error: "Campaign not found." });
   res.json({ campaign });
 });
-router$q.post("/campaigns/:id", requireMarketing("manage"), async (req, res) => {
+router$r.post("/campaigns/:id", requireMarketing("manage"), async (req, res) => {
   const store = getMarketingStore();
   const current = await store.getCampaign(req.params.id);
   if (!current) return res.status(404).json({ error: "Campaign not found." });
@@ -29781,7 +29781,7 @@ router$q.post("/campaigns/:id", requireMarketing("manage"), async (req, res) => 
   await store.saveCampaign(campaign);
   res.json({ campaign });
 });
-router$q.post("/campaigns/:id/duplicate", requireMarketing("manage"), async (req, res) => {
+router$r.post("/campaigns/:id/duplicate", requireMarketing("manage"), async (req, res) => {
   const store = getMarketingStore();
   const current = await store.getCampaign(req.params.id);
   if (!current) return res.status(404).json({ error: "Campaign not found." });
@@ -29803,7 +29803,7 @@ router$q.post("/campaigns/:id/duplicate", requireMarketing("manage"), async (req
   await store.saveCampaign(copy);
   res.status(201).json({ campaign: copy });
 });
-router$q.post("/campaigns/:id/preview", requireMarketing("send"), async (req, res) => {
+router$r.post("/campaigns/:id/preview", requireMarketing("send"), async (req, res) => {
   const store = getMarketingStore();
   const current = await store.getCampaign(req.params.id);
   if (!current) return res.status(404).json({ error: "Campaign not found." });
@@ -29822,7 +29822,7 @@ router$q.post("/campaigns/:id/preview", requireMarketing("send"), async (req, re
   await store.saveCampaign(campaign);
   res.json({ confirmation });
 });
-router$q.post("/campaigns/:id/test", requireMarketing("send"), async (req, res) => {
+router$r.post("/campaigns/:id/test", requireMarketing("send"), async (req, res) => {
   const to = normalizeEmail(req.body?.to);
   if (!isValidEmail(to)) return res.status(400).json({ error: "Enter a test email address." });
   const gmass = getGmassClient();
@@ -29851,7 +29851,7 @@ router$q.post("/campaigns/:id/test", requireMarketing("send"), async (req, res) 
   }
   res.json({ ok: true, to });
 });
-router$q.post("/campaigns/:id/send", requireMarketing("send"), async (req, res) => {
+router$r.post("/campaigns/:id/send", requireMarketing("send"), async (req, res) => {
   const store = getMarketingStore();
   const current = await store.getCampaign(req.params.id);
   if (!current) return res.status(404).json({ error: "Campaign not found." });
@@ -29955,7 +29955,7 @@ router$q.post("/campaigns/:id/send", requireMarketing("send"), async (req, res) 
     return res.status(502).json({ error: message });
   }
 });
-router$q.get("/campaigns/:id/report", requireMarketing("view"), async (req, res) => {
+router$r.get("/campaigns/:id/report", requireMarketing("view"), async (req, res) => {
   const store = getMarketingStore();
   const [campaign, report] = await Promise.all([
     store.getCampaign(req.params.id),
@@ -29964,7 +29964,7 @@ router$q.get("/campaigns/:id/report", requireMarketing("view"), async (req, res)
   if (!campaign) return res.status(404).json({ error: "Campaign not found." });
   res.json({ campaign, report });
 });
-router$q.post("/campaigns/:id/report", requireMarketing("view"), async (req, res) => {
+router$r.post("/campaigns/:id/report", requireMarketing("view"), async (req, res) => {
   const store = getMarketingStore();
   const campaign = await store.getCampaign(req.params.id);
   if (!campaign) return res.status(404).json({ error: "Campaign not found." });
@@ -30039,11 +30039,11 @@ router$q.post("/campaigns/:id/report", requireMarketing("view"), async (req, res
     res.status(502).json({ error: err instanceof Error ? err.message : "Could not refresh the GMass report." });
   }
 });
-router$q.get("/templates", requireMarketing("view"), async (_req, res) => {
+router$r.get("/templates", requireMarketing("view"), async (_req, res) => {
   const templates = await getMarketingStore().listTemplates();
   res.json({ templates });
 });
-router$q.post("/templates", requireMarketing("manage"), async (req, res) => {
+router$r.post("/templates", requireMarketing("manage"), async (req, res) => {
   const name = String(req.body?.name || "").trim();
   const html = String(req.body?.html || "");
   if (!name || !html) return res.status(400).json({ error: "A template needs a name and HTML." });
@@ -30058,15 +30058,15 @@ router$q.post("/templates", requireMarketing("manage"), async (req, res) => {
   await getMarketingStore().saveTemplate(template);
   res.json({ template });
 });
-router$q.delete("/templates/:id", requireMarketing("manage"), async (req, res) => {
+router$r.delete("/templates/:id", requireMarketing("manage"), async (req, res) => {
   await getMarketingStore().deleteTemplate(req.params.id);
   res.json({ ok: true });
 });
-router$q.get("/settings", requireMarketing("view"), async (_req, res) => {
+router$r.get("/settings", requireMarketing("view"), async (_req, res) => {
   const settings = await getMarketingStore().getSettings();
   res.json({ settings });
 });
-router$q.get("/account", requireMarketing("view"), async (_req, res) => {
+router$r.get("/account", requireMarketing("view"), async (_req, res) => {
   const settings = await getMarketingStore().getSettings();
   const gmass = getGmassClient();
   const base = {
@@ -30088,7 +30088,7 @@ router$q.get("/account", requireMarketing("view"), async (_req, res) => {
   ]);
   res.json({ ...base, user, warmup, domains });
 });
-router$q.post("/settings", requireMarketing("send"), async (req, res) => {
+router$r.post("/settings", requireMarketing("send"), async (req, res) => {
   const store = getMarketingStore();
   const current = await store.getSettings();
   const next = {
@@ -30111,7 +30111,7 @@ router$q.post("/settings", requireMarketing("send"), async (req, res) => {
   await store.saveSettings(next);
   res.json({ settings: next });
 });
-router$q.post("/account/unsubscribes", requireMarketing("send"), async (req, res) => {
+router$r.post("/account/unsubscribes", requireMarketing("send"), async (req, res) => {
   const gmass = getGmassClient();
   if (!gmass.configured) return res.status(503).json({ error: "Set GMASS_API_KEY before syncing a suppression to GMass." });
   const email = normalizeEmail(req.body?.email);
@@ -30131,7 +30131,7 @@ router$q.post("/account/unsubscribes", requireMarketing("send"), async (req, res
   }
   res.json({ ok: true });
 });
-router$q.post("/demo/sample-report", requireMarketing("send"), async (req, res) => {
+router$r.post("/demo/sample-report", requireMarketing("send"), async (req, res) => {
   if (process.env.MARKETING_DEMO !== "true" || isHostedDeployment(liveServerEnv())) {
     return res.status(404).json({ error: "Not found." });
   }
@@ -31889,7 +31889,7 @@ function openPixel(origin, campaignId, email, secret2) {
   const src = `${origin}/api/channel-campaigns/t/open.gif?c=${encodeURIComponent(campaignId)}&e=${encodeURIComponent(email)}&t=${token}`;
   return `<img src="${src}" width="1" height="1" alt="" />`;
 }
-const router$p = Router();
+const router$q = Router();
 const sendLimit = createRateLimiter({ windowMs: 10 * 60 * 1e3, max: 8 });
 const trackLimit = createRateLimiter({ windowMs: 60 * 1e3, max: 120 });
 const PIXEL = Buffer.from("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", "base64");
@@ -31945,7 +31945,7 @@ async function runBatches(items, worker) {
     if (index < batches.length - 1) await wait(delayMs());
   }
 }
-router$p.get("/t/open.gif", async (req, res) => {
+router$q.get("/t/open.gif", async (req, res) => {
   const limit = trackLimit.check(clientIp(req));
   const campaignId = String(req.query.c || "").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 80);
   const email = normalizeEmail(req.query.e);
@@ -31960,7 +31960,7 @@ router$p.get("/t/open.gif", async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   res.send(PIXEL);
 });
-router$p.get("/t/click", async (req, res) => {
+router$q.get("/t/click", async (req, res) => {
   const limit = trackLimit.check(clientIp(req));
   if (!limit.allowed) return res.status(429).send("Too many requests.");
   const campaignId = String(req.query.c || "").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 80);
@@ -31976,14 +31976,14 @@ router$p.get("/t/click", async (req, res) => {
   if (fresh) await store.bump(campaignId, "clicked");
   return res.redirect(url);
 });
-router$p.get("/", staffGate, async (req, res) => {
+router$q.get("/", staffGate, async (req, res) => {
   await ensureCampaignSample();
   const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 25));
   const page2 = await getChannelCampaignStore().list(limit, String(req.query.cursor || ""));
   const emailCampaigns = await emailCampaignSummaries();
   res.json({ ...page2, emailCampaigns, live: campaignSendLive() });
 });
-router$p.get("/calendar", staffGate, async (req, res) => {
+router$q.get("/calendar", staffGate, async (req, res) => {
   await ensureCampaignSample();
   const month = String(req.query.month || "");
   const campaigns = await getChannelCampaignStore().listAll(200);
@@ -32011,11 +32011,11 @@ router$p.get("/calendar", staffGate, async (req, res) => {
     }))
   });
 });
-router$p.get("/social-queue", staffGate, async (_req, res) => {
+router$q.get("/social-queue", staffGate, async (_req, res) => {
   const queue = await getChannelCampaignStore().listQueue(50);
   res.json({ queue });
 });
-router$p.get("/audience", staffGate, async (req, res) => {
+router$q.get("/audience", staffGate, async (req, res) => {
   await ensureCampaignSample();
   const segmentId = String(req.query.segmentId || "");
   const [preview, segments] = await Promise.all([
@@ -32027,7 +32027,7 @@ router$p.get("/audience", staffGate, async (req, res) => {
     audience: publicAudience(preview)
   });
 });
-router$p.post("/", staffGate, async (req, res) => {
+router$q.post("/", staffGate, async (req, res) => {
   const name = String(req.body?.name || "").trim();
   if (!name) return res.status(400).json({ error: "Name the campaign." });
   const now = (/* @__PURE__ */ new Date()).toISOString();
@@ -32046,7 +32046,7 @@ router$p.post("/", staffGate, async (req, res) => {
   await getChannelCampaignStore().save(campaign);
   res.status(201).json({ campaign });
 });
-router$p.post("/media", staffGate, async (req, res) => {
+router$q.post("/media", staffGate, async (req, res) => {
   const match = String(req.body?.dataUrl || "").match(/^data:(image\/(?:png|jpeg|gif|webp));base64,([A-Za-z0-9+/=\s]+)$/);
   if (!match) return res.status(400).json({ error: "Upload a PNG, JPEG, GIF, or WebP image." });
   const buffer = Buffer.from(match[2].replace(/\s/g, ""), "base64");
@@ -32061,7 +32061,7 @@ router$p.post("/media", staffGate, async (req, res) => {
   await fs.writeFile(path.join(dir, filename), buffer);
   res.json({ url: `/marketing/${filename}`, name: filename });
 });
-router$p.get("/:id", staffGate, async (req, res) => {
+router$q.get("/:id", staffGate, async (req, res) => {
   await ensureCampaignSample();
   const campaign = await getChannelCampaignStore().get(req.params.id);
   if (!campaign) return res.status(404).json({ error: "Campaign not found." });
@@ -32071,7 +32071,7 @@ router$p.get("/:id", staffGate, async (req, res) => {
   ]);
   res.json({ campaign, logs: logs.logs, audience: publicAudience(preview), live: campaignSendLive() });
 });
-router$p.post("/:id", staffGate, async (req, res) => {
+router$q.post("/:id", staffGate, async (req, res) => {
   const store = getChannelCampaignStore();
   const current = await store.get(req.params.id);
   if (!current) return res.status(404).json({ error: "Campaign not found." });
@@ -32095,7 +32095,7 @@ router$p.post("/:id", staffGate, async (req, res) => {
   await store.save(next, current.status);
   res.json({ campaign: next, reopened });
 });
-router$p.post("/:id/status", staffGate, async (req, res) => {
+router$q.post("/:id/status", staffGate, async (req, res) => {
   const store = getChannelCampaignStore();
   const current = await store.get(req.params.id);
   if (!current) return res.status(404).json({ error: "Campaign not found." });
@@ -32111,7 +32111,7 @@ router$p.post("/:id/status", staffGate, async (req, res) => {
   await store.save(next, current.status);
   res.json({ campaign: next });
 });
-router$p.post("/:id/posts/:postId/queue", staffGate, async (req, res) => {
+router$q.post("/:id/posts/:postId/queue", staffGate, async (req, res) => {
   const store = getChannelCampaignStore();
   const campaign = await store.get(req.params.id);
   if (!campaign) return res.status(404).json({ error: "Campaign not found." });
@@ -32139,12 +32139,12 @@ router$p.post("/:id/posts/:postId/queue", staffGate, async (req, res) => {
   });
   res.json({ campaign: next, queued: true });
 });
-router$p.get("/:id/logs", staffGate, async (req, res) => {
+router$q.get("/:id/logs", staffGate, async (req, res) => {
   const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 20));
   const page2 = await getChannelCampaignStore().listLogs(req.params.id, limit, String(req.query.cursor || ""));
   res.json(page2);
 });
-router$p.post("/:id/test", staffGate, async (req, res) => {
+router$q.post("/:id/test", staffGate, async (req, res) => {
   const limit = sendLimit.check(req.user?.uid || clientIp(req));
   if (!limit.allowed) return res.status(429).json({ error: "Too many send attempts. Try again shortly." });
   const to = normalizeEmail(req.user?.email || "");
@@ -32182,7 +32182,7 @@ router$p.post("/:id/test", staffGate, async (req, res) => {
   await getChannelCampaignStore().addLog(log);
   res.json({ delivered, to, log });
 });
-router$p.post("/:id/send", staffGate, async (req, res) => {
+router$q.post("/:id/send", staffGate, async (req, res) => {
   const limit = sendLimit.check(`${req.user?.uid || clientIp(req)}:send`);
   if (!limit.allowed) return res.status(429).json({ error: "Too many send attempts. Try again shortly." });
   const store = getChannelCampaignStore();
@@ -32284,7 +32284,7 @@ router$p.post("/:id/send", staffGate, async (req, res) => {
   await store.addLog(log);
   res.json({ dryRun: false, live: true, sent, failed, log, campaign: next });
 });
-const router$o = Router();
+const router$p = Router();
 const db$a = () => admin.firestore();
 function isAgentAuthorized(req) {
   const serviceKey = req.headers["x-agent-key"];
@@ -32326,7 +32326,7 @@ async function loadOrderForAppointment(appointment) {
   const orderDoc = await db$a().collection("orders").doc(String(appointment.orderId)).get();
   return orderDoc.exists ? { id: orderDoc.id, ref: orderDoc.ref, data: orderDoc.data() || {} } : null;
 }
-router$o.get("/briefing", requireStaff, async (_req, res) => {
+router$p.get("/briefing", requireStaff, async (_req, res) => {
   try {
     const today = /* @__PURE__ */ new Date();
     today.setHours(0, 0, 0, 0);
@@ -32525,9 +32525,9 @@ async function runReminderSweep(req, res) {
     return res.status(500).json({ error: "Failed to run reminder sweep." });
   }
 }
-router$o.get("/run-reminders", runReminderSweep);
-router$o.post("/run-reminders", runReminderSweep);
-router$o.get("/logs", requireStaff, async (req, res) => {
+router$p.get("/run-reminders", runReminderSweep);
+router$p.post("/run-reminders", runReminderSweep);
+router$p.get("/logs", requireStaff, async (req, res) => {
   try {
     const { agent, status: status2, requiresReview, limit = "50" } = req.query;
     let query = db$a().collection("agentLogs").orderBy("createdAt", "desc");
@@ -32542,7 +32542,7 @@ router$o.get("/logs", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch agent logs." });
   }
 });
-router$o.patch("/logs/:id/resolve", requireCoordinator, async (req, res) => {
+router$p.patch("/logs/:id/resolve", requireCoordinator, async (req, res) => {
   try {
     const { notes } = req.body;
     await db$a().collection("agentLogs").doc(req.params.id).update({
@@ -32557,7 +32557,7 @@ router$o.patch("/logs/:id/resolve", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to resolve flag." });
   }
 });
-router$o.post("/log", async (req, res) => {
+router$p.post("/log", async (req, res) => {
   try {
     if (!isAgentAuthorized(req)) {
       return res.status(401).json({ error: "Invalid agent key." });
@@ -33429,7 +33429,7 @@ async function revokeBotRoomKey(id) {
 function requestSecrets(presented) {
   return secretsInPlay(presented);
 }
-const router$n = Router();
+const router$o = Router();
 function sendBotRoomError(res, err) {
   if (res.headersSent) return;
   if (err instanceof BotRoomError) {
@@ -33510,14 +33510,14 @@ function queryFlag(value) {
 function queryString(value) {
   return typeof value === "string" ? value.trim() : "";
 }
-router$n.get("/openapi.json", (req, res) => {
+router$o.get("/openapi.json", (req, res) => {
   const forwardedProto = req.get("x-forwarded-proto");
   const proto = forwardedProto ? forwardedProto.split(",")[0].trim() : req.protocol;
   const forwardedHost = req.get("x-forwarded-host");
   const host = forwardedHost ? forwardedHost.split(",")[0].trim() : req.get("host");
   res.json(botRoomOpenApi(`${proto}://${host}/api/botroom`));
 });
-router$n.get("/messages", requireBotOrOwner, limitActor, wrap(async (req, res) => {
+router$o.get("/messages", requireBotOrOwner, limitActor, wrap(async (req, res) => {
   const limit = queryString(req.query.limit);
   const parsedLimit = limit ? Number(limit) : void 0;
   if (limit && !Number.isInteger(parsedLimit)) throw new BotRoomError(400, "limit must be a whole number.");
@@ -33530,7 +33530,7 @@ router$n.get("/messages", requireBotOrOwner, limitActor, wrap(async (req, res) =
   });
   res.json(result);
 }));
-router$n.post("/messages", requireBotOrOwner, limitActor, wrap(async (req, res) => {
+router$o.post("/messages", requireBotOrOwner, limitActor, wrap(async (req, res) => {
   const body = req.body && typeof req.body === "object" ? req.body : {};
   const message = await postBotRoomMessage({
     actor: actor$3(req),
@@ -33539,18 +33539,18 @@ router$n.post("/messages", requireBotOrOwner, limitActor, wrap(async (req, res) 
   });
   res.status(201).json({ message });
 }));
-router$n.post("/messages/:id/ack", requireBotOrOwner, limitActor, wrap(async (req, res) => {
+router$o.post("/messages/:id/ack", requireBotOrOwner, limitActor, wrap(async (req, res) => {
   const body = req.body && typeof req.body === "object" ? req.body : {};
   const message = await ackBotRoomMessage(req.params.id, actor$3(req), body);
   res.json({ message });
 }));
-router$n.get("/keys", wrap(async (req, res, next) => {
+router$o.get("/keys", wrap(async (req, res, next) => {
   await requireOwnerOrAdmin$1(req, res, next);
 }), wrap(async (_req, res) => {
   const keys = await listBotRoomKeys();
   res.json({ keys: keys.map(publicBotRoomKey) });
 }));
-router$n.post("/keys", wrap(async (req, res, next) => {
+router$o.post("/keys", wrap(async (req, res, next) => {
   await requireOwnerOrAdmin$1(req, res, next);
 }), wrap(async (req, res) => {
   const body = req.body && typeof req.body === "object" ? req.body : {};
@@ -33561,15 +33561,15 @@ router$n.post("/keys", wrap(async (req, res, next) => {
   });
   res.status(201).json(created);
 }));
-router$n.post("/keys/:id/revoke", wrap(async (req, res, next) => {
+router$o.post("/keys/:id/revoke", wrap(async (req, res, next) => {
   await requireOwnerOrAdmin$1(req, res, next);
 }), wrap(async (req, res) => {
   const record2 = await revokeBotRoomKey(req.params.id);
   res.json({ record: publicBotRoomKey(record2) });
 }));
-const router$m = Router();
+const router$n = Router();
 const db$9 = () => admin.firestore();
-router$m.get("/", requireStaff, async (req, res) => {
+router$n.get("/", requireStaff, async (req, res) => {
   try {
     const { status: status2, listingId, orderId, limit = "100" } = req.query;
     let q = db$9().collection("mediaJobs").orderBy("createdAt", "desc");
@@ -33583,7 +33583,7 @@ router$m.get("/", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch media jobs." });
   }
 });
-router$m.post("/", requireStaff, async (req, res) => {
+router$n.post("/", requireStaff, async (req, res) => {
   try {
     const {
       listingId,
@@ -33642,7 +33642,7 @@ router$m.post("/", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to create media job." });
   }
 });
-router$m.patch("/:id/status", requireCoordinator, async (req, res) => {
+router$n.patch("/:id/status", requireCoordinator, async (req, res) => {
   try {
     const { status: status2, resultItems = [], error = "", requiresHumanReview } = req.body;
     const valid = ["queued", "processing", "ready_for_review", "completed", "failed", "cancelled"];
@@ -33776,7 +33776,7 @@ async function moveMediaDelivery(input) {
     label: MEDIA_DELIVERY_LABELS[input.status]
   };
 }
-const router$l = Router();
+const router$m = Router();
 function adminReady$1(res) {
   if (admin.apps.length) return true;
   res.status(503).json({
@@ -33804,7 +33804,7 @@ function sendKnownError$1(res, err, fallback) {
   console.error("[Studio]", err);
   return res.status(500).json({ error: fallback });
 }
-router$l.get("/workspace", requireStaff, async (req, res) => {
+router$m.get("/workspace", requireStaff, async (req, res) => {
   if (!adminReady$1(res)) return;
   try {
     const listingId = typeof req.query.listingId === "string" ? req.query.listingId : "";
@@ -33826,7 +33826,7 @@ router$l.get("/workspace", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to load Studio.");
   }
 });
-router$l.get("/delivery-queue", requireStaff, async (req, res) => {
+router$m.get("/delivery-queue", requireStaff, async (req, res) => {
   if (!adminReady$1(res)) return;
   try {
     const rows = await listMediaDeliveryQueue({
@@ -33838,7 +33838,7 @@ router$l.get("/delivery-queue", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to load the delivery queue.");
   }
 });
-router$l.post("/delivery-queue/move", requireCoordinator, async (req, res) => {
+router$m.post("/delivery-queue/move", requireCoordinator, async (req, res) => {
   const galleryId = String(req.body?.galleryId || "").trim();
   const status2 = String(req.body?.status || "").trim();
   if (!/^[A-Za-z0-9_-]{8,128}$/.test(galleryId)) {
@@ -33875,7 +33875,7 @@ router$l.post("/delivery-queue/move", requireCoordinator, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to update delivery.");
   }
 });
-router$l.post("/order-edits", requireStaff, async (req, res) => {
+router$m.post("/order-edits", requireStaff, async (req, res) => {
   const listingId = String(req.body?.listingId || "").trim();
   if (!/^[A-Za-z0-9_-]{8,128}$/.test(listingId)) {
     return res.status(400).json({ error: "A valid listing id is required." });
@@ -33889,7 +33889,7 @@ router$l.post("/order-edits", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to queue the order edits.");
   }
 });
-router$l.post("/order-queue/tick", requireStaffOrQueueCron, async (req, res) => {
+router$m.post("/order-queue/tick", requireStaffOrQueueCron, async (req, res) => {
   let listingId = String(req.body?.listingId || "").trim();
   if (listingId && !/^[A-Za-z0-9_-]{8,128}$/.test(listingId)) {
     return res.status(400).json({ error: "A valid listing id is required." });
@@ -33919,7 +33919,7 @@ router$l.post("/order-queue/tick", requireStaffOrQueueCron, async (req, res) => 
     return sendKnownError$1(res, err, "Failed to advance the order edit queue.");
   }
 });
-router$l.post("/iconic-polish", requireStaff, async (req, res) => {
+router$m.post("/iconic-polish", requireStaff, async (req, res) => {
   const listingId = String(req.body?.listingId || "").trim();
   if (!/^[A-Za-z0-9_-]{8,128}$/.test(listingId)) {
     return res.status(400).json({ error: "A valid listing id is required." });
@@ -33936,7 +33936,7 @@ router$l.post("/iconic-polish", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to save Iconic Polish.");
   }
 });
-router$l.post("/ai-edit", requireStaff, async (req, res) => {
+router$m.post("/ai-edit", requireStaff, async (req, res) => {
   const parsed = parseAiEditRequest(req.body);
   if (parsed.ok === false) return res.status(400).json({ error: parsed.error });
   if (!adminReady$1(res)) return;
@@ -33956,7 +33956,7 @@ router$l.post("/ai-edit", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to enqueue the AI edit.");
   }
 });
-router$l.post("/adjust", requireStaff, async (req, res) => {
+router$m.post("/adjust", requireStaff, async (req, res) => {
   if (!adminReady$1(res)) return;
   try {
     const listingId = String(req.body?.listingId || "");
@@ -33979,7 +33979,7 @@ router$l.post("/adjust", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to save the adjustment.");
   }
 });
-router$l.post("/reject", requireStaff, async (req, res) => {
+router$m.post("/reject", requireStaff, async (req, res) => {
   if (!adminReady$1(res)) return;
   try {
     const listingId = String(req.body?.listingId || "");
@@ -33996,7 +33996,7 @@ router$l.post("/reject", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to reject the edit.");
   }
 });
-router$l.post("/approve", requireStaff, async (req, res) => {
+router$m.post("/approve", requireStaff, async (req, res) => {
   if (!adminReady$1(res)) return;
   try {
     const listingId = String(req.body?.listingId || "");
@@ -34081,8 +34081,8 @@ async function loadPhotographerPreview(staffId) {
     studioJobs
   };
 }
-const router$k = Router();
-router$k.get("/photographer-preview", requireAdmin, async (req, res) => {
+const router$l = Router();
+router$l.get("/photographer-preview", requireAdmin, async (req, res) => {
   const staffId = String(req.query.staffId || "").trim();
   if (!/^[A-Za-z0-9_-]{1,128}$/.test(staffId) || staffId === "demo-photographer") {
     return res.status(400).json({ error: "Choose a photographer." });
@@ -34214,16 +34214,16 @@ async function editScratchPhoto(input) {
     downloadName: scratchDownloadName(input.fileName || "scratch.jpg")
   };
 }
-const router$j = Router();
+const router$k = Router();
 function headerValue(value) {
   if (Array.isArray(value)) return value[0] || "";
   return value || "";
 }
-router$j.get("/", requireCoordinator, async (_req, res) => {
+router$k.get("/", requireCoordinator, async (_req, res) => {
   const grass = await grassReferenceStatus();
   return res.json({ grass, twilightPrompt: orderExteriorTwilightPrompt() });
 });
-router$j.post(
+router$k.post(
   "/",
   requireCoordinator,
   express.raw({ type: "image/jpeg", limit: "4mb" }),
@@ -34249,13 +34249,13 @@ router$j.post(
     }
   }
 );
-router$j.use((err, _req, res, next) => {
+router$k.use((err, _req, res, next) => {
   if (err?.type === "entity.too.large" || err?.status === 413) {
     return res.status(413).json({ error: "That photo is too large for the scratch pad. Export a smaller JPEG." });
   }
   return next(err);
 });
-const router$i = Router();
+const router$j = Router();
 const GOOGLE_KEY = process.env.GOOGLE_MAPS_API_KEY || "";
 function fromGoogle(p) {
   return {
@@ -34282,7 +34282,7 @@ function fromNominatim(r, idx) {
     secondary: parts.slice(1).join(", ")
   };
 }
-router$i.get("/autocomplete", async (req, res) => {
+router$j.get("/autocomplete", async (req, res) => {
   const input = (req.query.input || "").trim();
   if (!input || input.length < 2) {
     return res.json({ suggestions: [] });
@@ -34318,7 +34318,7 @@ router$i.get("/autocomplete", async (req, res) => {
     return res.json({ suggestions: [] });
   }
 });
-router$i.get("/distance", async (req, res) => {
+router$j.get("/distance", async (req, res) => {
   const destination = (req.query.destination || "").trim();
   const origin = (req.query.origin || process.env.STUDIO_ADDRESS || "The Woodlands, TX 77380").trim();
   if (!destination) {
@@ -34345,7 +34345,7 @@ router$i.get("/distance", async (req, res) => {
     return res.status(500).json({ error: "Failed to calculate distance." });
   }
 });
-const router$h = Router();
+const router$i = Router();
 const db$6 = () => admin.firestore();
 async function findOrderLikeDocument(id) {
   const orderRequestDoc = await db$6().collection("orderRequests").doc(id).get();
@@ -34354,7 +34354,7 @@ async function findOrderLikeDocument(id) {
   if (orderDoc.exists) return orderDoc;
   return null;
 }
-router$h.post("/send", requireStaff, async (req, res) => {
+router$i.post("/send", requireStaff, async (req, res) => {
   try {
     const { to, body, orderId } = req.body;
     if (!to || !body) return res.status(400).json({ error: "to and body required." });
@@ -34416,7 +34416,7 @@ router$h.post("/send", requireStaff, async (req, res) => {
     return res.status(500).json({ error: errorMessage });
   }
 });
-router$h.post("/remind/:orderId", requireStaff, async (req, res) => {
+router$i.post("/remind/:orderId", requireStaff, async (req, res) => {
   try {
     const { type = "24h" } = req.body;
     const orderDoc = await findOrderLikeDocument(req.params.orderId);
@@ -34458,7 +34458,7 @@ router$h.post("/remind/:orderId", requireStaff, async (req, res) => {
     return res.status(500).json({ error: errorMessage });
   }
 });
-router$h.post("/conversation", requireStaff, async (req, res) => {
+router$i.post("/conversation", requireStaff, async (req, res) => {
   try {
     const { orderId, photographerPhone, photographerName, clientPhone, clientName: clientName2 } = req.body;
     if (!orderId || !photographerPhone || !clientPhone) {
@@ -34510,7 +34510,7 @@ router$h.post("/conversation", requireStaff, async (req, res) => {
     return res.status(500).json({ error: errorMessage });
   }
 });
-router$h.get("/conversations", requireStaff, async (_req, res) => {
+router$i.get("/conversations", requireStaff, async (_req, res) => {
   try {
     const snapshot = await db$6().collection("conversations").orderBy("createdAt", "desc").limit(50).get();
     return res.json(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
@@ -34518,7 +34518,7 @@ router$h.get("/conversations", requireStaff, async (_req, res) => {
     return res.status(500).json({ error: "Failed to fetch conversations." });
   }
 });
-router$h.post("/conversation/:id/close", requireStaff, async (req, res) => {
+router$i.post("/conversation/:id/close", requireStaff, async (req, res) => {
   try {
     const convoDoc = await db$6().collection("conversations").doc(req.params.id).get();
     if (!convoDoc.exists) return res.status(404).json({ error: "Conversation not found." });
@@ -34530,7 +34530,7 @@ router$h.post("/conversation/:id/close", requireStaff, async (req, res) => {
     return res.status(500).json({ error: errorMessage });
   }
 });
-router$h.post("/webhook", express_raw_or_json, async (req, res) => {
+router$i.post("/webhook", express_raw_or_json, async (req, res) => {
   try {
     const authToken = process.env.TWILIO_AUTH_TOKEN;
     if (authToken && process.env.NODE_ENV === "production") {
@@ -34598,7 +34598,7 @@ router$h.post("/webhook", express_raw_or_json, async (req, res) => {
     return res.status(200).send("");
   }
 });
-router$h.post("/campaign/:id/send", requireCoordinator, async (req, res) => {
+router$i.post("/campaign/:id/send", requireCoordinator, async (req, res) => {
   try {
     const campaignDoc = await db$6().collection("campaigns").doc(req.params.id).get();
     if (!campaignDoc.exists) return res.status(404).json({ error: "Campaign not found." });
@@ -34641,7 +34641,7 @@ router$h.post("/campaign/:id/send", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: errorMessage });
   }
 });
-router$h.post("/opt-out", async (req, res) => {
+router$i.post("/opt-out", async (req, res) => {
   try {
     const { From, Body } = req.body;
     if (!From) return res.status(200).send("");
@@ -34664,7 +34664,7 @@ router$h.post("/opt-out", async (req, res) => {
 function express_raw_or_json(req, _res, next) {
   next();
 }
-const router$g = Router();
+const router$h = Router();
 const STAFF_INBOX_FALLBACK = "photos@iconicimagestx.com";
 const MAX_SUBJECT_LENGTH = 200;
 const MAX_MESSAGE_LENGTH = 4e3;
@@ -34692,7 +34692,7 @@ function contactFailureLog(error) {
   for (const secret2 of secrets) safe = safe.split(secret2).join("[redacted]");
   return safe.slice(0, 300);
 }
-router$g.post("/", async (req, res) => {
+router$h.post("/", async (req, res) => {
   try {
     const { name, email, subject, message, phone } = req.body ?? {};
     if (typeof name !== "string" || typeof email !== "string" || typeof subject !== "string" || typeof message !== "string" || !name.trim() || !email.trim() || !subject.trim() || !message.trim()) {
@@ -34753,10 +34753,10 @@ router$g.post("/", async (req, res) => {
     });
   }
 });
-const router$f = Router();
+const router$g = Router();
 const SENIOR_LIVING_RATE_WINDOW_MS = 15 * 60 * 1e3;
 const SENIOR_LIVING_RATE_MAX = 5;
-const limiter$2 = createRateLimiter({
+const limiter$3 = createRateLimiter({
   windowMs: SENIOR_LIVING_RATE_WINDOW_MS,
   max: SENIOR_LIVING_RATE_MAX
 });
@@ -34774,11 +34774,11 @@ async function nextInvoiceNumber$1() {
     return `INV-${year}-${String(Date.now()).slice(-6)}`;
   }
 }
-router$f.get("/config", (_req, res) => {
+router$g.get("/config", (_req, res) => {
   res.json({ depositCheckoutLive: seniorDepositCheckoutLive() });
 });
-router$f.post("/order", async (req, res) => {
-  const limit = limiter$2.check(clientIp(req));
+router$g.post("/order", async (req, res) => {
+  const limit = limiter$3.check(clientIp(req));
   if (!limit.allowed) {
     res.setHeader("Retry-After", String(limit.retryAfterSec));
     return res.status(429).json({
@@ -35055,8 +35055,8 @@ router$f.post("/order", async (req, res) => {
     });
   }
 });
-router$f.post("/", async (req, res) => {
-  const limit = limiter$2.check(clientIp(req));
+router$g.post("/", async (req, res) => {
+  const limit = limiter$3.check(clientIp(req));
   if (!limit.allowed) {
     res.setHeader("Retry-After", String(limit.retryAfterSec));
     return res.status(429).json({
@@ -35101,8 +35101,8 @@ router$f.post("/", async (req, res) => {
     });
   }
 });
-const router$e = Router();
-const limiter$1 = createRateLimiter({
+const router$f = Router();
+const limiter$2 = createRateLimiter({
   windowMs: 15 * 60 * 1e3,
   max: 5
 });
@@ -35138,7 +35138,7 @@ function publicAvailability(result, packageId) {
     fallback: result.available ? null : APPRENTICESHIP_CALENDAR_FALLBACK
   };
 }
-router$e.get("/config", (_req, res) => {
+router$f.get("/config", (_req, res) => {
   res.json({ depositCheckoutLive: seniorDepositCheckoutLive() });
 });
 function cronAuthorized$1(req) {
@@ -35156,9 +35156,9 @@ async function releaseHolds(req, res) {
     return res.status(500).json({ error: "Hold release failed." });
   }
 }
-router$e.get("/release-holds", releaseHolds);
-router$e.post("/release-holds", releaseHolds);
-router$e.get("/slots", async (req, res) => {
+router$f.get("/release-holds", releaseHolds);
+router$f.post("/release-holds", releaseHolds);
+router$f.get("/slots", async (req, res) => {
   const packageId = typeof req.query.package === "string" ? req.query.package : "apprentice-25";
   if (!findApprenticeshipPackage(packageId)) {
     return res.status(400).json({ error: "Choose an apprenticeship package." });
@@ -35167,7 +35167,7 @@ router$e.get("/slots", async (req, res) => {
   const result = await readApprenticeshipAvailability({ packageId });
   return res.json(publicAvailability(result, packageId));
 });
-router$e.get("/setup", requireStaff, async (_req, res) => {
+router$f.get("/setup", requireStaff, async (_req, res) => {
   const hours = apprenticeshipHoursFromEnv();
   const result = await readApprenticeshipAvailability({ packageId: "apprentice-25" });
   return res.json({
@@ -35183,8 +35183,8 @@ router$e.get("/setup", requireStaff, async (_req, res) => {
     }
   });
 });
-router$e.post("/order", async (req, res) => {
-  const limit = limiter$1.check(clientIp(req));
+router$f.post("/order", async (req, res) => {
+  const limit = limiter$2.check(clientIp(req));
   if (!limit.allowed) {
     res.setHeader("Retry-After", String(limit.retryAfterSec));
     return res.status(429).json({
@@ -35623,12 +35623,12 @@ async function deliverLiveChat(input, options = {}) {
     notConfigured ? "not_configured" : "failed"
   );
 }
-const router$d = Router();
+const router$e = Router();
 const liveChatLimiter = createRateLimiter({
   windowMs: LIVE_CHAT_WINDOW_MS,
   max: LIVE_CHAT_MAX_PER_WINDOW
 });
-router$d.post("/live-chat", async (req, res) => {
+router$e.post("/live-chat", async (req, res) => {
   const parsed = parseLiveChatBody(req.body);
   if (parsed.ok === false) {
     return res.status(400).json({ error: parsed.error });
@@ -35936,7 +35936,7 @@ async function alertStaffOfVisitorThread(threadId, input) {
     console.error("[ContactThread] Staff alert failed.", error);
   }
 }
-const router$c = Router();
+const router$d = Router();
 const THREAD_ID_RE = /^[a-f0-9]{32}$/;
 const postLimiter = createRateLimiter({
   windowMs: LIVE_CHAT_WINDOW_MS,
@@ -35950,7 +35950,7 @@ function threadToken(req) {
   const header2 = req.header("x-contact-thread-token");
   return typeof header2 === "string" ? header2.trim() : "";
 }
-router$c.get("/staff/threads", requireCoordinator, async (_req, res) => {
+router$d.get("/staff/threads", requireCoordinator, async (_req, res) => {
   try {
     const threads = await listContactThreads();
     return res.json({ threads });
@@ -35959,7 +35959,7 @@ router$c.get("/staff/threads", requireCoordinator, async (_req, res) => {
     return res.status(500).json({ error: "Couldn't load contact chats." });
   }
 });
-router$c.post("/staff/threads/:id/reply", requireCoordinator, async (req, res) => {
+router$d.post("/staff/threads/:id/reply", requireCoordinator, async (req, res) => {
   const id = routeParam(req.params.id);
   if (!THREAD_ID_RE.test(id)) {
     return res.status(404).json({ error: "Conversation not found." });
@@ -35980,7 +35980,7 @@ router$c.post("/staff/threads/:id/reply", requireCoordinator, async (req, res) =
     return res.status(500).json({ error: "Couldn't save the reply." });
   }
 });
-router$c.get("/threads/:id", async (req, res) => {
+router$d.get("/threads/:id", async (req, res) => {
   const id = routeParam(req.params.id);
   const token = threadToken(req);
   if (!THREAD_ID_RE.test(id) || !token) {
@@ -35995,7 +35995,7 @@ router$c.get("/threads/:id", async (req, res) => {
     return res.status(500).json({ error: "Couldn't load this chat." });
   }
 });
-router$c.post("/threads", async (req, res) => {
+router$d.post("/threads", async (req, res) => {
   const parsed = parseLiveChatBody(req.body);
   if (parsed.ok === false) {
     return res.status(400).json({ error: parsed.error });
@@ -36583,15 +36583,15 @@ function mergeFlag(current, patch, now) {
 function flagDocId(threadKeyValue) {
   return threadKeyValue.replace(/\//g, "_");
 }
-const memory$3 = /* @__PURE__ */ new Map();
+const memory$4 = /* @__PURE__ */ new Map();
 function firestoreOn$1() {
   return admin.apps.length > 0 && process.env.NODE_ENV !== "test";
 }
 function bucket$1(uid) {
-  const found = memory$3.get(uid);
+  const found = memory$4.get(uid);
   if (found) return found;
   const created = /* @__PURE__ */ new Map();
-  memory$3.set(uid, created);
+  memory$4.set(uid, created);
   return created;
 }
 async function listFlags(uid) {
@@ -37128,7 +37128,7 @@ function actorFromClient(uid, email) {
     permissions: null
   };
 }
-const router$b = Router();
+const router$c = Router();
 const AUDIENCES = /* @__PURE__ */ new Set(["clients", "leads", "photographers", "socials"]);
 function ownerEmails() {
   return ownerAllowlist(process.env.OWNER_EMAILS);
@@ -37183,7 +37183,7 @@ async function portalScope(req) {
     return { kind: "client", uid, email, phone: "" };
   }
 }
-router$b.get("/threads", requireCoordinator, async (req, res) => {
+router$c.get("/threads", requireCoordinator, async (req, res) => {
   const audience = typeof req.query.audience === "string" ? req.query.audience : "";
   const q = typeof req.query.q === "string" ? req.query.q : "";
   try {
@@ -37195,7 +37195,7 @@ router$b.get("/threads", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Couldn't load conversations." });
   }
 });
-router$b.get("/mine", requireAuth, async (req, res) => {
+router$c.get("/mine", requireAuth, async (req, res) => {
   try {
     const scope = await portalScope(req);
     const threads = threadsForPortal(await listUnifiedThreads(), scope);
@@ -37205,7 +37205,7 @@ router$b.get("/mine", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Couldn't load your messages." });
   }
 });
-router$b.post("/mine/reply", requireAuth, async (req, res) => {
+router$c.post("/mine/reply", requireAuth, async (req, res) => {
   const threadId = typeof req.body?.threadId === "string" ? req.body.threadId.trim() : "";
   const content = typeof req.body?.body === "string" ? req.body.body.trim() : "";
   if (!threadId || !content) return res.status(400).json({ error: "Choose a thread and enter a reply." });
@@ -37240,7 +37240,7 @@ router$b.post("/mine/reply", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Couldn't save the reply." });
   }
 });
-router$b.get("/mine/flags", requireAuth, async (req, res) => {
+router$c.get("/mine/flags", requireAuth, async (req, res) => {
   try {
     const who = await resolveDeskActor(req.user?.uid || "", req.user?.email || "");
     if (!who) return res.status(403).json({ error: "Sign in to see messages." });
@@ -37251,7 +37251,7 @@ router$b.get("/mine/flags", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Couldn't load your message folders." });
   }
 });
-router$b.post("/mine/flags", requireAuth, async (req, res) => {
+router$c.post("/mine/flags", requireAuth, async (req, res) => {
   const patches = patchesFromBody(req.body);
   if (!patches) return res.status(400).json({ error: "Choose a conversation to update." });
   try {
@@ -37293,7 +37293,7 @@ async function conversationVisible(scope, id) {
   const thread = await findUnifiedThread(id);
   return Boolean(thread && threadVisibleTo(thread, scope));
 }
-router$b.post("/reply", requireCoordinator, async (req, res) => {
+router$c.post("/reply", requireCoordinator, async (req, res) => {
   const threadId = typeof req.body?.threadId === "string" ? req.body.threadId.trim() : "";
   const channel = req.body?.channel === "sms" ? "sms" : req.body?.channel === "email" ? "email" : "";
   const content = typeof req.body?.body === "string" ? req.body.body.trim() : "";
@@ -37363,7 +37363,7 @@ router$b.post("/reply", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Couldn't send the reply." });
   }
 });
-router$b.get("/assist/status", requireOwnerOrAdmin, (_req, res) => {
+router$c.get("/assist/status", requireOwnerOrAdmin, (_req, res) => {
   const status2 = assistantStatus();
   return res.json({
     openai: status2.openai,
@@ -37372,7 +37372,7 @@ router$b.get("/assist/status", requireOwnerOrAdmin, (_req, res) => {
     openaiNotice: status2.openaiNotice
   });
 });
-router$b.post("/assist", requireOwnerOrAdmin, async (req, res) => {
+router$c.post("/assist", requireOwnerOrAdmin, async (req, res) => {
   const provider = req.body?.provider === "grok" ? "grok" : req.body?.provider === "openai" ? "openai" : "";
   if (!provider) return res.status(400).json({ error: "Choose Grok or OpenAI." });
   const messages = parseAssistantTurns(req.body);
@@ -37381,7 +37381,7 @@ router$b.post("/assist", requireOwnerOrAdmin, async (req, res) => {
   if (result.ok === false) return res.status(result.status).json({ error: result.message, enabled: false });
   return res.json({ reply: result.reply });
 });
-const router$a = Router();
+const router$b = Router();
 function kindOf(value) {
   return PERSON_KINDS.includes(value) ? value : null;
 }
@@ -37392,77 +37392,77 @@ function folderOf(value) {
 async function actor$2(req) {
   return resolveDeskActor(req.user?.uid || "", req.user?.email || "");
 }
-router$a.get("/directory", requireAuth, async (req, res) => {
+router$b.get("/directory", requireAuth, async (req, res) => {
   const who = await actor$2(req);
   if (!who) return res.status(403).json({ error: "Sign in to see people." });
   const result = await directory(who, String(req.query.q || ""), String(req.query.role || ""));
   if ("error" in result && result.error) return res.status(result.status).json({ error: result.error });
   return res.json(result);
 });
-router$a.get("/permissions", requireAuth, async (req, res) => {
+router$b.get("/permissions", requireAuth, async (req, res) => {
   const who = await actor$2(req);
   if (!who) return res.status(403).json({ error: "Sign in to see permissions." });
   const result = await permissionRoster(who);
   if ("error" in result && result.error) return res.status(result.status).json({ error: result.error });
   return res.json(result);
 });
-router$a.put("/permissions/:staffId", requireAuth, async (req, res) => {
+router$b.put("/permissions/:staffId", requireAuth, async (req, res) => {
   const who = await actor$2(req);
   if (!who) return res.status(403).json({ error: "Sign in to change permissions." });
   const result = await savePermission(who, req.params.staffId, String(req.body?.role || ""), req.body?.permissions);
   if ("error" in result && result.error) return res.status(result.status).json({ error: result.error });
   return res.json(result);
 });
-router$a.get("/groups", requireAuth, async (req, res) => {
+router$b.get("/groups", requireAuth, async (req, res) => {
   const who = await actor$2(req);
   if (!who) return res.status(403).json({ error: "Sign in to see groups." });
   const result = await groupsFor(who);
   if ("error" in result && result.error) return res.status(result.status).json({ error: result.error });
   return res.json(result);
 });
-router$a.post("/groups", requireAuth, async (req, res) => {
+router$b.post("/groups", requireAuth, async (req, res) => {
   const who = await actor$2(req);
   if (!who) return res.status(403).json({ error: "Sign in to add a group." });
   const result = await saveGroup(who, null, req.body);
   if ("error" in result && result.error) return res.status(result.status).json({ error: result.error });
   return res.status(201).json(result);
 });
-router$a.get("/groups/:id", requireAuth, async (req, res) => {
+router$b.get("/groups/:id", requireAuth, async (req, res) => {
   const who = await actor$2(req);
   if (!who) return res.status(403).json({ error: "Sign in to see this group." });
   const result = await groupFor(who, req.params.id);
   if ("error" in result && result.error) return res.status(result.status).json({ error: result.error });
   return res.json(result);
 });
-router$a.patch("/groups/:id", requireAuth, async (req, res) => {
+router$b.patch("/groups/:id", requireAuth, async (req, res) => {
   const who = await actor$2(req);
   if (!who) return res.status(403).json({ error: "Sign in to edit this group." });
   const result = await saveGroup(who, req.params.id, req.body);
   if ("error" in result && result.error) return res.status(result.status).json({ error: result.error });
   return res.json(result);
 });
-router$a.get("/inbox", requireAuth, async (req, res) => {
+router$b.get("/inbox", requireAuth, async (req, res) => {
   const who = await actor$2(req);
   if (!who) return res.status(403).json({ error: "Sign in to see messages." });
   const result = await inboxFor(who, folderOf(req.query.folder));
   if ("error" in result && result.error) return res.status(result.status).json({ error: result.error });
   return res.json(result);
 });
-router$a.post("/inbox/draft", requireAuth, async (req, res) => {
+router$b.post("/inbox/draft", requireAuth, async (req, res) => {
   const who = await actor$2(req);
   if (!who) return res.status(403).json({ error: "Sign in to save a draft." });
   const result = await saveInboxDraft(who, req.body || {});
   if ("error" in result && result.error) return res.status(result.status).json({ error: result.error });
   return res.status(201).json(result);
 });
-router$a.post("/inbox/send", requireAuth, async (req, res) => {
+router$b.post("/inbox/send", requireAuth, async (req, res) => {
   const who = await actor$2(req);
   if (!who) return res.status(403).json({ error: "Sign in to send a message." });
   const result = await sendInbox(who, req.body || {});
   if ("error" in result && result.error) return res.status(result.status).json({ error: result.error });
   return res.status(201).json(result);
 });
-router$a.post("/inbox/:id/reply", requireAuth, async (req, res) => {
+router$b.post("/inbox/:id/reply", requireAuth, async (req, res) => {
   const who = await actor$2(req);
   if (!who) return res.status(403).json({ error: "Sign in to reply." });
   const body = typeof req.body?.body === "string" ? req.body.body : "";
@@ -37470,7 +37470,7 @@ router$a.post("/inbox/:id/reply", requireAuth, async (req, res) => {
   if ("error" in result && result.error) return res.status(result.status).json({ error: result.error });
   return res.status(201).json(result);
 });
-router$a.post("/inbox/:id/folder", requireAuth, async (req, res) => {
+router$b.post("/inbox/:id/folder", requireAuth, async (req, res) => {
   const who = await actor$2(req);
   if (!who) return res.status(403).json({ error: "Sign in to file this message." });
   const folder = req.body?.folder;
@@ -37481,7 +37481,7 @@ router$a.post("/inbox/:id/folder", requireAuth, async (req, res) => {
   if ("error" in result && result.error) return res.status(result.status).json({ error: result.error });
   return res.json(result);
 });
-router$a.get("/:kind/:id", requireAuth, async (req, res) => {
+router$b.get("/:kind/:id", requireAuth, async (req, res) => {
   const kind = kindOf(req.params.kind);
   if (!kind) return res.status(404).json({ error: "Profile not found." });
   const who = await actor$2(req);
@@ -37491,7 +37491,7 @@ router$a.get("/:kind/:id", requireAuth, async (req, res) => {
   if ("error" in result && result.error) return res.status(result.status).json({ error: result.error });
   return res.json(result);
 });
-router$a.patch("/:kind/:id/settings", requireAuth, async (req, res) => {
+router$b.patch("/:kind/:id/settings", requireAuth, async (req, res) => {
   const kind = kindOf(req.params.kind);
   if (!kind) return res.status(404).json({ error: "Profile not found." });
   const who = await actor$2(req);
@@ -37670,12 +37670,6 @@ const PUBLIC_PAGES = [
     file: "seo/insights.html",
     title: "Iconic Insights | Iconic Images",
     description: "Field notes from Iconic Images on listing photography, video, and marketing in Spring, The Woodlands, and Houston."
-  },
-  {
-    path: "/news",
-    file: "seo/news.html",
-    title: "News | Iconic Images",
-    description: "Newsletters and promos from Iconic Images in Spring, The Woodlands, and Houston."
   },
   {
     path: "/book",
@@ -38107,7 +38101,7 @@ ${next}`;
 function escapeHtml$2(value) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
-const router$9 = Router();
+const router$a = Router();
 const db$2 = () => admin.firestore();
 function originOf(req) {
   const configured = process.env.APP_URL;
@@ -38151,7 +38145,7 @@ async function loadPresentation(token, origin) {
   const galleries = await galleriesForListing(listing.id, listing);
   return buildPresentation({ token, listing, galleries, origin });
 }
-router$9.get("/presentations/:token", async (req, res) => {
+router$a.get("/presentations/:token", async (req, res) => {
   const token = String(req.params.token || "");
   if (!isPresentationToken(token)) {
     return res.status(400).json({ error: "That presentation link is not valid." });
@@ -38176,7 +38170,7 @@ async function renderPresentationShell(token, origin) {
     if (!presentation) {
       return { status: 404, html: "<!doctype html><title>Presentation</title><p>This presentation link is not active.</p>" };
     }
-    const shell2 = await readSpaShell$4();
+    const shell2 = await readSpaShell$3();
     const html = shell2 ? injectPresentationMeta(shell2, presentation.meta) : standalonePresentation(presentation);
     return { status: 200, html };
   } catch (err) {
@@ -38188,8 +38182,8 @@ const handlePresentationShell = async (req, res) => {
   const rendered = await renderPresentationShell(String(req.params.token || ""), originOf(req));
   res.status(rendered.status).type("html").send(rendered.html);
 };
-router$9.get("/presentations/shell/:token", handlePresentationShell);
-router$9.post("/listings/:id/presentation", requireStaff, async (req, res) => {
+router$a.get("/presentations/shell/:token", handlePresentationShell);
+router$a.post("/listings/:id/presentation", requireStaff, async (req, res) => {
   const listingId = String(req.params.id || "");
   if (!/^[A-Za-z0-9_-]{8,128}$/.test(listingId)) {
     return res.status(400).json({ error: "A valid listing id is required." });
@@ -38238,7 +38232,7 @@ router$9.post("/listings/:id/presentation", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "The presentation link could not be saved." });
   }
 });
-async function readSpaShell$4() {
+async function readSpaShell$3() {
   const candidates = [
     path$1.join(process.cwd(), "dist/spa/index.html")
   ];
@@ -38294,7 +38288,7 @@ function escapeHtml$1(value) {
 function escapeAttr(value) {
   return escapeHtml$1(value).replace(/"/g, "&quot;");
 }
-const memory$2 = /* @__PURE__ */ new Map();
+const memory$3 = /* @__PURE__ */ new Map();
 function useMemory() {
   return !admin.apps.length || process.env.NODE_ENV === "test" || process.env.LISTING_SITE_STORE === "memory";
 }
@@ -38325,7 +38319,7 @@ async function withClientProfile(listing) {
 async function readPublishedListingSite(slug) {
   if (!isListingSiteSlug(slug)) return null;
   if (useMemory()) {
-    for (const listing of memory$2.values()) {
+    for (const listing of memory$3.values()) {
       const site = buildPublicListingSite(await withClientProfile(listing));
       if (site?.slug === slug) return site;
     }
@@ -38342,7 +38336,7 @@ async function readPublishedListingSite(slug) {
 async function saveListingSiteInquiry(slug, inquiry) {
   if (!isListingSiteSlug(slug)) return false;
   if (useMemory()) {
-    for (const listing of memory$2.values()) {
+    for (const listing of memory$3.values()) {
       const site = buildPublicListingSite(listing);
       if (site?.slug !== slug) continue;
       const existing = Array.isArray(listing.listingSiteInquiries) ? listing.listingSiteInquiries : [];
@@ -38377,7 +38371,7 @@ async function renderListingSiteShell(slug) {
     if (!site) {
       return { status: 404, html: "<!doctype html><title>Listing</title><p>This listing site is not published.</p>" };
     }
-    const shell2 = readSpaShell$3();
+    const shell2 = readSpaShell$2();
     if (shell2) return { status: 200, html: shell2 };
     return {
       status: 200,
@@ -38423,7 +38417,7 @@ const handleListingSiteInquiry = async (req, res) => {
     return res.status(500).json({ error: "The request could not be saved." });
   }
 };
-function readSpaShell$3() {
+function readSpaShell$2() {
   const candidates = [
     path.resolve(process.cwd(), "dist/spa/index.html"),
     path.resolve(process.cwd(), "dist/index.html")
@@ -38436,7 +38430,7 @@ function readSpaShell$3() {
 function escapeHtml(value) {
   return value.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch] || ch);
 }
-const router$8 = Router();
+const router$9 = Router();
 function adminReady(res) {
   if (admin.apps.length) return true;
   res.status(503).json({ error: "Firebase Admin is not configured. Set FIREBASE_SERVICE_ACCOUNT." });
@@ -38468,13 +38462,13 @@ async function advance(req, res, to) {
     return sendKnownError(res, err, "Could not update that edit request.");
   }
 }
-router$8.post("/listings/:id/photo-edit-requests/:requestId/sent", requireStaff, async (req, res) => {
+router$9.post("/listings/:id/photo-edit-requests/:requestId/sent", requireStaff, async (req, res) => {
   return advance(req, res, "sent_out");
 });
-router$8.post("/listings/:id/photo-edit-requests/:requestId/received", requireStaff, async (req, res) => {
+router$9.post("/listings/:id/photo-edit-requests/:requestId/received", requireStaff, async (req, res) => {
   return advance(req, res, "received_back");
 });
-router$8.post("/listings/:id/photo-edit-requests/:requestId/replacement", requireStaff, async (req, res) => {
+router$9.post("/listings/:id/photo-edit-requests/:requestId/replacement", requireStaff, async (req, res) => {
   if (!adminReady(res)) return;
   const listingId = portalListingId(req.params.id);
   const requestId = typeof req.params.requestId === "string" ? req.params.requestId.trim() : "";
@@ -38662,8 +38656,8 @@ function decode(data) {
     return "";
   }
 }
-const router$7 = Router();
-router$7.get("/inbox", requireAdmin, async (_req, res) => {
+const router$8 = Router();
+router$8.get("/inbox", requireAdmin, async (_req, res) => {
   const snapshot = await readPhotosInbox(process.env);
   return res.json(snapshot);
 });
@@ -38945,7 +38939,7 @@ async function handleOwnersPage(req, res) {
     }
     return res.status(404).type("html").send(NOT_FOUND_HTML);
   }
-  const html = injectDevPreamble(injectRobots(await readSpaShell$2() || FALLBACK_SHELL));
+  const html = injectDevPreamble(injectRobots(await readSpaShell$1() || FALLBACK_SHELL));
   return res.status(200).type("html").send(html);
 }
 function hasBearer(req) {
@@ -38986,7 +38980,7 @@ function injectRobots(html) {
   }
   return `<!doctype html>${robots}${next}`;
 }
-async function readSpaShell$2() {
+async function readSpaShell$1() {
   const source = path$1.join(process.cwd(), "index.html");
   const dist = path$1.join(process.cwd(), "dist/spa/index.html");
   const preferred = process.env.ICONIC_VITE_DEV === "1" ? [source, dist] : [dist, source];
@@ -39169,7 +39163,6 @@ const PAGES = [
       linkItem("pricing", "Pricing", "/pricing"),
       linkItem("portfolio", "Portfolio", "/portfolio"),
       linkItem("insights", "Insights", "/insights"),
-      linkItem("news", "News", "/news"),
       linkItem("stock", "Stock Footage", "/stock-footage"),
       linkItem("contact", "Contact Us", "/contact")
     ]),
@@ -39186,7 +39179,6 @@ const PAGES = [
       linkItem("socials", "Socials", "/socials"),
       linkItem("portfolio", "Portfolio", "/portfolio"),
       linkItem("insights", "Insights", "/insights"),
-      linkItem("news", "News", "/news"),
       linkItem("studio", "Studio 105", "/studio-105"),
       linkItem("contact", "Contact Us", "/contact"),
       linkItem("login", "Client Login", "/login")
@@ -39701,7 +39693,7 @@ function mergeContent(overlay2) {
     blocks
   });
 }
-const memory$1 = { published: {}, drafts: {} };
+const memory$2 = { published: {}, drafts: {} };
 const filePath = path$1.join(os.tmpdir(), "iconic-site-content.json");
 function siteContentUsesMemory() {
   return process.env.NODE_ENV === "test" || process.env.SITE_CONTENT_STORE === "memory" || !admin.apps.length;
@@ -39724,7 +39716,7 @@ async function writeFileStore(next) {
 async function listPublished() {
   if (siteContentUsesMemory()) {
     if (process.env.NODE_ENV === "test" || process.env.SITE_CONTENT_STORE === "memory") {
-      return Object.values(memory$1.published).map((page2) => stripPage(page2));
+      return Object.values(memory$2.published).map((page2) => stripPage(page2));
     }
     const stored = await readFileStore();
     return Object.values(stored.published).map((page2) => stripPage(page2));
@@ -39735,7 +39727,7 @@ async function listPublished() {
 async function readPublished(id) {
   if (siteContentUsesMemory()) {
     if (process.env.NODE_ENV === "test" || process.env.SITE_CONTENT_STORE === "memory") {
-      return memory$1.published[id] ? clone$1(memory$1.published[id]) : null;
+      return memory$2.published[id] ? clone$1(memory$2.published[id]) : null;
     }
     const stored = await readFileStore();
     return stored.published[id] ? clone$1(stored.published[id]) : null;
@@ -39746,7 +39738,7 @@ async function readPublished(id) {
 async function writePublished(page2) {
   if (siteContentUsesMemory()) {
     if (process.env.NODE_ENV === "test" || process.env.SITE_CONTENT_STORE === "memory") {
-      memory$1.published[page2.id] = clone$1(page2);
+      memory$2.published[page2.id] = clone$1(page2);
       return;
     }
     const stored = await readFileStore();
@@ -39759,7 +39751,7 @@ async function writePublished(page2) {
 async function readDraft(id) {
   if (siteContentUsesMemory()) {
     if (process.env.NODE_ENV === "test" || process.env.SITE_CONTENT_STORE === "memory") {
-      return memory$1.drafts[id] ? clone$1(memory$1.drafts[id]) : null;
+      return memory$2.drafts[id] ? clone$1(memory$2.drafts[id]) : null;
     }
     const stored = await readFileStore();
     return stored.drafts[id] ? clone$1(stored.drafts[id]) : null;
@@ -39771,7 +39763,7 @@ async function writeDraft(page2, meta) {
   const stored = { ...stripPage(page2), savedAt: meta.at, savedByUid: meta.byUid, savedByName: meta.byName };
   if (siteContentUsesMemory()) {
     if (process.env.NODE_ENV === "test" || process.env.SITE_CONTENT_STORE === "memory") {
-      memory$1.drafts[page2.id] = clone$1(stripPage(page2));
+      memory$2.drafts[page2.id] = clone$1(stripPage(page2));
       return;
     }
     const file = await readFileStore();
@@ -39784,7 +39776,7 @@ async function writeDraft(page2, meta) {
 async function deleteDraft(id) {
   if (siteContentUsesMemory()) {
     if (process.env.NODE_ENV === "test" || process.env.SITE_CONTENT_STORE === "memory") {
-      delete memory$1.drafts[id];
+      delete memory$2.drafts[id];
       return;
     }
     const stored = await readFileStore();
@@ -39796,7 +39788,7 @@ async function deleteDraft(id) {
 }
 async function listDraftIds() {
   if (siteContentUsesMemory()) {
-    if (process.env.NODE_ENV === "test" || process.env.SITE_CONTENT_STORE === "memory") return Object.keys(memory$1.drafts);
+    if (process.env.NODE_ENV === "test" || process.env.SITE_CONTENT_STORE === "memory") return Object.keys(memory$2.drafts);
     const stored = await readFileStore();
     return Object.keys(stored.drafts);
   }
@@ -39921,7 +39913,7 @@ async function importDropboxFile(rawUrl) {
   }
   throw new Error("Dropbox redirected too many times.");
 }
-const router$6 = Router();
+const router$7 = Router();
 function actor$1(req) {
   const email = req.user?.email || "";
   const name = email === "temp-admin@iconicimagestx.com" ? "Temporary Admin" : email || req.user?.uid || "Staff";
@@ -39988,18 +39980,18 @@ async function workspacePage(id) {
   const draft = await readDraft(id);
   return mergeContent(draft || (published ? stripPage(published) : base));
 }
-router$6.get("/", async (_req, res) => {
+router$7.get("/", async (_req, res) => {
   const pages = (await listPublished()).map((page2) => mergeContent(page2)).filter((page2) => Boolean(page2));
   return res.json({ pages });
 });
-router$6.get("/blob/:id", (req, res) => {
+router$7.get("/blob/:id", (req, res) => {
   const blob = siteMediaBlob(req.params.id);
   if (!blob) return res.status(404).json({ error: "File not found." });
   res.setHeader("Content-Type", blob.type);
   res.setHeader("Cache-Control", "public, max-age=3600");
   return res.send(blob.body);
 });
-router$6.get("/workspace", gate("view"), async (req, res) => {
+router$7.get("/workspace", gate("view"), async (req, res) => {
   const editorReq = req;
   const ids = knownPageIds();
   const pages = [];
@@ -40021,7 +40013,7 @@ router$6.get("/workspace", gate("view"), async (req, res) => {
     draftIds
   });
 });
-router$6.put("/:id", gate("edit"), async (req, res) => {
+router$7.put("/:id", gate("edit"), async (req, res) => {
   const id = req.params.id;
   if (!defaultPage(id)) return res.status(404).json({ error: "Unknown page." });
   const merged = mergeContent({ ...req.body, id });
@@ -40030,14 +40022,14 @@ router$6.put("/:id", gate("edit"), async (req, res) => {
   await writeDraft(merged, { at: (/* @__PURE__ */ new Date()).toISOString(), byUid: who.uid, byName: who.name });
   return res.json({ page: merged });
 });
-router$6.post("/:id/discard", gate("edit"), async (req, res) => {
+router$7.post("/:id/discard", gate("edit"), async (req, res) => {
   const id = req.params.id;
   if (!defaultPage(id)) return res.status(404).json({ error: "Unknown page." });
   await deleteDraft(id);
   const page2 = await workspacePage(id);
   return res.json({ page: page2 });
 });
-router$6.post("/:id/release", gate("publish"), async (req, res) => {
+router$7.post("/:id/release", gate("publish"), async (req, res) => {
   const id = req.params.id;
   if (!defaultPage(id)) return res.status(404).json({ error: "Unknown page." });
   const draft = await readDraft(id);
@@ -40058,7 +40050,7 @@ router$6.post("/:id/release", gate("publish"), async (req, res) => {
   await deleteDraft(id);
   return res.json({ page: stripPage(source), publishedAt: now, publishedByName: who.name });
 });
-router$6.post("/release-all", gate("publish"), async (req, res) => {
+router$7.post("/release-all", gate("publish"), async (req, res) => {
   const who = actor$1(req);
   const publishedIds = [];
   for (const id of await listDraftIds()) {
@@ -40079,7 +40071,7 @@ router$6.post("/release-all", gate("publish"), async (req, res) => {
   }
   return res.json({ publishedIds });
 });
-router$6.post("/:id/revert", gate("publish"), async (req, res) => {
+router$7.post("/:id/revert", gate("publish"), async (req, res) => {
   const id = req.params.id;
   if (!defaultPage(id)) return res.status(404).json({ error: "Unknown page." });
   const current = await readPublished(id);
@@ -40104,7 +40096,7 @@ function mediaFolder(pageIdRaw) {
   if (defaultPage(pageId)) return pageId;
   return null;
 }
-router$6.post("/media", gate("edit"), async (req, res) => {
+router$7.post("/media", gate("edit"), async (req, res) => {
   try {
     const folder = mediaFolder(req.body?.pageId);
     if (!folder) return res.status(404).json({ error: "Unknown page." });
@@ -40118,7 +40110,7 @@ router$6.post("/media", gate("edit"), async (req, res) => {
     return res.status(status2).json({ error: err instanceof Error ? err.message : "Upload failed." });
   }
 });
-router$6.post("/dropbox", gate("edit"), async (req, res) => {
+router$7.post("/dropbox", gate("edit"), async (req, res) => {
   try {
     const folder = mediaFolder(req.body?.pageId);
     if (!folder) return res.status(404).json({ error: "Unknown page." });
@@ -40476,7 +40468,7 @@ function claimSlug(desired, selfId, posts) {
   }
   return `${stem}-${Date.now().toString(36)}`;
 }
-const memory = /* @__PURE__ */ new Map();
+const memory$1 = /* @__PURE__ */ new Map();
 function insightsUseMemory() {
   return process.env.NODE_ENV === "test" || process.env.INSIGHTS_STORE === "memory" || !admin.apps.length;
 }
@@ -40487,7 +40479,7 @@ function byUpdated(posts) {
   return posts.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 async function listInsights() {
-  if (insightsUseMemory()) return byUpdated([...memory.values()].map(clone));
+  if (insightsUseMemory()) return byUpdated([...memory$1.values()].map(clone));
   const snap = await admin.firestore().collection(INSIGHT_COLLECTION).get();
   const posts = [];
   for (const doc of snap.docs) {
@@ -40498,7 +40490,7 @@ async function listInsights() {
 }
 async function listPublishedInsights() {
   if (insightsUseMemory()) {
-    return [...memory.values()].filter((post) => post.status === "published").sort((a, b) => (b.publishedAt || "").localeCompare(a.publishedAt || "")).map(clone);
+    return [...memory$1.values()].filter((post) => post.status === "published").sort((a, b) => (b.publishedAt || "").localeCompare(a.publishedAt || "")).map(clone);
   }
   const snap = await admin.firestore().collection(INSIGHT_COLLECTION).where("status", "==", "published").get();
   const posts = [];
@@ -40510,7 +40502,7 @@ async function listPublishedInsights() {
 }
 async function getInsight(id) {
   if (insightsUseMemory()) {
-    const post = memory.get(id);
+    const post = memory$1.get(id);
     return post ? clone(post) : null;
   }
   const doc = await admin.firestore().collection(INSIGHT_COLLECTION).doc(id).get();
@@ -40519,7 +40511,7 @@ async function getInsight(id) {
 }
 async function getPublishedInsightBySlug(slug) {
   if (insightsUseMemory()) {
-    const post = [...memory.values()].find((item) => item.status === "published" && item.slug === slug);
+    const post = [...memory$1.values()].find((item) => item.status === "published" && item.slug === slug);
     return post ? clone(post) : null;
   }
   const snap = await admin.firestore().collection(INSIGHT_COLLECTION).where("slug", "==", slug).limit(5).get();
@@ -40532,19 +40524,19 @@ async function getPublishedInsightBySlug(slug) {
 async function saveInsight(post) {
   const stored = clone(post);
   if (insightsUseMemory()) {
-    memory.set(stored.id, stored);
+    memory$1.set(stored.id, stored);
     return;
   }
   await admin.firestore().collection(INSIGHT_COLLECTION).doc(stored.id).set(stored);
 }
 async function deleteInsight(id) {
   if (insightsUseMemory()) {
-    memory.delete(id);
+    memory$1.delete(id);
     return;
   }
   await admin.firestore().collection(INSIGHT_COLLECTION).doc(id).delete();
 }
-const router$5 = Router();
+const router$6 = Router();
 const BLOB_URL = /^\/api\/site-content\/blob\/([A-Za-z0-9-]+)$/;
 const ALLOWED_ASSET_HOSTS = /* @__PURE__ */ new Set(["firebasestorage.googleapis.com", "storage.googleapis.com"]);
 function writerAllowed(req) {
@@ -40579,28 +40571,28 @@ async function withSlug(post) {
   const posts = await listInsights();
   return { ...post, slug: claimSlug(post.slug, post.id, posts) };
 }
-router$5.get("/", async (_req, res) => {
+router$6.get("/", async (_req, res) => {
   const posts = await listPublishedInsights();
   res.setHeader("Cache-Control", "no-store");
   return res.json({ posts: posts.map(toPublicInsight) });
 });
-router$5.get("/admin/posts", requireInsightsWriter, async (_req, res) => {
+router$6.get("/admin/posts", requireInsightsWriter, async (_req, res) => {
   const posts = await listInsights();
   return res.json({ posts });
 });
-router$5.post("/admin/posts", requireInsightsWriter, async (req, res) => {
+router$6.post("/admin/posts", requireInsightsWriter, async (req, res) => {
   const created = await withSlug(createInsightPost(req.body, actor(req)));
   await saveInsight(created);
   return res.status(201).json({ post: created });
 });
-router$5.put("/admin/posts/:id", requireInsightsWriter, async (req, res) => {
+router$6.put("/admin/posts/:id", requireInsightsWriter, async (req, res) => {
   const current = await getInsight(String(req.params.id || ""));
   if (!current) return res.status(404).json({ error: "That insight was not found." });
   const next = await withSlug(updateInsightPost(current, req.body));
   await saveInsight(next);
   return res.json({ post: next });
 });
-router$5.post("/admin/posts/:id/publish", requireInsightsWriter, async (req, res) => {
+router$6.post("/admin/posts/:id/publish", requireInsightsWriter, async (req, res) => {
   const current = await getInsight(String(req.params.id || ""));
   if (!current) return res.status(404).json({ error: "That insight was not found." });
   const edited = req.body && Object.keys(req.body).length ? updateInsightPost(current, req.body) : current;
@@ -40611,7 +40603,7 @@ router$5.post("/admin/posts/:id/publish", requireInsightsWriter, async (req, res
   await saveInsight(next);
   return res.json({ post: next });
 });
-router$5.post("/admin/posts/:id/unpublish", requireInsightsWriter, async (req, res) => {
+router$6.post("/admin/posts/:id/unpublish", requireInsightsWriter, async (req, res) => {
   const current = await getInsight(String(req.params.id || ""));
   if (!current) return res.status(404).json({ error: "That insight was not found." });
   const now = (/* @__PURE__ */ new Date()).toISOString();
@@ -40619,13 +40611,13 @@ router$5.post("/admin/posts/:id/unpublish", requireInsightsWriter, async (req, r
   await saveInsight(next);
   return res.json({ post: next });
 });
-router$5.delete("/admin/posts/:id", requireInsightsWriter, async (req, res) => {
+router$6.delete("/admin/posts/:id", requireInsightsWriter, async (req, res) => {
   const current = await getInsight(String(req.params.id || ""));
   if (!current) return res.status(404).json({ error: "That insight was not found." });
   await deleteInsight(current.id);
   return res.json({ ok: true });
 });
-router$5.get("/admin/posts/:id/social.zip", requireInsightsWriter, async (req, res) => {
+router$6.get("/admin/posts/:id/social.zip", requireInsightsWriter, async (req, res) => {
   const current = await getInsight(String(req.params.id || ""));
   if (!current) return res.status(404).json({ error: "That insight was not found." });
   if (!current.socialPack.assets.length) {
@@ -40649,7 +40641,7 @@ router$5.get("/admin/posts/:id/social.zip", requireInsightsWriter, async (req, r
   res.setHeader("Cache-Control", "no-store");
   return res.send(Buffer.from(zipStored(entries)));
 });
-router$5.get("/:slug", async (req, res) => {
+router$6.get("/:slug", async (req, res) => {
   const slug = String(req.params.slug || "");
   if (!isInsightSlug(slug)) return res.status(404).json({ error: "This insight is not published." });
   const post = await getPublishedInsightBySlug(slug);
@@ -40692,7 +40684,7 @@ async function readSocialAsset(url) {
     clearTimeout(timer);
   }
 }
-function readSpaShell$1() {
+function readSpaShell() {
   const candidates = [
     path.resolve(process.cwd(), "dist/spa/index.html"),
     path.resolve(process.cwd(), "dist/index.html")
@@ -40707,7 +40699,7 @@ async function renderInsightShell(slug, origin) {
     return { status: 404, html: "<!doctype html><title>Insight</title><p>This insight is not published.</p>" };
   }
   const post = await getPublishedInsightBySlug(slug);
-  const shell2 = readSpaShell$1();
+  const shell2 = readSpaShell();
   if (!post) {
     const tags2 = '<title>Insight | Iconic Images</title>\n    <meta name="robots" content="noindex, nofollow" />';
     const html2 = shell2 ? injectHead(shell2, tags2) : `<!doctype html><html><head>${tags2}</head><body><p>This insight is not published.</p></body></html>`;
@@ -40728,8 +40720,9 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 function slugifyNews(value) {
   return String(value || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60).replace(/-+$/g, "");
 }
+const NEWS_INDEX_PATH = "/insights/news";
 function newsIssuePath(meta) {
-  return meta.category === "promo" ? `/news/promos/${meta.slug}` : `/news/${meta.slug}`;
+  return meta.category === "promo" ? `${NEWS_INDEX_PATH}/promos/${meta.slug}` : `${NEWS_INDEX_PATH}/${meta.slug}`;
 }
 function sortNewsNewestFirst(items) {
   return [...items].sort((a, b) => {
@@ -40740,14 +40733,6 @@ function sortNewsNewestFirst(items) {
 function mergeNewsCards(folders, campaigns) {
   const taken = new Set(folders.map((item) => item.slug));
   return sortNewsNewestFirst([...folders, ...campaigns.filter((item) => !taken.has(item.slug))]);
-}
-function absoluteNewsImage(src, origin = SITE_ORIGIN) {
-  const base = String(origin || SITE_ORIGIN).replace(/\/$/, "");
-  const value = String(src || "").trim();
-  if (!value) return ogImageUrl(base);
-  if (/^https?:\/\//i.test(value)) return value;
-  if (value.startsWith("/")) return `${base}${value}`;
-  return `${base}/${value}`;
 }
 function parseNewsMeta(raw, folderSlug) {
   const record2 = raw && typeof raw === "object" ? raw : {};
@@ -40765,26 +40750,6 @@ function parseNewsMeta(raw, folderSlug) {
   if (!summary) throw new Error("News issue needs a summary.");
   if (!heroImage || heroImage.startsWith("javascript:")) throw new Error("News issue needs a hero image.");
   return { title, slug, category, date, summary, heroImage };
-}
-function newsHeadTags(issue, origin = SITE_ORIGIN) {
-  const title = escapeHtml$3(`${issue.title} | Iconic Images`);
-  const description = escapeHtml$3(issue.summary);
-  const url = escapeHtml$3(canonicalUrl(newsIssuePath(issue), origin));
-  const image = escapeHtml$3(absoluteNewsImage(issue.heroImage, origin));
-  return [
-    `<title>${title}</title>`,
-    `<meta name="description" content="${description}" />`,
-    `<link rel="canonical" href="${url}" />`,
-    `<meta property="og:type" content="article" />`,
-    `<meta property="og:title" content="${title}" />`,
-    `<meta property="og:description" content="${description}" />`,
-    `<meta property="og:url" content="${url}" />`,
-    `<meta property="og:image" content="${image}" />`,
-    `<meta name="twitter:card" content="summary_large_image" />`,
-    `<meta name="twitter:title" content="${title}" />`,
-    `<meta name="twitter:description" content="${description}" />`,
-    `<meta name="twitter:image" content="${image}" />`
-  ].join("\n    ");
 }
 function newsFilesFromCampaign(campaign) {
   if (campaign.status !== "sent") return null;
@@ -40910,27 +40875,18 @@ async function findSentCampaignIssue(category, slug) {
   }
   return null;
 }
-const router$4 = Router();
-function readSpaShell() {
-  const candidates = [
-    path.resolve(process.cwd(), "dist/spa/index.html"),
-    path.resolve(process.cwd(), "dist/index.html")
-  ];
-  for (const file of candidates) {
-    if (fs$2.existsSync(file)) return fs$2.readFileSync(file, "utf8");
-  }
-  return "";
-}
+const router$5 = Router();
+router$5.use(requireStaff);
 function categoryOf(value) {
   if (value === "newsletter" || value === "promo") return value;
   return null;
 }
-router$4.get("/", async (_req, res) => {
+router$5.get("/", async (_req, res) => {
   const folders = newsCards();
   const campaigns = await sentCampaignCards();
   res.json({ issues: mergeNewsCards(folders, campaigns) });
 });
-router$4.get("/issues/:category/:slug", async (req, res) => {
+router$5.get("/issues/:category/:slug", async (req, res) => {
   const category = categoryOf(String(req.params.category || ""));
   const slug = String(req.params.slug || "");
   if (!category) return res.status(404).json({ error: "That news issue is not published." });
@@ -40938,27 +40894,261 @@ router$4.get("/issues/:category/:slug", async (req, res) => {
   if (!issue) return res.status(404).json({ error: "That news issue is not published." });
   return res.json({ issue });
 });
-async function renderNewsShell(category, slug, origin) {
-  const issue = findFolderIssue(category, slug) || await findSentCampaignIssue(category, slug);
-  const shell2 = readSpaShell();
-  if (!issue) {
-    const tags2 = `<title>News | Iconic Images</title>
-    <meta name="robots" content="noindex, nofollow" />`;
-    const html2 = shell2 ? injectHead(shell2, tags2) : `<!doctype html><html><head>${tags2}</head><body><p>This news issue is not published.</p></body></html>`;
-    return { status: 404, html: html2 };
+const AMENITY_STOCK_PRICE = 49.99;
+const AMENITY_STOCK_CARDS = [
+  {
+    id: "artavia",
+    neighborhood: "Artavia",
+    price: AMENITY_STOCK_PRICE,
+    imageCount: 6,
+    coverFile: "A7303322.jpg",
+    coverAlt: "Artavia entrance with a large letter A sculpture"
+  },
+  {
+    id: "benders-landing",
+    neighborhood: "Bender's Landing",
+    price: AMENITY_STOCK_PRICE,
+    imageCount: 6,
+    coverFile: "DJI_0002_edits.jpg",
+    coverAlt: "Aerial view of a Bender's Landing playground"
+  },
+  {
+    id: "carlton-woods",
+    neighborhood: "Carlton Woods",
+    price: AMENITY_STOCK_PRICE,
+    imageCount: 6,
+    coverFile: "MLU07984.jpg",
+    coverAlt: "Carlton Woods outdoor basketball court"
+  },
+  {
+    id: "east-shore",
+    neighborhood: "East Shore",
+    price: AMENITY_STOCK_PRICE,
+    imageCount: 6,
+    coverFile: "A6509322.jpg",
+    coverAlt: "East Shore clubhouse and the East Shore Club sign"
+  },
+  {
+    id: "woodlands-waterway",
+    neighborhood: "The Woodlands Waterway",
+    price: AMENITY_STOCK_PRICE,
+    imageCount: 6,
+    coverFile: "DJI_0100.jpg",
+    coverAlt: "The Woodlands Waterway with glass towers, a bridge, and a fountain"
+  },
+  {
+    id: "woodforest",
+    neighborhood: "Woodforest",
+    price: AMENITY_STOCK_PRICE,
+    imageCount: 6,
+    coverFile: "DJI_0088.jpg",
+    coverAlt: "Aerial view of the Woodforest pool and water slides"
   }
-  const tags = newsHeadTags(issue, origin);
-  const html = shell2 ? injectHead(shell2, tags) : `<!doctype html><html><head>${tags}</head><body><div id="root"></div></body></html>`;
-  return { status: 200, html };
+];
+const CARDS_BY_ID = new Map(AMENITY_STOCK_CARDS.map((card) => [card.id, card]));
+function amenityStockById(id) {
+  return CARDS_BY_ID.get(id) ?? null;
 }
-const handleNewsShell = async (req, res, next) => {
-  if (process.env.ICONIC_VITE_DEV === "1") return next();
-  const slug = String(req.params.slug || "");
-  const category = req.path.includes("/news/promos/") ? "promo" : "newsletter";
-  const rendered = await renderNewsShell(category, slug, originForHost(req.get("host")));
-  res.setHeader("Cache-Control", "no-store");
-  res.status(rendered.status).type("html").send(rendered.html);
-};
+function amenityCoverUrl(card) {
+  return `/media/amenities/${card.id}/${card.coverFile}`;
+}
+function amenityCoverWebpUrl(card) {
+  return amenityCoverUrl(card).replace(/\.jpe?g$/i, ".webp");
+}
+const PUBLIC_AMENITY_FILES = new Set(
+  AMENITY_STOCK_CARDS.flatMap((card) => [amenityCoverUrl(card), amenityCoverWebpUrl(card)])
+);
+function decodePath(pathname) {
+  const pathOnly = pathname.split("?")[0]?.split("#")[0] ?? "";
+  if (!pathOnly.startsWith("/")) return null;
+  try {
+    return decodeURIComponent(pathOnly);
+  } catch {
+    return null;
+  }
+}
+function isAmenityMediaPath(pathname) {
+  return pathname === "/media/amenities" || pathname.startsWith("/media/amenities/");
+}
+function amenityMediaRequestAllowed(pathname) {
+  const decoded = decodePath(pathname);
+  if (!decoded || decoded.includes("\\") || decoded.includes("\0")) return false;
+  const normalized = decoded.replace(/\/{2,}/g, "/");
+  if (!isAmenityMediaPath(normalized)) return true;
+  if (normalized.includes("..")) return false;
+  return PUBLIC_AMENITY_FILES.has(normalized);
+}
+function amenityStockReturnPath(setId, orderNumber2) {
+  const params = new URLSearchParams({
+    paid: "1",
+    set: setId,
+    order: orderNumber2
+  });
+  return `/stock-footage?${params.toString()}`;
+}
+const SQUARE_HOST = /(^|\.)((square\.link)|(square\.site)|(squareup\.com)|(squareupsandbox\.com))$/i;
+function isSquareCheckoutUrl(value) {
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== "https:" || url.username || url.password) return false;
+  return SQUARE_HOST.test(url.hostname);
+}
+const FLASH_SALE_SOURCE = "flash-sale";
+const FLASH_SALE_ENDS_MS = Date.parse("2026-11-26T05:59:59.999Z");
+const FLASH_SALE_ADDONS = [
+  { id: "floor-plan", label: "2D Floor Plan" },
+  { id: "reel", label: "Social Media Walk Through Reel" }
+];
+const FLASH_SALE_BUNDLES = [
+  { shoots: 5, subtotalCents: 125e3, perShootCents: 25e3, label: "5 shoots" },
+  { shoots: 10, subtotalCents: 225e3, perShootCents: 22500, label: "10 shoots" }
+];
+function flashSaleOpen(now = Date.now()) {
+  return now <= FLASH_SALE_ENDS_MS;
+}
+function flashSaleBundle(shoots) {
+  return FLASH_SALE_BUNDLES.find((bundle) => bundle.shoots === shoots) ?? null;
+}
+function flashSaleAddon(id) {
+  return FLASH_SALE_ADDONS.find((addon) => addon.id === id) ?? null;
+}
+function quoteFlashSale(shoots) {
+  const bundle = flashSaleBundle(shoots);
+  if (!bundle) return null;
+  const processingCents = processingFeeCents(bundle.subtotalCents);
+  return {
+    shoots: bundle.shoots,
+    label: bundle.label,
+    subtotalCents: bundle.subtotalCents,
+    processingCents,
+    totalCents: bundle.subtotalCents + processingCents,
+    processingLabel: BOOKING_PROCESSING_LABEL
+  };
+}
+function formatFlashCents(cents2) {
+  return (cents2 / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
+}
+function flashSaleUseBy(purchasedAt) {
+  const expires = new Date(purchasedAt.getTime());
+  expires.setUTCDate(expires.getUTCDate() + 90);
+  return expires.toISOString();
+}
+const memory = [];
+async function saveFlashSaleOrder(order) {
+  if (!admin.apps.length) {
+    const id = `flash-${memory.length + 1}`;
+    memory.push({ id, ...order });
+    return id;
+  }
+  const ref = await admin.firestore().collection("orders").add({
+    ...order,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+  return ref.id;
+}
+const router$4 = Router();
+const limiter$1 = createRateLimiter({ windowMs: 15 * 60 * 1e3, max: 12 });
+function clean(value, max) {
+  return String(value || "").trim().slice(0, max);
+}
+function orderNumber$1() {
+  return `FS-${randomBytes$1(3).toString("hex").toUpperCase()}`;
+}
+router$4.post("/checkout", async (req, res) => {
+  const limit = limiter$1.check(clientIp(req));
+  if (!limit.allowed) {
+    res.setHeader("Retry-After", String(limit.retryAfterSec));
+    return res.status(429).json({ error: "Too many checkout attempts. Please wait and try again." });
+  }
+  if (!flashSaleOpen()) {
+    return res.status(410).json({ error: "This flash sale has ended." });
+  }
+  const shoots = Number(req.body?.bundle);
+  const quote = quoteFlashSale(shoots);
+  const addon = flashSaleAddon(String(req.body?.addon || ""));
+  const name = clean(req.body?.name, 120);
+  const email = clean(req.body?.email, 160).toLowerCase();
+  const phone = clean(req.body?.phone, 40);
+  if (!quote || !addon) return res.status(400).json({ error: "Choose a bundle and one add-on." });
+  if (name.length < 2 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || phone.replace(/\D/g, "").length < 7) {
+    return res.status(400).json({ error: "Name, email, and phone are required." });
+  }
+  const number = orderNumber$1();
+  let origin = "https://iconicimagestx.vercel.app";
+  try {
+    origin = publicSiteUrl();
+  } catch (err) {
+    console.error("[Flash sale] Public site URL is not https. Using the Vercel app.", err);
+  }
+  const redirectUrl = `${origin}/flash-sale?paid=1&order=${encodeURIComponent(number)}`;
+  const linked = await createHolidaySquareCheckout({
+    invoiceId: `fs-${quote.shoots}-${number}`,
+    invoiceNumber: number,
+    amount: quote.totalCents / 100,
+    email,
+    itemName: `Flash sale ${quote.label}`,
+    leadSource: "Flash sale",
+    orderNumber: number,
+    redirectUrl,
+    logLabel: "Flash sale",
+    lineItems: [
+      { name: `Flash sale · ${quote.label}`, amountCents: quote.subtotalCents },
+      { name: quote.processingLabel, amountCents: quote.processingCents }
+    ]
+  });
+  if (linked.payment !== "square" || !linked.checkoutUrl || !isSquareCheckoutUrl(linked.checkoutUrl)) {
+    return res.status(503).json({ error: "Square checkout is not available right now." });
+  }
+  const purchasedAt = /* @__PURE__ */ new Date();
+  const id = await saveFlashSaleOrder({
+    clientName: name,
+    clientEmail: email,
+    clientPhone: phone,
+    title: `Flash sale · ${quote.label}`,
+    selectedService: "Flash sale",
+    source: FLASH_SALE_SOURCE,
+    leadSource: "Flash sale",
+    status: "awaiting-payment",
+    bundle: quote.shoots,
+    addon: addon.id,
+    addonLabel: addon.label,
+    lineItems: [
+      { name: `Prepaid ${quote.label}`, price: quote.subtotalCents / 100, qty: 1 },
+      { name: quote.processingLabel, price: quote.processingCents / 100, qty: 1 }
+    ],
+    subtotal: quote.subtotalCents / 100,
+    processing: quote.processingCents / 100,
+    total: quote.totalCents / 100,
+    pricing: {
+      subtotal: quote.subtotalCents / 100,
+      processing: quote.processingCents / 100,
+      tax: 0,
+      total: quote.totalCents / 100
+    },
+    notes: [
+      `Each shoot: 50 photos + 3 aerials + ${addon.label}.`,
+      "Paid upfront. Use the shoots within 90 days.",
+      `Use by ${flashSaleUseBy(purchasedAt).slice(0, 10)}.`
+    ].join(" "),
+    useBy: flashSaleUseBy(purchasedAt),
+    orderNumber: number,
+    squareLinkId: linked.linkId || "",
+    squareOrderId: linked.squareOrderId || "",
+    createdAt: purchasedAt.toISOString(),
+    updatedAt: purchasedAt.toISOString()
+  });
+  return res.json({
+    checkoutUrl: linked.checkoutUrl,
+    orderNumber: number,
+    orderId: id,
+    total: formatFlashCents(quote.totalCents)
+  });
+});
 const CLEANUP_COLLECTIONS = [
   "orders",
   "invoices",
@@ -42228,109 +42418,6 @@ router$2.get("/dry-run", adminOrCron, async (req, res) => {
     return res.status(500).json({ ok: false, error: "Holy Grail dry run failed." });
   }
 });
-const AMENITY_STOCK_PRICE = 49.99;
-const AMENITY_STOCK_CARDS = [
-  {
-    id: "artavia",
-    neighborhood: "Artavia",
-    price: AMENITY_STOCK_PRICE,
-    imageCount: 6,
-    coverFile: "A7303322.jpg",
-    coverAlt: "Artavia entrance with a large letter A sculpture"
-  },
-  {
-    id: "benders-landing",
-    neighborhood: "Bender's Landing",
-    price: AMENITY_STOCK_PRICE,
-    imageCount: 6,
-    coverFile: "DJI_0002_edits.jpg",
-    coverAlt: "Aerial view of a Bender's Landing playground"
-  },
-  {
-    id: "carlton-woods",
-    neighborhood: "Carlton Woods",
-    price: AMENITY_STOCK_PRICE,
-    imageCount: 6,
-    coverFile: "MLU07984.jpg",
-    coverAlt: "Carlton Woods outdoor basketball court"
-  },
-  {
-    id: "east-shore",
-    neighborhood: "East Shore",
-    price: AMENITY_STOCK_PRICE,
-    imageCount: 6,
-    coverFile: "A6509322.jpg",
-    coverAlt: "East Shore clubhouse and the East Shore Club sign"
-  },
-  {
-    id: "woodlands-waterway",
-    neighborhood: "The Woodlands Waterway",
-    price: AMENITY_STOCK_PRICE,
-    imageCount: 6,
-    coverFile: "DJI_0100.jpg",
-    coverAlt: "The Woodlands Waterway with glass towers, a bridge, and a fountain"
-  },
-  {
-    id: "woodforest",
-    neighborhood: "Woodforest",
-    price: AMENITY_STOCK_PRICE,
-    imageCount: 6,
-    coverFile: "DJI_0088.jpg",
-    coverAlt: "Aerial view of the Woodforest pool and water slides"
-  }
-];
-const CARDS_BY_ID = new Map(AMENITY_STOCK_CARDS.map((card) => [card.id, card]));
-function amenityStockById(id) {
-  return CARDS_BY_ID.get(id) ?? null;
-}
-function amenityCoverUrl(card) {
-  return `/media/amenities/${card.id}/${card.coverFile}`;
-}
-function amenityCoverWebpUrl(card) {
-  return amenityCoverUrl(card).replace(/\.jpe?g$/i, ".webp");
-}
-const PUBLIC_AMENITY_FILES = new Set(
-  AMENITY_STOCK_CARDS.flatMap((card) => [amenityCoverUrl(card), amenityCoverWebpUrl(card)])
-);
-function decodePath(pathname) {
-  const pathOnly = pathname.split("?")[0]?.split("#")[0] ?? "";
-  if (!pathOnly.startsWith("/")) return null;
-  try {
-    return decodeURIComponent(pathOnly);
-  } catch {
-    return null;
-  }
-}
-function isAmenityMediaPath(pathname) {
-  return pathname === "/media/amenities" || pathname.startsWith("/media/amenities/");
-}
-function amenityMediaRequestAllowed(pathname) {
-  const decoded = decodePath(pathname);
-  if (!decoded || decoded.includes("\\") || decoded.includes("\0")) return false;
-  const normalized = decoded.replace(/\/{2,}/g, "/");
-  if (!isAmenityMediaPath(normalized)) return true;
-  if (normalized.includes("..")) return false;
-  return PUBLIC_AMENITY_FILES.has(normalized);
-}
-function amenityStockReturnPath(setId, orderNumber2) {
-  const params = new URLSearchParams({
-    paid: "1",
-    set: setId,
-    order: orderNumber2
-  });
-  return `/stock-footage?${params.toString()}`;
-}
-const SQUARE_HOST = /(^|\.)((square\.link)|(square\.site)|(squareup\.com)|(squareupsandbox\.com))$/i;
-function isSquareCheckoutUrl(value) {
-  let url;
-  try {
-    url = new URL(value);
-  } catch {
-    return false;
-  }
-  if (url.protocol !== "https:" || url.username || url.password) return false;
-  return SQUARE_HOST.test(url.hostname);
-}
 const router$1 = Router();
 const limiter = createRateLimiter({ windowMs: 15 * 60 * 1e3, max: 12 });
 function orderNumber() {
@@ -42917,7 +43004,7 @@ function createServer() {
     res.setHeader("Cache-Control", "public, max-age=300");
     if (kind === "sitemap") {
       res.type("application/xml");
-      return res.send(sitemapXml(origin, newsCards().map((issue) => issue.path)));
+      return res.send(sitemapXml(origin));
     }
     res.type("text/plain");
     return res.send(robotsTxt(origin));
@@ -43003,26 +43090,27 @@ function createServer() {
     res.json({ live: clientNotifyLive() });
   });
   mountOwners(app);
-  app.use("/api/bookings", router$E);
-  app.use("/api/headshots-10", router$D);
-  app.use("/api/orders", router$C);
+  app.use("/api/bookings", router$F);
+  app.use("/api/headshots-10", router$E);
+  app.use("/api/orders", router$D);
   app.patch("/api/admin/orders/:id/approval", handleOrderApproval);
-  app.use("/api/galleries", router$B);
-  app.use("/api/payments", router$A);
-  app.use("/api/vsai", router$z);
-  app.use("/api/messages", router$y);
-  app.use("/api/communications", router$b);
-  app.use("/api/people", router$a);
-  app.use("/api/clients", router$w);
+  app.use("/api/galleries", router$C);
+  app.use("/api/payments", router$B);
+  app.use("/api/vsai", router$A);
+  app.use("/api/messages", router$z);
+  app.use("/api/communications", router$c);
+  app.use("/api/people", router$b);
   app.use("/api/clients", router$x);
+  app.use("/api/clients", router$y);
   app.get("/api/portal/listings/:id", handleGetPublicPortalListing);
   app.get("/api/listing-sites/:slug", handleGetListingSite);
   app.post("/api/listing-sites/:slug/inquiry", handleListingSiteInquiry);
-  app.use("/api/staff", router$v);
-  app.use("/api/account", router$u);
-  app.use("/api/site-content", router$6);
-  app.use("/api/insights", router$5);
-  app.use("/api/news", router$4);
+  app.use("/api/staff", router$w);
+  app.use("/api/account", router$v);
+  app.use("/api/site-content", router$7);
+  app.use("/api/insights", router$6);
+  app.use("/api/news", router$5);
+  app.use("/api/flash-sale", router$4);
   app.get("/present/:token", (req, res, next) => {
     if (process.env.ICONIC_VITE_DEV === "1") return next();
     return handlePresentationShell(req, res);
@@ -43033,37 +43121,32 @@ function createServer() {
   });
   app.get("/insights/:slug", (req, res, next) => {
     if (process.env.ICONIC_VITE_DEV === "1") return next();
-    if (req.params.slug === "prep") return next();
+    if (req.params.slug === "prep" || req.params.slug === "news") return next();
     return handleInsightShell(req, res);
   });
-  app.get("/news/promos/:slug", handleNewsShell);
-  app.get("/news/:slug", (req, res, next) => {
-    if (req.params.slug === "promos") return next();
-    return handleNewsShell(req, res, next);
-  });
+  app.use("/api", router$a);
+  app.use("/api/listings", router$u);
   app.use("/api", router$9);
-  app.use("/api/listings", router$t);
-  app.use("/api", router$8);
-  app.use("/api/task-board", router$7);
-  app.use("/api/campaigns", router$s);
+  app.use("/api/task-board", router$8);
+  app.use("/api/campaigns", router$t);
+  app.use("/api/marketing", router$s);
   app.use("/api/marketing", router$r);
-  app.use("/api/marketing", router$q);
-  app.use("/api/channel-campaigns", router$p);
-  app.use("/api/agents", router$o);
-  app.use("/api/botroom", router$n);
-  app.use("/api/media-jobs", router$m);
-  app.use("/api/studio", router$l);
-  app.use("/api/ops", router$k);
-  app.use("/api/studio/scratch", router$j);
-  app.use("/api/places", router$i);
-  app.use("/api/sms", router$h);
-  app.use("/api/contact", router$c);
+  app.use("/api/channel-campaigns", router$q);
+  app.use("/api/agents", router$p);
+  app.use("/api/botroom", router$o);
+  app.use("/api/media-jobs", router$n);
+  app.use("/api/studio", router$m);
+  app.use("/api/ops", router$l);
+  app.use("/api/studio/scratch", router$k);
+  app.use("/api/places", router$j);
+  app.use("/api/sms", router$i);
   app.use("/api/contact", router$d);
-  app.use("/api/contact", router$g);
-  app.use("/api/senior-living", router$f);
+  app.use("/api/contact", router$e);
+  app.use("/api/contact", router$h);
+  app.use("/api/senior-living", router$g);
   app.use("/api/virtual-staging-pro", router);
   app.use("/api/stock-footage", router$1);
-  app.use("/api/apprenticeship", router$e);
+  app.use("/api/apprenticeship", router$f);
   app.use("/api/admin/test-data", router$3);
   app.use("/api/holy-grail", router$2);
   app.use(
