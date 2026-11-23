@@ -1,11 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Layout from "@/components/Layout";
-import { bundledNewsCards } from "@/lib/newsCatalog";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   type NewsCard,
   formatNewsDate,
-  mergeNewsCards,
   newsCategoryLabel,
 } from "@shared/news";
 
@@ -18,23 +17,31 @@ const FILTERS: { id: Filter; label: string }[] = [
 ];
 
 export default function News() {
-  const [issues, setIssues] = useState<NewsCard[]>(() => bundledNewsCards());
+  const { user } = useAuth();
+  const [issues, setIssues] = useState<NewsCard[]>([]);
   const [filter, setFilter] = useState<Filter>("all");
+  const [error, setError] = useState("");
 
   useEffect(() => {
     let cancel = false;
-    fetch("/api/news")
-      .then((response) => (response.ok ? response.json() : null))
-      .then((data: { issues?: NewsCard[] } | null) => {
-        if (cancel || !data?.issues) return;
-        const remote = data.issues.filter((issue) => issue.source === "campaign");
-        setIssues(mergeNewsCards(bundledNewsCards(), remote));
-      })
-      .catch(() => undefined);
+    (async () => {
+      const token = await user?.getIdToken();
+      if (!token) return;
+      const response = await fetch("/api/news", { headers: { Authorization: `Bearer ${token}` } });
+      const data = await response.json().catch(() => ({})) as { issues?: NewsCard[]; error?: string };
+      if (cancel) return;
+      if (!response.ok) {
+        setError(data.error || "News could not be loaded.");
+        return;
+      }
+      setIssues(data.issues || []);
+    })().catch(() => {
+      if (!cancel) setError("News could not be loaded.");
+    });
     return () => {
       cancel = true;
     };
-  }, []);
+  }, [user]);
 
   const shown = issues.filter((issue) => filter === "all" || issue.category === filter);
 
@@ -66,6 +73,7 @@ export default function News() {
               );
             })}
           </div>
+          {error && <p className="mt-6 text-sm font-semibold text-[#e8432e]">{error}</p>}
           <div className="mt-6 flex flex-col gap-5">
             {shown.map((issue) => (
               <Link

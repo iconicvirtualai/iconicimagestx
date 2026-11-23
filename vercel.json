@@ -87,6 +87,36 @@
       "permanent": false
     },
     {
+      "source": "/news",
+      "destination": "/insights/news",
+      "statusCode": 302
+    },
+    {
+      "source": "/news/",
+      "destination": "/insights/news",
+      "statusCode": 302
+    },
+    {
+      "source": "/news/promos/:slug",
+      "destination": "/insights/news/promos/:slug",
+      "statusCode": 302
+    },
+    {
+      "source": "/news/promos/:slug/",
+      "destination": "/insights/news/promos/:slug",
+      "statusCode": 302
+    },
+    {
+      "source": "/news/:slug",
+      "destination": "/insights/news/:slug",
+      "statusCode": 302
+    },
+    {
+      "source": "/news/:slug/",
+      "destination": "/insights/news/:slug",
+      "statusCode": 302
+    },
+    {
       "source": "/booking",
       "destination": "/book",
       "statusCode": 301
@@ -929,26 +959,6 @@
       ]
     },
     {
-      "source": "/news",
-      "destination": "/seo/www/news.html",
-      "has": [
-        {
-          "type": "host",
-          "value": "www.iconicimagestx.com"
-        }
-      ]
-    },
-    {
-      "source": "/news/",
-      "destination": "/seo/www/news.html",
-      "has": [
-        {
-          "type": "host",
-          "value": "www.iconicimagestx.com"
-        }
-      ]
-    },
-    {
       "source": "/book",
       "destination": "/seo/www/book.html",
       "has": [
@@ -1319,26 +1329,6 @@
       ]
     },
     {
-      "source": "/news",
-      "destination": "/seo/www/news.html",
-      "has": [
-        {
-          "type": "host",
-          "value": "iconicimagestx.com"
-        }
-      ]
-    },
-    {
-      "source": "/news/",
-      "destination": "/seo/www/news.html",
-      "has": [
-        {
-          "type": "host",
-          "value": "iconicimagestx.com"
-        }
-      ]
-    },
-    {
       "source": "/book",
       "destination": "/seo/www/book.html",
       "has": [
@@ -1619,27 +1609,35 @@
       "destination": "/seo/app.html"
     },
     {
+      "source": "/insights/news/promos/:slug",
+      "destination": "/seo/private.html"
+    },
+    {
+      "source": "/insights/news/promos/:slug/",
+      "destination": "/seo/private.html"
+    },
+    {
+      "source": "/insights/news/:slug",
+      "destination": "/seo/private.html"
+    },
+    {
+      "source": "/insights/news/:slug/",
+      "destination": "/seo/private.html"
+    },
+    {
+      "source": "/insights/news",
+      "destination": "/seo/private.html"
+    },
+    {
+      "source": "/insights/news/",
+      "destination": "/seo/private.html"
+    },
+    {
       "source": "/insights/:slug",
       "destination": "/api/index"
     },
     {
       "source": "/insights/:slug/",
-      "destination": "/api/index"
-    },
-    {
-      "source": "/news/promos/:slug",
-      "destination": "/api/index"
-    },
-    {
-      "source": "/news/promos/:slug/",
-      "destination": "/api/index"
-    },
-    {
-      "source": "/news/:slug",
-      "destination": "/api/index"
-    },
-    {
-      "source": "/news/:slug/",
       "destination": "/api/index"
     },
     {
@@ -1725,14 +1723,6 @@
     {
       "source": "/insights/",
       "destination": "/seo/insights.html"
-    },
-    {
-      "source": "/news",
-      "destination": "/seo/news.html"
-    },
-    {
-      "source": "/news/",
-      "destination": "/seo/news.html"
     },
     {
       "source": "/book",
@@ -1868,6 +1858,14 @@
     },
     {
       "source": "/services/virtual-staging/pro-order/",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/flash-sale",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/flash-sale/",
       "destination": "/seo/app.html"
     },
     {
@@ -2398,6 +2396,60 @@
     },
     {
       "source": "/headshots-10/location/",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/news",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/news/",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/news/(.*)",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/insights/news",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/insights/news/",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/insights/news/(.*)",
       "headers": [
         {
           "key": "X-Robots-Tag",

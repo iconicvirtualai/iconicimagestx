@@ -192,6 +192,12 @@ describe("spa rewrite coverage", () => {
       "/headshots-10/faq/",
       "/headshots-10/location",
       "/headshots-10/location/",
+      "/news",
+      "/news/",
+      "/news/(.*)",
+      "/insights/news",
+      "/insights/news/",
+      "/insights/news/(.*)",
     ]);
     for (const rule of vercel.headers) {
       expect(rule.headers).toEqual([{ key: "X-Robots-Tag", value: "noindex, nofollow" }]);

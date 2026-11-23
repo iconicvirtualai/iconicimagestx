@@ -80,6 +80,7 @@ export const navGroups: { label: string; items: AdminNavItem[] }[] = [
       { label: "Reports", href: "/admin/marketing/reports", icon: Newspaper, roles: ADMIN_ONLY },
       { label: "Account", href: "/admin/marketing/account", icon: Settings, roles: ADMIN_ONLY },
       { label: "Insights", href: "/admin/insights", icon: Newspaper, roles: ADMIN_ONLY },
+      { label: "Newsletters", href: "/insights/news", icon: Newspaper, roles: ["admin", "coordinator", "photographer", "editor"] },
       { label: "Social queue", href: "/admin/insights/social", icon: Share2, roles: ADMIN_ONLY },
     ],
   },

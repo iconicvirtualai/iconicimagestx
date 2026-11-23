@@ -115,13 +115,6 @@ export const PUBLIC_PAGES: readonly PublicPage[] = [
       "Field notes from Iconic Images on listing photography, video, and marketing in Spring, The Woodlands, and Houston.",
   },
   {
-    path: "/news",
-    file: "seo/news.html",
-    title: "News | Iconic Images",
-    description:
-      "Newsletters and promos from Iconic Images in Spring, The Woodlands, and Houston.",
-  },
-  {
     path: "/book",
     file: "seo/book.html",
     title: "Book a Shoot | Iconic Images",
@@ -241,6 +234,9 @@ export function isNoIndexPath(pathname: string): boolean {
   if (path.startsWith("/studio/")) return true;
   if (path.startsWith("/gallery/")) return true;
   if (path === "/invoice" || path.startsWith("/invoice/")) return true;
+  if (path === "/news" || path.startsWith("/news/")) return true;
+  if (path === "/insights/news" || path.startsWith("/insights/news/")) return true;
+  if (path === "/flash-sale") return false;
   return false;
 }
 
@@ -268,8 +264,19 @@ export function metaPlan(pathname: string, origin = SITE_ORIGIN): MetaPlan {
     };
   }
   if (path === "/present" || path.startsWith("/present/")) return { kind: "hands-off" };
+  if (path === "/news" || path.startsWith("/news/") || path === "/insights/news" || path.startsWith("/insights/news/")) {
+    return { kind: "noindex", title: "News | Iconic Images" };
+  }
+  if (path === "/flash-sale") {
+    return {
+      kind: "public",
+      title: "Flash Sale | Iconic Images",
+      description: "Prepaid listing shoot bundles from Iconic Images in Spring, The Woodlands, and Houston.",
+      canonical: canonicalUrl(path, origin),
+      image: ogImageUrl(origin),
+    };
+  }
   if (path.startsWith("/insights/") && path !== "/insights/prep") return { kind: "hands-off" };
-  if (path.startsWith("/news/")) return { kind: "hands-off" };
   if (path === "/go") return { kind: "preserve-title" };
   if (path.startsWith("/studio-105/")) {
     return {

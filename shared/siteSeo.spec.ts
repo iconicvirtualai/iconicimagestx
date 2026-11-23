@@ -66,7 +66,6 @@ describe("public page meta", () => {
       "/partners",
       "/socials",
       "/insights",
-      "/news",
       "/book",
       "/apprenticeship",
       "/senior-living",
@@ -148,9 +147,13 @@ describe("public page meta", () => {
     expect(metaPlan("/insights").kind).toBe("public");
     expect(metaPlan("/insights/prep").kind).toBe("generic");
     expect(metaPlan("/insights/twilight-porch").kind).toBe("hands-off");
-    expect(metaPlan("/news").kind).toBe("public");
-    expect(metaPlan("/news/holysmokes").kind).toBe("hands-off");
-    expect(metaPlan("/news/promos/jan2027").kind).toBe("hands-off");
+    expect(metaPlan("/news").kind).toBe("noindex");
+    expect(metaPlan("/news/holysmokes").kind).toBe("noindex");
+    expect(metaPlan("/insights/news").kind).toBe("noindex");
+    expect(metaPlan("/insights/news/holysmokes").kind).toBe("noindex");
+    expect(metaPlan("/flash-sale").kind).toBe("public");
+    expect(isNoIndexPath("/insights/news/holysmokes")).toBe(true);
+    expect(isNoIndexPath("/flash-sale")).toBe(false);
     expect(metaPlan("/agents").kind).toBe("generic");
     expect(isNoIndexPath("/realestate-75")).toBe(true);
     expect(isNoIndexPath("/realestate-75/schedule")).toBe(true);

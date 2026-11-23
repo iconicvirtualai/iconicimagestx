@@ -17,7 +17,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Navigate, Routes, Route, useLocation } from "react-router-dom";
+import { BrowserRouter, Navigate, Routes, Route, useLocation, useParams } from "react-router-dom";
 import { PublicSiteTracking } from "./lib/tracking";
 import { lazy, Suspense, useEffect } from "react";
 import { AuthProvider } from "./contexts/AuthContext";
@@ -51,6 +51,7 @@ import Insights from "./pages/Insights";
 import InsightPost from "./pages/InsightPost";
 import News from "./pages/News";
 import NewsIssue from "./pages/NewsIssue";
+import FlashSale from "./pages/FlashSale";
 import AgentLandingPage from "./pages/AgentLandingPage";
 import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
@@ -137,6 +138,11 @@ function LegacyMarketingRedirect() {
   return <Navigate to={`${next}${location.search}`} replace />;
 }
 
+function LegacyNewsSlugRedirect({ promo = false }: { promo?: boolean }) {
+  const { slug = "" } = useParams();
+  return <Navigate to={promo ? `/insights/news/promos/${slug}` : `/insights/news/${slug}`} replace />;
+}
+
 function PortalQueryRedirect({ to }: { to: string }) {
   const { search } = useLocation();
   return <Navigate to={`${to}${search}`} replace />;
@@ -214,10 +220,14 @@ const App = () => (
             {/* Resources stays off the public site. Stock Footage library is public again. */}
             <Route path="/insights" element={<Insights />} />
             <Route path="/insights/prep" element={<Navigate to="/" replace />} />
+            <Route path="/insights/news" element={<ProtectedRoute requiredRole="staff"><News /></ProtectedRoute>} />
+            <Route path="/insights/news/promos/:slug" element={<ProtectedRoute requiredRole="staff"><NewsIssue category="promo" /></ProtectedRoute>} />
+            <Route path="/insights/news/:slug" element={<ProtectedRoute requiredRole="staff"><NewsIssue category="newsletter" /></ProtectedRoute>} />
             <Route path="/insights/:slug" element={<InsightPost />} />
-            <Route path="/news" element={<News />} />
-            <Route path="/news/promos/:slug" element={<NewsIssue category="promo" />} />
-            <Route path="/news/:slug" element={<NewsIssue category="newsletter" />} />
+            <Route path="/news" element={<Navigate to="/insights/news" replace />} />
+            <Route path="/news/promos/:slug" element={<LegacyNewsSlugRedirect promo />} />
+            <Route path="/news/:slug" element={<LegacyNewsSlugRedirect />} />
+            <Route path="/flash-sale" element={<FlashSale />} />
             <Route path="/stock-footage" element={<StockFootage />} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/unsubscribe" element={<Unsubscribe />} />
