@@ -49,6 +49,8 @@ import AIPricingAssistant from "./pages/AIPricingAssistant";
 import Socials from "./pages/Socials";
 import Insights from "./pages/Insights";
 import InsightPost from "./pages/InsightPost";
+import News from "./pages/News";
+import NewsIssue from "./pages/NewsIssue";
 import AgentLandingPage from "./pages/AgentLandingPage";
 import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
@@ -213,6 +215,9 @@ const App = () => (
             <Route path="/insights" element={<Insights />} />
             <Route path="/insights/prep" element={<Navigate to="/" replace />} />
             <Route path="/insights/:slug" element={<InsightPost />} />
+            <Route path="/news" element={<News />} />
+            <Route path="/news/promos/:slug" element={<NewsIssue category="promo" />} />
+            <Route path="/news/:slug" element={<NewsIssue category="newsletter" />} />
             <Route path="/stock-footage" element={<StockFootage />} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/unsubscribe" element={<Unsubscribe />} />

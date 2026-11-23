@@ -72,6 +72,9 @@ const RESERVED: Rewrite[] = [
   // first HTML response can carry the cover image and the SEO title.
   { source: "/insights/prep", destination: APP_SHELL },
   { source: "/insights/:slug", destination: "/api/index" },
+  // Issue HTML is rendered by the API so the first response carries the title and hero.
+  { source: "/news/promos/:slug", destination: "/api/index" },
+  { source: "/news/:slug", destination: "/api/index" },
 ];
 
 function withSlashVariants(rules: Rewrite[]): Rewrite[] {

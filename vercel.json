@@ -24,7 +24,7 @@
   "functions": {
     "api/index.mjs": {
       "maxDuration": 60,
-      "includeFiles": "{dist/spa/index.html,public/studio/grass-reference.jpg}",
+      "includeFiles": "{dist/spa/index.html,public/studio/grass-reference.jpg,content/news/**}",
       "excludeFiles": "{node_modules/sharp/**,node_modules/@img/**,node_modules/.pnpm/sharp@*/**,node_modules/.pnpm/@img+sharp*/**}"
     },
     "api/media-display.mjs": {
@@ -929,6 +929,26 @@
       ]
     },
     {
+      "source": "/news",
+      "destination": "/seo/www/news.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/news/",
+      "destination": "/seo/www/news.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.iconicimagestx.com"
+        }
+      ]
+    },
+    {
       "source": "/book",
       "destination": "/seo/www/book.html",
       "has": [
@@ -1299,6 +1319,26 @@
       ]
     },
     {
+      "source": "/news",
+      "destination": "/seo/www/news.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/news/",
+      "destination": "/seo/www/news.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "iconicimagestx.com"
+        }
+      ]
+    },
+    {
       "source": "/book",
       "destination": "/seo/www/book.html",
       "has": [
@@ -1587,6 +1627,22 @@
       "destination": "/api/index"
     },
     {
+      "source": "/news/promos/:slug",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/news/promos/:slug/",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/news/:slug",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/news/:slug/",
+      "destination": "/api/index"
+    },
+    {
       "source": "/",
       "destination": "/index.html"
     },
@@ -1669,6 +1725,14 @@
     {
       "source": "/insights/",
       "destination": "/seo/insights.html"
+    },
+    {
+      "source": "/news",
+      "destination": "/seo/news.html"
+    },
+    {
+      "source": "/news/",
+      "destination": "/seo/news.html"
     },
     {
       "source": "/book",
