@@ -40720,9 +40720,8 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 function slugifyNews(value) {
   return String(value || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60).replace(/-+$/g, "");
 }
-const NEWS_INDEX_PATH = "/insights/news";
 function newsIssuePath(meta) {
-  return meta.category === "promo" ? `${NEWS_INDEX_PATH}/promos/${meta.slug}` : `${NEWS_INDEX_PATH}/${meta.slug}`;
+  return meta.category === "promo" ? `/news/promos/${meta.slug}` : `/news/${meta.slug}`;
 }
 function sortNewsNewestFirst(items) {
   return [...items].sort((a, b) => {
@@ -40876,23 +40875,23 @@ async function findSentCampaignIssue(category, slug) {
   return null;
 }
 const router$5 = Router();
-router$5.use(requireStaff);
 function categoryOf(value) {
   if (value === "newsletter" || value === "promo") return value;
   return null;
 }
-router$5.get("/", async (_req, res) => {
-  const folders = newsCards();
-  const campaigns = await sentCampaignCards();
-  res.json({ issues: mergeNewsCards(folders, campaigns) });
-});
 router$5.get("/issues/:category/:slug", async (req, res) => {
+  res.setHeader("X-Robots-Tag", "noindex, nofollow");
   const category = categoryOf(String(req.params.category || ""));
   const slug = String(req.params.slug || "");
   if (!category) return res.status(404).json({ error: "That news issue is not published." });
   const issue = findFolderIssue(category, slug) || await findSentCampaignIssue(category, slug);
   if (!issue) return res.status(404).json({ error: "That news issue is not published." });
   return res.json({ issue });
+});
+router$5.get("/", requireStaff, async (_req, res) => {
+  const folders = newsCards();
+  const campaigns = await sentCampaignCards();
+  res.json({ issues: mergeNewsCards(folders, campaigns) });
 });
 const AMENITY_STOCK_PRICE = 49.99;
 const AMENITY_STOCK_CARDS = [
