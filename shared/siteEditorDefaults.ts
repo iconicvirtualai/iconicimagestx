@@ -89,6 +89,7 @@ const PAGES: ContentPage[] = [
     ], [
       linkItem("home", "Home", "/"),
       linkItem("whatWeDo", "What we do", "/what-we-do"),
+      linkItem("videoTeam", "Video Team", "/video-team"),
       linkItem("pricing", "Pricing", "/pricing"),
       linkItem("socials", "Socials", "/socials"),
       linkItem("portfolio", "Portfolio", "/portfolio"),

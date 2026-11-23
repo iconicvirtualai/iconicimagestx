@@ -809,6 +809,26 @@
       ]
     },
     {
+      "source": "/video-team",
+      "destination": "/seo/www/video-team.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/video-team/",
+      "destination": "/seo/www/video-team.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.iconicimagestx.com"
+        }
+      ]
+    },
+    {
       "source": "/pricing",
       "destination": "/seo/www/pricing.html",
       "has": [
@@ -1171,6 +1191,26 @@
     {
       "source": "/what-we-do/",
       "destination": "/seo/www/what-we-do.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/video-team",
+      "destination": "/seo/www/video-team.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/video-team/",
+      "destination": "/seo/www/video-team.html",
       "has": [
         {
           "type": "host",
@@ -1669,6 +1709,14 @@
     {
       "source": "/what-we-do/",
       "destination": "/seo/what-we-do.html"
+    },
+    {
+      "source": "/video-team",
+      "destination": "/seo/video-team.html"
+    },
+    {
+      "source": "/video-team/",
+      "destination": "/seo/video-team.html"
     },
     {
       "source": "/pricing",

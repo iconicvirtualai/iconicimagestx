@@ -33,6 +33,7 @@ const SURFACE = [
   "client/components/BookingForm.tsx",
   "client/pages/About.tsx",
   "client/pages/WhatWeDo.tsx",
+  "client/pages/VideoTeam.tsx",
   "client/pages/AgentLandingPage.tsx",
   "client/pages/Book.tsx",
   "client/pages/Contact.tsx",
