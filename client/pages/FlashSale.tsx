@@ -55,7 +55,7 @@ export default function FlashSale() {
   return (
     <Layout>
       <div className="min-h-screen bg-[#f4eee4] text-[#141414]">
-        <section className="mx-auto max-w-xl px-4 pb-20 pt-28 sm:px-6 sm:pt-32">
+        <section className="mx-auto max-w-xl px-4 pb-20 pt-40 sm:px-6 sm:pt-36">
           <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#0f8f80]">Flash sale</p>
           <h1 className="mt-3 text-4xl font-black tracking-tight">Stock up on shoots.</h1>
           <p className="mt-3 text-base leading-relaxed text-[#5b5249]">
