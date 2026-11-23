@@ -44,6 +44,11 @@ export function flashSaleOpen(now = Date.now()): boolean {
   return now <= FLASH_SALE_ENDS_MS;
 }
 
+/** Site-wide bar while the sale is open. The editor's AI staging line stays the fallback. */
+export const FLASH_SALE_BAR_HREF = "/flash-sale";
+export const FLASH_SALE_BAR_FULL = "⚡ FLASH SALE · 5 SHOOTS $1,250 · 10 SHOOTS $2,250 · ENDS WED NOV 25";
+export const FLASH_SALE_BAR_SHORT = "⚡ FLASH SALE · 5 FOR $1,250 · 10 FOR $2,250";
+
 export function flashSaleBundle(shoots: number): FlashSaleBundle | null {
   return FLASH_SALE_BUNDLES.find((bundle) => bundle.shoots === shoots) ?? null;
 }

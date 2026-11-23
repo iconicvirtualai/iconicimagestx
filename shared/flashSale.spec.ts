@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   FLASH_SALE_ENDS_MS,
+  FLASH_SALE_BAR_FULL,
+  FLASH_SALE_BAR_HREF,
+  FLASH_SALE_BAR_SHORT,
   flashSaleCheckoutPath,
   flashSaleOpen,
   formatFlashCents,
@@ -33,6 +36,8 @@ describe("flash sale", () => {
     expect(formatFlashCents(five!.totalCents)).toBe("$1,285.00");
     expect(formatFlashCents(ten!.totalCents)).toBe("$2,313.00");
     expect(flashSaleCheckoutPath(5)).toBe("/flash-sale?bundle=5");
+    expect(FLASH_SALE_BAR_HREF).toBe("/flash-sale");
+    expect(FLASH_SALE_BAR_SHORT.length).toBeLessThan(FLASH_SALE_BAR_FULL.length);
     expect(flashSaleCheckoutPath(10)).toBe("/flash-sale?bundle=10");
     expect(quoteFlashSale(7)).toBeNull();
   });
