@@ -2,23 +2,26 @@ import { describe, expect, it } from "vitest";
 import { renderToString } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
 import About from "./About";
-import { ABOUT_TEAM, PLACEHOLDER_BIO } from "@/content/aboutTeam";
+import { ABOUT_TEAM, CADI_PHOTO, PLACEHOLDER_BIO } from "@/content/aboutTeam";
 
 describe("About team", () => {
-  it("shows Cadi, then the crew in order, with circular headshots and no Jazmin photo", () => {
+  it("shows the crew in order, with Cadi as one circular card", () => {
     const html = renderToString(
       <MemoryRouter>
         <About />
       </MemoryRouter>,
     );
 
-    expect(html).toContain("About the owner");
-    expect(html).toContain("Cadi Torres founded Iconic around 2016.");
+    expect(html).not.toContain("About the owner");
+    expect(html).not.toContain("Cadi Torres founded Iconic around 2016.");
+    expect(html).toContain("She founded Iconic around 2016.");
     expect(html).toContain("Meet the team");
     expect(html).not.toContain('href="/video-team"');
     expect(html).not.toMatch(/jazmin/i);
     expect(html).not.toContain("b694584c91da4099bb13e517f9890e59");
+    expect(html).not.toContain("crew-cadi");
     expect(html).not.toContain("Visionary Creator");
+    expect(html.split(CADI_PHOTO).length - 1).toBe(1);
 
     const names = [
       ...html.matchAll(
@@ -35,12 +38,15 @@ describe("About team", () => {
 
     const photos = [...html.matchAll(/<img\b[^>]*>/g)]
       .map((match) => match[0])
-      .filter((tag) => tag.includes("/holiday-2026/crew-"));
-    expect(photos).toHaveLength(ABOUT_TEAM.length + 1);
+      .filter((tag) => ABOUT_TEAM.some((person) => tag.includes(person.photo)));
+    expect(photos).toHaveLength(ABOUT_TEAM.length);
     for (const tag of photos) {
       expect(tag).toContain("rounded-full");
+      expect(tag).toContain("h-24 w-24");
+      expect(tag).toContain("sm:h-36 sm:w-36");
       expect(tag).not.toContain("aspect-");
     }
+    expect(photos[0]).toContain("object-top");
 
     const placeholderBios = [...html.matchAll(/data-bio="placeholder"/g)];
     expect(placeholderBios).toHaveLength(

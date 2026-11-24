@@ -1,13 +1,15 @@
 /**
  * About page roster.
  *
- * Photos are the circular holiday crew headshots. The video-team page uses
- * the same files. /video-team is not a route on main, so About does not link there.
+ * Photos are the circular holiday crew headshots, except Cadi.
+ * Her card uses the portrait that was on the live About page, saved at
+ * public/media/about/cadi-torres.webp. That file is only used on her card.
+ * /video-team is not a route on main, so About does not link there.
  *
  * Roles come from the crew cards in public/thankful.html.
  * "Video team" is added for Mike, Daniel, and Armando because that is a known fact.
  * Cadi founded Iconic around 2016, which matches the "Est. 2016" line already on About.
- * Her blurb also keeps the existing About line about making agents more money with less effort.
+ * That is the only line on her card. There is no separate owner section.
  *
  * Armando's blurb is shortened from the published /aboutarmando profile
  * (born in Mexico, raised in Houston, UT Austin Television and Film Production, photographer since 2013).
@@ -24,15 +26,11 @@ export type AboutTeamMember = {
   blurb: string;
   bioIsPlaceholder: boolean;
   photo: string;
+  /** Tailwind object-position. Cadi's source is a tall portrait, so the circle keeps her face. */
+  photoPosition?: string;
 };
 
-export const ABOUT_OWNER = {
-  kicker: "About the owner",
-  name: "Cadi Torres",
-  photo: "/holiday-2026/crew-cadi.jpg",
-  blurb:
-    "Cadi Torres founded Iconic around 2016. She built the studio to solve one problem: how to make agents more money with less effort.",
-};
+export const CADI_PHOTO = "/media/about/cadi-torres.webp";
 
 export const ABOUT_TEAM: readonly AboutTeamMember[] = [
   {
@@ -42,7 +40,8 @@ export const ABOUT_TEAM: readonly AboutTeamMember[] = [
     roleIsPlaceholder: false,
     blurb: "She founded Iconic around 2016.",
     bioIsPlaceholder: false,
-    photo: "/holiday-2026/crew-cadi.jpg",
+    photo: CADI_PHOTO,
+    photoPosition: "object-top",
   },
   {
     id: "mike",
