@@ -56,11 +56,14 @@ export default function FlashSale() {
     <Layout>
       <div className="min-h-screen bg-[#f4eee4] text-[#141414]">
         <section className="mx-auto max-w-xl px-4 pb-20 pt-40 sm:px-6 sm:pt-36">
-          <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#0f8f80]">Flash sale</p>
+          <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#141414]">Black Friday Sale</p>
           <h1 className="mt-3 text-4xl font-black tracking-tight">Stock up on shoots.</h1>
           <p className="mt-3 text-base leading-relaxed text-[#5b5249]">
             Each shoot is 50 photos, 3 aerials, and your choice of one add-on. Paid upfront. Use the shoots within 90 days.
           </p>
+          {open && (
+            <p className="mt-3 text-sm font-semibold text-[#141414]">Ends Friday, Nov 27 at 11:59pm CT.</p>
+          )}
           {paid && (
             <p className="mt-6 rounded-3xl bg-[#fffdf9] px-5 py-4 text-sm leading-relaxed ring-1 ring-[#e4dacb]">
               If Square confirmed the payment, your bundle is recorded. We did not send a receipt from this page.
@@ -68,8 +71,8 @@ export default function FlashSale() {
           )}
           {!open && (
             <div className="mt-8 rounded-[1.75rem] bg-[#fffdf9] px-5 py-8 text-center ring-1 ring-[#e4dacb]">
-              <h2 className="text-2xl font-black">This flash sale has ended.</h2>
-              <p className="mt-2 text-sm text-[#5b5249]">The offer closed Wednesday, Nov 25, 2026.</p>
+              <h2 className="text-2xl font-black">This Black Friday sale has ended.</h2>
+              <p className="mt-2 text-sm text-[#5b5249]">The offer closed Friday, Nov 27, 2026 at 11:59pm CT.</p>
               <Link to="/book" className="mt-5 inline-flex rounded-full bg-[#0f8f80] px-5 py-3 text-sm font-bold text-white">
                 Book a shoot
               </Link>

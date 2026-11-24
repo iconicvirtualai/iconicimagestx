@@ -39,7 +39,7 @@ const APP_SHELL_SOURCES = [
   "/services/virtual-staging/select",
   "/services/virtual-staging/ai-tool",
   "/services/virtual-staging/pro-order",
-  "/flash-sale",
+  "/black-friday",
   "/dev/invoice-template",
   ...STUDIO105_APP_SOURCES,
 ];
@@ -162,6 +162,8 @@ export function buildVercelRedirects(): Redirect[] {
     { source: "/gallery/", destination: "/portal", permanent: false },
     { source: "/news", destination: "/", statusCode: 302 },
     { source: "/news/", destination: "/", statusCode: 302 },
+    { source: "/flash-sale", destination: "/black-friday", statusCode: 302 },
+    { source: "/flash-sale/", destination: "/black-friday", statusCode: 302 },
     { source: "/insights/news/promos/:slug", destination: "/news/promos/:slug", statusCode: 302 },
     { source: "/insights/news/promos/:slug/", destination: "/news/promos/:slug", statusCode: 302 },
     { source: "/insights/news/:slug", destination: "/news/:slug", statusCode: 302 },

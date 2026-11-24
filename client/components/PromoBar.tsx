@@ -9,8 +9,8 @@ const barLayout =
   "fixed top-0 left-0 right-0 z-[60] flex items-center justify-center gap-2 px-3 py-1.5 text-center text-[10px] font-black uppercase leading-none text-white shadow-lg";
 
 /**
- * The site editor still stores the AI staging line. While the flash sale is open
- * that line is replaced in the bar only. After FLASH_SALE_ENDS_MS it comes back
+ * The site editor still stores the AI staging line. While the Black Friday sale
+ * is open that line is replaced in the bar only. After SALE_ENDS_MS it comes back
  * on its own. The bar is painted in the browser, not in the SEO shell.
  */
 export default function PromoBar() {
@@ -35,11 +35,11 @@ export default function PromoBar() {
       <Link
         to={FLASH_SALE_BAR_HREF}
         data-testid="promo-bar"
-        data-promo="flash-sale"
-        className={`${barLayout} border-b border-[#9f1239] bg-gradient-to-r from-[#e8432e] to-[#d6336c] tracking-[0.04em] sm:text-xs sm:tracking-[0.12em]`}
+        data-promo="black-friday"
+        className={`${barLayout} border-b-2 border-[#ffd23f] bg-[#141414] tracking-[0.02em] lg:text-xs lg:tracking-[0.08em]`}
       >
-        <span className="sm:hidden">{FLASH_SALE_BAR_SHORT}</span>
-        <span className="hidden sm:inline">{FLASH_SALE_BAR_FULL}</span>
+        <span className="lg:hidden">{FLASH_SALE_BAR_SHORT}</span>
+        <span className="hidden lg:inline">{FLASH_SALE_BAR_FULL}</span>
         <ArrowRight className="h-3.5 w-3.5 shrink-0" />
       </Link>
     );

@@ -5,7 +5,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { FLASH_SALE_ENDS_MS } from "@shared/flashSale";
+import { SALE_ENDS_MS } from "@shared/flashSale";
 import PromoBar from "./PromoBar";
 
 vi.mock("@/hooks/useSiteSettings", () => ({
@@ -49,22 +49,23 @@ async function renderBar() {
 
 describe("promo bar", () => {
   it("shows the flash sale through the shared Central deadline", async () => {
-    vi.spyOn(Date, "now").mockReturnValue(FLASH_SALE_ENDS_MS);
+    vi.spyOn(Date, "now").mockReturnValue(SALE_ENDS_MS);
     await renderBar();
     const open = container?.querySelector("[data-testid='promo-bar']");
-    expect(open?.getAttribute("href")).toBe("/flash-sale");
-    expect(open?.getAttribute("data-promo")).toBe("flash-sale");
+    expect(open?.getAttribute("href")).toBe("/black-friday");
+    expect(open?.getAttribute("data-promo")).toBe("black-friday");
+    expect(open?.textContent).toContain("BLACK FRIDAY SALE");
     expect(open?.textContent).toContain("5 SHOOTS $1,250");
     expect(open?.textContent).not.toContain("ICONICAI");
   });
 
   it("returns the AI staging line after that deadline", async () => {
-    vi.spyOn(Date, "now").mockReturnValue(FLASH_SALE_ENDS_MS + 1);
+    vi.spyOn(Date, "now").mockReturnValue(SALE_ENDS_MS + 1);
     await renderBar();
     const closed = container?.querySelector("[data-testid='promo-bar']");
     expect(closed?.getAttribute("href")).toBe("/book");
     expect(closed?.getAttribute("data-promo")).toBe("staging");
     expect(closed?.textContent).toContain("FREE AI STAGING ON YOUR FIRST ORDER - CODE: ICONICAI");
-    expect(closed?.textContent).not.toContain("FLASH SALE");
+    expect(closed?.textContent).not.toContain("BLACK FRIDAY");
   });
 });

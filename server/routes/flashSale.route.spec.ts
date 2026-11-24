@@ -72,6 +72,7 @@ describe("flash sale checkout", () => {
     expect(posted?.url).toBe("https://connect.squareupsandbox.com/v2/online-checkout/payment-links");
     const lines = (posted?.body.order as { line_items?: Array<{ name?: string; base_price_money?: { amount?: number } }> }).line_items;
     expect(lines?.map((line) => line.base_price_money?.amount)).toEqual([125000, 3500]);
+    expect(lines?.[0]?.name).toBe("Black Friday Sale · 5 shoots");
     expect(lines?.[1]?.name).toBe("Processing (2.8%)");
     const saved = flashSaleMemoryOrders();
     expect(saved).toHaveLength(1);
@@ -79,6 +80,8 @@ describe("flash sale checkout", () => {
     expect(saved[0].total).toBe(1285);
     expect(saved[0].status).toBe("awaiting-payment");
     expect(String(saved[0].source)).toBe("flash-sale");
+    expect(saved[0].title).toBe("Black Friday Sale · 5 shoots");
+    expect(saved[0].leadSource).toBe("Black Friday Sale");
 
     const ten = await fetch(`${baseUrl}/api/flash-sale/checkout`, {
       method: "POST",

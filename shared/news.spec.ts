@@ -67,6 +67,10 @@ describe("news issues", () => {
     expect(tags).toContain(`href="${CANONICAL_WWW_ORIGIN}/news/holysmokes"`);
     expect(email).toContain("https://www.iconicimagestx.com/flash-sale?bundle=5");
     expect(email).toContain("https://www.iconicimagestx.com/flash-sale?bundle=10");
+    expect(email).toContain("BLACK FRIDAY SALE");
+    expect(email).toContain("11:59 PM CT");
+    expect(email).not.toContain("FLASH SALE");
+    expect(email).not.toContain("Nov 25");
     expect(email).toContain("Cadi, Mike, Armando, Daniel, Steven, Pedro and David");
     expect(email).toContain("Message us and we'll lock in your bundle");
     const preview = prepareEmailSrcDoc(email, "https://preview.example");
@@ -74,8 +78,10 @@ describe("news issues", () => {
     expect(preview).toContain("https://preview.example/marketing/email/holy-smokes-2026/05-podcast-vote.gif");
     expect(preview).toContain("news-email-height");
     expect(preview).toContain("overflow:hidden");
-    expect(preview).toContain("https://preview.example/flash-sale?bundle=5");
-    expect(preview).toContain('href="/unsubscribe"');
+    expect(preview).toContain("https://preview.example/black-friday?bundle=5");
+    expect(preview).not.toContain("/flash-sale");
+    expect(preview).toContain(">Unsubscribe</a>");
+    expect(prepareEmailSrcDoc('<a href="[UNSUBSCRIBE LINK]">Unsubscribe</a>')).toContain('href="/unsubscribe"');
     expect(preview).toContain('href="https://www.iconicimagestx.com/book"');
     const previewHost = prepareEmailSrcDoc(email, DEFAULT_SITE_ORIGIN);
     expect(previewHost).toContain(`${DEFAULT_SITE_ORIGIN}/marketing/email/holy-smokes-2026/hero.jpg`);

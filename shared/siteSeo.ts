@@ -236,7 +236,7 @@ export function isNoIndexPath(pathname: string): boolean {
   if (path === "/invoice" || path.startsWith("/invoice/")) return true;
   if (path === "/news" || path.startsWith("/news/")) return true;
   if (path === "/insights/news" || path.startsWith("/insights/news/")) return true;
-  if (path === "/flash-sale") return false;
+  if (path === "/black-friday") return false;
   return false;
 }
 
@@ -267,10 +267,10 @@ export function metaPlan(pathname: string, origin = SITE_ORIGIN): MetaPlan {
   if (path === "/news" || path.startsWith("/news/") || path === "/insights/news" || path.startsWith("/insights/news/")) {
     return { kind: "noindex", title: "News | Iconic Images" };
   }
-  if (path === "/flash-sale") {
+  if (path === "/black-friday") {
     return {
       kind: "public",
-      title: "Flash Sale | Iconic Images",
+      title: "Black Friday Sale | Iconic Images",
       description: "Prepaid listing shoot bundles from Iconic Images in Spring, The Woodlands, and Houston.",
       canonical: canonicalUrl(path, origin),
       image: ogImageUrl(origin),
