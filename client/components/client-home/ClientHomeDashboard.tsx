@@ -33,6 +33,14 @@ import { PortalListingsHome } from "@/components/client-home/PortalListingsHome"
 
 export type ClientHomeSection = PortalHomeSection;
 
+export interface PortalOrderSummary {
+  id: string;
+  address: string;
+  status: string;
+  href: string;
+  orderNumber?: string | null;
+}
+
 const TONE_CLASS: Record<AppointmentTone, string> = {
   past: "bg-gray-200 text-gray-600 border-gray-200",
   submitted: "bg-blue-600 text-white border-blue-600",
@@ -62,6 +70,7 @@ export function ClientHomeView({
   accountName,
   listings,
   invoices,
+  orders = [],
   appointments,
   listingsTruncated = false,
   invoicesTruncated = false,
@@ -80,6 +89,7 @@ export function ClientHomeView({
   accountName?: string;
   listings: ClientListingCard[];
   invoices: ClientInvoiceStatement[];
+  orders?: PortalOrderSummary[];
   appointments: ClientAppointment[];
   listingsTruncated?: boolean;
   invoicesTruncated?: boolean;
@@ -130,14 +140,34 @@ export function ClientHomeView({
             />
           </>
         ) : section === "orders" ? (
-          invoices.length === 0 ? (
+          orders.length === 0 && invoices.length === 0 ? (
             <div className="card">
               <h2>Order history</h2>
               <p>No invoices are stored on this account yet.</p>
               <Link to={portalHref("/portal/settings/billing", example)} className="btn btn-ink btn-md" style={{ marginTop: 16 }}>Open billing</Link>
             </div>
           ) : (
-            <OrderHistory invoices={invoices} truncated={invoicesTruncated} filterable exampleOpen={example} />
+            <>
+              {orders.length > 0 ? (
+                <div className={invoices.length > 0 ? "mb-8" : undefined}>
+                  <SectionHeading title="Order history" note="Orders saved for this account." />
+                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                    {orders.map((order) => (
+                      <Link key={order.id} to={order.href} className="flex items-center justify-between gap-4 border-b border-gray-100 px-5 py-4 last:border-b-0 hover:bg-gray-50">
+                        <div className="min-w-0">
+                          <OrderNumberMark value={order.orderNumber} />
+                          <p className="truncate text-sm font-bold text-black">{order.address}</p>
+                        </div>
+                        <span className="shrink-0 text-[10px] font-black uppercase tracking-widest text-gray-500">{humanStatus(order.status)}</span>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+              {invoices.length > 0 ? (
+                <OrderHistory invoices={invoices} truncated={invoicesTruncated} filterable exampleOpen={example} />
+              ) : null}
+            </>
           )
         ) : section === "messages" ? (
           <PortalMessages example={example} onUnreadCount={onMessageCount} />

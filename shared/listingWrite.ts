@@ -19,6 +19,8 @@ export interface ClientCandidate {
 export interface PortalIdentity {
   ids: string[];
   email?: string | null;
+  /** Ids that belong to a different client. Omit when that list was not loaded. */
+  otherClientIds?: string[];
 }
 
 /** A Firestore Timestamp, a date-only string, or a Date. Never an Invalid Date. */
@@ -105,6 +107,7 @@ export function visibleToPortalClient(
     ids: identity.ids,
     firebaseUid: identity.ids[0] || null,
     email: normalizeEmail(identity.email),
+    ...(Array.isArray(identity.otherClientIds) ? { otherClientIds: identity.otherClientIds } : {}),
   });
 }
 

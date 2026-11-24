@@ -76,7 +76,13 @@ export default function AdminOrders() {
     const unsub = onSnapshot(collection(db, "orderRequests"), snap => {
       setOrders(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       setLoading(false);
-    }, err => { console.error(err); toast.error("Failed to load orders"); setLoading(false); });
+    }, (err) => {
+      console.error(err);
+      const code = err && typeof err === "object" && "code" in err ? String((err as { code?: unknown }).code || "") : "";
+      const denied = code === "permission-denied" || code.endsWith("/permission-denied");
+      toast.error(denied ? "Failed to load orders (permission-denied)." : "Failed to load orders");
+      setLoading(false);
+    });
 
     const unsubEdits = onSnapshot(collection(db, "editRequests"), snap => {
       setEditRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })));

@@ -9,6 +9,7 @@ import admin from "firebase-admin";
 import { requireCoordinator, requireStaff, requireAuth, type AuthenticatedRequest } from "../middleware/auth";
 import { cleanPersonName, normalizeEmail } from "../../shared/listingAccess";
 import { visibleToPortalClient } from "../../shared/listingWrite";
+import { otherKnownClientIds } from "../services/knownClients";
 import { profileId } from "../../shared/peopleProfiles";
 import {
   addressText,
@@ -242,24 +243,11 @@ router.get("/me/home", requireAuth, async (req: AuthenticatedRequest, res) => {
     const orders: Record<string, unknown>[] = [];
     const ordersById = new Map<string, Record<string, unknown>>();
     const seenOrder = new Set<string>();
-    const pushOrder = (entry: FirebaseFirestore.QueryDocumentSnapshot) => {
+    const orderDocs: FirebaseFirestore.QueryDocumentSnapshot[] = [];
+    const collectOrder = (entry: FirebaseFirestore.QueryDocumentSnapshot) => {
       if (seenOrder.has(entry.id)) return;
-      const data = entry.data();
-      if (!visibleToPortalClient(
-        { clientId: data.clientId, firebaseUid: data.firebaseUid, clientProfileId: data.clientProfileId, email: data.email, clientEmail: data.clientEmail },
-        { ids: identity.ids, email: identity.email },
-      )) return;
       seenOrder.add(entry.id);
-      const stored = asRecord(jsonSafe(data));
-      ordersById.set(entry.id, { ...stored, id: entry.id });
-      const listingId = typeof data.listingId === "string" ? data.listingId : "";
-      orders.push({
-        id: entry.id,
-        address: addressText(data.address || data.shootLocation) || "Order",
-        status: data.status || "new",
-        href: listingId ? clientListingPath(listingId) : "/portal/home?section=orders",
-        orderNumber: stored.orderNumber ?? null,
-      });
+      orderDocs.push(entry);
     };
     try {
       for (const clientId of identity.ids) {
@@ -269,18 +257,47 @@ router.get("/me/home", requireAuth, async (req: AuthenticatedRequest, res) => {
           db().collection("orderRequests").where("firebaseUid", "==", clientId).limit(HOME_LIMIT).get(),
           db().collection("orderRequests").where("clientProfileId", "==", profileKey).limit(HOME_LIMIT).get(),
         ]);
-        [...byId.docs, ...byUid.docs, ...byProfile.docs].forEach(pushOrder);
+        [...byId.docs, ...byUid.docs, ...byProfile.docs].forEach(collectOrder);
       }
       if (identity.email) {
         const [byEmail, byClientEmail] = await Promise.all([
           db().collection("orderRequests").where("email", "==", identity.email).limit(HOME_LIMIT).get(),
           db().collection("orderRequests").where("clientEmail", "==", identity.email).limit(HOME_LIMIT).get(),
         ]);
-        byEmail.docs.forEach(pushOrder);
-        byClientEmail.docs.forEach(pushOrder);
+        byEmail.docs.forEach(collectOrder);
+        byClientEmail.docs.forEach(collectOrder);
       }
     } catch (orderErr) {
       console.error("[Clients] Order lookup failed:", orderErr);
+    }
+    let otherClientIds: string[] | undefined;
+    try {
+      otherClientIds = await otherKnownClientIds(db(), orderDocs.map((entry) => entry.data()), identity.ids);
+    } catch (lookupErr) {
+      console.error("[Clients] Client id lookup failed:", lookupErr);
+    }
+    const orderIdentity = {
+      ids: identity.ids,
+      email: identity.email,
+      ...(otherClientIds ? { otherClientIds } : {}),
+    };
+    for (const entry of orderDocs) {
+      const data = entry.data();
+      if (!visibleToPortalClient(
+        { clientId: data.clientId, firebaseUid: data.firebaseUid, clientProfileId: data.clientProfileId, email: data.email, clientEmail: data.clientEmail },
+        orderIdentity,
+      )) continue;
+      const stored = asRecord(jsonSafe(data));
+      const title = typeof data.title === "string" ? data.title.trim() : "";
+      ordersById.set(entry.id, { ...stored, id: entry.id });
+      const listingId = typeof data.listingId === "string" ? data.listingId : "";
+      orders.push({
+        id: entry.id,
+        address: addressText(data.address || data.shootLocation) || title || "Order",
+        status: data.status || "new",
+        href: listingId ? clientListingPath(listingId) : "/portal/home?section=orders",
+        orderNumber: stored.orderNumber ?? null,
+      });
     }
 
     if (identity.email) {

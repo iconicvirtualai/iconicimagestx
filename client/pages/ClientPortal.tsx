@@ -14,6 +14,7 @@ interface PortalHome {
   listings?: ClientListingCard[];
   projects?: ClientListingCard[];
   invoices?: ClientInvoiceStatement[];
+  orders?: Array<{ id: string; address: string; status: string; href: string; orderNumber?: string | null }>;
   appointments?: ClientAppointment[];
   listingsTruncated?: boolean;
   invoicesTruncated?: boolean;
@@ -117,6 +118,7 @@ export default function ClientPortal() {
           accountName={accountName}
           listings={listings}
           invoices={example ? [exampleInvoice()] : home?.invoices || []}
+          orders={example ? [] : home?.orders || []}
           appointments={example ? exampleAppointments() : home?.appointments || []}
           listingsTruncated={Boolean(home?.listingsTruncated)}
           invoicesTruncated={Boolean(home?.invoicesTruncated)}

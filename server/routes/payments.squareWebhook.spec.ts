@@ -437,6 +437,65 @@ describe("Square webhook paid unlock", () => {
     expect(sent).toHaveLength(0);
   });
 
+  it("marks the orderRequests doc paid when a flash-sale checkout has no invoice", async () => {
+    memory.seed("orderRequests", "flash-req", {
+      source: "flash-sale",
+      status: "awaiting-payment",
+      squareOrderId: "sq-flash-1",
+      squareLinkId: "link-flash",
+      squarePaymentLinkId: "link-flash",
+      orderId: "flash-req",
+      orderRequestId: "flash-req",
+      clientEmail: "ada@example.com",
+      total: 1285,
+      orderNumber: "FS-1048",
+    });
+    memory.seed("orders", "flash-req", {
+      source: "flash-sale",
+      status: "awaiting-payment",
+      squareOrderId: "sq-flash-1",
+      orderRequestId: "flash-req",
+      total: 1285,
+    });
+    const event = {
+      merchant_id: "MLTEST",
+      type: "payment.updated",
+      event_id: "evt-flash",
+      data: {
+        type: "payment",
+        id: "pay-flash",
+        object: {
+          payment: {
+            id: "pay-flash",
+            status: "COMPLETED",
+            order_id: "sq-flash-1",
+            payment_link_id: "link-flash",
+            amount_money: { amount: 128500, currency: "USD" },
+            total_money: { amount: 128500, currency: "USD" },
+          },
+        },
+      },
+    };
+    const result = await postEvent(event);
+    expect(result.status).toBe(200);
+    expect(result.json).toMatchObject({ received: true, orderRequest: true });
+    expect(memory.get("orderRequests", "flash-req")).toMatchObject({
+      paymentStatus: "paid",
+      squarePaymentId: "pay-flash",
+      status: "new",
+      amountPaid: 1285,
+      balanceDue: 0,
+    });
+    expect(memory.get("orders", "flash-req")).toMatchObject({
+      paymentStatus: "paid",
+      squarePaymentId: "pay-flash",
+      orderRequestId: "flash-req",
+    });
+    const again = await postEvent({ ...event, event_id: "evt-flash-again" });
+    expect(again.status).toBe(200);
+    expect(memory.get("orderRequests", "flash-req")?.amountPaid).toBe(1285);
+  });
+
   it("leaves invoice.payment_made alone until a completed payment event arrives", async () => {
     seedPaidWorld({ squareOrderId: "sq-order-playtest", squareInvoiceId: "inv-square-1" });
     const made = {
