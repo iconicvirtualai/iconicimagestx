@@ -1527,6 +1527,58 @@ async function findInvoiceForSquarePayment(payment: Record<string, unknown>) {
   return snap.exists ? snap : null;
 }
 
+async function findSquareSaleDoc(collectionName: string, payment: Record<string, unknown>) {
+  const orderId = typeof payment.order_id === "string" ? payment.order_id.trim() : "";
+  const linkRaw = payment.payment_link_id || payment.paymentLinkId;
+  const linkId = typeof linkRaw === "string" ? linkRaw.trim() : "";
+  const steps: Array<[string, string]> = [];
+  if (orderId) steps.push(["squareOrderId", orderId]);
+  if (linkId) {
+    steps.push(["squarePaymentLinkId", linkId]);
+    steps.push(["squareLinkId", linkId]);
+  }
+  for (const [field, value] of steps) {
+    const snap = await db().collection(collectionName).where(field, "==", value).limit(1).get();
+    if (!snap.empty) return snap.docs[0];
+  }
+  return null;
+}
+
+async function markSquareOrderPaid(
+  ref: FirebaseFirestore.DocumentReference,
+  data: Record<string, unknown>,
+  amount: number,
+  squarePaymentId: string,
+) {
+  if (data.squarePaymentId === squarePaymentId && data.paymentStatus === "paid") return;
+  const pricing = data.pricing && typeof data.pricing === "object" ? data.pricing as { total?: unknown } : {};
+  const total = Number(data.total) || Number(pricing.total) || amount;
+  const current = typeof data.status === "string" ? data.status : "";
+  await ref.update({
+    status: current === "awaiting-payment" ? "new" : current || "new",
+    paymentStatus: "paid",
+    amountPaid: amount,
+    balanceDue: Math.max(0, Math.round((total - amount) * 100) / 100),
+    squarePaymentId,
+    paidAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+}
+
+/** Prepaid checkout has no invoice. The paid webhook still updates orderRequests. */
+async function settlePrepaidOrderRequest(payment: Record<string, unknown>, amount: number): Promise<boolean> {
+  const paymentId = typeof payment.id === "string" ? payment.id.trim() : "";
+  if (!paymentId) return false;
+  const request = await findSquareSaleDoc("orderRequests", payment);
+  const legacy = request ? null : await findSquareSaleDoc("orders", payment);
+  const primary = request || legacy;
+  if (!primary) return false;
+  await markSquareOrderPaid(primary.ref, primary.data() || {}, amount, paymentId);
+  const twin = await db().collection(request ? "orders" : "orderRequests").doc(primary.id).get();
+  if (twin.exists) await markSquareOrderPaid(twin.ref, twin.data() || {}, amount, paymentId);
+  return true;
+}
+
 router.post("/square-webhook", async (req: Request, res: Response) => {
   try {
     const signatureKey = process.env.SQUARE_WEBHOOK_SIGNATURE_KEY;
@@ -1563,8 +1615,14 @@ router.post("/square-webhook", async (req: Request, res: Response) => {
     const payment = event?.data?.object?.payment || event?.data?.object;
     if (!payment?.id || payment.status !== "COMPLETED") return res.json({ received: true });
 
+    const amountCents = Number(payment.amount_money?.amount ?? payment.total_money?.amount ?? 0);
+    const amount = amountCents / 100;
+    if (amount <= 0) return res.json({ received: true, ignored: "zero-amount" });
+
     const invoiceDoc = await findInvoiceForSquarePayment(payment);
     if (!invoiceDoc) {
+      const settledOrder = await settlePrepaidOrderRequest(payment, amount);
+      if (settledOrder) return res.json({ received: true, orderRequest: true });
       await db().collection("agentLogs").add({
         agent: "travis",
         action: "Unmatched Square payment",
@@ -1586,10 +1644,6 @@ router.post("/square-webhook", async (req: Request, res: Response) => {
     if (isMirroredPayAtCloseSquarePayment(payment, invoice)) {
       return res.json({ received: true, ignored: "pay-at-close-external" });
     }
-
-    const amountCents = Number(payment.amount_money?.amount ?? payment.total_money?.amount ?? 0);
-    const amount = amountCents / 100;
-    if (amount <= 0) return res.json({ received: true, ignored: "zero-amount" });
 
     if (isDepositSquarePayment(invoice, payment)) {
       await applyDepositPayment({

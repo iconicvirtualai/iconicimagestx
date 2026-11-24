@@ -257,6 +257,23 @@ describe("client home dashboard", () => {
     expect(html).toContain("Open billing");
   });
 
+  it("shows a saved order on Order history when there is no invoice", () => {
+    const html = view({
+      section: "orders",
+      orders: [{
+        id: "order-221",
+        address: "221 Stale Creek Dr",
+        status: "awaiting-payment",
+        href: "/portal/home?section=orders",
+        orderNumber: "#221",
+      }],
+    });
+    expect(html).toContain("Order history");
+    expect(html).toContain("221 Stale Creek Dr");
+    expect(html).toContain("#221");
+    expect(html).not.toContain("No invoices are stored on this account yet");
+  });
+
   it("colors past, submitted, accepted, and changed appointments", () => {
     const html = view({
       section: "schedule",

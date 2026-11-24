@@ -3,7 +3,7 @@ import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createServer } from "../index";
-import { resetFlashSaleMemory, flashSaleMemoryOrders } from "../services/flashSaleOrders";
+import { resetFlashSaleMemory, flashSaleMemoryOrders, flashSaleMemoryOrderTwins } from "../services/flashSaleOrders";
 import { resetFlashSaleRateLimit } from "./flashSale";
 
 let server: Server;
@@ -76,12 +76,25 @@ describe("flash sale checkout", () => {
     expect(lines?.[1]?.name).toBe("Processing (2.8%)");
     const saved = flashSaleMemoryOrders();
     expect(saved).toHaveLength(1);
+    expect(saved[0].collection).toBe("orderRequests");
+    expect(saved[0].clientName).toBe("Ada Agent");
     expect(saved[0].clientEmail).toBe("ada@example.com");
+    expect(saved[0].email).toBe("ada@example.com");
+    expect(saved[0].clientPhone).toBe("2815550100");
+    expect(saved[0].address).toBe("");
     expect(saved[0].total).toBe(1285);
     expect(saved[0].status).toBe("awaiting-payment");
+    expect(saved[0].orderNumber).toBe(body.orderNumber);
+    expect(Array.isArray(saved[0].lineItems)).toBe(true);
     expect(String(saved[0].source)).toBe("flash-sale");
     expect(saved[0].title).toBe("Black Friday Sale · 5 shoots");
     expect(saved[0].leadSource).toBe("Black Friday Sale");
+    const twin = flashSaleMemoryOrderTwins();
+    expect(twin).toHaveLength(1);
+    expect(twin[0].collection).toBe("orders");
+    expect(twin[0].id).toBe(saved[0].id);
+    expect(twin[0].orderRequestId).toBe(saved[0].id);
+    expect(saved[0].orderId).toBe(saved[0].id);
 
     const ten = await fetch(`${baseUrl}/api/flash-sale/checkout`, {
       method: "POST",

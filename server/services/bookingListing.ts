@@ -8,6 +8,7 @@ import admin from "firebase-admin";
 import { invoiceRedirectTarget, legacyInvoiceDocIds } from "../../shared/invoicePay";
 import { normalizeEmail } from "../../shared/listingAccess";
 import { visibleToPortalClient } from "../../shared/listingWrite";
+import { otherKnownClientIds } from "./knownClients";
 import {
   bookingListingGroups,
   fillEmptyListingFields,
@@ -173,19 +174,14 @@ async function loadVisibleSeeds(identity: { ids: string[]; email: string }): Pro
   const orders = new Map<string, BookingListingDoc>();
   const invoices = new Map<string, BookingListingDoc>();
   const appointments = new Map<string, BookingListingDoc>();
-  const keep = (map: Map<string, BookingListingDoc>, docs: BookingListingDoc[]) => {
+  const stash = (map: Map<string, BookingListingDoc>, docs: BookingListingDoc[]) => {
     for (const doc of docs) {
-      if (!visibleToPortalClient({
-        clientId: text(doc.data.clientId),
-        email: text(doc.data.email),
-        clientEmail: text(doc.data.clientEmail),
-      }, identity)) continue;
       if (!map.has(doc.id)) map.set(doc.id, doc);
     }
   };
   const jobs: Array<Promise<void>> = [];
   const track = (job: Promise<BookingListingDoc[]>, map: Map<string, BookingListingDoc>) => {
-    jobs.push(job.then((docs) => keep(map, docs)));
+    jobs.push(job.then((docs) => stash(map, docs)));
   };
   if (identity.ids.length) {
     track(queryIn("orderRequests", "clientId", identity.ids), requests);
@@ -201,6 +197,33 @@ async function loadVisibleSeeds(identity: { ids: string[]; email: string }): Pro
     track(queryEqual("appointments", "clientEmail", identity.email), appointments);
   }
   await Promise.all(jobs);
+  let otherClientIds: string[] | undefined;
+  try {
+    otherClientIds = await otherKnownClientIds(db(), [
+      ...requests.values(),
+      ...orders.values(),
+      ...invoices.values(),
+      ...appointments.values(),
+    ].map((doc) => doc.data), identity.ids);
+  } catch (err) {
+    console.error("[Booking listing] Client id lookup failed:", err);
+  }
+  const portalIdentity = otherClientIds ? { ...identity, otherClientIds } : identity;
+  const dropHidden = (map: Map<string, BookingListingDoc>) => {
+    for (const [id, doc] of map) {
+      if (!visibleToPortalClient({
+        clientId: text(doc.data.clientId),
+        firebaseUid: text(doc.data.firebaseUid),
+        clientProfileId: text(doc.data.clientProfileId),
+        email: text(doc.data.email),
+        clientEmail: text(doc.data.clientEmail),
+      }, portalIdentity)) map.delete(id);
+    }
+  };
+  dropHidden(requests);
+  dropHidden(orders);
+  dropHidden(invoices);
+  dropHidden(appointments);
   return {
     orderRequests: [...requests.values()],
     orders: [...orders.values()],
