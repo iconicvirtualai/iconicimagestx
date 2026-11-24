@@ -1,4 +1,5 @@
 import Layout from "@/components/Layout";
+import AboutTeam from "@/components/about/AboutTeam";
 import DecadeMashupCarousel from "@/components/DecadeMashupCarousel";
 import { Button } from "@/components/ui/button";
 import { Star, Zap, Rocket, MapPin, Award } from "lucide-react";
@@ -120,51 +121,7 @@ export default function About() {
           </div>
         </section>
 
-        {/* Cadi Section */}
-        <section className="bg-gray-50 py-24 md:py-32 overflow-hidden">
-          <div className="container mx-auto px-4 max-w-7xl">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-              <div className="relative">
-                <div className="absolute -top-10 -left-10 w-40 h-40 bg-teal-500/10 rounded-full blur-3xl"></div>
-                <div className="relative rounded-[2.5rem] overflow-hidden shadow-2xl bg-gray-900 aspect-square md:aspect-[4/5]">
-                  <img src="https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2Fb694584c91da4099bb13e517f9890e59?format=webp&width=800&height=1200" className="w-full h-full object-cover mix-blend-luminosity hover:mix-blend-normal transition-all duration-700" alt="Cadi - Visionary Creator" />
-                  <div className="absolute bottom-0 left-0 w-full p-8 bg-gradient-to-t from-black via-black/40 to-transparent">
-                    <p className="text-teal-400 font-bold tracking-widest text-xs uppercase mb-1">Visionary Creator</p>
-                    <h4 className="text-white text-3xl font-bold">CADI</h4>
-                  </div>
-                </div>
-              </div>
-              <div className="space-y-8">
-                <div className="text-[#0d9488] font-bold tracking-wider text-xs uppercase">
-                  THE ARCHITECT OF THE ICON
-                </div>
-                <h2 className="text-4xl md:text-6xl font-bold text-black leading-tight tracking-tight">CADI</h2>
-                <div className="space-y-6 text-gray-600 leading-relaxed text-lg">
-                  <p>
-                    Cadi didn't just start a photography studio; she engineered a media powerhouse. Obsessed with the friction agents face daily, she built Iconic to solve one problem: <span className="text-black font-bold">How to make agents more money with less effort.</span>
-                  </p>
-                  <p>
-                    She doesn't just direct the operation; she directs the strategy. By mirroring her high-energy hustle into our AI-driven workflows, she ensures that every client receives a "Celebrity Agent" experience.
-                  </p>
-                </div>
-
-                {/* New Block: The Infrastructure of Success */}
-                <div className="pt-8 border-t border-gray-100">
-                  <h3 className="text-2xl font-bold text-black mb-1 uppercase tracking-tight">THE INFRASTRUCTURE OF SUCCESS</h3>
-                  <p className="text-[#0d9488] font-bold text-sm uppercase tracking-wider mb-4">Propelling your brand while the world sleeps.</p>
-                  <div className="space-y-4 text-gray-600 leading-relaxed">
-                    <p>
-                      Our proprietary Marketing Studio and AI Editing Tools are the unfair advantage. We’ve engineered a high-velocity backend that allows us to absorb massive workloads and deliver surgical-grade precision at scale. Our custom infrastructure empowers agents to leverage high-end, custom edits in seconds, saving thousands in production costs without compromising quality.
-                    </p>
-                    <p>
-                      While you sleep, our systems are awake. The Iconic Infrastructure is custom-built to automatically integrate new features, master emerging AI trends, and update your content strategy in real-time. We don't just keep up with the market; we stay on top of it.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
+        <AboutTeam />
 
         {/* Final CTA / Location */}
         <section className="py-20 md:py-24 bg-white text-center">
