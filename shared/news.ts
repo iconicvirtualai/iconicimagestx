@@ -206,8 +206,8 @@ const FRAME_FIT_SCRIPT = `<script>
  * Script tags from the email are removed, then a height reporter is added so the
  * iframe can grow to the message and the page is the only scroller.
  * The unsubscribe merge tag becomes the site page.
- * When pageOrigin is another host (a preview), marketing images and flash-sale
- * links follow that host. The file on disk keeps the www URLs.
+ * When pageOrigin is another host (a preview), marketing images and the
+ * Black Friday links follow that host. The file on disk keeps the www URLs.
  */
 export function prepareEmailSrcDoc(html: string, pageOrigin = ""): string {
   let next = String(html || "").replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "");
@@ -218,7 +218,8 @@ export function prepareEmailSrcDoc(html: string, pageOrigin = ""): string {
       /(<img\b[^>]*\bsrc=["'])https:\/\/www\.iconicimagestx\.com\//gi,
       `$1${origin}/`,
     );
-    next = next.split(`${NEWS_ASSET_ORIGIN}/flash-sale`).join(`${origin}/flash-sale`);
+    next = next.split(`${NEWS_ASSET_ORIGIN}/black-friday`).join(`${origin}/black-friday`);
+    next = next.split(`${NEWS_ASSET_ORIGIN}/flash-sale`).join(`${origin}/black-friday`);
   }
   if (next.includes("</head>")) next = next.replace("</head>", `${FRAME_FIT_STYLE}</head>`);
   if (next.includes("</body>")) next = next.replace("</body>", `${FRAME_FIT_SCRIPT}</body>`);

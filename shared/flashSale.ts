@@ -1,5 +1,5 @@
 /**
- * Prepaid flash-sale bundles. The fee matches other card checkouts.
+ * Prepaid Black Friday bundles. The fee matches other card checkouts.
  * It is quoted here for the checkout page and the Square charge.
  * The newsletter does not print it.
  */
@@ -9,8 +9,8 @@ import { BOOKING_PROCESSING_LABEL, processingFeeCents } from "./invoiceProcessin
 export const FLASH_SALE_SOURCE = "flash-sale";
 export const FLASH_SALE_TIME_ZONE = "America/Chicago";
 
-/** Wed Nov 25, 2026, 11:59:59.999 PM Central. DST has ended, so this is UTC-6. */
-export const FLASH_SALE_ENDS_MS = Date.parse("2026-11-26T05:59:59.999Z");
+/** Fri Nov 27, 2026, 11:59:59.999 PM Central. DST has ended, so this is UTC-6. */
+export const SALE_ENDS_MS = Date.parse("2026-11-28T05:59:59.999Z");
 
 export const FLASH_SALE_ADDONS = [
   { id: "floor-plan", label: "2D Floor Plan" },
@@ -41,8 +41,13 @@ export interface FlashSaleQuote {
 }
 
 export function flashSaleOpen(now = Date.now()): boolean {
-  return now <= FLASH_SALE_ENDS_MS;
+  return now <= SALE_ENDS_MS;
 }
+
+/** Site-wide bar while the sale is open. The editor's AI staging line stays the fallback. */
+export const FLASH_SALE_BAR_HREF = "/black-friday";
+export const FLASH_SALE_BAR_FULL = "BLACK FRIDAY SALE · 5 SHOOTS $1,250 · 10 SHOOTS $2,250 · ENDS FRI NOV 27";
+export const FLASH_SALE_BAR_SHORT = "BLACK FRIDAY · 5 FOR $1,250 · 10 FOR $2,250";
 
 export function flashSaleBundle(shoots: number): FlashSaleBundle | null {
   return FLASH_SALE_BUNDLES.find((bundle) => bundle.shoots === shoots) ?? null;
@@ -72,7 +77,7 @@ export function formatFlashCents(cents: number): string {
 }
 
 export function flashSaleCheckoutPath(shoots: 5 | 10): string {
-  return `/flash-sale?bundle=${shoots}`;
+  return `/black-friday?bundle=${shoots}`;
 }
 
 export function flashSaleUseBy(purchasedAt: Date): string {

@@ -97,6 +97,16 @@
       "statusCode": 302
     },
     {
+      "source": "/flash-sale",
+      "destination": "/black-friday",
+      "statusCode": 302
+    },
+    {
+      "source": "/flash-sale/",
+      "destination": "/black-friday",
+      "statusCode": 302
+    },
+    {
       "source": "/insights/news/promos/:slug",
       "destination": "/news/promos/:slug",
       "statusCode": 302
@@ -1861,11 +1871,11 @@
       "destination": "/seo/app.html"
     },
     {
-      "source": "/flash-sale",
+      "source": "/black-friday",
       "destination": "/seo/app.html"
     },
     {
-      "source": "/flash-sale/",
+      "source": "/black-friday/",
       "destination": "/seo/app.html"
     },
     {

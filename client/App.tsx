@@ -227,7 +227,8 @@ const App = () => (
             <Route path="/news" element={<Navigate to="/" replace />} />
             <Route path="/news/promos/:slug" element={<NewsIssue category="promo" />} />
             <Route path="/news/:slug" element={<NewsIssue category="newsletter" />} />
-            <Route path="/flash-sale" element={<FlashSale />} />
+            <Route path="/black-friday" element={<FlashSale />} />
+            <Route path="/flash-sale" element={<PortalQueryRedirect to="/black-friday" />} />
             <Route path="/stock-footage" element={<StockFootage />} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/unsubscribe" element={<Unsubscribe />} />
