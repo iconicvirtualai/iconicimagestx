@@ -40997,7 +40997,7 @@ function isSquareCheckoutUrl(value) {
   return SQUARE_HOST.test(url.hostname);
 }
 const FLASH_SALE_SOURCE = "flash-sale";
-const FLASH_SALE_ENDS_MS = Date.parse("2026-11-26T05:59:59.999Z");
+const SALE_ENDS_MS = Date.parse("2026-11-28T05:59:59.999Z");
 const FLASH_SALE_ADDONS = [
   { id: "floor-plan", label: "2D Floor Plan" },
   { id: "reel", label: "Social Media Walk Through Reel" }
@@ -41007,7 +41007,7 @@ const FLASH_SALE_BUNDLES = [
   { shoots: 10, subtotalCents: 225e3, perShootCents: 22500, label: "10 shoots" }
 ];
 function flashSaleOpen(now = Date.now()) {
-  return now <= FLASH_SALE_ENDS_MS;
+  return now <= SALE_ENDS_MS;
 }
 function flashSaleBundle(shoots) {
   return FLASH_SALE_BUNDLES.find((bundle) => bundle.shoots === shoots) ?? null;
@@ -41065,7 +41065,7 @@ router$4.post("/checkout", async (req, res) => {
     return res.status(429).json({ error: "Too many checkout attempts. Please wait and try again." });
   }
   if (!flashSaleOpen()) {
-    return res.status(410).json({ error: "This flash sale has ended." });
+    return res.status(410).json({ error: "This Black Friday sale has ended." });
   }
   const shoots = Number(req.body?.bundle);
   const quote = quoteFlashSale(shoots);
@@ -41082,21 +41082,21 @@ router$4.post("/checkout", async (req, res) => {
   try {
     origin = publicSiteUrl();
   } catch (err) {
-    console.error("[Flash sale] Public site URL is not https. Using the Vercel app.", err);
+    console.error("[Black Friday sale] Public site URL is not https. Using the Vercel app.", err);
   }
-  const redirectUrl = `${origin}/flash-sale?paid=1&order=${encodeURIComponent(number)}`;
+  const redirectUrl = `${origin}/black-friday?paid=1&order=${encodeURIComponent(number)}`;
   const linked = await createHolidaySquareCheckout({
     invoiceId: `fs-${quote.shoots}-${number}`,
     invoiceNumber: number,
     amount: quote.totalCents / 100,
     email,
-    itemName: `Flash sale ${quote.label}`,
-    leadSource: "Flash sale",
+    itemName: `Black Friday Sale ${quote.label}`,
+    leadSource: "Black Friday Sale",
     orderNumber: number,
     redirectUrl,
-    logLabel: "Flash sale",
+    logLabel: "Black Friday Sale",
     lineItems: [
-      { name: `Flash sale · ${quote.label}`, amountCents: quote.subtotalCents },
+      { name: `Black Friday Sale · ${quote.label}`, amountCents: quote.subtotalCents },
       { name: quote.processingLabel, amountCents: quote.processingCents }
     ]
   });
@@ -41108,10 +41108,10 @@ router$4.post("/checkout", async (req, res) => {
     clientName: name,
     clientEmail: email,
     clientPhone: phone,
-    title: `Flash sale · ${quote.label}`,
-    selectedService: "Flash sale",
+    title: `Black Friday Sale · ${quote.label}`,
+    selectedService: "Black Friday Sale",
     source: FLASH_SALE_SOURCE,
-    leadSource: "Flash sale",
+    leadSource: "Black Friday Sale",
     status: "awaiting-payment",
     bundle: quote.shoots,
     addon: addon.id,

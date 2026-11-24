@@ -1,5 +1,5 @@
 /**
- * Public flash-sale checkout.
+ * Public Black Friday checkout. The /api/flash-sale path stays so existing callers keep working.
  * Creates a Square payment link for the bundle plus the usual 2.8% fee.
  * Opening the link is the buyer's step. This route does not capture a payment,
  * and it does not send email or text.
@@ -44,7 +44,7 @@ router.post("/checkout", async (req, res) => {
     return res.status(429).json({ error: "Too many checkout attempts. Please wait and try again." });
   }
   if (!flashSaleOpen()) {
-    return res.status(410).json({ error: "This flash sale has ended." });
+    return res.status(410).json({ error: "This Black Friday sale has ended." });
   }
 
   const shoots = Number(req.body?.bundle);
@@ -63,21 +63,21 @@ router.post("/checkout", async (req, res) => {
   try {
     origin = publicSiteUrl();
   } catch (err) {
-    console.error("[Flash sale] Public site URL is not https. Using the Vercel app.", err);
+    console.error("[Black Friday sale] Public site URL is not https. Using the Vercel app.", err);
   }
-  const redirectUrl = `${origin}/flash-sale?paid=1&order=${encodeURIComponent(number)}`;
+  const redirectUrl = `${origin}/black-friday?paid=1&order=${encodeURIComponent(number)}`;
   const linked = await createHolidaySquareCheckout({
     invoiceId: `fs-${quote.shoots}-${number}`,
     invoiceNumber: number,
     amount: quote.totalCents / 100,
     email,
-    itemName: `Flash sale ${quote.label}`,
-    leadSource: "Flash sale",
+    itemName: `Black Friday Sale ${quote.label}`,
+    leadSource: "Black Friday Sale",
     orderNumber: number,
     redirectUrl,
-    logLabel: "Flash sale",
+    logLabel: "Black Friday Sale",
     lineItems: [
-      { name: `Flash sale · ${quote.label}`, amountCents: quote.subtotalCents },
+      { name: `Black Friday Sale · ${quote.label}`, amountCents: quote.subtotalCents },
       { name: quote.processingLabel, amountCents: quote.processingCents },
     ],
   });
@@ -91,10 +91,10 @@ router.post("/checkout", async (req, res) => {
     clientName: name,
     clientEmail: email,
     clientPhone: phone,
-    title: `Flash sale · ${quote.label}`,
-    selectedService: "Flash sale",
+    title: `Black Friday Sale · ${quote.label}`,
+    selectedService: "Black Friday Sale",
     source: FLASH_SALE_SOURCE,
-    leadSource: "Flash sale",
+    leadSource: "Black Friday Sale",
     status: "awaiting-payment",
     bundle: quote.shoots,
     addon: addon.id,

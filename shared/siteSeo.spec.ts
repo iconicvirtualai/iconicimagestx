@@ -151,9 +151,12 @@ describe("public page meta", () => {
     expect(metaPlan("/news/holysmokes").kind).toBe("noindex");
     expect(metaPlan("/insights/news").kind).toBe("noindex");
     expect(metaPlan("/insights/news/holysmokes").kind).toBe("noindex");
-    expect(metaPlan("/flash-sale").kind).toBe("public");
+    expect(metaPlan("/black-friday")).toMatchObject({
+      kind: "public",
+      title: "Black Friday Sale | Iconic Images",
+    });
     expect(isNoIndexPath("/insights/news/holysmokes")).toBe(true);
-    expect(isNoIndexPath("/flash-sale")).toBe(false);
+    expect(isNoIndexPath("/black-friday")).toBe(false);
     expect(metaPlan("/agents").kind).toBe("generic");
     expect(isNoIndexPath("/realestate-75")).toBe(true);
     expect(isNoIndexPath("/realestate-75/schedule")).toBe(true);

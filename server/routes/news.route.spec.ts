@@ -33,6 +33,7 @@ describe("unlisted news pages", () => {
     const detail = await page.json() as { issue: { path: string; emailHtml: string } };
     expect(detail.issue.path).toBe("/news/holysmokes");
     expect(detail.issue.emailHtml).toContain("flash-sale?bundle=5");
+    expect(detail.issue.emailHtml).toContain("BLACK FRIDAY SALE");
 
     const list = await fetch(`${baseUrl}/api/news`, { headers: { Authorization: "Bearer temp-admin-token" } });
     expect(list.status).toBe(200);

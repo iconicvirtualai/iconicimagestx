@@ -56,11 +56,16 @@ export default function FlashSale() {
     <Layout>
       <div className="min-h-screen bg-[#f4eee4] text-[#141414]">
         <section className="mx-auto max-w-xl px-4 pb-20 pt-40 sm:px-6 sm:pt-36">
-          <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#0f8f80]">Flash sale</p>
+          <p className="inline-flex rounded-full bg-gradient-to-r from-[#0b0b0b] via-[#c9a227] to-[#e6c35c] px-4 py-1.5 text-xs font-black uppercase tracking-[0.18em] text-white shadow-sm [text-shadow:0_1px_1px_rgba(0,0,0,0.9)]">
+            Black Friday Sale
+          </p>
           <h1 className="mt-3 text-4xl font-black tracking-tight">Stock up on shoots.</h1>
           <p className="mt-3 text-base leading-relaxed text-[#5b5249]">
             Each shoot is 50 photos, 3 aerials, and your choice of one add-on. Paid upfront. Use the shoots within 90 days.
           </p>
+          {open && (
+            <p className="mt-3 text-sm font-semibold text-[#141414]">Ends Friday, Nov 27 at 11:59pm CT.</p>
+          )}
           {paid && (
             <p className="mt-6 rounded-3xl bg-[#fffdf9] px-5 py-4 text-sm leading-relaxed ring-1 ring-[#e4dacb]">
               If Square confirmed the payment, your bundle is recorded. We did not send a receipt from this page.
@@ -68,8 +73,8 @@ export default function FlashSale() {
           )}
           {!open && (
             <div className="mt-8 rounded-[1.75rem] bg-[#fffdf9] px-5 py-8 text-center ring-1 ring-[#e4dacb]">
-              <h2 className="text-2xl font-black">This flash sale has ended.</h2>
-              <p className="mt-2 text-sm text-[#5b5249]">The offer closed Wednesday, Nov 25, 2026.</p>
+              <h2 className="text-2xl font-black">This Black Friday sale has ended.</h2>
+              <p className="mt-2 text-sm text-[#5b5249]">The offer closed Friday, Nov 27, 2026 at 11:59pm CT.</p>
               <Link to="/book" className="mt-5 inline-flex rounded-full bg-[#0f8f80] px-5 py-3 text-sm font-bold text-white">
                 Book a shoot
               </Link>
@@ -85,7 +90,7 @@ export default function FlashSale() {
                     return (
                       <label
                         key={bundle.shoots}
-                        className={`cursor-pointer rounded-3xl bg-[#fffdf9] p-4 ring-1 ${selected ? "ring-[#0f8f80]" : "ring-[#e4dacb]"}`}
+                        className={`cursor-pointer rounded-3xl bg-[#fffdf9] p-4 ring-1 ${selected ? "ring-2 ring-[#c9a227]" : "ring-[#e4dacb]"}`}
                       >
                         <input
                           type="radio"
@@ -94,7 +99,7 @@ export default function FlashSale() {
                           checked={selected}
                           onChange={() => setShoots(bundle.shoots)}
                         />
-                        <span className="block text-sm font-bold uppercase tracking-[0.14em] text-[#0f8f80]">{bundle.label}</span>
+                        <span className={`block text-sm font-bold uppercase tracking-[0.14em] ${selected ? "text-[#6b5210]" : "text-[#8a7560]"}`}>{bundle.label}</span>
                         <span className="mt-1 block text-2xl font-black">{formatFlashCents(bundle.subtotalCents)}</span>
                         <span className="mt-1 block text-sm text-[#5b5249]">{formatFlashCents(bundle.perShootCents)} per shoot</span>
                       </label>
@@ -106,7 +111,7 @@ export default function FlashSale() {
                 <legend className="text-sm font-bold">Each shoot includes one of these</legend>
                 <div className="mt-2 grid gap-3">
                   {FLASH_SALE_ADDONS.map((item) => (
-                    <label key={item.id} className={`flex cursor-pointer items-center gap-3 rounded-2xl bg-[#fffdf9] px-4 py-3 ring-1 ${addon === item.id ? "ring-[#0f8f80]" : "ring-[#e4dacb]"}`}>
+                    <label key={item.id} className={`flex cursor-pointer items-center gap-3 rounded-2xl bg-[#fffdf9] px-4 py-3 ring-1 ${addon === item.id ? "ring-2 ring-[#c9a227]" : "ring-[#e4dacb]"}`}>
                       <input
                         type="radio"
                         name="addon"
@@ -139,7 +144,7 @@ export default function FlashSale() {
               <button
                 type="submit"
                 disabled={busy || !addon}
-                className="w-full rounded-full bg-[#141414] px-5 py-3 text-sm font-bold text-white disabled:opacity-50"
+                className="w-full rounded-full bg-gradient-to-r from-[#0b0b0b] via-[#c9a227] to-[#e6c35c] px-5 py-3 text-sm font-bold text-white shadow-sm [text-shadow:0_1px_1px_rgba(0,0,0,0.9)] disabled:opacity-50"
               >
                 {busy ? "Starting checkout…" : `Continue to pay ${formatFlashCents(quote.totalCents)}`}
               </button>
