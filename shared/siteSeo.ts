@@ -61,7 +61,7 @@ export const PUBLIC_PAGES: readonly PublicPage[] = [
   {
     path: "/video-team",
     file: "seo/video-team.html",
-    title: "Meet our Video Team | Iconic Images",
+    title: "Meet Your Video Team | Iconic Images",
     description:
       "Meet the Iconic Images video crew in Spring, The Woodlands, and Houston. Listing films, on-camera reels, events, and brand video.",
   },

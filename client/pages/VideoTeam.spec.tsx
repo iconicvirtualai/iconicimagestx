@@ -5,7 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 import VideoTeam from "./VideoTeam";
 import { CREW, SAMPLE_CATEGORIES, TEAM_REELS } from "@/data/videoTeam";
 
-describe("Meet our Video Team", () => {
+describe("Meet Your Video Team", () => {
   it("renders the crew, muted team reels, and poster-only samples", () => {
     const html = renderToString(
       <MemoryRouter>
@@ -13,7 +13,9 @@ describe("Meet our Video Team", () => {
       </MemoryRouter>,
     );
 
-    expect(html).toContain("Meet our Video Team");
+    expect(html).toContain("Meet Your Video Team");
+    expect(html).toContain("We Film. We Edit. We Post.");
+    expect(html).not.toContain("Meet our Video Team");
     expect(html).toContain("The crew");
     expect(html).toContain("What we film");
     expect(html).toContain("Book your video shoot");

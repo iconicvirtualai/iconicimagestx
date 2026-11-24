@@ -36,7 +36,7 @@ describe("What we do", () => {
     expect(html).toContain('href="/book"');
     expect(html).toContain('href="/studio-105"');
     expect(html).toContain('href="/video-team"');
-    expect(html).toContain("Meet our Video Team");
+    expect(html).toContain("Meet Your Video Team");
     expect(html).not.toMatch(/\$\s?\d/);
     expect(html).not.toMatch(/jazmin/i);
 

@@ -217,11 +217,12 @@ export default function VideoTeam() {
       <div data-testid="video-team-page" className="bg-[#f4eee4] text-[#141414]" style={{ fontFamily: PAGE_FONT }}>
         <section className="mx-auto max-w-6xl px-4 pb-16 pt-40 sm:px-6 sm:pt-44">
           <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#0f8f80]">Iconic Images</p>
-          <h1 className="mt-3 max-w-3xl text-4xl font-extrabold tracking-tight sm:text-6xl">Meet our Video Team</h1>
+          <h1 className="mt-3 max-w-3xl text-4xl font-extrabold tracking-tight sm:text-6xl">Meet Your Video Team</h1>
           <p className="mt-4 max-w-xl text-base leading-relaxed text-[#5b5249] sm:text-lg">
             Listing films, on-camera reels, commercial, events, product, and brand video from the crew in Spring, The Woodlands, and Houston.
           </p>
-          <div className="-mx-4 mt-8 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 [scrollbar-width:none] sm:mx-0 sm:px-0 lg:grid lg:grid-cols-4 lg:overflow-visible [&::-webkit-scrollbar]:hidden">
+          <h2 className="mt-10 text-3xl font-extrabold tracking-tight sm:text-4xl">We Film. We Edit. We Post.</h2>
+          <div className="-mx-4 mt-6 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 [scrollbar-width:none] sm:mx-0 sm:px-0 lg:grid lg:grid-cols-4 lg:overflow-visible [&::-webkit-scrollbar]:hidden">
             {TEAM_REELS.map((reel) => (
               <div key={reel.id} className="w-[58vw] max-w-[250px] shrink-0 snap-center sm:w-[240px] lg:w-auto lg:max-w-none">
                 <TeamReelCard
