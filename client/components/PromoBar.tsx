@@ -36,11 +36,11 @@ export default function PromoBar() {
         to={FLASH_SALE_BAR_HREF}
         data-testid="promo-bar"
         data-promo="black-friday"
-        className={`${barLayout} border-b-2 border-[#ffd23f] bg-[#141414] tracking-[0.02em] lg:text-xs lg:tracking-[0.08em]`}
+        className={`${barLayout} border-b border-[#6b5210] bg-gradient-to-r from-[#0b0b0b] via-[#c9a227] to-[#e6c35c] tracking-[0.02em] [text-shadow:0_1px_1px_rgba(0,0,0,0.9)] lg:text-xs lg:tracking-[0.08em]`}
       >
         <span className="lg:hidden">{FLASH_SALE_BAR_SHORT}</span>
         <span className="hidden lg:inline">{FLASH_SALE_BAR_FULL}</span>
-        <ArrowRight className="h-3.5 w-3.5 shrink-0" />
+        <ArrowRight className="h-3.5 w-3.5 shrink-0 drop-shadow-[0_1px_1px_rgba(0,0,0,0.9)]" />
       </Link>
     );
   }
