@@ -29,6 +29,9 @@ import SiteMeta from "./components/SiteMeta";
 const AdminUnreadFixture = import.meta.env.DEV
   ? lazy(() => import("./pages/AdminUnreadFixture"))
   : null;
+const AdminOrdersDeskFixture = import.meta.env.DEV
+  ? lazy(() => import("./pages/AdminOrdersDeskFixture"))
+  : null;
 
 // Public pages
 import Index from "./pages/Index";
@@ -311,6 +314,9 @@ const App = () => (
             <Route path="/admin/communications" element={<ProtectedRoute requiredRole="coordinator"><AdminMessages /></ProtectedRoute>} />
             {AdminUnreadFixture ? (
               <Route path="/admin/unread-badge-fixture" element={<Suspense fallback={null}><AdminUnreadFixture /></Suspense>} />
+            ) : null}
+            {AdminOrdersDeskFixture ? (
+              <Route path="/admin/orders-desk-fixture" element={<Suspense fallback={null}><AdminOrdersDeskFixture /></Suspense>} />
             ) : null}
             <Route path="/admin/botroom" element={<ProtectedRoute requiredRole="admin"><AdminMessages /></ProtectedRoute>} />
             <Route path="/admin/botroom/connect" element={<ProtectedRoute requiredRole="admin"><AdminBotRoomConnect /></ProtectedRoute>} />

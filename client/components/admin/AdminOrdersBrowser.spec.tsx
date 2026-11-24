@@ -83,26 +83,38 @@ afterEach(async () => {
 });
 
 describe("orders desk sections", () => {
-  it("keeps triage orders out of all orders and collapses archives", async () => {
+  it("lists open orders newest first and collapses archives", async () => {
     await renderAt("adminOrdersView:desk");
     expect(container?.querySelector("[data-orders-view]")?.getAttribute("data-orders-view")).toBe("list");
+    expect(container?.querySelector("[data-orders-sort]")?.getAttribute("data-orders-sort")).toBe("newest");
     expect(section("archived").textContent).toContain("Collapsed");
     expect(section("archived").querySelector("[data-order-id]")).toBeNull();
-    expect(idsIn("action").sort()).toEqual(["fixture-birch", "fixture-oak"]);
-    expect(idsIn("active").sort()).toEqual(["fixture-cedar", "fixture-maple", "fixture-pine"]);
-    expect(section("action").textContent).toContain("Unscheduled");
-    expect(section("action").textContent).toContain("No photographer assigned");
-    expect(section("action").textContent).toContain("Schedule");
-    expect(section("action").textContent).toContain("Assign");
-    const schedule = section("action").querySelector("a[href*='desk=schedule']");
+    expect(idsIn("open")).toEqual(["fixture-cedar", "fixture-maple", "fixture-oak", "fixture-pine", "fixture-birch"]);
+    expect(section("open").textContent).toContain("Unscheduled");
+    expect(section("open").textContent).toContain("No photographer assigned");
+    expect(section("open").textContent).toContain("Schedule");
+    expect(section("open").textContent).toContain("Assign");
+    expect(section("open").textContent).toContain("#33018");
+    expect(section("open").textContent).not.toContain("ORD - L - 33018");
+    const schedule = section("open").querySelector("a[href*='desk=schedule']");
     expect(schedule?.getAttribute("href")).toContain("/admin/order-request/");
+    expect(container?.querySelector("[data-testid='orders-new-count']")?.textContent).toBe("1");
 
     const expand = section("archived").querySelector("[aria-label='Expand Archives & Cancellations']") as HTMLButtonElement;
     await act(async () => {
       expand.click();
     });
     expect(idsIn("archived")).toEqual(["fixture-elm"]);
-    expect(section("active").textContent).not.toContain("Sample Client Eden Frost");
+    expect(section("open").textContent).not.toContain("Sample Client Eden Frost");
+  });
+
+  it("sorts oldest and by status from the same list", async () => {
+    await renderAt("adminOrdersView:sort");
+    await clickButton(container!, "Oldest");
+    expect(idsIn("open")).toEqual(["fixture-birch", "fixture-pine", "fixture-oak", "fixture-maple", "fixture-cedar"]);
+    await clickButton(container!, "Status");
+    expect(idsIn("open")[0]).toBe("fixture-birch");
+    expect(container?.querySelector("[data-orders-sort]")?.getAttribute("data-orders-sort")).toBe("status");
   });
 
   it("filters every section from the one search box and the status tabs", async () => {
@@ -113,8 +125,7 @@ describe("orders desk sections", () => {
       setter?.call(input, "Maple");
       input.dispatchEvent(new Event("input", { bubbles: true }));
     });
-    expect(idsIn("active")).toEqual(["fixture-maple"]);
-    expect(idsIn("action")).toEqual([]);
+    expect(idsIn("open")).toEqual(["fixture-maple"]);
     expect(container?.textContent).not.toContain("Sample Client Blair Quinn");
 
     await act(async () => {
@@ -123,13 +134,12 @@ describe("orders desk sections", () => {
       input.dispatchEvent(new Event("input", { bubbles: true }));
     });
     await clickButton(container!, "Unscheduled1");
-    expect(idsIn("action")).toEqual(["fixture-birch"]);
-    expect(idsIn("active")).toEqual([]);
+    expect(idsIn("open")).toEqual(["fixture-birch"]);
   });
 
   it("shows order, payment, and gallery as plain text with one neutral dot", async () => {
     await renderAt("adminOrdersView:status");
-    const maple = section("active").querySelector("[data-order-id='fixture-maple']");
+    const maple = section("open").querySelector("[data-order-id='fixture-maple']");
     expect(maple?.textContent).toContain("Order");
     expect(maple?.textContent).toContain("Scheduled");
     expect(maple?.textContent).toContain("Payment");
@@ -141,8 +151,8 @@ describe("orders desk sections", () => {
     expect(maple?.textContent).toContain(adminOrderTotalLabel(orders.find((order) => order.id === "fixture-maple")!));
     const link = maple?.querySelector("a[data-order-link='fixture-maple']") as HTMLAnchorElement | null;
     expect(link?.getAttribute("href")).toBe("/admin/order-request/fixture-maple");
-    expect(section("active").textContent).toContain("The Showcase");
-    expect(section("active").textContent).toContain("+1");
+    expect(section("open").textContent).toContain("The Showcase");
+    expect(section("open").textContent).toContain("+1");
   });
 
   it("remembers list or board per user", async () => {

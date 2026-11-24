@@ -5,28 +5,25 @@ import {
   type AdminOrderListStaff,
 } from "@shared/adminOrderList";
 import {
-  bookedShootDay,
   computeOrderDeskKpis,
   DEFAULT_ORDER_DESK_PREFS,
   deskFilterCounts,
-  orderDeskSection,
-  orderDeskTriage,
+  moveManualId,
   orderIsArchived,
+  orderIsUnhandled,
   orderMatchesDeskFilter,
+  ordersOnDesk,
   parseOrderDeskPrefs,
-  reorderDeskSections,
+  parseOrderDeskSort,
+  sortDeskOrders,
+  summarizeOrderDesk,
   type OrderDeskFilter,
   type OrderDeskPrefs,
-  type OrderDeskSectionId,
+  type OrderDeskSort,
 } from "@shared/adminOrdersDesk";
+import { compactOrderLabel } from "@shared/orderNumber";
 import { type DragGhostModel } from "@/components/drag/DragGhost";
 import { OrdersDeskFace } from "@/components/admin/ordersDeskFace";
-
-const SECTION_META: Record<OrderDeskSectionId, { title: string; subdued: string }> = {
-  action: { title: "Orders Requiring Action", subdued: "Triage queue · one-click next step" },
-  active: { title: "All Orders", subdued: "Sorted by shoot date" },
-  archived: { title: "Archives & Cancellations", subdued: "Archived and cancelled" },
-};
 
 type KpiKey = "today" | "unscheduled" | "progress" | "revenue";
 
@@ -63,15 +60,19 @@ export function AdminOrdersBrowser({
   const [draft, setDraft] = React.useState("");
   const [localPrefs, setLocalPrefs] = React.useState<OrderDeskPrefs>(() => prefs ?? DEFAULT_ORDER_DESK_PREFS);
   const [ghost, setGhost] = React.useState<DragGhostModel | null>(null);
-  const [dropBefore, setDropBefore] = React.useState<OrderDeskSectionId | "end" | null>(null);
+  const [rowDropBefore, setRowDropBefore] = React.useState<string | "end" | null>(null);
+  const [sortMode, setSortMode] = React.useState<OrderDeskSort>(() => readSort(storageKey));
+  const [manualIds, setManualIds] = React.useState<string[]>(() => readManual(storageKey));
   const [ticking, setTicking] = React.useState(() => now ?? new Date());
-  const dropRef = React.useRef<OrderDeskSectionId | "end" | null>(null);
+  const dropRef = React.useRef<string | "end" | null>(null);
   const controlled = onPrefsChange != null;
   const deskPrefs = controlled ? (prefs ?? DEFAULT_ORDER_DESK_PREFS) : localPrefs;
   const clock = now ?? ticking;
 
   React.useEffect(() => {
     setView(readDeskView(storageKey));
+    setSortMode(readSort(storageKey));
+    setManualIds(readManual(storageKey));
   }, [storageKey]);
 
   React.useEffect(() => {
@@ -107,19 +108,15 @@ export function AdminOrdersBrowser({
     }
   };
 
-  const searched = filterAdminOrderRecords(orders, query);
+  const summary = summarizeOrderDesk(orders);
+  const searched = ordersOnDesk(filterAdminOrderRecords(orders, query));
   const visible = searched.filter((order) => orderMatchesDeskFilter(order, filter, clock, staff));
   const kpis = computeOrderDeskKpis(orders, clock);
-  const counts = deskFilterCounts(searched, clock, staff);
-  const openCount = orders.filter((order) => !orderIsArchived(order)).length;
-  const archivedCount = orders.length - openCount;
-  const visibleIds = visible.map((order) => String(order.id || ""));
-
-  const grouped = {
-    action: sortAction(visible.filter((order) => orderDeskSection(order, staff, editRequests) === "action"), staff, editRequests),
-    active: sortByShoot(visible.filter((order) => orderDeskSection(order, staff, editRequests) === "active")),
-    archived: sortByShoot(visible.filter((order) => orderDeskSection(order, staff, editRequests) === "archived")),
-  };
+  const counts = deskFilterCounts(filterAdminOrderRecords(orders, query), clock, staff);
+  const openRows = sortDeskOrders(visible.filter((order) => !orderIsArchived(order)), sortMode, manualIds);
+  const archivedRows = sortDeskOrders(visible.filter((order) => orderIsArchived(order)), "newest");
+  const visibleNewCount = openRows.filter(orderIsUnhandled).length;
+  const visibleIds = [...openRows, ...archivedRows].map((order) => String(order.id || ""));
 
   const chooseFilter = (next: OrderDeskFilter) => {
     setFilter((current) => (current === next ? "all" : next));
@@ -138,7 +135,18 @@ export function AdminOrdersBrowser({
     setEditing(null);
   };
 
-  const startDrag = (event: React.PointerEvent<HTMLButtonElement>, id: OrderDeskSectionId) => {
+  const chooseSort = (mode: Exclude<OrderDeskSort, "custom">) => {
+    setSortMode(mode);
+    setManualIds([]);
+    try {
+      window.localStorage.setItem(sortStorageKey(storageKey), mode);
+      window.localStorage.removeItem(manualStorageKey(storageKey));
+    } catch {
+      /* The buttons still update this view. */
+    }
+  };
+
+  const startRowDrag = (event: React.PointerEvent<HTMLButtonElement>, id: string) => {
     if (event.button !== 0) return;
     event.preventDefault();
     event.stopPropagation();
@@ -147,18 +155,22 @@ export function AdminOrdersBrowser({
     const originX = event.clientX;
     const originY = event.clientY;
     let active = false;
+    const seed = sortMode === "custom" && manualIds.length > 0
+      ? manualIds
+      : openRows.map((order) => String(order.id || ""));
     const move = (pointer: PointerEvent) => {
       if (!active && Math.hypot(pointer.clientX - originX, pointer.clientY - originY) < 6) return;
       active = true;
       const hit = document.elementFromPoint(pointer.clientX, pointer.clientY);
-      const zone = hit instanceof Element ? hit.closest("[data-section-drop]") : null;
-      const before = (zone?.getAttribute("data-section-drop") || null) as OrderDeskSectionId | "end" | null;
+      const zone = hit instanceof Element ? hit.closest("[data-order-drop]") : null;
+      const before = zone?.getAttribute("data-order-drop") || null;
       dropRef.current = before;
-      setDropBefore(before);
+      setRowDropBefore(before);
+      const order = openRows.find((item) => String(item.id || "") === id);
       setGhost({
         x: pointer.clientX,
         y: pointer.clientY,
-        title: SECTION_META[id].title,
+        title: order ? compactOrderLabel(order) || "Order" : "Order",
         subtitle: "Drop to reorder",
       });
     };
@@ -168,10 +180,18 @@ export function AdminOrdersBrowser({
       window.removeEventListener("pointercancel", up, true);
       const before = dropRef.current;
       setGhost(null);
-      setDropBefore(null);
+      setRowDropBefore(null);
       dropRef.current = null;
-      if (!active || !before) return;
-      updatePrefs({ ...deskPrefs, sectionOrder: reorderDeskSections(deskPrefs.sectionOrder, id, before) });
+      if (!active || !before || before === id) return;
+      const next = moveManualId(seed, id, before);
+      setManualIds(next);
+      setSortMode("custom");
+      try {
+        window.localStorage.setItem(sortStorageKey(storageKey), "custom");
+        window.localStorage.setItem(manualStorageKey(storageKey), JSON.stringify(next));
+      } catch {
+        /* The list still keeps this order until reload. */
+      }
     };
     window.addEventListener("pointermove", move, true);
     window.addEventListener("pointerup", up, true);
@@ -186,9 +206,14 @@ export function AdminOrdersBrowser({
       clock={clock}
       kpis={kpis}
       counts={counts}
-      openCount={openCount}
-      archivedCount={archivedCount}
-      grouped={grouped}
+      openCount={summary.openCount}
+      archivedCount={summary.archivedCount}
+      newCount={summary.newCount}
+      visibleNewCount={visibleNewCount}
+      sortMode={sortMode}
+      openOrders={openRows}
+      archivedOrders={archivedRows}
+      boardOrders={[...openRows, ...archivedRows]}
       deskPrefs={deskPrefs}
       menu={menu}
       editing={editing !== null}
@@ -197,12 +222,13 @@ export function AdminOrdersBrowser({
       staff={staff}
       editRequests={editRequests}
       ghost={ghost}
-      dropBefore={dropBefore}
+      rowDropBefore={rowDropBefore}
       visibleIds={visibleIds}
       onQuery={setQuery}
       onFilter={setFilter}
       onChooseFilter={chooseFilter}
       onView={chooseView}
+      onSort={chooseSort}
       onDraft={setDraft}
       onOpenMenu={(key) => {
         setMenu((current) => (current === key ? null : key));
@@ -218,7 +244,7 @@ export function AdminOrdersBrowser({
       onToggleSelect={onToggleSelect}
       onSelectIds={onSelectIds}
       onStudioChange={onStudioChange}
-      onDragStart={startDrag}
+      onRowDragStart={startRowDrag}
       onToggleCollapsed={(section) => updatePrefs({
         ...deskPrefs,
         collapsed: { ...deskPrefs.collapsed, [section]: !deskPrefs.collapsed[section] },
@@ -227,41 +253,36 @@ export function AdminOrdersBrowser({
   );
 }
 
-function sortByShoot(orders: Record<string, unknown>[]): Record<string, unknown>[] {
-  return [...orders].sort((left, right) => {
-    const a = bookedShootDay(left);
-    const b = bookedShootDay(right);
-    if (a === b) return String(left.id || "").localeCompare(String(right.id || ""));
-    if (!a) return 1;
-    if (!b) return -1;
-    return b.localeCompare(a);
-  });
-}
-
-function sortAction(
-  orders: Record<string, unknown>[],
-  staff: AdminOrderListStaff[],
-  editRequests: Record<string, unknown>[],
-): Record<string, unknown>[] {
-  const rank = { unscheduled: 0, nophoto: 1, edit: 2, review: 3 };
-  return [...orders].sort((left, right) => {
-    const a = orderDeskTriage(left, staff, editRequests)?.reason || "review";
-    const b = orderDeskTriage(right, staff, editRequests)?.reason || "review";
-    if (rank[a] !== rank[b]) return rank[a] - rank[b];
-    const leftDay = bookedShootDay(left);
-    const rightDay = bookedShootDay(right);
-    if (leftDay === rightDay) return String(left.id || "").localeCompare(String(right.id || ""));
-    if (!leftDay) return 1;
-    if (!rightDay) return -1;
-    return rightDay.localeCompare(leftDay);
-  });
-}
-
 function readDeskView(key: string): "list" | "board" {
   try {
     const value = window.localStorage.getItem(key);
     return value === "board" || value === "tile" ? "board" : "list";
   } catch {
     return "list";
+  }
+}
+
+function sortStorageKey(key: string): string {
+  return `${key}:sort`;
+}
+
+function manualStorageKey(key: string): string {
+  return `${key}:manualOrder`;
+}
+
+function readSort(key: string): OrderDeskSort {
+  try {
+    return parseOrderDeskSort(window.localStorage.getItem(sortStorageKey(key)));
+  } catch {
+    return "newest";
+  }
+}
+
+function readManual(key: string): string[] {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(manualStorageKey(key)) || "[]");
+    return Array.isArray(parsed) ? parsed.filter((id) => typeof id === "string" && id) : [];
+  } catch {
+    return [];
   }
 }

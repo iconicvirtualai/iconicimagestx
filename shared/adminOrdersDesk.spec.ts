@@ -8,15 +8,23 @@ import {
   DEFAULT_ORDER_DESK_PREFS,
   deliveryProgress,
   deskFilterCounts,
+  actionableOrderCount,
+  applyManualOrder,
+  dedupeOrderRecords,
+  moveManualId,
   orderDeskSection,
   orderDeskTriage,
+  orderGalleryInProgress,
+  orderHasNoPhotographer,
   orderHasOpenEdit,
   orderIsTodayShoot,
+  orderIsUnscheduled,
   orderMatchesDeskFilter,
   orderPaidThisWeek,
   parseOrderDeskPrefs,
   reorderDeskSections,
   shootWhen,
+  sortDeskOrders,
 } from "./adminOrdersDesk.ts";
 
 const NOW = new Date("2026-11-10T18:00:00.000Z");
@@ -82,7 +90,7 @@ describe("orders desk KPIs", () => {
     expect(counts.unscheduled).toBe(1);
     expect(counts.progress).toBe(2);
     expect(counts.revenue).toBe(2);
-    expect(counts.all).toBe(rows.filter((row) => adminOrderStatusLabel(row) !== "Archived" && adminOrderStatusLabel(row) !== "Cancelled").length);
+    expect(counts.all).toBe(rows.filter((row) => !row.playtest && adminOrderStatusLabel(row) !== "Archived" && adminOrderStatusLabel(row) !== "Cancelled").length);
     expect(orderMatchesDeskFilter(rows[0], "today", NOW)).toBe(true);
     expect(orderMatchesDeskFilter(rows[2], "unscheduled", NOW)).toBe(true);
     expect(orderMatchesDeskFilter(rows[4], "week", NOW)).toBe(false);
@@ -116,6 +124,10 @@ describe("orders desk sections", () => {
     }
     expect([...placed.values()].filter((section) => section === "action")).toHaveLength(4);
     expect([...placed.values()].filter((section) => section === "active")).toHaveLength(1);
+  });
+
+  it("does not treat a missing edit status as open", () => {
+    expect(orderHasOpenEdit(order({ editRequests: [{ id: "e0" }] }))).toBe(false);
   });
 
   it("reads an open edit from the order or a linked edit request", () => {
@@ -157,6 +169,48 @@ describe("orders desk display helpers", () => {
     expect(deliveryProgress(order({ images: [{ status: "delivered" }, { status: "editing" }, {}, {}] }))).toEqual({ delivered: 1, total: 4 });
     expect(deliveryProgress(order({ photoCount: 4 }))).toBeNull();
     expect(deliveryProgress(order({ photoCount: 4, deliveredCount: 2 }))).toEqual({ delivered: 2, total: 4 });
+  });
+});
+
+describe("orders desk counts", () => {
+  it("counts a scheduled order with no gallery field as not in progress", () => {
+    const booked = order({ id: "booked", status: "scheduled", appointmentDate: "2026-11-12", assignedPhotographerName: "Mike Luna" });
+    expect(orderGalleryInProgress(booked)).toBe(false);
+    expect(orderIsUnscheduled(booked)).toBe(false);
+    expect(deskFilterCounts([booked], NOW).progress).toBe(0);
+    expect(deskFilterCounts([booked], NOW).unscheduled).toBe(0);
+  });
+
+  it("leaves delivered orders and duplicate copies out of the new count", () => {
+    const original = order({ id: "req-220", orderNumber: 220, status: "request", createdAt: "2026-11-20T18:00:00.000Z" });
+    const copy = order({ id: "twin-220", orderNumber: "#220", status: "request", createdAt: "2024-01-01T18:00:00.000Z" });
+    const delivered = order({
+      id: "done-1",
+      orderNumber: 501,
+      status: "delivered",
+      appointmentDate: "2025-05-01",
+      galleryStatus: "delivered",
+    });
+    const play = order({ id: "play-row", orderNumber: 899, status: "new", playtest: true });
+    const rows = [original, copy, delivered, play];
+    expect(dedupeOrderRecords(rows).map((row) => row.id)).toEqual(["req-220", "done-1", "play-row"]);
+    expect(actionableOrderCount(rows)).toBe(1);
+    expect(orderHasNoPhotographer(delivered)).toBe(false);
+    expect(orderDeskTriage(delivered)).toBeNull();
+    expect(deskFilterCounts(rows, NOW).all).toBe(2);
+    expect(deskFilterCounts(rows, NOW).unscheduled).toBe(1);
+  });
+
+  it("sorts newest first and keeps a manual order", () => {
+    const older = order({ id: "old", status: "request", createdAt: "2026-01-01T15:00:00.000Z" });
+    const newer = order({ id: "new", status: "scheduled", appointmentDate: "2026-11-21", createdAt: "2026-11-20T15:00:00.000Z" });
+    expect(sortDeskOrders([older, newer], "newest").map((row) => row.id)).toEqual(["new", "old"]);
+    expect(sortDeskOrders([older, newer], "oldest").map((row) => row.id)).toEqual(["old", "new"]);
+    expect(sortDeskOrders([older, newer], "status").map((row) => row.id)).toEqual(["old", "new"]);
+    const manual = moveManualId(["new", "old"], "new", "end");
+    expect(manual).toEqual(["old", "new"]);
+    expect(applyManualOrder([newer, older], manual).map((row) => row.id)).toEqual(["old", "new"]);
+    expect(applyManualOrder([newer, older, order({ id: "fresh", status: "request", createdAt: "2026-11-21T15:00:00.000Z" })], manual).map((row) => row.id)[0]).toBe("fresh");
   });
 });
 

@@ -5,8 +5,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { staffHomePath } from "@shared/staffAccess";
 import { LogOut, Menu, X } from "lucide-react";
 import { mostSpecificNavHref, navGroups } from "@/lib/adminNav";
+import { shellUnreadTotal } from "@shared/adminUnread";
 import { AdminSidebarNav } from "@/components/admin/AdminSidebarNav";
 import { AdminUnreadProvider, useAdminUnread } from "@/components/admin/AdminUnreadProvider";
+import { useLiveOrderBadge } from "@/components/admin/useLiveOrderBadge";
 import { UnreadBadge } from "@/components/admin/UnreadBadge";
 
 interface AdminLayoutProps {
@@ -77,6 +79,9 @@ function AdminShell({
   const location = useLocation();
   const [navOpen, setNavOpen] = useState(false);
   const unread = useAdminUnread();
+  const liveOrders = useLiveOrderBadge(role === "admin" || role === "coordinator");
+  const counts = liveOrders == null ? unread.counts : { ...unread.counts, orders: liveOrders };
+  const menuTotal = shellUnreadTotal(counts, role);
 
   const badge = ROLE_BADGE[role] ?? { label: role, color: "bg-gray-500/20 text-gray-400" };
 
@@ -127,7 +132,7 @@ function AdminShell({
           groups={visibleGroups}
           activeHref={activeHref}
           role={role}
-          counts={unread.counts}
+          counts={counts}
           onNavigate={() => setNavOpen(false)}
         />
 
@@ -167,7 +172,7 @@ function AdminShell({
         {!plain && <AdminDecor />}
         <div className="relative z-[1] min-h-full w-full">
           {plain && (
-            <MenuButton count={unread.total} onClick={() => setNavOpen(true)} className="m-3" />
+            <MenuButton count={menuTotal} onClick={() => setNavOpen(true)} className="m-3" />
           )}
           {!plain && title && (
             <div className="relative border-b border-slate-200 bg-white sticky top-0 z-10 overflow-hidden">
@@ -180,7 +185,7 @@ function AdminShell({
               <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-teal-500/70 to-transparent" />
               <div className="flex w-full min-w-0 items-center justify-between gap-3 px-4 py-4 sm:px-6 sm:py-5">
                 <div className="flex min-w-0 items-center gap-3">
-                  <MenuButton count={unread.total} onClick={() => setNavOpen(true)} className="shrink-0" />
+                  <MenuButton count={menuTotal} onClick={() => setNavOpen(true)} className="shrink-0" />
                   <h1 className="min-w-0 truncate text-xl font-black text-black uppercase tracking-tight">
                     {title}
                   </h1>

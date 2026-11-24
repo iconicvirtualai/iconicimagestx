@@ -10,27 +10,30 @@ import {
   type AdminOrderListRow,
   type AdminOrderListStaff,
 } from "@shared/adminOrderList";
+import { compactOrderLabel } from "@shared/orderNumber";
 import { formatAdminMoney } from "@shared/listingPrice";
 import {
   ADMIN_ORDER_BOARD_COLUMNS,
   deliveryProgress,
   orderDeskTriage,
+  orderIsUnhandled,
   shootWhen,
   shownKpiValue,
   type OrderDeskFilter,
   type OrderDeskKpis,
   type OrderDeskPrefs,
   type OrderDeskSectionId,
+  type OrderDeskSort,
 } from "@shared/adminOrdersDesk";
 import { DragGhost, type DragGhostModel } from "@/components/drag/DragGhost";
 import { cn } from "@/lib/utils";
 import "./ordersDesk.css";
 
-const SECTION_META: Record<OrderDeskSectionId, { title: string; subdued: string }> = {
-  action: { title: "Orders Requiring Action", subdued: "Triage queue · one-click next step" },
-  active: { title: "All Orders", subdued: "Sorted by shoot date" },
-  archived: { title: "Archives & Cancellations", subdued: "Archived and cancelled" },
-};
+const SORTS: { id: Exclude<OrderDeskSort, "custom">; label: string }[] = [
+  { id: "newest", label: "Newest" },
+  { id: "oldest", label: "Oldest" },
+  { id: "status", label: "Status" },
+];
 
 const FILTERS: { id: OrderDeskFilter; label: string }[] = [
   { id: "all", label: "All" },
@@ -54,7 +57,12 @@ export function OrdersDeskFace({
   counts,
   openCount,
   archivedCount,
-  grouped,
+  newCount,
+  visibleNewCount,
+  sortMode,
+  openOrders,
+  archivedOrders,
+  boardOrders,
   deskPrefs,
   menu,
   editing,
@@ -63,11 +71,12 @@ export function OrdersDeskFace({
   staff,
   editRequests,
   ghost,
-  dropBefore,
+  rowDropBefore,
   onQuery,
   onFilter,
   onChooseFilter,
   onView,
+  onSort,
   onDraft,
   onOpenMenu,
   onEdit,
@@ -77,7 +86,7 @@ export function OrdersDeskFace({
   onSelectIds,
   onStudioChange,
   visibleIds,
-  onDragStart,
+  onRowDragStart,
   onToggleCollapsed,
 }: {
   view: "list" | "board";
@@ -88,7 +97,12 @@ export function OrdersDeskFace({
   counts: Record<OrderDeskFilter, number>;
   openCount: number;
   archivedCount: number;
-  grouped: Record<OrderDeskSectionId, Record<string, unknown>[]>;
+  newCount: number;
+  visibleNewCount: number;
+  sortMode: OrderDeskSort;
+  openOrders: Record<string, unknown>[];
+  archivedOrders: Record<string, unknown>[];
+  boardOrders: Record<string, unknown>[];
   deskPrefs: OrderDeskPrefs;
   menu: KpiKey | null;
   editing: boolean;
@@ -97,11 +111,12 @@ export function OrdersDeskFace({
   staff: AdminOrderListStaff[];
   editRequests: Record<string, unknown>[];
   ghost: DragGhostModel | null;
-  dropBefore: OrderDeskSectionId | "end" | null;
+  rowDropBefore: string | "end" | null;
   onQuery: (value: string) => void;
   onFilter: (filter: OrderDeskFilter) => void;
   onChooseFilter: (filter: OrderDeskFilter) => void;
   onView: (view: "list" | "board") => void;
+  onSort: (mode: Exclude<OrderDeskSort, "custom">) => void;
   onDraft: (value: string) => void;
   onOpenMenu: (key: KpiKey) => void;
   onEdit: (key: KpiKey) => void;
@@ -111,7 +126,7 @@ export function OrdersDeskFace({
   onSelectIds: (ids: string[]) => void;
   onStudioChange: (orderId: string, studio: AdminStudioId) => void;
   visibleIds: string[];
-  onDragStart: (event: React.PointerEvent<HTMLButtonElement>, id: OrderDeskSectionId) => void;
+  onRowDragStart: (event: React.PointerEvent<HTMLButtonElement>, id: string) => void;
   onToggleCollapsed: (section: OrderDeskSectionId) => void;
 }) {
   const cards: { key: KpiKey; filterId: OrderDeskFilter; label: string; value: string; hint: string; icon: React.ReactNode; tone: string }[] = [
@@ -122,13 +137,13 @@ export function OrdersDeskFace({
   ];
 
   return (
-    <div className="orders-desk main" data-orders-view={view} data-orders-filter={filter}>
+    <div className="orders-desk main" data-orders-view={view} data-orders-filter={filter} data-orders-sort={sortMode}>
       <DragGhost ghost={ghost} />
       <div className="page-head">
         <div>
           <h1>Orders</h1>
           <div className="sub">
-            <strong>{openCount}</strong> open this period · <strong>{archivedCount}</strong> archived · week of {kpis.week.startLabel}
+            <strong>{openCount}</strong> open · <strong data-testid="orders-new-total">{newCount}</strong> new · <strong>{archivedCount}</strong> archived · week of {kpis.week.startLabel}
           </div>
         </div>
         <div className="view-toggle" role="group" aria-label="Orders view" data-testid="orders-view-toggle">
@@ -189,6 +204,16 @@ export function OrdersDeskFace({
             </button>
           ))}
         </nav>
+        <div className="sorts" role="group" aria-label="Sort orders" data-testid="orders-sort">
+          {SORTS.map((item) => (
+            <button key={item.id} type="button" className={sortMode === item.id ? "active" : ""} aria-pressed={sortMode === item.id} data-testid={`orders-sort-${item.id}`} onClick={() => onSort(item.id)}>
+              {item.label}
+            </button>
+          ))}
+          {sortMode === "custom" ? (
+            <button type="button" className="active" data-testid="orders-sort-reset" onClick={() => onSort("newest")}>Reset order</button>
+          ) : null}
+        </div>
         <label className="select-all">
           <input
             type="checkbox"
@@ -205,100 +230,170 @@ export function OrdersDeskFace({
       </div>
 
       {view === "board" ? (
-        <Board orders={grouped.action.concat(grouped.active, grouped.archived)} staff={staff} now={clock} selection={selection} onToggleSelect={onToggleSelect} />
+        <Board orders={boardOrders} staff={staff} now={clock} selection={selection} onToggleSelect={onToggleSelect} />
       ) : (
         <div className="stack">
-          {deskPrefs.sectionOrder.map((section) => (
-            <React.Fragment key={section}>
-              {dropBefore === section && <DropSlot title={SECTION_META[sectionTitle(ghost) || section].title} />}
-              <section
-                data-section={section}
-                data-section-drop={section}
-                className={cn("block", deskPrefs.collapsed[section] && "is-collapsed", ghost?.title === SECTION_META[section].title && "is-dragging")}
+          <section data-section="open" className="block" data-testid="orders-open">
+            <div className="block-head">
+              <h2>Orders</h2>
+              <span className="count-calm" data-testid="orders-new-count" title="New requests waiting for a first response. Handled, delivered, and duplicate copies are not included.">{visibleNewCount}</span>
+              <span className="subdued">{sortHint(sortMode)}</span>
+            </div>
+            <div className="block-body">
+              {openOrders.length === 0 ? <div className="empty-note">No orders in this list</div> : (
+                <ScanList
+                  orders={openOrders}
+                  staff={staff}
+                  now={clock}
+                  editRequests={editRequests}
+                  selection={selection}
+                  rowDropBefore={rowDropBefore}
+                  onToggleSelect={onToggleSelect}
+                  onStudioChange={onStudioChange}
+                  onRowDragStart={onRowDragStart}
+                />
+              )}
+              <div data-order-drop="end" className="order-end">
+                {rowDropBefore === "end" ? <div className="row-slot" data-testid="order-drop-slot" /> : null}
+              </div>
+            </div>
+          </section>
+          <section data-section="archived" className={cn("block", deskPrefs.collapsed.archived && "is-collapsed")}>
+            <div className="block-head">
+              <button
+                type="button"
+                className="fold"
+                aria-expanded={!deskPrefs.collapsed.archived}
+                aria-label={deskPrefs.collapsed.archived ? "Expand Archives & Cancellations" : "Collapse Archives & Cancellations"}
+                onClick={() => onToggleCollapsed("archived")}
               >
-                <div className="block-head">
-                  <button type="button" className="drag-handle" data-drag-handle aria-label={`Drag to reorder ${SECTION_META[section].title}`} title="Drag to reorder" onPointerDown={(event) => onDragStart(event, section)}>
-                    <GripIcon />
-                  </button>
-                  <button
-                    type="button"
-                    className="fold"
-                    aria-expanded={!deskPrefs.collapsed[section]}
-                    aria-label={deskPrefs.collapsed[section] ? `Expand ${SECTION_META[section].title}` : `Collapse ${SECTION_META[section].title}`}
-                    onClick={() => onToggleCollapsed(section)}
-                  >
-                    <FoldIcon />
-                  </button>
-                  <h2>{SECTION_META[section].title}</h2>
-                  <span className="count-calm">{grouped[section].length}</span>
-                  <span className="subdued">{section === "archived" && deskPrefs.collapsed.archived ? "Collapsed" : SECTION_META[section].subdued}</span>
-                </div>
-                {!deskPrefs.collapsed[section] && (
-                <div className="block-body">
-                  {grouped[section].length === 0 ? <div className="empty-note">No orders in this list</div> : section === "action" ? (
-                    <Triage orders={grouped.action} staff={staff} now={clock} editRequests={editRequests} selection={selection} onToggleSelect={onToggleSelect} onStudioChange={onStudioChange} />
-                  ) : (
-                    <OrderTable orders={grouped[section]} staff={staff} now={clock} selection={selection} onToggleSelect={onToggleSelect} onStudioChange={onStudioChange} />
-                  )}
-                </div>
+                <FoldIcon />
+              </button>
+              <h2>Archives & Cancellations</h2>
+              <span className="count-calm">{archivedOrders.length}</span>
+              <span className="subdued">{deskPrefs.collapsed.archived ? "Collapsed" : "Archived and cancelled"}</span>
+            </div>
+            {!deskPrefs.collapsed.archived && (
+              <div className="block-body">
+                {archivedOrders.length === 0 ? <div className="empty-note">No orders in this list</div> : (
+                  <ScanList
+                    orders={archivedOrders}
+                    staff={staff}
+                    now={clock}
+                    editRequests={editRequests}
+                    selection={selection}
+                    rowDropBefore={null}
+                    onToggleSelect={onToggleSelect}
+                    onStudioChange={onStudioChange}
+                    onRowDragStart={null}
+                  />
                 )}
-              </section>
-            </React.Fragment>
-          ))}
-          <div data-section-drop="end">
-            {dropBefore === "end" && <DropSlot title={SECTION_META[sectionTitle(ghost) || "action"].title} />}
-          </div>
+              </div>
+            )}
+          </section>
         </div>
       )}
     </div>
   );
 }
 
-function DropSlot({ title }: { title: string }) {
-  return <div className="ghost-section-slot" data-testid="section-drop-slot">Drop {title} here</div>;
-}
-
-function Triage({
-  orders, staff, now, editRequests, selection, onToggleSelect, onStudioChange,
+function ScanList({
+  orders, staff, now, editRequests, selection, rowDropBefore, onToggleSelect, onStudioChange, onRowDragStart,
 }: {
   orders: Record<string, unknown>[];
   staff: AdminOrderListStaff[];
   now: Date;
   editRequests: Record<string, unknown>[];
   selection: Set<string>;
+  rowDropBefore: string | "end" | null;
   onToggleSelect: (id: string) => void;
   onStudioChange: (orderId: string, studio: AdminStudioId) => void;
+  onRowDragStart: ((event: React.PointerEvent<HTMLButtonElement>, id: string) => void) | null;
 }) {
   return (
-    <div className="triage">
+    <div className="scan-list" data-order-list>
       {orders.map((order) => {
         const id = String(order.id || "");
         const row = buildAdminOrderListRow(order, staff);
+        const number = compactOrderLabel(order) || row.orderCode;
         const triage = orderDeskTriage(order, staff, editRequests);
         const when = shootWhen(order, now);
+        const parts = packageParts(row);
+        const progress = deliveryProgress(order);
         const tile = buildAdminOrderTile(order);
-        if (!triage) return null;
+        const address = splitAddress(row.address);
+        const fresh = orderIsUnhandled(order);
         return (
-          <div key={id} className="t-row" data-order-id={id}>
-            <input className="pick" type="checkbox" aria-label={`Select ${row.orderCode}`} checked={selection.has(id)} onChange={() => onToggleSelect(id)} />
-            <span className="reason">{triage.label}</span>
-            <div className="t-main">
-              <span>
-                <Link className="oid" to={adminOrderDetailHref(id)} data-order-link={id}>{row.orderCode}</Link>
-                {row.calendarHoldFailed ? <span data-slot="calendar-hold" className="subdued"> Calendar hold failed</span> : null}
-              </span>
-              <span className="who">{row.clientName}</span>
-              <span className="where">{streetLine(row.address)}</span>
+          <div key={id} className="scan-wrap" data-order-id={id} data-order-drop={id}>
+          {rowDropBefore === id ? <div className="row-slot" data-testid="order-drop-slot" /> : null}
+          <article
+            className={cn("scan", fresh && "is-new", rowDropBefore === id && "is-drop")}
+          >
+            {onRowDragStart ? (
+              <button type="button" className="drag-handle" aria-label={`Drag to reorder ${number}`} title="Drag to reorder" onPointerDown={(event) => onRowDragStart(event, id)}>
+                <GripIcon />
+              </button>
+            ) : <span className="drag-spacer" />}
+            <input className="pick" type="checkbox" aria-label={`Select ${number}`} checked={selection.has(id)} onChange={() => onToggleSelect(id)} />
+            <div className="scan-id">
+              <Link className="oid" to={adminOrderDetailHref(id)} data-order-link={id} title={row.orderCode === number ? id : `${row.orderCode} · ${id}`}>{number}</Link>
+              {fresh ? <span className="pill">New</span> : null}
+              {row.calendarHoldFailed ? <span data-slot="calendar-hold" className="subdued">Calendar hold failed</span> : null}
             </div>
-            <div className="t-when">{when.day}{when.time ? ` · ${when.time}` : ""}</div>
-            {tile.studio ? (
-              <select className="studio-pick" aria-label={`Studio for ${row.orderCode}`} value={tile.studio} onChange={(event) => onStudioChange(id, event.target.value as AdminStudioId)}>
-                {ADMIN_STUDIOS.map((studio) => <option key={studio.id} value={studio.id}>{studio.label}</option>)}
-              </select>
-            ) : null}
-            <Link className={cn("btn", triage.action === "Assign" && "btn-teal", triage.action === "Open gallery" && "btn-dark")} to={triageHref(id, order, triage.action)}>
-              {triage.action}
-            </Link>
+            <div className="scan-main">
+              <div className="client">
+                <div className={`av ${toneClass(row.clientName)}`}>{initials(row.clientName)}</div>
+                <div>
+                  <div className="nm">{row.clientName}</div>
+                  {orderEmail(order, row) ? <div className="em">{orderEmail(order, row)}</div> : null}
+                </div>
+              </div>
+              <div className="addr"><div className="st">{address.street}</div>{address.city ? <div className="ct">{address.city}</div> : null}</div>
+              <div className="pkg">
+                <span className="name">{parts[0]}</span>
+                {parts.length > 1 ? <span className="plus" tabIndex={0}>+{parts.length - 1}</span> : null}
+                {parts.length > 1 ? (
+                  <div className="pkg-tip">
+                    <strong>Package & services</strong>
+                    <ul>{parts.map((part) => <li key={part}>{part}</li>)}</ul>
+                  </div>
+                ) : null}
+              </div>
+              {tile.studio ? (
+                <select className="studio-pick" aria-label={`Studio for ${number}`} value={tile.studio} onChange={(event) => onStudioChange(id, event.target.value as AdminStudioId)}>
+                  {ADMIN_STUDIOS.map((studio) => <option key={studio.id} value={studio.id}>{studio.label}</option>)}
+                </select>
+              ) : null}
+            </div>
+            <div className="scan-status statii">
+              <div className="st-line"><span className="st-k">Order</span><span className="st-v"><i className="ndot" />{row.statusLabel}</span></div>
+              <div className="st-line"><span className="st-k">Payment</span><span className="st-v">{adminOrderPaymentLabel(order)}</span></div>
+              <div className="st-line"><span className="st-k">Gallery</span><span className="st-v">{adminOrderGalleryLabel(order)}</span></div>
+              <div className="meta-row">
+                <Photographer name={row.photographer} />
+                {progress ? (
+                  <div className="prog">
+                    <div className="lab">{progress.delivered}/{progress.total} delivered</div>
+                    <div className="track"><i style={{ width: `${Math.round((progress.delivered / progress.total) * 100)}%` }} /></div>
+                  </div>
+                ) : null}
+                <Note notes={row.notes} />
+              </div>
+              {triage ? <span className="reason">{triage.label}</span> : null}
+            </div>
+            <div className="scan-side">
+              <div className="when">
+                <div className="d">Received {row.placedLabel}</div>
+                <div className="t">{when.day}{when.time ? ` · ${when.time}` : ""}</div>
+              </div>
+              <div className="total" data-slot="money">{row.totalLabel}</div>
+              {triage ? (
+                <Link className={cn("btn", triage.action === "Assign" && "btn-teal", triage.action === "Open gallery" && "btn-dark")} to={triageHref(id, order, triage.action)}>
+                  {triage.action}
+                </Link>
+              ) : null}
+            </div>
+          </article>
           </div>
         );
       })}
@@ -306,102 +401,6 @@ function Triage({
   );
 }
 
-function OrderTable({
-  orders, staff, now, selection, onToggleSelect, onStudioChange,
-}: {
-  orders: Record<string, unknown>[];
-  staff: AdminOrderListStaff[];
-  now: Date;
-  selection: Set<string>;
-  onToggleSelect: (id: string) => void;
-  onStudioChange: (orderId: string, studio: AdminStudioId) => void;
-}) {
-  return (
-    <div className="table-wrap" data-order-list>
-      <table className="orders">
-        <thead>
-          <tr>
-            {["Order", "Client", "Address", "Shoot date", "Package", "Status", "Total"].map((label) => <th key={label}>{label}</th>)}
-          </tr>
-        </thead>
-        <tbody>
-          {orders.map((order) => {
-            const id = String(order.id || "");
-            const row = buildAdminOrderListRow(order, staff);
-            const when = shootWhen(order, now);
-            const parts = packageParts(row);
-            const progress = deliveryProgress(order);
-            const tile = buildAdminOrderTile(order);
-            const address = splitAddress(row.address);
-            return (
-              <tr key={id} data-order-id={id}>
-                <td>
-                  <div className="oid-line">
-                    <input className="pick" type="checkbox" aria-label={`Select ${row.orderCode}`} checked={selection.has(id)} onChange={() => onToggleSelect(id)} />
-                    <div>
-                      <Link className="oid" to={adminOrderDetailHref(id)} data-order-link={id}>{row.orderCode}</Link>
-                      {row.calendarHoldFailed ? <div data-slot="calendar-hold" className="subdued">Calendar hold failed</div> : null}
-                    </div>
-                  </div>
-                </td>
-                <td>
-                  <div className="client">
-                    <div className={`av ${toneClass(row.clientName)}`}>{initials(row.clientName)}</div>
-                    <div>
-                      <div className="nm">{row.clientName}</div>
-                      {orderEmail(order, row) ? <div className="em">{orderEmail(order, row)}</div> : null}
-                    </div>
-                  </div>
-                </td>
-                <td>
-                  <div className="addr"><div className="st">{address.street}</div>{address.city ? <div className="ct">{address.city}</div> : null}</div>
-                </td>
-                <td>
-                  <div className="when"><div className="d">{when.day}</div>{when.time ? <div className="t">{when.time}</div> : null}</div>
-                </td>
-                <td>
-                  <div className="pkg">
-                    <span className="name">{parts[0]}</span>
-                    {parts.length > 1 ? <span className="plus" tabIndex={0}>+{parts.length - 1}</span> : null}
-                    {parts.length > 1 ? (
-                      <div className="pkg-tip">
-                        <strong>Package & services</strong>
-                        <ul>{parts.map((part) => <li key={part}>{part}</li>)}</ul>
-                      </div>
-                    ) : null}
-                  </div>
-                  {tile.studio ? (
-                    <select className="studio-pick" aria-label={`Studio for ${row.orderCode}`} value={tile.studio} onChange={(event) => onStudioChange(id, event.target.value as AdminStudioId)}>
-                      {ADMIN_STUDIOS.map((studio) => <option key={studio.id} value={studio.id}>{studio.label}</option>)}
-                    </select>
-                  ) : null}
-                </td>
-                <td className="status-cell">
-                  <div className="statii">
-                    <div className="st-line"><span className="st-k">Order</span><span className="st-v"><i className="ndot" />{row.statusLabel}</span></div>
-                    <div className="st-line"><span className="st-k">Payment</span><span className="st-v">{adminOrderPaymentLabel(order)}</span></div>
-                    <div className="st-line"><span className="st-k">Gallery</span><span className="st-v">{adminOrderGalleryLabel(order)}</span></div>
-                  </div>
-                  <div className="meta-row">
-                    <Photographer name={row.photographer} />
-                    {progress ? (
-                      <div className="prog">
-                        <div className="lab">{progress.delivered}/{progress.total} delivered</div>
-                        <div className="track"><i style={{ width: `${Math.round((progress.delivered / progress.total) * 100)}%` }} /></div>
-                      </div>
-                    ) : null}
-                    <Note notes={row.notes} />
-                  </div>
-                </td>
-                <td><div className="total" data-slot="money">{row.totalLabel}</div></td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-}
 
 function Board({
   orders, staff, now, selection, onToggleSelect,
@@ -435,8 +434,8 @@ function Board({
               return (
                 <article key={id} className="ocard" data-order-id={id}>
                   <div className="top">
-                    <Link className="oid" to={adminOrderDetailHref(id)} data-order-link={id}>{row.orderCode}</Link>
-                    <input className="pick" type="checkbox" aria-label={`Select ${row.orderCode}`} checked={selection.has(id)} onChange={() => onToggleSelect(id)} />
+                    <Link className="oid" to={adminOrderDetailHref(id)} data-order-link={id}>{compactOrderLabel(order) || row.orderCode}</Link>
+                    <input className="pick" type="checkbox" aria-label={`Select ${compactOrderLabel(order) || row.orderCode}`} checked={selection.has(id)} onChange={() => onToggleSelect(id)} />
                   </div>
                   <div className="addr">{address.street}</div>
                   {address.city ? <div className="city">{address.city}</div> : null}
@@ -483,9 +482,11 @@ function Note({ notes }: { notes: string }) {
   );
 }
 
-function sectionTitle(ghost: DragGhostModel | null): OrderDeskSectionId | null {
-  if (!ghost) return null;
-  return (Object.keys(SECTION_META) as OrderDeskSectionId[]).find((id) => SECTION_META[id].title === ghost.title) || null;
+function sortHint(mode: OrderDeskSort): string {
+  if (mode === "oldest") return "Oldest first";
+  if (mode === "status") return "Grouped by status";
+  if (mode === "custom") return "Your order";
+  return "Newest first";
 }
 
 function triageHref(id: string, order: Record<string, unknown>, action: string): string {
@@ -507,10 +508,6 @@ function splitAddress(value: string): { street: string; city: string } {
   const parts = value.split(",").map((part) => part.trim()).filter(Boolean);
   if (parts.length < 2) return { street: value, city: "" };
   return { street: parts[0], city: parts.slice(1).join(", ") };
-}
-
-function streetLine(value: string): string {
-  return splitAddress(value).street;
 }
 
 function orderEmail(order: Record<string, unknown>, row: AdminOrderListRow): string {

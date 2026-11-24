@@ -20,6 +20,48 @@ export function orderNumberLookupKeys(raw: unknown): string[] {
   return [...new Set(keys)];
 }
 
+function labelText(value: unknown): string {
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return typeof value === "string" ? value.trim() : "";
+}
+
+/** #003 from a counter value. Long ids and words are not sequential numbers. */
+export function sequentialOrderLabel(value: unknown): string | null {
+  if (typeof value === "number" && Number.isInteger(value) && value >= 1) return formatOrderNumber(value);
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  const hashed = trimmed.match(/^#(\d+)$/);
+  const digits = hashed ? hashed[1] : (/^\d+$/.test(trimmed) ? trimmed : "");
+  if (!digits) return null;
+  const n = Number(digits);
+  if (!Number.isInteger(n) || n < 1) return null;
+  return formatOrderNumber(n);
+}
+
+/**
+ * Label shown on the orders desk. A sequential #003 wins.
+ * `ORD - L - 10482` is shown as #10482. A raw document id becomes a stable
+ * 4-digit code. Nothing here writes or changes the document id.
+ */
+export function compactOrderLabel(record: Record<string, unknown> | null | undefined): string {
+  if (!record) return "";
+  const sequential = sequentialOrderLabel(record.orderNumber);
+  if (sequential) return sequential;
+  const coded = [record.orderCode, record.displayId]
+    .map(labelText)
+    .find((value) => value && !/example/i.test(value)) || "";
+  const wrapped = coded.match(/^ORD\s*-\s*[A-Z0-9]+\s*-\s*(\d{3,8})$/i);
+  if (wrapped) {
+    const digits = wrapped[1].replace(/^0+(?=\d)/, "");
+    return `#${digits.padStart(3, "0")}`;
+  }
+  const source = labelText(record.id) || coded || labelText(record.orderNumber);
+  if (!source) return "";
+  const short = sequentialOrderLabel(source);
+  if (short && source.length <= 8) return short;
+  return `#${orderCodeTail(source).slice(-4)}`;
+}
+
 /**
  * Five-digit code for a Firestore id. Ids with at least five digits keep their
  * last five (unless that is all zeros); short or digit-poor ids, which used to
