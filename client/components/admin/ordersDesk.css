@@ -960,12 +960,21 @@
 @media (max-width: 900px){
   .orders-desk .kpis{ grid-template-columns: 1fr 1fr; }
   .orders-desk .scan{
-    grid-template-columns: 28px 16px minmax(0, 1fr);
+    grid-template-columns: auto auto minmax(0, 1fr);
     grid-template-areas:
       "grip pick id"
-      "grip pick main"
-      "grip pick status"
-      "grip pick side";
+      "main main main"
+      "status status status"
+      "side side side";
+    column-gap: 8px;
+    row-gap: 8px;
+    padding: 12px;
+  }
+  .orders-desk .scan-id{
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
   }
   .orders-desk .scan-status,
   .orders-desk .scan-side{ align-items: flex-start; }
