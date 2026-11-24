@@ -5430,10 +5430,50 @@ function recordVisibleToIdentity(record2, identity) {
   if (clientId2 && ids.has(clientId2)) return true;
   if (firebaseUid && ids.has(firebaseUid)) return true;
   if (profile && profiles.has(profile)) return true;
-  if (clientId2 || firebaseUid || profile) return false;
+  if (!Array.isArray(identity.otherClientIds)) {
+    if (clientId2 || firebaseUid || profile) return false;
+  } else {
+    const other = new Set(identity.otherClientIds.map((id) => id.trim()).filter(Boolean));
+    if (clientId2 && !ids.has(clientId2) && other.has(clientId2)) return false;
+    if (firebaseUid && !ids.has(firebaseUid) && other.has(firebaseUid)) return false;
+    if (profile && !profiles.has(profile) && other.has(profile)) return false;
+  }
   const email = clean$1(identity.email).toLowerCase();
   if (!email) return false;
   return [record2.email, record2.clientEmail].some((value) => clean$1(value).toLowerCase() === email);
+}
+function foreignIdCandidates(records, identityIds2) {
+  const mine = new Set(identityIds2.map((id) => id.trim()).filter(Boolean));
+  const found = /* @__PURE__ */ new Set();
+  for (const record2 of records) {
+    if (!record2) continue;
+    for (const value of [record2.clientId, record2.firebaseUid]) {
+      const id = clean$1(value);
+      if (id && !mine.has(id)) found.add(id);
+    }
+    const profile = clean$1(record2.clientProfileId);
+    if (profile.startsWith("client:")) {
+      const id = profile.slice("client:".length).trim();
+      if (id && !mine.has(id)) found.add(id);
+    }
+  }
+  return [...found];
+}
+function knownClientIds(docs, except) {
+  const mine = new Set(except.map((id) => id.trim()).filter(Boolean));
+  const other = /* @__PURE__ */ new Set();
+  for (const doc of docs) {
+    const id = clean$1(doc.id);
+    if (!id || mine.has(id)) continue;
+    other.add(id);
+    other.add(profileId("client", id));
+    const uid = clean$1(doc.firebaseUid);
+    if (uid && !mine.has(uid)) {
+      other.add(uid);
+      other.add(profileId("client", uid));
+    }
+  }
+  return [...other];
 }
 const PORTAL_LISTING_ID$1 = /^[A-Za-z0-9_-]{4,128}$/;
 const NEVER_FILL = /* @__PURE__ */ new Set([
@@ -6008,8 +6048,24 @@ function visibleToPortalClient(record2, identity) {
   return recordVisibleToIdentity(record2, {
     ids: identity.ids,
     firebaseUid: identity.ids[0] || null,
-    email: normalizeEmail$1(identity.email)
+    email: normalizeEmail$1(identity.email),
+    ...Array.isArray(identity.otherClientIds) ? { otherClientIds: identity.otherClientIds } : {}
   });
+}
+async function otherKnownClientIds(db2, records, identityIds2) {
+  const candidates = foreignIdCandidates(records, identityIds2).slice(0, 40);
+  const docs = [];
+  await Promise.all(candidates.map(async (id) => {
+    const direct = await db2.collection("clients").doc(id).get();
+    if (direct.exists) {
+      docs.push({ id: direct.id, firebaseUid: direct.data()?.firebaseUid });
+      return;
+    }
+    const byUid = await db2.collection("clients").where("firebaseUid", "==", id).limit(1).get();
+    const hit = byUid.docs[0];
+    if (hit) docs.push({ id: hit.id, firebaseUid: hit.data()?.firebaseUid });
+  }));
+  return knownClientIds(docs, identityIds2);
 }
 const db$D = () => admin.firestore();
 const LINK_COLLECTIONS = /* @__PURE__ */ new Set([
@@ -6136,19 +6192,14 @@ async function loadVisibleSeeds(identity) {
   const orders = /* @__PURE__ */ new Map();
   const invoices = /* @__PURE__ */ new Map();
   const appointments = /* @__PURE__ */ new Map();
-  const keep = (map, docs) => {
+  const stash = (map, docs) => {
     for (const doc of docs) {
-      if (!visibleToPortalClient({
-        clientId: text$u(doc.data.clientId),
-        email: text$u(doc.data.email),
-        clientEmail: text$u(doc.data.clientEmail)
-      }, identity)) continue;
       if (!map.has(doc.id)) map.set(doc.id, doc);
     }
   };
   const jobs = [];
   const track = (job, map) => {
-    jobs.push(job.then((docs) => keep(map, docs)));
+    jobs.push(job.then((docs) => stash(map, docs)));
   };
   if (identity.ids.length) {
     track(queryIn("orderRequests", "clientId", identity.ids), requests);
@@ -6164,6 +6215,33 @@ async function loadVisibleSeeds(identity) {
     track(queryEqual$1("appointments", "clientEmail", identity.email), appointments);
   }
   await Promise.all(jobs);
+  let otherClientIds;
+  try {
+    otherClientIds = await otherKnownClientIds(db$D(), [
+      ...requests.values(),
+      ...orders.values(),
+      ...invoices.values(),
+      ...appointments.values()
+    ].map((doc) => doc.data), identity.ids);
+  } catch (err) {
+    console.error("[Booking listing] Client id lookup failed:", err);
+  }
+  const portalIdentity = otherClientIds ? { ...identity, otherClientIds } : identity;
+  const dropHidden = (map) => {
+    for (const [id, doc] of map) {
+      if (!visibleToPortalClient({
+        clientId: text$u(doc.data.clientId),
+        firebaseUid: text$u(doc.data.firebaseUid),
+        clientProfileId: text$u(doc.data.clientProfileId),
+        email: text$u(doc.data.email),
+        clientEmail: text$u(doc.data.clientEmail)
+      }, portalIdentity)) map.delete(id);
+    }
+  };
+  dropHidden(requests);
+  dropHidden(orders);
+  dropHidden(invoices);
+  dropHidden(appointments);
   return {
     orderRequests: [...requests.values()],
     orders: [...orders.values()],
@@ -21223,6 +21301,49 @@ async function findInvoiceForSquarePayment(payment) {
   const snap = await db$n().collection("invoices").doc(hit.id).get();
   return snap.exists ? snap : null;
 }
+async function findSquareSaleDoc(collectionName2, payment) {
+  const orderId = typeof payment.order_id === "string" ? payment.order_id.trim() : "";
+  const linkRaw = payment.payment_link_id || payment.paymentLinkId;
+  const linkId = typeof linkRaw === "string" ? linkRaw.trim() : "";
+  const steps = [];
+  if (orderId) steps.push(["squareOrderId", orderId]);
+  if (linkId) {
+    steps.push(["squarePaymentLinkId", linkId]);
+    steps.push(["squareLinkId", linkId]);
+  }
+  for (const [field, value] of steps) {
+    const snap = await db$n().collection(collectionName2).where(field, "==", value).limit(1).get();
+    if (!snap.empty) return snap.docs[0];
+  }
+  return null;
+}
+async function markSquareOrderPaid(ref, data, amount, squarePaymentId) {
+  if (data.squarePaymentId === squarePaymentId && data.paymentStatus === "paid") return;
+  const pricing = data.pricing && typeof data.pricing === "object" ? data.pricing : {};
+  const total = Number(data.total) || Number(pricing.total) || amount;
+  const current = typeof data.status === "string" ? data.status : "";
+  await ref.update({
+    status: current === "awaiting-payment" ? "new" : current || "new",
+    paymentStatus: "paid",
+    amountPaid: amount,
+    balanceDue: Math.max(0, Math.round((total - amount) * 100) / 100),
+    squarePaymentId,
+    paidAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+}
+async function settlePrepaidOrderRequest(payment, amount) {
+  const paymentId = typeof payment.id === "string" ? payment.id.trim() : "";
+  if (!paymentId) return false;
+  const request = await findSquareSaleDoc("orderRequests", payment);
+  const legacy = request ? null : await findSquareSaleDoc("orders", payment);
+  const primary = request || legacy;
+  if (!primary) return false;
+  await markSquareOrderPaid(primary.ref, primary.data() || {}, amount, paymentId);
+  const twin = await db$n().collection(request ? "orders" : "orderRequests").doc(primary.id).get();
+  if (twin.exists) await markSquareOrderPaid(twin.ref, twin.data() || {}, amount, paymentId);
+  return true;
+}
 router$B.post("/square-webhook", async (req, res) => {
   try {
     const signatureKey = process.env.SQUARE_WEBHOOK_SIGNATURE_KEY;
@@ -21255,8 +21376,13 @@ router$B.post("/square-webhook", async (req, res) => {
     const event = JSON.parse(rawBody);
     const payment = event?.data?.object?.payment || event?.data?.object;
     if (!payment?.id || payment.status !== "COMPLETED") return res.json({ received: true });
+    const amountCents = Number(payment.amount_money?.amount ?? payment.total_money?.amount ?? 0);
+    const amount = amountCents / 100;
+    if (amount <= 0) return res.json({ received: true, ignored: "zero-amount" });
     const invoiceDoc = await findInvoiceForSquarePayment(payment);
     if (!invoiceDoc) {
+      const settledOrder = await settlePrepaidOrderRequest(payment, amount);
+      if (settledOrder) return res.json({ received: true, orderRequest: true });
       await db$n().collection("agentLogs").add({
         agent: "travis",
         action: "Unmatched Square payment",
@@ -21277,9 +21403,6 @@ router$B.post("/square-webhook", async (req, res) => {
     if (isMirroredPayAtCloseSquarePayment(payment, invoice)) {
       return res.json({ received: true, ignored: "pay-at-close-external" });
     }
-    const amountCents = Number(payment.amount_money?.amount ?? payment.total_money?.amount ?? 0);
-    const amount = amountCents / 100;
-    if (amount <= 0) return res.json({ received: true, ignored: "zero-amount" });
     if (isDepositSquarePayment(invoice, payment)) {
       await applyDepositPayment({
         invoiceId: invoiceDoc.id,
@@ -24165,24 +24288,11 @@ router$y.get("/me/home", requireAuth, async (req, res) => {
     const orders = [];
     const ordersById = /* @__PURE__ */ new Map();
     const seenOrder = /* @__PURE__ */ new Set();
-    const pushOrder = (entry2) => {
+    const orderDocs = [];
+    const collectOrder = (entry2) => {
       if (seenOrder.has(entry2.id)) return;
-      const data = entry2.data();
-      if (!visibleToPortalClient(
-        { clientId: data.clientId, firebaseUid: data.firebaseUid, clientProfileId: data.clientProfileId, email: data.email, clientEmail: data.clientEmail },
-        { ids: identity.ids, email: identity.email }
-      )) return;
       seenOrder.add(entry2.id);
-      const stored = asRecord$4(jsonSafe(data));
-      ordersById.set(entry2.id, { ...stored, id: entry2.id });
-      const listingId = typeof data.listingId === "string" ? data.listingId : "";
-      orders.push({
-        id: entry2.id,
-        address: addressText(data.address || data.shootLocation) || "Order",
-        status: data.status || "new",
-        href: listingId ? clientListingPath(listingId) : "/portal/home?section=orders",
-        orderNumber: stored.orderNumber ?? null
-      });
+      orderDocs.push(entry2);
     };
     try {
       for (const clientId2 of identity.ids) {
@@ -24192,18 +24302,47 @@ router$y.get("/me/home", requireAuth, async (req, res) => {
           db$i().collection("orderRequests").where("firebaseUid", "==", clientId2).limit(HOME_LIMIT).get(),
           db$i().collection("orderRequests").where("clientProfileId", "==", profileKey).limit(HOME_LIMIT).get()
         ]);
-        [...byId.docs, ...byUid.docs, ...byProfile.docs].forEach(pushOrder);
+        [...byId.docs, ...byUid.docs, ...byProfile.docs].forEach(collectOrder);
       }
       if (identity.email) {
         const [byEmail, byClientEmail] = await Promise.all([
           db$i().collection("orderRequests").where("email", "==", identity.email).limit(HOME_LIMIT).get(),
           db$i().collection("orderRequests").where("clientEmail", "==", identity.email).limit(HOME_LIMIT).get()
         ]);
-        byEmail.docs.forEach(pushOrder);
-        byClientEmail.docs.forEach(pushOrder);
+        byEmail.docs.forEach(collectOrder);
+        byClientEmail.docs.forEach(collectOrder);
       }
     } catch (orderErr) {
       console.error("[Clients] Order lookup failed:", orderErr);
+    }
+    let otherClientIds;
+    try {
+      otherClientIds = await otherKnownClientIds(db$i(), orderDocs.map((entry2) => entry2.data()), identity.ids);
+    } catch (lookupErr) {
+      console.error("[Clients] Client id lookup failed:", lookupErr);
+    }
+    const orderIdentity = {
+      ids: identity.ids,
+      email: identity.email,
+      ...otherClientIds ? { otherClientIds } : {}
+    };
+    for (const entry2 of orderDocs) {
+      const data = entry2.data();
+      if (!visibleToPortalClient(
+        { clientId: data.clientId, firebaseUid: data.firebaseUid, clientProfileId: data.clientProfileId, email: data.email, clientEmail: data.clientEmail },
+        orderIdentity
+      )) continue;
+      const stored = asRecord$4(jsonSafe(data));
+      const title = typeof data.title === "string" ? data.title.trim() : "";
+      ordersById.set(entry2.id, { ...stored, id: entry2.id });
+      const listingId = typeof data.listingId === "string" ? data.listingId : "";
+      orders.push({
+        id: entry2.id,
+        address: addressText(data.address || data.shootLocation) || title || "Order",
+        status: data.status || "new",
+        href: listingId ? clientListingPath(listingId) : "/portal/home?section=orders",
+        orderNumber: stored.orderNumber ?? null
+      });
     }
     if (identity.email) {
       try {
@@ -41036,18 +41175,40 @@ function flashSaleUseBy(purchasedAt) {
   expires.setUTCDate(expires.getUTCDate() + 90);
   return expires.toISOString();
 }
+const ORDER_REQUESTS = "orderRequests";
+const ORDERS = "orders";
 const memory = [];
+function flashSaleOrderFields(order) {
+  const email = typeof order.clientEmail === "string" && order.clientEmail ? order.clientEmail : typeof order.email === "string" ? order.email : "";
+  const phone = typeof order.clientPhone === "string" && order.clientPhone ? order.clientPhone : typeof order.phone === "string" ? order.phone : "";
+  const link = typeof order.squareLinkId === "string" ? order.squareLinkId : "";
+  return {
+    ...order,
+    email: typeof order.email === "string" && order.email ? order.email : email,
+    phone: typeof order.phone === "string" && order.phone ? order.phone : phone,
+    address: typeof order.address === "string" ? order.address : "",
+    ...link && !order.squarePaymentLinkId ? { squarePaymentLinkId: link } : {}
+  };
+}
 async function saveFlashSaleOrder(order) {
+  const fields = flashSaleOrderFields(order);
   if (!admin.apps.length) {
     const id = `flash-${memory.length + 1}`;
-    memory.push({ id, ...order });
+    const linked2 = { ...fields, orderId: id, orderRequestId: id };
+    memory.push({ id, collection: ORDER_REQUESTS, ...linked2 });
     return id;
   }
-  const ref = await admin.firestore().collection("orders").add({
-    ...order,
+  const db2 = admin.firestore();
+  const ref = db2.collection(ORDER_REQUESTS).doc();
+  const linked = {
+    ...fields,
+    orderId: ref.id,
+    orderRequestId: ref.id,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
-  });
+  };
+  await ref.set(linked);
+  await db2.collection(ORDERS).doc(ref.id).set(linked);
   return ref.id;
 }
 const router$4 = Router();
