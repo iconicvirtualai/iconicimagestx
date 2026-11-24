@@ -8,7 +8,7 @@
  *
  * Roles come from the crew cards in public/thankful.html.
  * "Video team" is added for Mike, Daniel, and Armando because that is a known fact.
- * Cadi founded Iconic around 2016, which matches the "Est. 2016" line already on About.
+ * Cadi founded Iconic in 2016, which matches the "Est. 2016" line already on About.
  * That is the only line on her card. There is no separate owner section.
  *
  * Armando's blurb is shortened from the published /aboutarmando profile
@@ -38,7 +38,7 @@ export const ABOUT_TEAM: readonly AboutTeamMember[] = [
     name: "Cadi Torres",
     role: "Owner",
     roleIsPlaceholder: false,
-    blurb: "She founded Iconic around 2016.",
+    blurb: "Founded Iconic in 2016.",
     bioIsPlaceholder: false,
     photo: CADI_PHOTO,
     photoPosition: "object-top",

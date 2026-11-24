@@ -13,8 +13,8 @@ describe("About team", () => {
     );
 
     expect(html).not.toContain("About the owner");
-    expect(html).not.toContain("Cadi Torres founded Iconic around 2016.");
-    expect(html).toContain("She founded Iconic around 2016.");
+    expect(html).not.toContain("around 2016");
+    expect(html).toContain("Founded Iconic in 2016.");
     expect(html).toContain("Meet the team");
     expect(html).not.toContain('href="/video-team"');
     expect(html).not.toMatch(/jazmin/i);
