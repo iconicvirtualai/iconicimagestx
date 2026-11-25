@@ -34,6 +34,16 @@ export function clientEmailNotifyLive(env: Record<string, string | undefined> = 
   return env[CLIENT_EMAIL_NOTIFY_FLAG] === "true";
 }
 
+/**
+ * The older booking_received and order_confirmed client emails.
+ * They stay on unless CLIENT_EMAIL_NOTIFY_LIVE is exactly "true", because
+ * the Aryeo Order Confirmation replaces them and a client must not get both.
+ * CLIENT_NOTIFY_LIVE does not decide this.
+ */
+export function legacyClientOrderEmailEnabled(env: Record<string, string | undefined> = process.env): boolean {
+  return !clientEmailNotifyLive(env);
+}
+
 export function aryeoFromHeader(): string {
   return `${ARYEO_EMAIL_FROM_NAME} <${ARYEO_EMAIL_FROM_ADDRESS}>`;
 }

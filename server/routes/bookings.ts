@@ -30,6 +30,7 @@ import { applyServerTravel, isTravelFeeLine, travelInvoiceLine, travelSummaryTex
 import { planOrderPackageRepair } from "../../shared/orderPackageRepair";
 import { notifyOfficeOfOrder } from "../services/officeOrderNotify";
 import { dispatchClientEmailNotifications } from "../services/aryeoEmailNotify";
+import { legacyClientOrderEmailEnabled } from "../../shared/aryeoEmailNotify";
 import { bumpAdminUnreadChannel } from "../services/adminUnread";
 import { orderRequestSignal } from "../../shared/adminUnread";
 import { HOLIDAY_RSVP_LEAD, HOLIDAY_SEASON_LEAD, HOLIDAY_SOCIAL_SAVES_LEAD, holidayCheckoutKind, holidayOrderReceivedHtml } from "../../shared/holidayCheckout";
@@ -782,10 +783,11 @@ router.post("/", async (req, res) => {
       console.info(
         `[Bookings] Studio 105 request ${docRef.id} was saved. booking_received was not sent.`,
       );
-    } else {
+    } else if (legacyClientOrderEmailEnabled()) {
       // Order-received confirmation to the client. booking_received is excluded from the
       // RED blast kill and sends even when CLIENT_NOTIFY_LIVE is unset.
       // Holiday paid/season orders send their own HTML so a stored real-estate template cannot replace it.
+      // Skipped only when the Aryeo order confirmation is live, so the client gets one email.
       clientEmailStatus = await sendEmail({
         to: email,
         template: "booking_received",
@@ -813,7 +815,14 @@ router.post("/", async (req, res) => {
         console.error("[Bookings] Confirmation email failed:", err);
         return "failed" as const;
       });
+    } else {
+      clientEmailStatus = "gated";
+      console.info(
+        `[Bookings] booking_received was not sent for request ${docRef.id}. The Aryeo order confirmation replaces it.`,
+      );
+    }
 
+    if (!studio105Request && !isThankfulRsvp) {
       // Client confirmation text uses the same CLIENT_NOTIFY_LIVE / RED check as
       // other client mail and the admin text. An exact NOTIFY_TEST_ALLOWLIST
       // address can still receive it. booking_received email is not part of this
@@ -1777,22 +1786,25 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
       }
     }
 
-    // Send confirmation email to client
-    await sendEmail({
-      to: requestEmail,
-      template: "order_confirmed",
-      variables: {
-        clientName: requestClientName,
-        address: requestAddressLabel,
-        orderNumber: typeof request.orderNumber === "string" ? request.orderNumber : "",
-        scheduledDate: bookingDateLabel(confirmSource, "To be confirmed"),
-        scheduledTime: confirmTime || "To be confirmed",
-        photographerName: assignedPhotographerName || "Our team",
-        travelFee: travelSummaryText(travel),
-        orderId: orderRef.id,
-        portalUrl: publicClientUrl("/portal"),
-      },
-    }).catch((err) => console.error("[Bookings] Confirmation email failed:", err));
+    // Older appointment confirmation. Sent only while the Aryeo order confirmation is off,
+    // so a client does not receive both.
+    if (legacyClientOrderEmailEnabled()) {
+      await sendEmail({
+        to: requestEmail,
+        template: "order_confirmed",
+        variables: {
+          clientName: requestClientName,
+          address: requestAddressLabel,
+          orderNumber: typeof request.orderNumber === "string" ? request.orderNumber : "",
+          scheduledDate: bookingDateLabel(confirmSource, "To be confirmed"),
+          scheduledTime: confirmTime || "To be confirmed",
+          photographerName: assignedPhotographerName || "Our team",
+          travelFee: travelSummaryText(travel),
+          orderId: orderRef.id,
+          portalUrl: publicClientUrl("/portal"),
+        },
+      }).catch((err) => console.error("[Bookings] Confirmation email failed:", err));
+    }
 
     // Confirm schedules the shoot. Square billing waits until after the shoot.
     const confirmedRecord = {

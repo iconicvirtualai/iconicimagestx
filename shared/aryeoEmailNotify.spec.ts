@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   CLIENT_EMAIL_NOTIFY_TEST_SINK,
@@ -7,6 +8,7 @@ import {
   contextFromRecord,
   hardSuppressionReason,
   intentsForEvent,
+  legacyClientOrderEmailEnabled,
   reminderDueAt,
   renderNotification,
   sampleNotifyContext,
@@ -19,6 +21,23 @@ describe("CLIENT_EMAIL_NOTIFY_LIVE", () => {
     expect(clientEmailNotifyLive({ CLIENT_EMAIL_NOTIFY_LIVE: "TRUE" })).toBe(false);
     expect(clientEmailNotifyLive({ CLIENT_EMAIL_NOTIFY_LIVE: "true" })).toBe(true);
     expect(CLIENT_EMAIL_NOTIFY_TEST_SINK).toBe("ops+deliveryqa@iconicimagestx.com");
+  });
+
+  it("suppresses the older client confirmations only when the Aryeo flag is on", () => {
+    expect(legacyClientOrderEmailEnabled({})).toBe(true);
+    expect(legacyClientOrderEmailEnabled({ CLIENT_EMAIL_NOTIFY_LIVE: "" })).toBe(true);
+    expect(legacyClientOrderEmailEnabled({ CLIENT_EMAIL_NOTIFY_LIVE: "TRUE" })).toBe(true);
+    expect(legacyClientOrderEmailEnabled({ CLIENT_NOTIFY_LIVE: "true" })).toBe(true);
+    expect(legacyClientOrderEmailEnabled({ CLIENT_EMAIL_NOTIFY_LIVE: "true", CLIENT_NOTIFY_LIVE: "true" })).toBe(false);
+
+    const bookings = readFileSync(new URL("../server/routes/bookings.ts", import.meta.url), "utf8");
+    for (const template of ["booking_received", "order_confirmed"]) {
+      const at = bookings.indexOf(`template: "${template}"`);
+      const guard = bookings.lastIndexOf("legacyClientOrderEmailEnabled()", at);
+      expect(at).toBeGreaterThan(guard);
+      expect(at - guard).toBeLessThan(600);
+    }
+    expect(bookings.match(/legacyClientOrderEmailEnabled\(\)/g)).toHaveLength(2);
   });
 });
 
