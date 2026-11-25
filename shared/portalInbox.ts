@@ -228,14 +228,17 @@ export function initials(name: string): string {
 function directFolder(
   thread: InboxThread,
   uid: string,
+  flag: PortalThreadFlag | undefined,
 ): Exclude<PortalFolder, "starred"> | "purged" {
   const stored = thread.folderByUid[uid];
   if (stored === "purged") return "purged";
+  const flagged = flag?.folder;
   if (thread.status === "draft") {
-    if (stored === "trash") return "trash";
-    if (stored === "archived") return "archived";
+    if (flagged === "trash" || stored === "trash") return "trash";
+    if (flagged === "archived" || stored === "archived") return "archived";
     return "drafts";
   }
+  if (flagged === "inbox" || flagged === "archived" || flagged === "trash") return flagged;
   if (stored === "archived" || stored === "trash") return stored;
   return "inbox";
 }
@@ -309,7 +312,7 @@ export function directItem(
   viewer: DeskActor,
   flag: PortalThreadFlag | undefined,
 ): PortalInboxItem | null {
-  const folder = directFolder(thread, viewer.uid);
+  const folder = directFolder(thread, viewer.uid, flag);
   if (folder === "purged") return null;
   const member =
     thread.participantUids.includes(viewer.uid) ||

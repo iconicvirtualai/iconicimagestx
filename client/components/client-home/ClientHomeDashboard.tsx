@@ -82,6 +82,7 @@ export function ClientHomeView({
   loading = false,
   error = "",
   example = false,
+  headshotUrl = "",
   messageCount = 0,
   onMessageCount,
 }: {
@@ -101,6 +102,7 @@ export function ClientHomeView({
   loading?: boolean;
   error?: string;
   example?: boolean;
+  headshotUrl?: string;
   messageCount?: number;
   onMessageCount?: (count: number) => void;
 }) {
@@ -115,6 +117,7 @@ export function ClientHomeView({
       onSignOut={onSignOut}
       active={section}
       example={example}
+      headshotUrl={headshotUrl}
       onSection={onSection}
       counts={{ listings: orderedListings.length, schedule: upcoming || calendarAppointments.length, messages: messageCount }}
     >

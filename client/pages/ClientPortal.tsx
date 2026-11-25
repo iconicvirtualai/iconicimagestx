@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { ClientHomeView, type ClientHomeSection } from "@/components/client-home/ClientHomeDashboard";
 import { portalHref } from "@/components/client-hub/PortalShell";
 import { exampleAppointments, exampleInvoice, exampleListings, exampleThreads, samplePortalProfile } from "@/lib/exampleHub";
+import { usePortalHeadshot } from "@/lib/usePortalHeadshot";
 
 interface PortalHome {
   profile?: { firstName?: string; lastName?: string; email?: string };
@@ -32,6 +33,7 @@ export default function ClientPortal() {
   const [error, setError] = useState("");
   const [fetching, setFetching] = useState(!example);
   const [messageCount, setMessageCount] = useState(0);
+  const headshotUrl = usePortalHeadshot(example ? null : user, example);
   function onSection(next: ClientHomeSection) {
     const nextParams = new URLSearchParams(params);
     if (example) nextParams.set("example", "1");
@@ -133,6 +135,7 @@ export default function ClientPortal() {
           loading={fetching}
           error={error}
           example={example}
+          headshotUrl={headshotUrl}
           messageCount={example ? exampleThreads().length : messageCount}
           onMessageCount={setMessageCount}
         />

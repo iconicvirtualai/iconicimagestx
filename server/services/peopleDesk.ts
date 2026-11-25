@@ -96,17 +96,20 @@ async function readCollection(name: string, limit: number): Promise<Array<{ id: 
   return snap.docs.map((doc) => ({ id: doc.id, data: doc.data() as Record<string, unknown> }));
 }
 
-export async function loadProfiles(): Promise<PersonProfile[]> {
+export async function loadProfiles(limits?: { staff?: number; clients?: number; agents?: number }): Promise<PersonProfile[]> {
+  const staffLimit = limits?.staff ?? 80;
+  const clientLimit = limits?.clients ?? 80;
+  const agentLimit = limits?.agents ?? 40;
   const map = new Map<string, PersonProfile>();
   if (previewOn()) {
     for (const profile of previewProfiles()) map.set(profile.id, profile);
   }
   if (firestoreOn()) {
     const [staff, clients, agents, billing] = await Promise.all([
-      readCollection("staff", 80),
-      readCollection("clients", 80),
-      readCollection("agentContacts", 40),
-      readCollection("clientBilling", 80),
+      readCollection("staff", staffLimit),
+      readCollection("clients", clientLimit),
+      readCollection("agentContacts", agentLimit),
+      readCollection("clientBilling", Math.max(clientLimit, 80)),
     ]);
     const cards = new Map(billing.map((row) => [row.id, cardSummaryFrom(row.data)]));
     for (const row of staff) map.set(`staff:${row.id}`, profileFromStaff(row.id, row.data));
@@ -171,7 +174,8 @@ export async function directory(actor: DeskActor, query: string, role: string) {
   }
   const groups = await loadGroups();
   const visibleGroups = visibleGroupsFor(actor, groups);
-  let profiles = await loadProfiles();
+  const wide = Boolean(query.trim());
+  let profiles = await loadProfiles(wide ? { staff: 400, clients: 400, agents: 200 } : undefined);
   if (actor.kind === "client") {
     const allowed = new Set<string>(visibleGroups.flatMap((group) => [...group.memberProfileIds, ...group.canMessageProfileIds]));
     profiles = profiles.filter((profile) => profile.uid === actor.uid || allowed.has(profile.id));
