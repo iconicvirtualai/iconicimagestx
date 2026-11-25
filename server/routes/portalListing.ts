@@ -24,6 +24,7 @@ import {
 import { listingSiteSlug } from "../../shared/listingSite";
 import { invoiceRedirectTarget, legacyInvoiceDocIds } from "../../shared/invoicePay";
 import { jsonSafe } from "../lib/firestoreJson";
+import { applyB2MediaUrls } from "../services/b2Storage";
 import { resolveClientIdentity } from "../services/clientAccounts";
 import { filePhotoEditRequest, PhotoEditRequestError } from "../services/photoEditRequests";
 import { createPortalClientUploadUrl, PortalUploadError, registerPortalClientUpload } from "../services/portalClientUpload";
@@ -142,7 +143,7 @@ async function loadSources(listingId: string, listing: Record<string, unknown>):
   ]);
 
   return {
-    listing,
+    listing: applyB2MediaUrls(listing),
     orderRequest,
     order,
     invoices: unique([
@@ -150,7 +151,7 @@ async function loadSources(listingId: string, listing: Record<string, unknown>):
       ...legacyDocs,
       ...[...invoicesByListing, ...invoicesByOrder, ...invoicesByRequest].filter((record) => !invoiceRedirectTarget(record)),
     ]),
-    galleries: unique([galleryDoc, ...galleriesByListing, ...galleriesByOrder]),
+    galleries: unique([galleryDoc, ...galleriesByListing, ...galleriesByOrder]).map((gallery) => applyB2MediaUrls(gallery)),
     appointments: unique([...appointmentsByRequest, ...appointmentsByOrder, ...appointmentsByListing]),
   };
 }

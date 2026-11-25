@@ -36,6 +36,7 @@ import {
   kickStudioQueue,
   uploadQueueKickDecision,
 } from "../services/studioQueueKick";
+import { applyB2MediaUrls } from "../services/b2Storage";
 
 const router = Router();
 const db = () => admin.firestore();
@@ -141,7 +142,7 @@ router.get("/assigned", requirePhotographer, async (req: AuthenticatedRequest, r
     }
 
     const listings = docs
-      .map((doc) => serializeDoc(doc.id, doc.data()))
+      .map((doc) => applyB2MediaUrls(serializeDoc(doc.id, doc.data())))
       .sort((a, b) => {
         const aTime = Date.parse(String(a.apptDate || a.shootDate || "")) || 0;
         const bTime = Date.parse(String(b.apptDate || b.shootDate || "")) || 0;
@@ -159,10 +160,14 @@ router.get("/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
   try {
     const listing = await assertListingAccess(req, req.params.id);
     const staffDoc = await db().collection("staff").doc(req.user!.uid).get();
-    const payload = serializeDoc(listing.id, listing);
+    const payload = applyB2MediaUrls(serializeDoc(listing.id, listing));
     if (!staffDoc.exists) {
       delete payload.notes;
       delete payload.internalNotes;
+      delete payload.staffOnly;
+      delete payload.lockboxCode;
+      delete payload.supraCode;
+      delete payload.accessInfo;
     }
     return res.json(payload);
   } catch (err) {

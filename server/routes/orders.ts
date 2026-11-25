@@ -16,6 +16,8 @@ import { clientIp } from "../lib/clientIp";
 import { planRevenueAcceptanceUpdates, sumTransactionAmounts } from "../../shared/revenueCount";
 import { loadRevenueDocs } from "../services/revenueAcceptance";
 import { dispatchClientEmailNotifications } from "../services/aryeoEmailNotify";
+import { presentStaffOrder } from "../../shared/orderStaffOnly";
+import { applyB2MediaUrls } from "../services/b2Storage";
 
 const router = Router();
 const db = () => admin.firestore();
@@ -74,7 +76,7 @@ router.get("/", requireStaff, async (req, res) => {
     }
 
     const snapshot = await query.get();
-    const orders = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const orders = snapshot.docs.map((d) => presentStaffOrder({ id: d.id, ...d.data() }));
 
     return res.json({
       orders,
@@ -140,7 +142,7 @@ router.get("/:id", requireStaff, async (req: AuthenticatedRequest, res) => {
     const orderDoc = await db().collection("orders").doc(req.params.id).get();
     if (!orderDoc.exists) return res.status(404).json({ error: "Order not found." });
 
-    const order = { id: orderDoc.id, ...orderDoc.data() };
+    const order = presentStaffOrder({ id: orderDoc.id, ...orderDoc.data() });
 
     // Fetch related records independently so an optional missing index or
     // collection issue does not prevent staff from opening the order.
@@ -166,7 +168,7 @@ router.get("/:id", requireStaff, async (req: AuthenticatedRequest, res) => {
 
     return res.json({
       order,
-      gallery: !gallery || gallery.empty ? null : { id: gallery.docs[0].id, ...gallery.docs[0].data() },
+      gallery: !gallery || gallery.empty ? null : applyB2MediaUrls({ id: gallery.docs[0].id, ...gallery.docs[0].data() }),
       invoice: !invoice || invoice.empty ? null : { id: invoice.docs[0].id, ...invoice.docs[0].data() },
       appointment: !appointment || appointment.empty ? null : { id: appointment.docs[0].id, ...appointment.docs[0].data() },
       messages: messages ? messages.docs.map((d) => ({ id: d.id, ...d.data() })) : [],

@@ -28,6 +28,7 @@ import {
 import { renderVideoPlaceholder, type VideoPlaceholderTone } from "../lib/videoPosterPlaceholder";
 import { clientIp } from "../lib/clientIp";
 import { createRateLimiter } from "../lib/rateLimit";
+import { applyB2MediaUrls, b2ReadableHosts } from "../services/b2Storage";
 
 const CACHE_CONTROL = "public, s-maxage=300, stale-while-revalidate=60";
 const MAX_EDGE = 1600;
@@ -111,7 +112,8 @@ function remoteUrl(sourceUrl: string): string | null {
     return null;
   }
   if (url.protocol !== "https:" || url.username || url.password) return null;
-  if (!ALLOWED_HOSTS.has(url.hostname.toLowerCase())) return null;
+  const host = url.hostname.toLowerCase();
+  if (!ALLOWED_HOSTS.has(host) && !b2ReadableHosts().includes(host)) return null;
   return url.toString();
 }
 
@@ -266,7 +268,7 @@ async function galleriesForShare(listingId: string, listing: ShareListing): Prom
   for (const id of ids) {
     try {
       const snap = await admin.firestore().collection("galleries").doc(id).get();
-      if (snap.exists) docs.push({ id: snap.id, ...(snap.data() || {}) });
+      if (snap.exists) docs.push(applyB2MediaUrls({ id: snap.id, ...(snap.data() || {}) }));
     } catch {
       // A missing gallery must not hide the listing photos.
     }
@@ -274,7 +276,7 @@ async function galleriesForShare(listingId: string, listing: ShareListing): Prom
   try {
     const linked = await admin.firestore().collection("galleries").where("listingId", "==", listingId).limit(5).get();
     linked.docs.forEach((doc) => {
-      if (!docs.some((item) => item.id === doc.id)) docs.push({ id: doc.id, ...(doc.data() || {}) });
+      if (!docs.some((item) => item.id === doc.id)) docs.push(applyB2MediaUrls({ id: doc.id, ...(doc.data() || {}) }));
     });
   } catch {
     // Listing-photo indexes do not depend on this query.
@@ -347,20 +349,20 @@ function displayTarget(req: {
 async function loadListing(listingId: string): Promise<ShareListing | null> {
   const snap = await admin.firestore().collection("listings").doc(listingId).get();
   if (!snap.exists) return null;
-  return { id: snap.id, ...(snap.data() || {}) };
+  return applyB2MediaUrls({ id: snap.id, ...(snap.data() || {}) });
 }
 
 async function listingByPresentationToken(token: string): Promise<ShareListing | null> {
   const snap = await admin.firestore().collection("listings").where("presentationToken", "==", token).limit(1).get();
   const doc = snap.docs[0];
   if (!doc) return null;
-  return { id: doc.id, ...(doc.data() || {}) };
+  return applyB2MediaUrls({ id: doc.id, ...(doc.data() || {}) });
 }
 
 async function galleryMedia(galleryId: string): Promise<unknown[] | null> {
   const snap = await admin.firestore().collection("galleries").doc(galleryId).get();
   if (!snap.exists) return null;
-  const data = snap.data() || {};
+  const data = applyB2MediaUrls({ ...(snap.data() || {}) });
   return [
     ...(Array.isArray(data.mediaItems) ? data.mediaItems : []),
     ...(Array.isArray(data.videoLinks) ? data.videoLinks : []),

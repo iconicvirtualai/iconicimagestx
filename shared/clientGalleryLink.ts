@@ -234,7 +234,7 @@ function publicImages(listing: GalleryLinkDoc): StudioMedia[] {
   const coverId = readMediaArrangement(listing.mediaArrangement).coverId;
   if (coverId && Array.isArray(listing.images)) {
     const cover = (listing.images as Array<Record<string, unknown>>).find((row) => (
-      text(row.id) === coverId || text(row.path) === coverId || text(row.url) === coverId
+      text(row.id) === coverId || text(row.b2Key) === coverId || text(row.path) === coverId || text(row.url) === coverId
     ));
     const coverUrl = cover ? httpUrl(cover.url) : "";
     const index = coverUrl ? images.findIndex((image) => image.url === coverUrl) : -1;

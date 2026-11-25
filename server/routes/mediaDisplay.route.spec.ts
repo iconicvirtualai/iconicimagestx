@@ -75,6 +75,11 @@ beforeEach(() => {
   delete process.env.VERCEL_URL;
   delete process.env.VERCEL_PROJECT_PRODUCTION_URL;
   delete process.env.APP_URL;
+  delete process.env.B2_KEY_ID;
+  delete process.env.B2_APP_KEY;
+  delete process.env.B2_BUCKET;
+  delete process.env.B2_ENDPOINT;
+  delete process.env.B2_PUBLIC_BASE_URL;
   seed("listings", LISTING_ID, qaListingData());
 });
 
@@ -285,6 +290,45 @@ describe("GET /api/media/display/:listingId/:index", () => {
       expect(stored.statusCode).toBe(200);
       expect(calls).toEqual([{ url: storageUrl, redirect: "error" }]);
     } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("previews a B2 original from the public base and still fetches Firebase files", async () => {
+    process.env.B2_PUBLIC_BASE_URL = "https://media.example.test";
+    const calls: string[] = [];
+    const jpeg = await sharp({
+      create: { width: 4, height: 4, channels: 3, background: { r: 2, g: 2, b: 2 } },
+    }).jpeg().toBuffer();
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      calls.push(String(url));
+      return new Response(jpeg, { status: 200, headers: { "content-type": "image/jpeg" } });
+    }));
+    const listingId = "b2listing01";
+    const firebaseUrl = "https://firebasestorage.googleapis.com/v0/b/iconic.appspot.com/o/old.jpg?alt=media&token=t";
+    seed("listings", listingId, {
+      storageBackend: "b2",
+      images: [
+        { url: firebaseUrl, name: "old.jpg", contentType: "image/jpeg", storageBackend: "firebase" },
+        { storageBackend: "b2", b2Key: "aryeo-test/caroline-warren/front.jpg", name: "front.jpg", contentType: "image/jpeg", deliveryName: "001_front.jpg" },
+      ],
+    });
+    try {
+      const firebase = await openDisplay("0", {}, listingId);
+      const b2 = await openDisplay("1", {}, listingId);
+      expect(firebase.statusCode).toBe(200);
+      expect(b2.statusCode).toBe(200);
+      expect(calls).toEqual([
+        firebaseUrl,
+        "https://media.example.test/aryeo-test/caroline-warren/front.jpg",
+      ]);
+      delete process.env.B2_PUBLIC_BASE_URL;
+      calls.length = 0;
+      const unsigned = await openDisplay("1", {}, listingId);
+      expect(unsigned.statusCode).toBe(404);
+      expect(calls).toEqual([]);
+    } finally {
+      delete process.env.B2_PUBLIC_BASE_URL;
       vi.unstubAllGlobals();
     }
   });

@@ -7,6 +7,7 @@ import { bookingListingDocId } from "./bookingListing";
 import { calendarDateKey } from "./clientHome";
 import { recordVisibleToIdentity } from "./clientLink";
 import { normalizeEmail } from "./listingAccess";
+import { lockboxCodeFromOrder } from "./orderStaffOnly";
 import { storedRecordPin } from "./serviceLocation";
 
 export interface ClientCandidate {
@@ -224,7 +225,7 @@ export function projectCarryFromOrder(order: Record<string, unknown>): ProjectCa
   const time = orderScheduleTime(order);
   const lineItems = Array.isArray(order.lineItems) ? [...order.lineItems] : [];
   const accessMethod = text(order.accessMethod);
-  const lockboxCode = text(order.lockboxCode);
+  const lockboxCode = lockboxCodeFromOrder(order);
   const pin = storedRecordPin(order);
   const placeId = text(order.placeId);
   const duration = typeof order.appointmentDuration === "number" && Number.isFinite(order.appointmentDuration)

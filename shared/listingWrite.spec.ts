@@ -77,6 +77,10 @@ describe("projectCarryFromOrder", () => {
     expect(carry.lineItems).toEqual([{ name: "The Showcase", price: 549 }, { name: "Twilight", price: 75 }]);
     expect(carry.services).toEqual(["The Showcase", "Twilight"]);
     expect(carry.accessInfo).toBe("Lockbox - 1234");
+    const migrated = projectCarryFromOrder({ staffOnly: { lockboxCode: "4455" }, accessMethod: "Lockbox" });
+    expect(migrated.lockboxCode).toBe("4455");
+    expect(migrated.accessInfo).toBe("Lockbox - 4455");
+    expect(migrated.notes).not.toContain("4455");
     expect(carry.packageName).toBe("The Showcase");
     expect(carry.selectedAddOns).toEqual(["twilight"]);
     expect(carry.lat).toBe(29.76);

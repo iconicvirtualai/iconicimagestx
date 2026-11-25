@@ -6,6 +6,7 @@
 import admin from "firebase-admin";
 import { buildPublicListingSite, isListingSiteSlug, type PublicListingSite } from "../../shared/listingSite";
 import { jsonSafe } from "../lib/firestoreJson";
+import { applyB2MediaUrls } from "./b2Storage";
 
 const memory = new Map<string, Record<string, unknown>>();
 
@@ -51,14 +52,14 @@ export async function readPublishedListingSite(slug: string): Promise<PublicList
   if (!isListingSiteSlug(slug)) return null;
   if (useMemory()) {
     for (const listing of memory.values()) {
-      const site = buildPublicListingSite(await withClientProfile(listing));
+      const site = buildPublicListingSite(applyB2MediaUrls(await withClientProfile(listing)));
       if (site?.slug === slug) return site;
     }
     return null;
   }
   const snap = await admin.firestore().collection("listings").where("listingSiteSlug", "==", slug).limit(5).get();
   for (const doc of snap.docs) {
-    const listing = jsonSafe({ id: doc.id, ...(doc.data() || {}) }) as Record<string, unknown>;
+    const listing = applyB2MediaUrls(jsonSafe({ id: doc.id, ...(doc.data() || {}) }) as Record<string, unknown>);
     const site = buildPublicListingSite(await withClientProfile(listing));
     if (site?.slug === slug) return site;
   }
