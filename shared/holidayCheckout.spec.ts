@@ -54,6 +54,27 @@ describe("holiday checkout", () => {
     expect(holidayReturnPath(HOLIDAY_SOCIAL_SAVES_LEAD, "#043")).toBe("/thankful?paid=1&order=%23043#social-saves");
   });
 
+  it("puts the invoice id on an itemized Square order so Pay at Booking can be matched", () => {
+    const body = holidayPaymentLinkBody({
+      invoiceId: "inv-pay-now",
+      invoiceNumber: "INV-2026-18",
+      amount: 137.89,
+      itemName: "Booking",
+      locationId: "LOC",
+      redirectUrl: "https://iconicimagestx.vercel.app/book?paid=1&order=%23018",
+      lineItems: [
+        { name: "Photos", amountCents: 13900 },
+        { name: "Processing", amountCents: 389 },
+        { name: "Pay Now savings", amountCents: -500 },
+      ],
+    });
+    const order = body.order as { reference_id?: string; line_items?: unknown[]; discounts?: unknown[] };
+    expect(order.reference_id).toBe("inv-pay-now");
+    expect(order.line_items).toHaveLength(2);
+    expect(order.discounts).toHaveLength(1);
+    expect(body.payment_note).toBe(squarePaymentNote("inv-pay-now", "INV-2026-18"));
+  });
+
   it("sends a holiday confirmation with the exact time, not the real-estate shell", () => {
     const html = holidayOrderReceivedHtml({
       clientName: "Ada <Client>",

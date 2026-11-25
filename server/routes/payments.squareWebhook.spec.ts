@@ -38,6 +38,8 @@ const ENV_KEYS = [
   "FRONTEND_URL",
   "VERCEL_PROJECT_PRODUCTION_URL",
   "BOOKING_NOTIFY_LIVE",
+  "SQUARE_ACCESS_TOKEN",
+  "SQUARE_ENVIRONMENT",
 ] as const;
 const saved = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
 
@@ -522,5 +524,294 @@ describe("Square webhook paid unlock", () => {
     expect(memory.get("invoices", "playtest-delivery-qa-invoice")?.status).toBe("sent");
     expect(memory.get("invoices", "playtest-delivery-qa-invoice")?.amountPaid).toBe(0);
     expect(memory.get("listings", "playtest-delivery-qa-listing")?.downloadEnabled).toBe(false);
+  });
+
+  it("marks a Pay at Booking order paid when Square collected the total, including the processing fee", async () => {
+    memory.seed("invoices", "inv-pay-now", {
+      paymentMethod: "pay_now",
+      status: "draft",
+      orderRequestId: "req-pay-now",
+      clientEmail: "ada@example.com",
+      clientName: "Ada Agent",
+      total: 137.89,
+      amountPaid: 0,
+      amountDue: 137.89,
+      squareOrderId: "sq-pay-now",
+      squarePaymentLinkId: "link-pay-now",
+    });
+    memory.seed("orderRequests", "req-pay-now", {
+      paymentMethod: "pay_now",
+      paymentStatus: "unpaid",
+      invoiceId: "inv-pay-now",
+      orderNumber: "#018",
+      total: 137.89,
+      amountPaid: 0,
+      squareOrderId: "sq-pay-now",
+    });
+    const event = {
+      type: "payment.updated",
+      event_id: "evt-pay-now",
+      data: {
+        type: "payment",
+        id: "pay-now-1",
+        object: {
+          payment: {
+            id: "pay-now-1",
+            status: "COMPLETED",
+            order_id: "sq-pay-now",
+            amount_money: { amount: 13789, currency: "USD" },
+          },
+        },
+      },
+    };
+    const first = await postEvent(event);
+    expect(first.status).toBe(200);
+    expect(first.json).toMatchObject({ received: true, applied: true, unlocked: true });
+    expect(memory.get("invoices", "inv-pay-now")).toMatchObject({
+      status: "paid",
+      amountPaid: 137.89,
+      amountDue: 0,
+      paymentMethod: "pay_now",
+      paymentProvider: "square",
+      squarePaymentId: "pay-now-1",
+    });
+    expect(memory.get("orderRequests", "req-pay-now")).toMatchObject({
+      paymentStatus: "paid",
+      amountPaid: 137.89,
+      balanceDue: 0,
+      squarePaymentId: "pay-now-1",
+      paymentMethod: "pay_now",
+    });
+    expect(memory.get("orderRequests", "req-pay-now")?.paidAt).toBeTruthy();
+    expect(sent).toHaveLength(0);
+
+    const replay = await postEvent({ ...event, event_id: "evt-pay-now-again" });
+    expect(replay.json.duplicate).toBe(true);
+    expect(memory.get("invoices", "inv-pay-now")?.amountPaid).toBe(137.89);
+    expect(memory.get("orderRequests", "req-pay-now")?.amountPaid).toBe(137.89);
+    expect(sent).toHaveLength(0);
+  });
+
+  it("matches a Pay at Booking payment by Square reference id when the note is missing", async () => {
+    memory.seed("invoices", "inv-ref", {
+      paymentMethod: "pay_now",
+      status: "draft",
+      orderRequestId: "req-ref",
+      total: 134,
+      amountPaid: 0,
+      amountDue: 134,
+    });
+    memory.seed("orderRequests", "req-ref", {
+      paymentMethod: "pay_now",
+      paymentStatus: "unpaid",
+      invoiceId: "inv-ref",
+      total: 134,
+      amountPaid: 0,
+    });
+    const result = await postEvent({
+      type: "payment.updated",
+      event_id: "evt-ref",
+      data: {
+        object: {
+          payment: {
+            id: "pay-ref",
+            status: "COMPLETED",
+            reference_id: "inv-ref",
+            amount_money: { amount: 13400, currency: "USD" },
+          },
+        },
+      },
+    });
+    expect(result.status).toBe(200);
+    expect(memory.get("orderRequests", "req-ref")?.paymentStatus).toBe("paid");
+    expect(memory.get("invoices", "inv-ref")?.squarePaymentId).toBe("pay-ref");
+  });
+
+  it("reads the Square order reference when the payment has no note and the stored order id differs", async () => {
+    memory.seed("invoices", "inv-fetch", {
+      paymentMethod: "pay_now",
+      status: "draft",
+      orderRequestId: "req-fetch",
+      total: 137.89,
+      amountPaid: 0,
+      amountDue: 137.89,
+    });
+    memory.seed("orderRequests", "req-fetch", {
+      paymentMethod: "pay_now",
+      paymentStatus: "unpaid",
+      invoiceId: "inv-fetch",
+      total: 137.89,
+    });
+    useEnv({ SQUARE_ACCESS_TOKEN: "sq-test-token" });
+    const realFetch = globalThis.fetch;
+    vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("squareup.com/v2/orders/")) {
+        return new Response(JSON.stringify({ order: { reference_id: "inv-fetch", state: "COMPLETED", tenders: [] } }), { status: 200 });
+      }
+      return realFetch(input, init);
+    });
+    try {
+      const result = await postEvent({
+        type: "payment.updated",
+        event_id: "evt-fetch",
+        data: {
+          object: {
+            payment: {
+              id: "pay-fetch",
+              status: "COMPLETED",
+              order_id: "sq-different",
+              amount_money: { amount: 13789, currency: "USD" },
+            },
+          },
+        },
+      });
+      expect(result.status).toBe(200);
+      expect(result.json.applied).toBe(true);
+      expect(memory.get("orderRequests", "req-fetch")?.paymentStatus).toBe("paid");
+      expect(memory.get("invoices", "inv-fetch")?.amountPaid).toBe(137.89);
+    } finally {
+      vi.stubGlobal("fetch", realFetch);
+    }
+  });
+
+  it("keeps a senior-living deposit partial instead of marking the order paid", async () => {
+    memory.seed("invoices", "inv-deposit", {
+      status: "draft",
+      depositRequired: true,
+      total: 257,
+      amountPaid: 0,
+      amountDue: 257,
+      depositPaid: 0,
+      orderId: "order-deposit",
+      orderRequestId: "req-deposit",
+      squareDepositOrderId: "sq-deposit",
+      squareDepositPaymentLinkId: "link-deposit",
+    });
+    memory.seed("orders", "order-deposit", { total: 257, balanceDue: 257, depositPaid: 0 });
+    memory.seed("orderRequests", "req-deposit", { total: 257, balanceDue: 257, invoiceId: "inv-deposit" });
+    const result = await postEvent({
+      type: "payment.updated",
+      event_id: "evt-deposit",
+      data: {
+        object: {
+          payment: {
+            id: "pay-deposit",
+            status: "COMPLETED",
+            order_id: "sq-deposit",
+            payment_link_id: "link-deposit",
+            note: squarePaymentNote("inv-deposit", "INV-DEP"),
+            amount_money: { amount: 12850, currency: "USD" },
+          },
+        },
+      },
+    });
+    expect(result.status).toBe(200);
+    expect(result.json.deposit).toBe(true);
+    expect(memory.get("invoices", "inv-deposit")).toMatchObject({
+      status: "draft",
+      depositPaid: 128.5,
+      amountPaid: 128.5,
+      amountDue: 128.5,
+    });
+    expect(memory.get("orders", "order-deposit")?.paymentStatus).toBe("partial");
+    expect(memory.get("orderRequests", "req-deposit")).toMatchObject({
+      paymentStatus: "partial",
+      amountPaid: 128.5,
+      balanceDue: 128.5,
+      squarePaymentId: "pay-deposit",
+    });
+    expect(memory.get("orderRequests", "req-deposit")?.paymentStatus).not.toBe("paid");
+
+    const replay = await postEvent({
+      type: "payment.updated",
+      event_id: "evt-deposit-again",
+      data: {
+        object: {
+          payment: {
+            id: "pay-deposit",
+            status: "COMPLETED",
+            order_id: "sq-deposit",
+            payment_link_id: "link-deposit",
+            amount_money: { amount: 12850, currency: "USD" },
+          },
+        },
+      },
+    });
+    expect(replay.status).toBe(200);
+    expect(memory.get("invoices", "inv-deposit")?.depositPaid).toBe(128.5);
+    expect(memory.get("orderRequests", "req-deposit")?.amountPaid).toBe(128.5);
+  });
+
+  it("reconciles a Pay at Booking return by reading the Square payment and does not email", async () => {
+    memory.seed("invoices", "inv-return", {
+      paymentMethod: "pay_now",
+      status: "draft",
+      orderRequestId: "req-return",
+      total: 137.89,
+      amountPaid: 0,
+      amountDue: 137.89,
+      squareOrderId: "sq-return",
+      clientEmail: "ada@example.com",
+    });
+    memory.seed("orderRequests", "req-return", {
+      paymentMethod: "pay_now",
+      paymentStatus: "unpaid",
+      invoiceId: "inv-return",
+      orderNumber: "#018",
+      total: 137.89,
+      amountPaid: 0,
+      squareOrderId: "sq-return",
+    });
+    useEnv({ SQUARE_ACCESS_TOKEN: "sq-test-token" });
+    const realFetch = globalThis.fetch;
+    vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("/v2/orders/sq-return")) {
+        return new Response(JSON.stringify({
+          order: {
+            reference_id: "inv-return",
+            state: "COMPLETED",
+            tenders: [{ payment_id: "pay-return", amount_money: { amount: 13789, currency: "USD" } }],
+          },
+        }), { status: 200 });
+      }
+      if (url.includes("/v2/payments/pay-return")) {
+        return new Response(JSON.stringify({
+          payment: {
+            id: "pay-return",
+            status: "COMPLETED",
+            order_id: "sq-return",
+            reference_id: "inv-return",
+            amount_money: { amount: 13789, currency: "USD" },
+          },
+        }), { status: 200 });
+      }
+      return realFetch(input, init);
+    });
+    try {
+      const response = await fetch(`${baseUrl}/api/payments/pay-now/reconcile`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ orderNumber: "18" }),
+      });
+      const json = await response.json();
+      expect(response.status).toBe(200);
+      expect(json).toEqual({ paymentStatus: "paid", orderNumber: "#018" });
+      expect(memory.get("orderRequests", "req-return")?.paymentStatus).toBe("paid");
+      expect(memory.get("invoices", "inv-return")?.amountPaid).toBe(137.89);
+      expect(sent).toHaveLength(0);
+
+      const again = await fetch(`${baseUrl}/api/payments/pay-now/reconcile`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ orderNumber: "#018" }),
+      });
+      expect(await again.json()).toMatchObject({ paymentStatus: "paid" });
+      expect(memory.get("invoices", "inv-return")?.amountPaid).toBe(137.89);
+      expect(sent).toHaveLength(0);
+    } finally {
+      vi.stubGlobal("fetch", realFetch);
+    }
   });
 });

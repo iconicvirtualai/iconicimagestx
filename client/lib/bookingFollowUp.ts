@@ -10,6 +10,8 @@ export interface BookingSubmitResult {
   selectedService?: string | null;
   accountCreated?: boolean;
   checkoutUrl?: string;
+  /** Set on the Square return page after the server confirms the payment. */
+  paymentStatus?: "paid" | "partial" | "unpaid" | "pending";
   /**
    * True only when client notifications are live (CLIENT_NOTIFY_LIVE is exactly
    * "true" and CLIENT_COMMS_ZONE is not RED).
@@ -55,6 +57,15 @@ export async function readClientNotificationsLive(): Promise<boolean> {
 const PORTAL_PATH = "Sign in at the client portal (/portal), or use Forgot password on that page.";
 
 export function bookingFollowUp(result: BookingSubmitResult) {
+  if (result.paymentStatus === "paid") {
+    return "Payment received. This order is marked paid, including card processing. Save your order number.";
+  }
+  if (result.paymentStatus === "partial") {
+    return "Deposit received. The remaining balance is due after the shoot. This order is marked deposit paid.";
+  }
+  if (result.paymentStatus === "pending") {
+    return "We are confirming the Square payment for this order. Save your order number.";
+  }
   const live = result.clientNotificationsLive === true;
   const portalOpen = clientPortalEnabled();
   const notes = ["We saved your appointment request. Nothing was charged today. Your invoice comes after the shoot."];

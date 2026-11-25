@@ -37,6 +37,20 @@ describe("booking confirmation screen", () => {
     expect(html).toContain("flex-col");
   });
 
+  it("says the Pay at Booking order is paid after Square sends the client back", () => {
+    const html = renderToStaticMarkup(
+      <BookingConfirmation
+        result={{ orderNumber: "#018", paymentStatus: "paid" }}
+        onBookAnother={() => undefined}
+      />,
+    );
+    const text = visibleText(html);
+    expect(text).toContain("#018");
+    expect(text).toContain("Payment received");
+    expect(text).toContain("marked paid");
+    expect(text).not.toContain("Nothing was charged today");
+  });
+
   it("promises the confirmation email only when client notifications are live", () => {
     process.env.CLIENT_PORTAL_ENABLED = "true";
     const html = renderToStaticMarkup(

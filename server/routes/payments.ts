@@ -16,7 +16,7 @@ import { doorsOpenReceiptEmailHtml } from "../../shared/doorsOpenTour";
 import { clientNotifyLive } from "../../shared/clientNotify";
 import { addressText } from "../../shared/addressText";
 import { bookingDateLabel } from "../../shared/clientHome";
-import { amountStillDue, invoiceAllowsDownload, squarePaymentNote } from "../../shared/paymentAccess";
+import { amountStillDue, invoiceAllowsDownload, invoiceIdFromSquareNote, squarePaymentNote } from "../../shared/paymentAccess";
 import { invoiceEmailNumber, invoicePageInvoiceNumber, receiptEmailNumber } from "../../shared/orderProjectInvoice";
 import { fetchPublishedSquareInvoiceUrl, resolveSquareCheckoutUrl } from "../../shared/squareInvoice";
 import { squareBuyerPrefill } from "../../shared/clientHubSettings";
@@ -66,6 +66,12 @@ import {
   shapePayAtCloseDraft,
 } from "../../shared/payAtClose";
 import { packagesForStaffEditor } from "../../shared/bookingCatalog";
+import { orderNumberLookupKeys } from "../../shared/orderNumber";
+import { PAY_NOW_METHOD } from "../../shared/payNow";
+import { paymentSettlementStatus, roundSettlementMoney } from "../../shared/paymentSettlement";
+import { createRateLimiter } from "../lib/rateLimit";
+import { clientIp } from "../lib/clientIp";
+import { fetchSquareOrderSnapshot, fetchSquarePayment } from "../services/squareOrderLookup";
 import { buildBookingInvoiceDraft } from "../../shared/bookingInvoice";
 import { loadPricingAdjustments } from "../services/pricingAdjustments";
 import {
@@ -77,6 +83,7 @@ import {
 
 const router = Router();
 const db = () => appFirestore();
+const payNowReconcileLimiter = createRateLimiter({ windowMs: 10 * 60 * 1000, max: 30 });
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
   apiVersion: "2024-06-20",
@@ -365,6 +372,48 @@ async function appendOrderHistory(orderId: string, entry: Record<string, unknown
   }
 }
 
+/** Copy paid / partial onto the order and the order request the admin desk reads. */
+async function rememberPaymentOnRecords(input: {
+  orderId: string;
+  orderRequestId: string;
+  amountPaid: number;
+  amountDue: number;
+  status: "paid" | "partial" | "unpaid";
+  squarePaymentId?: string;
+  method: "square" | "stripe" | "pay_at_close";
+  storedPaymentMethod?: string;
+  titusCheckoutId?: string;
+  /** First delivery only. A webhook retry must not add the deposit again. */
+  incrementDeposit?: number;
+}) {
+  if (input.status === "unpaid") return;
+  const patch: Record<string, unknown> = {
+    paymentStatus: input.status,
+    amountPaid: input.amountPaid,
+    balanceDue: input.amountDue,
+    ...(input.status === "paid" ? { paidAt: admin.firestore.FieldValue.serverTimestamp() } : {}),
+    ...(input.squarePaymentId ? { squarePaymentId: input.squarePaymentId } : {}),
+    ...(input.storedPaymentMethod === PAY_NOW_METHOD ? { paymentMethod: PAY_NOW_METHOD } : {}),
+    ...(input.method === "pay_at_close"
+      ? { paymentMethod: PAY_AT_CLOSE_METHOD, titusCheckoutId: input.titusCheckoutId || null }
+      : {}),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
+  const writes: Array<Promise<unknown>> = [];
+  if (input.orderId) {
+    writes.push(db().collection("orders").doc(input.orderId).update({
+      ...patch,
+      ...(input.incrementDeposit ? { depositPaid: admin.firestore.FieldValue.increment(input.incrementDeposit) } : {}),
+    }).catch((err) => console.error("[Payments] Order balance update failed:", err)));
+  }
+  if (input.orderRequestId) {
+    writes.push(db().collection("orderRequests").doc(input.orderRequestId).update(patch).catch((err) => {
+      console.error("[Payments] Order request balance update failed:", err);
+    }));
+  }
+  await Promise.all(writes);
+}
+
 async function applySuccessfulPayment({
   invoiceId,
   orderId,
@@ -376,6 +425,7 @@ async function applySuccessfulPayment({
   stripePaymentIntentId,
   titusCheckoutId,
   titusPaidAt,
+  skipReceipt,
 }: {
   invoiceId: string;
   orderId?: string;
@@ -387,6 +437,8 @@ async function applySuccessfulPayment({
   stripePaymentIntentId?: string;
   titusCheckoutId?: string;
   titusPaidAt?: string;
+  /** Return-page reconcile must not send a receipt. The webhook still can. */
+  skipReceipt?: boolean;
 }): Promise<AppliedPayment | undefined> {
   const invoiceRef = db().collection("invoices").doc(invoiceId);
   const invoiceDoc = await invoiceRef.get();
@@ -395,11 +447,27 @@ async function applySuccessfulPayment({
   const invoice = invoiceDoc.data()!;
   const resolvedOrderId = orderId || invoice.orderId || "";
   const resolvedClientId = clientId || invoice.clientId || "";
+  const orderRequestId = typeof invoice.orderRequestId === "string" ? invoice.orderRequestId : "";
+  const storedPaymentMethod = typeof invoice.paymentMethod === "string" ? invoice.paymentMethod : "";
   const sameSquare = Boolean(squarePaymentId) && invoice.squarePaymentId === squarePaymentId;
   const sameStripe = Boolean(stripePaymentIntentId) && invoice.stripePaymentIntentId === stripePaymentIntentId;
   const duplicate = sameSquare || sameStripe || await paymentAlreadyRecorded({ squarePaymentId, stripePaymentIntentId, titusCheckoutId });
 
   if (duplicate) {
+    const currentPaid = roundSettlementMoney(Number(invoice.amountPaid) || 0);
+    const total = roundSettlementMoney(Number(invoice.total) || 0);
+    const due = roundSettlementMoney(Math.max(0, total - currentPaid));
+    await rememberPaymentOnRecords({
+      orderId: resolvedOrderId,
+      orderRequestId,
+      amountPaid: currentPaid,
+      amountDue: due,
+      status: paymentSettlementStatus(total, currentPaid, invoice.status),
+      squarePaymentId,
+      method,
+      storedPaymentMethod,
+      titusCheckoutId,
+    });
     if (invoiceAllowsDownload(invoice)) {
       await syncDownloadAccess({
         invoiceId,
@@ -412,16 +480,21 @@ async function applySuccessfulPayment({
   }
 
   const currentPaid = Number(invoice.amountPaid) || 0;
-  const total = Number(invoice.total) || 0;
-  const newAmountPaid = currentPaid + amount;
-  const newAmountDue = Math.max(0, total - newAmountPaid);
+  const total = roundSettlementMoney(Number(invoice.total) || 0);
+  const newAmountPaid = roundSettlementMoney(currentPaid + amount);
+  const newAmountDue = roundSettlementMoney(Math.max(0, total - newAmountPaid));
+  const settlement = paymentSettlementStatus(total, newAmountPaid);
+  const paymentMethod = storedPaymentMethod === PAY_NOW_METHOD || storedPaymentMethod === PAY_AT_CLOSE_METHOD
+    ? storedPaymentMethod
+    : method;
 
   await invoiceRef.update({
     amountPaid: newAmountPaid,
     amountDue: newAmountDue,
-    status: newAmountDue <= 0 ? "paid" : "partial",
-    paidAt: newAmountDue <= 0 ? admin.firestore.FieldValue.serverTimestamp() : null,
-    paymentMethod: method,
+    status: settlement === "paid" ? "paid" : "partial",
+    paidAt: settlement === "paid" ? admin.firestore.FieldValue.serverTimestamp() : null,
+    paymentMethod,
+    ...(method === "square" ? { paymentProvider: "square" } : {}),
     ...(squarePaymentId ? { squarePaymentId } : {}),
     ...(stripePaymentIntentId ? { stripePaymentIntentId } : {}),
     ...(titusCheckoutId ? { titusCheckoutId, titusSettledCheckoutId: titusCheckoutId } : {}),
@@ -429,25 +502,18 @@ async function applySuccessfulPayment({
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   });
 
-  if (resolvedOrderId) {
-    await db().collection("orders").doc(resolvedOrderId).update({
-      depositPaid: admin.firestore.FieldValue.increment(amount),
-      balanceDue: newAmountDue,
-      paymentStatus: newAmountDue <= 0 ? "paid" : "partial",
-      ...(method === "pay_at_close" ? { paymentMethod: PAY_AT_CLOSE_METHOD, titusCheckoutId: titusCheckoutId || null } : {}),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    }).catch((err) => console.error("[Payments] Order balance update failed:", err));
-  }
-
-  const orderRequestId = typeof invoice.orderRequestId === "string" ? invoice.orderRequestId : "";
-  if (orderRequestId && method === "pay_at_close") {
-    await db().collection("orderRequests").doc(orderRequestId).update({
-      paymentMethod: PAY_AT_CLOSE_METHOD,
-      paymentStatus: newAmountDue <= 0 ? "paid" : "partial",
-      balanceDue: newAmountDue,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    }).catch((err) => console.error("[Payments] Order request balance update failed:", err));
-  }
+  await rememberPaymentOnRecords({
+    orderId: resolvedOrderId,
+    orderRequestId,
+    amountPaid: newAmountPaid,
+    amountDue: newAmountDue,
+    status: settlement,
+    squarePaymentId,
+    method,
+    storedPaymentMethod,
+    titusCheckoutId,
+    incrementDeposit: amount,
+  });
 
   const stamp = revenueStamp(invoice);
   if (resolvedClientId && stamp.countsTowardRevenue) {
@@ -478,7 +544,7 @@ async function applySuccessfulPayment({
 
   const unlocked = newAmountDue <= 0;
   let email: EmailDelivery | "failed" = "suppressed";
-  if (invoice.clientEmail) {
+  if (!skipReceipt && invoice.clientEmail) {
     try {
       email = await deliverPaymentReceipt(invoice, invoiceId, newAmountPaid, newAmountDue, unlocked);
     } catch (err) {
@@ -681,10 +747,14 @@ async function applyDepositPayment({
       if (order.source === HEADSHOTS_ORDER_SOURCE && order.status === APPRENTICESHIP_EXPIRED_STATUS && orderId) {
         lateHeadshotOrderId = orderId;
       }
+      const depositStatus = paymentSettlementStatus(total, depositPaid);
       tx.update(orderRef, {
         depositPaid,
+        amountPaid: depositPaid,
         balanceDue: amountDue,
-        paymentStatus: amountDue <= 0 ? "paid" : "partial",
+        paymentStatus: depositStatus,
+        ...(paymentKey ? { squarePaymentId: paymentKey } : {}),
+        ...(depositStatus === "paid" ? { paidAt: admin.firestore.FieldValue.serverTimestamp() } : {}),
         ...((confirmsBooking || confirmsHeadshot)
           ? {
             status: "confirmed",
@@ -710,11 +780,15 @@ async function applyDepositPayment({
     }
     if (requestRef && requestSnap?.exists) {
       const request = (requestSnap.data() || {}) as Record<string, unknown>;
+      const requestStatus = paymentSettlementStatus(total, depositPaid);
       tx.update(requestRef, {
         depositPaid,
+        amountPaid: depositPaid,
+        paymentStatus: requestStatus,
         ...((request.source === APPRENTICESHIP_ORDER_SOURCE || request.source === HEADSHOTS_ORDER_SOURCE)
           ? { depositStatus: "paid" }
           : {}),
+        ...(paymentKey ? { squarePaymentId: paymentKey } : {}),
         balanceDue: amountDue,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
@@ -1550,34 +1624,248 @@ async function markSquareOrderPaid(
   amount: number,
   squarePaymentId: string,
 ) {
-  if (data.squarePaymentId === squarePaymentId && data.paymentStatus === "paid") return;
+  if (data.squarePaymentId === squarePaymentId) return;
   const pricing = data.pricing && typeof data.pricing === "object" ? data.pricing as { total?: unknown } : {};
-  const total = Number(data.total) || Number(pricing.total) || amount;
+  const total = roundSettlementMoney(Number(data.total) || Number(pricing.total) || amount);
+  const paid = roundSettlementMoney(amount);
+  const status = paymentSettlementStatus(total, paid);
   const current = typeof data.status === "string" ? data.status : "";
   await ref.update({
     status: current === "awaiting-payment" ? "new" : current || "new",
-    paymentStatus: "paid",
-    amountPaid: amount,
-    balanceDue: Math.max(0, Math.round((total - amount) * 100) / 100),
+    paymentStatus: status,
+    amountPaid: paid,
+    balanceDue: roundSettlementMoney(Math.max(0, total - paid)),
     squarePaymentId,
-    paidAt: admin.firestore.FieldValue.serverTimestamp(),
+    ...(status === "paid" ? { paidAt: admin.firestore.FieldValue.serverTimestamp() } : {}),
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   });
 }
 
-/** Prepaid checkout has no invoice. The paid webhook still updates orderRequests. */
-async function settlePrepaidOrderRequest(payment: Record<string, unknown>, amount: number): Promise<boolean> {
+/**
+ * No invoice match yet. If the order request still points at an invoice,
+ * settle that invoice (full Pay at Booking vs a deposit). Otherwise mark the
+ * prepaid order itself.
+ */
+async function settlePrepaidOrderRequest(
+  payment: Record<string, unknown>,
+  amount: number,
+  options?: { skipReceipt?: boolean },
+): Promise<boolean> {
   const paymentId = typeof payment.id === "string" ? payment.id.trim() : "";
   if (!paymentId) return false;
   const request = await findSquareSaleDoc("orderRequests", payment);
   const legacy = request ? null : await findSquareSaleDoc("orders", payment);
   const primary = request || legacy;
   if (!primary) return false;
-  await markSquareOrderPaid(primary.ref, primary.data() || {}, amount, paymentId);
+  const data = primary.data() || {};
+  const invoiceId = typeof data.invoiceId === "string" ? data.invoiceId.trim() : "";
+  if (invoiceId) {
+    const invoiceSnap = await db().collection("invoices").doc(invoiceId).get();
+    if (invoiceSnap.exists) {
+      const invoice = invoiceSnap.data() || {};
+      if (invoiceProvider(invoice) !== "stripe" && !isMirroredPayAtCloseSquarePayment(payment, invoice)) {
+        if (isDepositSquarePayment(invoice, payment)) {
+          await applyDepositPayment({ invoiceId, amount, squarePaymentId: paymentId });
+          return true;
+        }
+        const linkedOrderId = typeof invoice.orderId === "string" ? invoice.orderId : "";
+        await applySuccessfulPayment({
+          invoiceId,
+          orderId: linkedOrderId || (request ? undefined : primary.id),
+          clientId: typeof invoice.clientId === "string" ? invoice.clientId : undefined,
+          clientName: typeof invoice.clientName === "string" ? invoice.clientName : undefined,
+          amount,
+          method: "square",
+          squarePaymentId: paymentId,
+          skipReceipt: options?.skipReceipt,
+        });
+        return true;
+      }
+    }
+  }
+  await markSquareOrderPaid(primary.ref, data, amount, paymentId);
   const twin = await db().collection(request ? "orders" : "orderRequests").doc(primary.id).get();
   if (twin.exists) await markSquareOrderPaid(twin.ref, twin.data() || {}, amount, paymentId);
   return true;
 }
+
+function squareMoneyCents(payment: Record<string, unknown>): number {
+  const amountMoney = payment.amount_money;
+  const totalMoney = payment.total_money;
+  const amount = amountMoney && typeof amountMoney === "object"
+    ? Number((amountMoney as { amount?: unknown }).amount)
+    : NaN;
+  const total = totalMoney && typeof totalMoney === "object"
+    ? Number((totalMoney as { amount?: unknown }).amount)
+    : NaN;
+  if (Number.isFinite(amount)) return amount;
+  if (Number.isFinite(total)) return total;
+  return 0;
+}
+
+/** When the payment has no note or reference, read the Square order's reference id. */
+async function paymentWithSquareOrderReference(payment: Record<string, unknown>): Promise<Record<string, unknown>> {
+  if (invoiceIdFromSquareNote(payment.note || payment.payment_note)) return payment;
+  if (typeof payment.reference_id === "string" && payment.reference_id.trim()) return payment;
+  const orderId = typeof payment.order_id === "string" ? payment.order_id.trim() : "";
+  if (!orderId) return payment;
+  const snapshot = await fetchSquareOrderSnapshot(orderId, process.env).catch(() => null);
+  if (!snapshot?.referenceId) return payment;
+  return { ...payment, reference_id: snapshot.referenceId };
+}
+
+/** Idempotent settlement for one completed Square payment. */
+export async function settleCompletedSquarePayment(
+  payment: Record<string, unknown>,
+  options?: { skipReceipt?: boolean },
+): Promise<Record<string, unknown>> {
+  if (!payment?.id || payment.status !== "COMPLETED") return { received: true };
+  const amount = squareMoneyCents(payment) / 100;
+  if (amount <= 0) return { received: true, ignored: "zero-amount" };
+
+  const matchedPayment = await paymentWithSquareOrderReference(payment);
+  const invoiceDoc = await findInvoiceForSquarePayment(matchedPayment);
+  if (!invoiceDoc) {
+    const settledOrder = await settlePrepaidOrderRequest(matchedPayment, amount, options);
+    if (settledOrder) return { received: true, orderRequest: true };
+    await db().collection("agentLogs").add({
+      agent: "travis",
+      action: "Unmatched Square payment",
+      summary: `Square payment ${payment.id} could not be matched to an invoice`,
+      status: "flagged",
+      relatedType: "invoice",
+      priority: "high",
+      requiresHumanReview: true,
+      details: payment.order_id || payment.note || "",
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    return { received: true, unmatched: true };
+  }
+
+  const invoice = invoiceDoc.data() || {};
+  if (invoiceProvider(invoice) === "stripe") {
+    return { received: true, ignored: "stripe-invoice" };
+  }
+  if (isMirroredPayAtCloseSquarePayment(matchedPayment, invoice)) {
+    return { received: true, ignored: "pay-at-close-external" };
+  }
+
+  if (isDepositSquarePayment(invoice, matchedPayment)) {
+    await applyDepositPayment({
+      invoiceId: invoiceDoc.id,
+      amount,
+      squarePaymentId: String(payment.id),
+    });
+    return { received: true, deposit: true };
+  }
+
+  const settled = await applySuccessfulPayment({
+    invoiceId: invoiceDoc.id,
+    orderId: typeof invoice.orderId === "string" ? invoice.orderId : undefined,
+    clientId: typeof invoice.clientId === "string" ? invoice.clientId : undefined,
+    clientName: typeof invoice.clientName === "string" ? invoice.clientName : undefined,
+    amount,
+    method: "square",
+    squarePaymentId: String(payment.id),
+    skipReceipt: options?.skipReceipt,
+  });
+
+  return { received: true, ...(settled ?? {}) };
+}
+
+/** Return page. Confirms the Square payment server-side and does not email the client. */
+export async function reconcilePayNowOrder(rawOrderNumber: string): Promise<{
+  paymentStatus: "paid" | "partial" | "unpaid" | "pending";
+  orderNumber: string;
+}> {
+  const keys = orderNumberLookupKeys(rawOrderNumber);
+  const shown = keys[0] || "";
+  if (!shown) return { paymentStatus: "unpaid", orderNumber: "" };
+
+  let request: FirebaseFirestore.QueryDocumentSnapshot | null = null;
+  for (const key of keys) {
+    const snap = await db().collection("orderRequests").where("orderNumber", "==", key).limit(1).get();
+    if (!snap.empty) {
+      request = snap.docs[0];
+      break;
+    }
+  }
+  if (!request) return { paymentStatus: "pending", orderNumber: shown };
+
+  const data = request.data() || {};
+  const orderNumber = typeof data.orderNumber === "string" && data.orderNumber ? data.orderNumber : shown;
+  const invoiceId = typeof data.invoiceId === "string" ? data.invoiceId.trim() : "";
+  const invoiceSnap = invoiceId ? await db().collection("invoices").doc(invoiceId).get() : null;
+  const invoice = invoiceSnap?.exists ? (invoiceSnap.data() || {}) : {};
+  const total = roundSettlementMoney(Number(invoice.total) || Number(data.total) || 0);
+  const already = roundSettlementMoney(Math.max(Number(invoice.amountPaid) || 0, Number(data.amountPaid) || 0));
+  const current = paymentSettlementStatus(total, already, invoice.paymentStatus || invoice.status || data.paymentStatus);
+  if (current === "paid" || current === "partial") {
+    await rememberPaymentOnRecords({
+      orderId: typeof invoice.orderId === "string" ? invoice.orderId : "",
+      orderRequestId: request.id,
+      amountPaid: already,
+      amountDue: roundSettlementMoney(Math.max(0, total - already)),
+      status: current,
+      squarePaymentId: typeof invoice.squarePaymentId === "string" ? invoice.squarePaymentId : undefined,
+      method: "square",
+      storedPaymentMethod: typeof invoice.paymentMethod === "string" ? invoice.paymentMethod : typeof data.paymentMethod === "string" ? data.paymentMethod : "",
+    });
+    return { paymentStatus: current, orderNumber };
+  }
+
+  const squareOrderId = String(invoice.squareOrderId || data.squareOrderId || "").trim();
+  if (!squareOrderId) return { paymentStatus: "pending", orderNumber };
+  const snapshot = await fetchSquareOrderSnapshot(squareOrderId, process.env);
+  const paymentId = snapshot?.paymentIds[0] || "";
+  if (!paymentId) return { paymentStatus: "pending", orderNumber };
+  const payment = await fetchSquarePayment(paymentId, process.env);
+  if (!payment || payment.status !== "COMPLETED") return { paymentStatus: "pending", orderNumber };
+
+  const referenceId = typeof payment.reference_id === "string" && payment.reference_id.trim()
+    ? payment.reference_id
+    : snapshot?.referenceId || invoiceId;
+  await settleCompletedSquarePayment({
+    ...payment,
+    order_id: typeof payment.order_id === "string" && payment.order_id ? payment.order_id : squareOrderId,
+    ...(referenceId ? { reference_id: referenceId } : {}),
+  }, { skipReceipt: true });
+
+  const afterInvoice = invoiceId ? await db().collection("invoices").doc(invoiceId).get() : null;
+  const afterRequest = await request.ref.get();
+  const afterInvoiceData = afterInvoice?.exists ? (afterInvoice.data() || {}) : {};
+  const afterRequestData = afterRequest.data() || {};
+  const afterPaid = roundSettlementMoney(Math.max(
+    Number(afterInvoiceData.amountPaid) || 0,
+    Number(afterRequestData.amountPaid) || 0,
+  ));
+  const afterTotal = roundSettlementMoney(Number(afterInvoiceData.total) || Number(afterRequestData.total) || total);
+  const after = paymentSettlementStatus(
+    afterTotal,
+    afterPaid,
+    afterInvoiceData.status || afterRequestData.paymentStatus,
+  );
+  return { paymentStatus: after === "unpaid" ? "pending" : after, orderNumber };
+}
+
+router.post("/pay-now/reconcile", async (req: Request, res: Response) => {
+  const limit = payNowReconcileLimiter.check(clientIp(req));
+  if (!limit.allowed) {
+    res.set("Retry-After", String(limit.retryAfterSec));
+    return res.status(429).json({ error: "Please wait a moment and try again." });
+  }
+  const raw = typeof req.body?.orderNumber === "string"
+    ? req.body.orderNumber
+    : typeof req.body?.order === "string"
+      ? req.body.order
+      : "";
+  try {
+    return res.json(await reconcilePayNowOrder(raw));
+  } catch (err) {
+    console.error("[Payments] Pay Now reconcile failed:", err instanceof Error ? err.message : "error");
+    return res.status(500).json({ error: "Payment could not be confirmed." });
+  }
+});
 
 router.post("/square-webhook", async (req: Request, res: Response) => {
   try {
@@ -1613,58 +1901,7 @@ router.post("/square-webhook", async (req: Request, res: Response) => {
 
     const event = JSON.parse(rawBody);
     const payment = event?.data?.object?.payment || event?.data?.object;
-    if (!payment?.id || payment.status !== "COMPLETED") return res.json({ received: true });
-
-    const amountCents = Number(payment.amount_money?.amount ?? payment.total_money?.amount ?? 0);
-    const amount = amountCents / 100;
-    if (amount <= 0) return res.json({ received: true, ignored: "zero-amount" });
-
-    const invoiceDoc = await findInvoiceForSquarePayment(payment);
-    if (!invoiceDoc) {
-      const settledOrder = await settlePrepaidOrderRequest(payment, amount);
-      if (settledOrder) return res.json({ received: true, orderRequest: true });
-      await db().collection("agentLogs").add({
-        agent: "travis",
-        action: "Unmatched Square payment",
-        summary: `Square payment ${payment.id} could not be matched to an invoice`,
-        status: "flagged",
-        relatedType: "invoice",
-        priority: "high",
-        requiresHumanReview: true,
-        details: payment.order_id || payment.note || "",
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-      return res.json({ received: true, unmatched: true });
-    }
-
-    const invoice = invoiceDoc.data() || {};
-    if (invoiceProvider(invoice) === "stripe") {
-      return res.json({ received: true, ignored: "stripe-invoice" });
-    }
-    if (isMirroredPayAtCloseSquarePayment(payment, invoice)) {
-      return res.json({ received: true, ignored: "pay-at-close-external" });
-    }
-
-    if (isDepositSquarePayment(invoice, payment)) {
-      await applyDepositPayment({
-        invoiceId: invoiceDoc.id,
-        amount,
-        squarePaymentId: payment.id,
-      });
-      return res.json({ received: true, deposit: true });
-    }
-
-    const settled = await applySuccessfulPayment({
-      invoiceId: invoiceDoc.id,
-      orderId: invoice.orderId,
-      clientId: invoice.clientId,
-      clientName: invoice.clientName,
-      amount,
-      method: "square",
-      squarePaymentId: payment.id,
-    });
-
-    return res.json({ received: true, ...(settled ?? {}) });
+    return res.json(await settleCompletedSquarePayment(payment || {}));
   } catch (err) {
     console.error("[Payments] Square webhook error:", err);
     return res.status(500).json({ error: "Square webhook handler failed." });

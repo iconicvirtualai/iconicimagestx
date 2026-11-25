@@ -54,6 +54,7 @@ import { isPromoInvoiceLine } from "../../shared/invoiceFace";
 import { loadPricingAdjustments, loadPricingRates } from "../services/pricingAdjustments";
 import { PAY_AT_CLOSE_METHOD, PAY_AT_CLOSE_PENDING_STATUS, payAtCloseCustomerOffer, payAtClosePublicOffer, shapePayAtCloseDraft } from "../../shared/payAtClose";
 import { PAY_LATER_METHOD, PAY_NOW_METHOD, applyPayNowSavings, payNowSquareLines } from "../../shared/payNow";
+import { paymentSettlementStatus, roundSettlementMoney, settlementMoney } from "../../shared/paymentSettlement";
 import { createTitusCheckout } from "../services/payAtClose";
 import { normalizeEmail } from "../../shared/listingAccess";
 import { portalBillingStamp } from "../../shared/clientHubSettings";
@@ -456,6 +457,11 @@ router.post("/", async (req, res) => {
       processing: socialSaves ? 0 : (sale.processing ?? 0),
       processingPolicy: socialSaves ? "waived" : (sale.processingPolicy ?? (processingEnabled() ? "included" : "waived")),
       ...(storedPaymentMethod ? { paymentMethod: storedPaymentMethod } : {}),
+      ...(wantsPayNow ? {
+        paymentStatus: "unpaid",
+        amountPaid: 0,
+        balanceDue: Number(total) || 0,
+      } : {}),
       ...(wantsPayAtClose ? {
         paymentStatus: PAY_AT_CLOSE_PENDING_STATUS,
         payAtCloseFee,
@@ -1014,6 +1020,12 @@ router.post("/", async (req, res) => {
             squareOrderId: linked.squareOrderId || null,
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
           }).catch((err) => console.error("[Bookings] Pay Now payment link was not saved:", err));
+          await docRef.update({
+            squarePaymentLinkId: linked.linkId || null,
+            squareOrderId: linked.squareOrderId || null,
+            paymentProvider: "square",
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          }).catch((err) => console.error("[Bookings] Pay Now order link was not saved:", err));
         }
       } catch (err) {
         console.error("[Bookings] Pay Now checkout failed:", err);
@@ -1453,8 +1465,21 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
       travelMiles: travel.travelMiles,
       travelFeeCents: travel.travelFeeCents,
       travelQuoted: travel.travelQuoted,
-      depositPaid: 0,
-      balanceDue: requestTotal,
+      depositPaid: request.paymentMethod === PAY_NOW_METHOD ? (Number(request.amountPaid) || 0) : 0,
+      balanceDue: request.paymentMethod === PAY_NOW_METHOD && request.balanceDue != null
+        ? Number(request.balanceDue)
+        : requestTotal,
+      ...(request.paymentMethod === PAY_NOW_METHOD ? {
+        paymentMethod: PAY_NOW_METHOD,
+        paymentStatus: typeof request.paymentStatus === "string" && request.paymentStatus
+          ? request.paymentStatus
+          : "unpaid",
+        amountPaid: Number(request.amountPaid) || 0,
+        ...(typeof request.squarePaymentId === "string" && request.squarePaymentId
+          ? { squarePaymentId: request.squarePaymentId }
+          : {}),
+        ...(request.paidAt ? { paidAt: request.paidAt } : {}),
+      } : {}),
       ...(request.paymentMethod === PAY_AT_CLOSE_METHOD ? {
         paymentMethod: PAY_AT_CLOSE_METHOD,
         paymentStatus: typeof request.paymentStatus === "string" && request.paymentStatus
@@ -1608,6 +1633,7 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
     if (linkedInvoiceId) {
       const existingInvoice = await db().collection("invoices").doc(linkedInvoiceId).get();
       if (existingInvoice.exists) {
+        const paidFields = settledFieldsFromInvoice(existingInvoice.data() || {});
         await existingInvoice.ref.update({
           orderId: orderRef.id,
           clientId,
@@ -1619,6 +1645,10 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
           ...revenueFields,
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
+        if (paidFields) {
+          await orderRef.update({ ...paidFields, updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+          await requestDoc.ref.update({ ...paidFields, updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+        }
       } else {
         console.error(`[Bookings] Confirm kept invoiceId ${linkedInvoiceId} but the invoice doc is missing. Not creating a second invoice.`);
       }
@@ -1856,6 +1886,23 @@ async function stampDurableLinks(input: {
   if (input.listingId && plan.listingFields) {
     await db().collection("listings").doc(input.listingId).update({ ...plan.listingFields, updatedAt: now });
   }
+}
+
+function settledFieldsFromInvoice(invoice: Record<string, unknown>): Record<string, unknown> | null {
+  const total = roundSettlementMoney(settlementMoney(invoice.total));
+  const amountPaid = roundSettlementMoney(Math.max(settlementMoney(invoice.amountPaid), settlementMoney(invoice.depositPaid)));
+  const status = paymentSettlementStatus(total, amountPaid, invoice.paymentStatus || invoice.status);
+  if (status === "unpaid") return null;
+  return {
+    paymentStatus: status,
+    amountPaid,
+    balanceDue: roundSettlementMoney(Math.max(0, total - amountPaid)),
+    depositPaid: roundSettlementMoney(settlementMoney(invoice.depositPaid) || amountPaid),
+    ...(typeof invoice.squarePaymentId === "string" && invoice.squarePaymentId
+      ? { squarePaymentId: invoice.squarePaymentId }
+      : {}),
+    ...(status === "paid" && invoice.paidAt ? { paidAt: invoice.paidAt } : {}),
+  };
 }
 
 function linesForConfirmedOrder(request: Record<string, unknown>) {

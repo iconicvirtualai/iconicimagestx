@@ -322,6 +322,9 @@ describe("booking payment checkout", () => {
     ]);
     const order = [...docs("orderRequests").values()][0];
     expect(order.paymentMethod).toBe("pay_now");
+    expect(order.paymentStatus).toBe("unpaid");
+    expect(order.squareOrderId).toBe("sq-order-1");
+    expect(order.squarePaymentLinkId).toBe("link-1");
     const orderNames = (order.lineItems as Array<{ name?: string }>).map((item) => String(item.name || ""));
     expect(orderNames.indexOf("Processing")).toBeLessThan(orderNames.indexOf("Pay Now savings"));
 

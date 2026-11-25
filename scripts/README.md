@@ -17,3 +17,19 @@ pnpm migrate:invoice-ids -- --live
 The plan renames `listing_`, `ordreq_`, and `playtest-invoice-` ids to Firestore auto-ids, adds a `payToken` where one is missing, repoints `invoiceId` on listings, orders, order requests, and galleries, copies Square ids onto the new document, and keeps the old document as a tombstone with `redirectInvoiceId`. It does not delete the old document and it does not call the Square API.
 
 Adding a `payToken` to a legacy 20-character auto-id makes the public pay link require `?t=`. Resend those pay links with the write. Do not write until that resend is ready.
+
+# Pay at Booking unpaid scan
+
+`pnpm report:pay-at-booking-unpaid` prints a count of Pay at Booking orders that Square collected while the local order still shows unpaid. It does not write Firestore, send email, or change Square.
+
+```bash
+pnpm report:pay-at-booking-unpaid
+pnpm report:pay-at-booking-unpaid -- --fixture
+pnpm report:pay-at-booking-unpaid -- --live
+```
+
+- Default and `--fixture` use a built-in sample. They do not contact Firebase or Square.
+- `--live` reads `orderRequests` and, when `SQUARE_ACCESS_TOKEN` is set, reads those Square orders. It prints counts only.
+- The live scan needs `FIREBASE_SERVICE_ACCOUNT` or `GOOGLE_APPLICATION_CREDENTIALS`.
+- `--write` is refused. This script has no write path. Do not backfill orders from it.
+

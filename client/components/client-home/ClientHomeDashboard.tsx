@@ -28,6 +28,7 @@ import {
 } from "@shared/clientHome";
 import { ListingPackageCard } from "@/components/listing-card/ListingPackageCard";
 import { PortalMessages } from "@/components/communications/PortalMessages";
+import { paymentFaceLabel } from "@shared/paymentSettlement";
 import { OrderNumberMark } from "@/components/OrderNumberMark";
 import { PortalListingsHome } from "@/components/client-home/PortalListingsHome";
 
@@ -39,6 +40,32 @@ export interface PortalOrderSummary {
   status: string;
   href: string;
   orderNumber?: string | null;
+  paymentStatus?: string | null;
+  amountPaid?: number | null;
+  depositPaid?: number | null;
+  total?: number | null;
+}
+
+function portalPaymentWord(order: PortalOrderSummary): string {
+  if (order.paymentStatus == null && order.amountPaid == null && order.depositPaid == null) return "";
+  const label = paymentFaceLabel({
+    paymentStatus: order.paymentStatus,
+    total: order.total,
+    amountPaid: order.amountPaid,
+    depositPaid: order.depositPaid,
+  });
+  return label === "Unpaid" ? "" : label;
+}
+
+function invoicePaymentWord(invoice: ClientInvoiceStatement): string {
+  const label = paymentFaceLabel({
+    status: invoice.status,
+    total: invoice.total,
+    amountPaid: invoice.amountPaid,
+    depositPaid: null,
+  });
+  if (label === "Paid" || label === "Partial" || label === "Deposit paid") return label;
+  return invoice.status ? humanStatus(invoice.status) : "Status not stored";
 }
 
 const TONE_CLASS: Record<AppointmentTone, string> = {
@@ -161,7 +188,9 @@ export function ClientHomeView({
                           <OrderNumberMark value={order.orderNumber} />
                           <p className="truncate text-sm font-bold text-black">{order.address}</p>
                         </div>
-                        <span className="shrink-0 text-[10px] font-black uppercase tracking-widest text-gray-500">{humanStatus(order.status)}</span>
+                        <span className="shrink-0 text-[10px] font-black uppercase tracking-widest text-gray-500">
+                          {[humanStatus(order.status), portalPaymentWord(order)].filter(Boolean).join(" · ")}
+                        </span>
                       </Link>
                     ))}
                   </div>
@@ -315,7 +344,7 @@ export function OrderHistory({
                   <OrderNumberMark value={invoice.orderNumber || invoice.invoiceNumber} />
                   <p className="font-black truncate">{invoice.invoiceNumber}</p>
                   <p className="text-xs text-gray-500 mt-1 uppercase tracking-widest">
-                    {[invoice.issuedOn, invoice.status ? humanStatus(invoice.status) : "Status not stored"].filter(Boolean).join(" · ")}
+                    {[invoice.issuedOn, invoicePaymentWord(invoice)].filter(Boolean).join(" · ")}
                   </p>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
@@ -346,7 +375,7 @@ function InvoiceDetail({ invoice }: { invoice: ClientInvoiceStatement }) {
           <OrderNumberMark value={invoice.orderNumber || invoice.invoiceNumber} />
           <div className="kicker">Invoice</div>
           <h2 style={{ fontSize: 28, fontWeight: 900, letterSpacing: "-0.03em" }}>{invoice.invoiceNumber}</h2>
-          <p className="ink3">{[invoice.issuedOn, invoice.status ? humanStatus(invoice.status) : ""].filter(Boolean).join(" · ")}</p>
+          <p className="ink3">{[invoice.issuedOn, invoicePaymentWord(invoice)].filter(Boolean).join(" · ")}</p>
           <p className="kicker" style={{ marginTop: 16 }}>Invoice to</p>
           {invoice.clientName ? <p className="font-bold">{invoice.clientName}</p> : null}
           {invoice.address ? <p className="ink3">{invoice.address}</p> : null}

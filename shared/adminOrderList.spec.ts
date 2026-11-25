@@ -72,11 +72,29 @@ describe("admin order payment status", () => {
     expect(adminOrderPaymentLabel(byId("fixture-pine"))).toBe("No invoice");
     expect(adminOrderPaymentLabel({
       invoice: { status: "partial", amountPaid: 40, total: 200 },
-    })).toBe("Unpaid");
+    })).toBe("Partial");
     expect(adminOrderPaymentLabel({
       invoice: { status: "sent", amountPaid: 200, total: 200 },
     })).toBe("Paid");
     expect(adminOrderPaymentLabel({ invoiceId: "inv_missing_body" })).toBe("—");
+    expect(adminOrderPaymentLabel({
+      paymentMethod: "pay_now",
+      invoiceId: "inv_pay_now",
+      total: 137.89,
+    })).toBe("Unpaid");
+    expect(adminOrderPaymentLabel({
+      paymentMethod: "pay_now",
+      invoiceId: "inv_pay_now",
+      paymentStatus: "paid",
+      amountPaid: 137.89,
+      total: 137.89,
+    })).toBe("Paid");
+    expect(adminOrderPaymentLabel({
+      paymentStatus: "partial",
+      depositPaid: 128.5,
+      amountPaid: 128.5,
+      total: 257,
+    })).toBe("Deposit paid");
   });
 });
 

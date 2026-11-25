@@ -192,6 +192,34 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
   const [promoInput, setPromoInput] = useState("");
   const [appliedPromo, setAppliedPromo] = useState<{ code: string; discount: number } | null>(null);
 
+  useEffect(() => {
+    const paid = searchParams.get("paid");
+    const order = searchParams.get("order");
+    if (paid !== "1" || !order) return undefined;
+    let cancel = false;
+    (async () => {
+      try {
+        const response = await fetch("/api/payments/pay-now/reconcile", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orderNumber: order }),
+        });
+        const data = await response.json().catch(() => ({})) as { paymentStatus?: string };
+        if (cancel) return;
+        const paymentStatus = data.paymentStatus === "paid" || data.paymentStatus === "partial" || data.paymentStatus === "unpaid"
+          ? data.paymentStatus
+          : "pending";
+        setSubmitResult({ orderNumber: order, paymentStatus });
+      } catch {
+        if (!cancel) setSubmitResult({ orderNumber: order, paymentStatus: "pending" });
+      }
+      if (!cancel) setStep("success");
+    })();
+    return () => {
+      cancel = true;
+    };
+  }, [searchParams]);
+
   const [expandedCategories, setExpandedCategories] = useState<string[]>(() => {
     if (initialCategoryId) return [initialCategoryId];
     const service = bookingOffer(packagesForStaffEditor([])).services.find((item) => item.id === seededSelection.selectedService);

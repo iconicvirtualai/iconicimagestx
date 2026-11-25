@@ -296,6 +296,10 @@ router.get("/me/home", requireAuth, async (req: AuthenticatedRequest, res) => {
         address: addressText(data.address || data.shootLocation) || title || "Order",
         status: data.status || "new",
         href: listingId ? clientListingPath(listingId) : "/portal/home?section=orders",
+        paymentStatus: typeof data.paymentStatus === "string" ? data.paymentStatus : null,
+        amountPaid: typeof data.amountPaid === "number" ? data.amountPaid : null,
+        depositPaid: typeof data.depositPaid === "number" ? data.depositPaid : null,
+        total: typeof data.total === "number" ? data.total : null,
         orderNumber: stored.orderNumber ?? null,
       });
     }

@@ -71,6 +71,9 @@ export function holidayPaymentLinkBody(input: {
     ? {
       order: {
         location_id: input.locationId,
+        // Square copies this onto the paid order. The webhook matches it to the invoice
+        // when the payment itself has no note. Max length is 40.
+        reference_id: input.invoiceId.slice(0, 40),
         line_items: lines.filter((line) => line.amountCents > 0).map((line) => ({
           name: line.name.slice(0, 255),
           quantity: "1",
