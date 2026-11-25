@@ -1,10 +1,20 @@
 import Layout from "@/components/Layout";
 import DecadeMashupCarousel from "@/components/DecadeMashupCarousel";
+import AboutPortrait from "@/components/about/AboutPortrait";
 import { Button } from "@/components/ui/button";
 import { Star, Zap, Rocket, MapPin, Award } from "lucide-react";
 import { Link } from "react-router-dom";
-import { itemText, useSiteItems, useSiteText } from "@/content/siteContent";
+import { itemText, useBlockHidden, useSiteItems, useSiteText } from "@/content/siteContent";
 import { DECADE_MASHUPS, type DecadeMashup } from "@shared/decadeMashups";
+import {
+  ABOUT_OWNER,
+  ABOUT_OWNER_BODY_FOLLOW,
+  ABOUT_OWNER_BODY_LEAD,
+  ABOUT_TEAM_KICKER,
+  ABOUT_TEAM_LINE,
+  ABOUT_TEAM_TITLE,
+  aboutTeamFromItems,
+} from "@shared/aboutTeam";
 
 const DECADE_BODY = "Est. 2016. 10 Years. Thousands of Listings. Millions in Commission Generated for our Partners.";
 
@@ -19,6 +29,18 @@ export default function About() {
   const philosophyTitle = useSiteText("about", "hub", "philosophyTitle", "THE ICONIC PHILOSOPHY");
   const philosophy = useSiteText("about", "hub", "philosophy", "We believe the agent is the architect of the deal, but the media is the fuel.");
   const tiles = useSiteItems("about", "hero");
+  const ownerHidden = useBlockHidden("about", "owner");
+  const teamHidden = useBlockHidden("about", "team");
+  const ownerKicker = useSiteText("about", "owner", "kicker", ABOUT_OWNER.kicker);
+  const ownerName = useSiteText("about", "owner", "name", ABOUT_OWNER.name);
+  const ownerRole = useSiteText("about", "owner", "role", ABOUT_OWNER.role);
+  const ownerPhoto = useSiteText("about", "owner", "photo", ABOUT_OWNER.photo);
+  const ownerLead = useSiteText("about", "owner", "bodyLead", ABOUT_OWNER_BODY_LEAD);
+  const ownerFollow = useSiteText("about", "owner", "bodyFollow", ABOUT_OWNER_BODY_FOLLOW);
+  const teamKicker = useSiteText("about", "team", "kicker", ABOUT_TEAM_KICKER);
+  const teamTitle = useSiteText("about", "team", "title", ABOUT_TEAM_TITLE);
+  const teamLine = useSiteText("about", "team", "line", ABOUT_TEAM_LINE);
+  const team = aboutTeamFromItems(useSiteItems("about", "team"));
   const mashups: DecadeMashup[] = tiles?.length
     ? tiles.flatMap((item) => {
       const video = itemText(item, "video");
@@ -120,31 +142,37 @@ export default function About() {
           </div>
         </section>
 
-        {/* Cadi Section */}
-        <section className="bg-gray-50 py-24 md:py-32 overflow-hidden">
+        {ownerHidden ? null : (
+        <section className="bg-gray-50 py-24 md:py-32 overflow-hidden" aria-labelledby="about-owner-heading">
           <div className="container mx-auto px-4 max-w-7xl">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
               <div className="relative">
                 <div className="absolute -top-10 -left-10 w-40 h-40 bg-teal-500/10 rounded-full blur-3xl"></div>
-                <div className="relative rounded-[2.5rem] overflow-hidden shadow-2xl bg-gray-900 aspect-square md:aspect-[4/5]">
-                  <img src="https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2Fb694584c91da4099bb13e517f9890e59?format=webp&width=800&height=1200" className="w-full h-full object-cover mix-blend-luminosity hover:mix-blend-normal transition-all duration-700" alt="Cadi - Visionary Creator" />
+                <div className="relative aspect-square overflow-hidden rounded-[2.5rem] bg-gray-900 shadow-2xl md:aspect-[4/5]">
+                  <AboutPortrait name={ownerName} role={ownerRole} photo={ownerPhoto} block="owner" eager className="absolute inset-0" />
                   <div className="absolute bottom-0 left-0 w-full p-8 bg-gradient-to-t from-black via-black/40 to-transparent">
-                    <p className="text-teal-400 font-bold tracking-widest text-xs uppercase mb-1">Visionary Creator</p>
-                    <h4 className="text-white text-3xl font-bold">CADI</h4>
+                    <p data-site-page="about" data-site-block="owner" data-site-field="role" data-site-kind="text" className="text-teal-400 font-bold tracking-widest text-xs uppercase mb-1">{ownerRole}</p>
+                    <p data-site-page="about" data-site-block="owner" data-site-field="name" data-site-kind="text" className="text-white text-3xl font-bold">{ownerName}</p>
                   </div>
                 </div>
               </div>
               <div className="space-y-8">
-                <div className="text-[#0d9488] font-bold tracking-wider text-xs uppercase">
-                  THE ARCHITECT OF THE ICON
+                <div data-site-page="about" data-site-block="owner" data-site-field="kicker" data-site-kind="text" className="text-[#0d9488] font-bold tracking-wider text-xs uppercase">
+                  {ownerKicker}
                 </div>
-                <h2 className="text-4xl md:text-6xl font-bold text-black leading-tight tracking-tight">CADI</h2>
+                <h2 id="about-owner-heading" className="text-4xl md:text-6xl font-bold text-black leading-tight tracking-tight">{ownerName}</h2>
                 <div className="space-y-6 text-gray-600 leading-relaxed text-lg">
-                  <p>
-                    Cadi didn't just start a photography studio; she engineered a media powerhouse. Obsessed with the friction agents face daily, she built Iconic to solve one problem: <span className="text-black font-bold">How to make agents more money with less effort.</span>
-                  </p>
-                  <p>
-                    She doesn't just direct the operation; she directs the strategy. By mirroring her high-energy hustle into our AI-driven workflows, she ensures that every client receives a "Celebrity Agent" experience.
+                  {ownerLead === ABOUT_OWNER_BODY_LEAD ? (
+                    <p data-site-page="about" data-site-block="owner" data-site-field="bodyLead" data-site-kind="text">
+                      Cadi didn't just start a photography studio; she engineered a media powerhouse. Obsessed with the friction agents face daily, she built Iconic to solve one problem: <span className="text-black font-bold">How to make agents more money with less effort.</span>
+                    </p>
+                  ) : (
+                    <p data-site-page="about" data-site-block="owner" data-site-field="bodyLead" data-site-kind="text">{ownerLead}</p>
+                  )}
+                  <p data-site-page="about" data-site-block="owner" data-site-field="bodyFollow" data-site-kind="text">
+                    {ownerFollow === ABOUT_OWNER_BODY_FOLLOW
+                      ? "She doesn't just direct the operation; she directs the strategy. By mirroring her high-energy hustle into our AI-driven workflows, she ensures that every client receives a \"Celebrity Agent\" experience."
+                      : ownerFollow}
                   </p>
                 </div>
 
@@ -165,9 +193,48 @@ export default function About() {
             </div>
           </div>
         </section>
+        )}
+
+        {teamHidden ? null : (
+        <section className="bg-white py-20 md:py-28" aria-labelledby="about-team-heading">
+          <div className="container mx-auto max-w-7xl px-4">
+            <div className="mx-auto mb-12 max-w-2xl text-center md:mb-16">
+              <p data-site-page="about" data-site-block="team" data-site-field="kicker" data-site-kind="text" className="mb-4 text-xs font-bold uppercase tracking-[0.3em] text-[#0d9488]">{teamKicker}</p>
+              <h2 id="about-team-heading" data-site-page="about" data-site-block="team" data-site-field="title" data-site-kind="text" className="text-4xl font-bold tracking-tight text-black md:text-6xl">{teamTitle}</h2>
+              <p data-site-page="about" data-site-block="team" data-site-field="line" data-site-kind="text" className="mt-5 text-lg leading-relaxed text-gray-600">{teamLine}</p>
+            </div>
+            <ul className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 lg:gap-8">
+              {team.map((member) => (
+                <li key={member.id}>
+                  <article className="flex h-full flex-col overflow-hidden rounded-[1.75rem] border border-gray-100 bg-white shadow-[0_18px_50px_-32px_rgba(0,0,0,0.45)]">
+                    <div className="relative aspect-square overflow-hidden bg-black">
+                      <AboutPortrait
+                        name={member.name}
+                        role={member.role}
+                        photo={member.photo}
+                        block="team"
+                        item={member.id}
+                        className="absolute inset-0"
+                        eager
+                      />
+                    </div>
+                    <div className="flex flex-1 flex-col gap-2 p-5 sm:p-6">
+                      <h3 data-site-page="about" data-site-block="team" data-site-item={member.id} data-site-field="name" data-site-kind="text" className="text-2xl font-bold tracking-tight text-black">{member.name}</h3>
+                      <p data-site-page="about" data-site-block="team" data-site-item={member.id} data-site-field="role" data-site-kind="text" className="text-xs font-bold uppercase tracking-wide text-[#0d9488]">{member.role}</p>
+                      {member.bio ? (
+                        <p data-site-page="about" data-site-block="team" data-site-item={member.id} data-site-field="bio" data-site-kind="text" className="text-sm leading-relaxed text-gray-600">{member.bio}</p>
+                      ) : null}
+                    </div>
+                  </article>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+        )}
 
         {/* Final CTA / Location */}
-        <section className="py-20 md:py-24 bg-white text-center">
+        <section className="border-t border-gray-100 bg-white py-20 text-center md:py-24">
           <div className="container mx-auto px-4">
             <h2 className="text-4xl md:text-6xl font-bold text-black mb-8 tracking-tight uppercase">BE ICONIC.</h2>
             <p className="text-xl md:text-2xl text-gray-500 max-w-3xl mx-auto leading-relaxed mb-12 font-medium">
