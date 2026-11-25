@@ -5,6 +5,7 @@
 
 import type { BookingLineItem } from "./bookingPricing.ts";
 import { normalizeBookingLineItems } from "./bookingPricing.ts";
+import { isTravelFeeLine } from "./travelZones.ts";
 
 export const ADJUSTMENT_LINE_IDS = {
   processing: "adjustment-processing",
@@ -113,12 +114,19 @@ export function invoiceChargeTotal(face: Pick<InvoiceFace, "subtotal" | "process
 /** Build the client/staff face from a stored invoice. Does not invent a processing fee. */
 export function invoiceFaceFromStored(data: Record<string, unknown>): InvoiceFace {
   const lines = normalizeBookingLineItems(data.lineItems);
-  const services = lines.filter((item) => !isPromoInvoiceLine(item) && !adjustmentKind(item));
-  const subtotal = explicitAmount(data.subtotal) ?? roundMoney(services.reduce((sum, item) => sum + item.price, 0));
+  const services = lines.filter((item) => {
+    if (isPromoInvoiceLine(item)) return false;
+    const kind = adjustmentKind(item);
+    return kind !== "processing" && kind !== "fees";
+  });
+  const serviceSum = roundMoney(services.reduce((sum, item) => sum + item.price, 0));
+  const travelOnLines = lines.some((item) => isTravelFeeLine(item) && item.price !== 0);
+  const explicitSubtotal = explicitAmount(data.subtotal);
+  const subtotal = travelOnLines ? serviceSum : (explicitSubtotal ?? serviceSum);
   const processingAmount = explicitAmount(data.processing) ?? lineAmount(lines, "processing");
   const processing = processingAmount != null && processingAmount !== 0 ? processingAmount : null;
   const fees = explicitAmount(data.fees) ?? lineAmount(lines, "fees") ?? 0;
-  const travel = explicitAmount(data.travel) ?? lineAmount(lines, "travel") ?? 0;
+  const travel = travelOnLines ? 0 : (explicitAmount(data.travel) ?? lineAmount(lines, "travel") ?? 0);
   const promoFromLines = roundMoney(lines.filter(isPromoInvoiceLine).reduce((sum, item) => sum + Math.abs(item.price), 0));
   const fieldPromo = explicitAmount(data.promoDiscount);
   const promotions = promoFromLines > 0 ? promoFromLines : (fieldPromo ?? 0);

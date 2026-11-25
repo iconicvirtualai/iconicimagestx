@@ -225,7 +225,8 @@ const HTML_SOURCE: Record<ClientEmailTemplateKey, string> = {
         <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Access Method</td><td style="padding:10px 14px;border-bottom:1px solid #eee;"><strong>{{accessMethod}}</strong></td></tr>
         <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Square Footage</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">{{squareFootage}}</td></tr>
         <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Travel</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">{{travelFee}}</td></tr>
-        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">${BOOKING_PROCESSING_LABEL}</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">{{processing}}</td></tr>
+        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Subtotal</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">{{subtotal}}</td></tr>
+        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">${BOOKING_PROCESSING_LABEL}</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">{{processing}}</td></tr>
         <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;">Order Total</td><td style="padding:10px 14px;font-weight:bold;color:#0d9488;">{{total}}</td></tr>
       </table>
       <p style="color:#888;font-size:13px;">Confirmation ID: <strong>{{requestId}}</strong> — keep this for your records.</p>

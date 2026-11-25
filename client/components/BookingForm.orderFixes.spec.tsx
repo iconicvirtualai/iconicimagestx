@@ -167,10 +167,13 @@ describe("/book estimator processing line", () => {
     const after = summaryAfter?.textContent || "";
     expect(after).toContain("Pay Now savings");
     expect(after).toContain("-$5.00");
-    expect(after).toContain("$21.98");
-    expect(after).toContain("$801.98");
-    expect(after.indexOf("Processing")).toBeLessThan(after.indexOf("Pay Now savings"));
-    expect(after.indexOf("Pay Now savings")).toBeLessThan(after.indexOf("Total estimate"));
+    expect(after).toContain("Subtotal");
+    expect(after).toContain("$780.00");
+    expect(after).toContain("$21.84");
+    expect(after).toContain("$801.84");
+    expect(after.indexOf("Pay Now savings")).toBeLessThan(after.indexOf("Subtotal"));
+    expect(after.indexOf("Subtotal")).toBeLessThan(after.indexOf("Processing"));
+    expect(after.indexOf("Processing")).toBeLessThan(after.indexOf("Total estimate"));
     const payNowProcessing = summaryAfter?.querySelector('[data-testid="booking-processing-line"]');
     expect(payNowProcessing?.textContent).toContain("Processing (2.8%)");
     expect(payNowProcessing?.textContent).not.toContain("charged on the invoice");

@@ -174,7 +174,7 @@ function applyProcessingToDraftLines(
   } else if (storedProcessing) {
     next.push(storedProcessing);
   }
-  return { ...totals, lineItems: next };
+  return { ...totals, subtotal: totals.processingBase, lineItems: next };
 }
 
 function roundDraftMoney(value: number): number {

@@ -341,7 +341,7 @@ router.post("/", async (req, res) => {
       payAtCloseFee = shaped.payAtCloseFee;
       sale = shaped as unknown as typeof sale;
     } else if (wantsPayNow) {
-      sale = applyPayNowSavings(sale);
+      sale = applyPayNowSavings(sale, { processingPercent: rates.processingPercent });
     }
     const lineItems = sale.lineItems;
     const bookedStudio = studioIdFromBooking({
@@ -796,6 +796,7 @@ router.post("/", async (req, res) => {
           address: displayAddress,
           orderNumber,
           processing: money(sale.processing ?? 0),
+          subtotal: money(sale.subtotal),
           total: money(total),
           requestId: docRef.id,
           scheduledDate: bookingDateLabel(scheduledDate, "TBD — we'll confirm shortly"),
@@ -1368,7 +1369,10 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
     const requestTotal = traveledConfirm.total;
     const requestSubtotal = sumLineItemPrices(requestLineItems.filter((item) => {
       const id = String(item.id || "");
-      return !id.startsWith("promo-") && !item.name.startsWith("Promo Code:");
+      return !id.startsWith("promo-")
+        && !item.name.startsWith("Promo Code:")
+        && id !== "adjustment-processing"
+        && id !== "processing";
     }));
     const confirmSource = scheduledDate || request.scheduledDate || request.appointmentDate || request.requestedDate;
     const confirmDate = toDate(confirmSource);

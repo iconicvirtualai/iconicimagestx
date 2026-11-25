@@ -582,6 +582,7 @@ export default function AdminOrderRequest() {
   const extraPromo = separatePromoDiscount(lineItems, promoDiscount);
   const presented = presentOrderCharges(editing ? form : order);
   const shownServices = presented.services;
+  const shownSubtotal = Math.round((shownServices.reduce((sum, line) => sum + (Number(line.price) || 0), 0) - extraPromo) * 100) / 100;
   const shownProcessing = presented.processing;
   const shownTotal = editing && typeof form.total === "number" ? Number(form.total) || 0 : presented.total;
   const clientName = order.clientName || `${order.firstName || ""} ${order.lastName || ""}`.trim() || "—";
@@ -716,6 +717,10 @@ export default function AdminOrderRequest() {
                     <MoneyAmount className="text-sm font-bold text-black">{fmtCurrency(presented.fees)}</MoneyAmount>
                   </div>
                 )}
+                <div data-testid="order-subtotal-line" className="flex items-baseline justify-between gap-3 px-4 py-3 border-t border-gray-200/50">
+                  <span className="min-w-0 text-sm font-bold text-gray-500">Subtotal</span>
+                  <MoneyAmount className="text-sm font-black text-black">{fmtCurrency(shownSubtotal)}</MoneyAmount>
+                </div>
                 {shownProcessing > 0 && (
                   <div data-testid="order-processing-line" className="flex items-baseline justify-between gap-3 px-4 py-3 border-t border-gray-200/50">
                     <span className="min-w-0 text-sm font-bold text-gray-500">{BOOKING_PROCESSING_LABEL}</span>
@@ -777,6 +782,10 @@ export default function AdminOrderRequest() {
                 <MoneyAmount className="text-green-600 font-bold">-{fmtCurrency(extraPromo)}</MoneyAmount>
               </div>
             )}
+            <div className="mb-2 flex items-baseline justify-between gap-3 text-sm">
+              <span className="min-w-0 text-gray-400">Subtotal</span>
+              <MoneyAmount className="font-bold">{fmtCurrency(shownSubtotal)}</MoneyAmount>
+            </div>
             {shownProcessing > 0 && (
               <div data-testid="order-summary-processing" className="flex items-baseline justify-between gap-3 text-sm mb-2">
                 <span className="min-w-0 text-gray-400">{BOOKING_PROCESSING_LABEL}</span>

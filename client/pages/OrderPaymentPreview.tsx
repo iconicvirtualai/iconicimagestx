@@ -13,17 +13,17 @@ export default function OrderPaymentPreview() {
     ? {
       paymentMethod: "pay_now",
       paymentStatus: "paid",
-      amountPaid: 137.89,
-      total: 137.89,
+      amountPaid: 250.83,
+      total: 250.83,
       paidAt: "2026-11-25T18:04:00.000Z",
-      invoice: { status: "paid", amountPaid: 137.89, total: 137.89, paidAt: "2026-11-25T18:04:00.000Z" },
+      invoice: { status: "paid", amountPaid: 250.83, total: 250.83, paidAt: "2026-11-25T18:04:00.000Z" },
     }
     : {
       paymentMethod: "pay_now",
       paymentStatus: "unpaid",
       amountPaid: 0,
-      total: 137.89,
-      invoice: { status: "draft", amountPaid: 0, total: 137.89 },
+      total: 250.83,
+      invoice: { status: "draft", amountPaid: 0, total: 250.83 },
     };
 
   return (
@@ -46,12 +46,14 @@ export default function OrderPaymentPreview() {
           </div>
           <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
             <h2 className="mb-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Services</h2>
-            <Row name="Photos Only — 18 photos" amount="$139.00" />
-            <Row name="Processing (2.8%)" amount="$3.89" />
+            <Row name="Hollywood" amount="$199.00" />
+            <Row name="Travel fee — Zone 2" amount="$50.00" />
             <Row name="Pay Now savings" amount="-$5.00" />
+            <Row name="Subtotal" amount="$244.00" />
+            <Row name="Processing (2.8%)" amount="$6.83" />
             <div className="mt-2 flex items-baseline justify-between gap-3 border-t border-gray-200 px-1 pt-4">
               <span className="text-base font-black uppercase">Total Amount</span>
-              <span className="text-xl font-black">$137.89</span>
+              <span className="text-xl font-black">$250.83</span>
             </div>
           </div>
         </section>
@@ -60,15 +62,15 @@ export default function OrderPaymentPreview() {
             <h2 className="mb-4 text-[10px] font-black uppercase tracking-widest text-gray-500">Order Summary</h2>
             <div className="flex items-baseline justify-between gap-3 text-lg">
               <span className="font-black text-white">Total</span>
-              <span className="font-black text-[#0d9488]">$137.89</span>
+              <span className="font-black text-[#0d9488]">$250.83</span>
             </div>
             <div className="mt-4 space-y-2 border-t border-white/10 pt-4">
               <OrderPaymentLines dark record={record} />
             </div>
             <p className="mt-4 text-[11px] leading-relaxed text-gray-500">
               {paid
-                ? "Sample preview after a successful Pay at Booking payment. The charge includes the 2.8% processing fee."
-                : "Sample preview before the payment is recorded. The order still shows unpaid."}
+                ? "Sample preview. Subtotal is package + travel − Pay Now savings. Processing is 2.8% of that subtotal."
+                : "Sample preview before payment. Subtotal $244.00, processing $6.83, total $250.83."}
             </p>
           </div>
         </aside>

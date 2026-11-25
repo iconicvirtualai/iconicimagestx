@@ -5,12 +5,13 @@
  * invoice is created. Later pages, the PDF, and checkout print and charge
  * that stored total. They do not compute a second fee.
  *
- * Processing base (tax excluded, travel excluded):
- *   max(0, service subtotal − promotions + fees)
- * Tax is a separate add-on in this codebase, so it is not part of the base.
- * Travel is quoted on its own line and is not part of the base either.
- * The $549 Showcase has no promo, no fees, and no tax, so the base is $549,
- * the fee is $15.37, and the total is $564.37.
+ * Processing base (tax excluded):
+ *   max(0, service subtotal − promotions + fees + travel)
+ * Tax is a separate add-on, so it is not part of the base.
+ * Travel is its own line and is inside the subtotal the fee is taken on.
+ * Pay Now savings are a promotion, so they reduce this base before the fee.
+ * The $549 Showcase has no promo, no fees, no travel, and no tax, so the
+ * base is $549, the fee is $15.37, and the total is $564.37.
  *
  * Rounding is integer cents, half-up: round(baseCents * 0.028).
  * That is floor((baseCents * 28 + 500) / 1000), which matches half-up
@@ -74,7 +75,7 @@ export interface InvoiceTotals {
   fees: number;
   travel: number;
   tax: number;
-  /** max(0, subtotal − promotions + fees). Tax and travel stay outside. */
+  /** max(0, subtotal − promotions + fees + travel). Tax stays outside. */
   processingBase: number;
   processing: number;
   total: number;
@@ -131,8 +132,8 @@ export function computeInvoiceTotals(input: InvoiceTotalsInput): InvoiceTotals {
   const tax = nonNegativeMoney(input.tax);
   const amountPaid = nonNegativeMoney(input.amountPaid);
   const netServices = roundMoney(Math.max(0, subtotal - promotions));
-  const processingBase = roundMoney(Math.max(0, netServices + fees));
-  const saleBeforeProcessing = roundMoney(netServices + fees + travel + tax);
+  const processingBase = roundMoney(Math.max(0, netServices + fees + travel));
+  const saleBeforeProcessing = roundMoney(processingBase + tax);
   const comped = input.comped === true;
   const stored = input.processing == null || !Number.isFinite(Number(input.processing))
     ? null
@@ -169,8 +170,9 @@ export function computeInvoiceTotals(input: InvoiceTotalsInput): InvoiceTotals {
 
 /**
  * /book Total Estimate. The service subtotal is the catalog lines before
- * promo. Promo uses the same floor as calculateSidebarTotal. Travel is added
- * after processing and is not part of the 2.8% base. Fees are not on /book.
+ * promo. Promo uses the same floor as calculateSidebarTotal. Travel is its
+ * own line and is part of the 2.8% base. Fees are not on /book.
+ * Pay Now savings are applied by the caller before this fee is shown.
  */
 export function estimateBookingCharge(
   input: BookingPriceInput,

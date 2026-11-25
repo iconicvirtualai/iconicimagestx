@@ -610,6 +610,6 @@ export function presentOrderCharges(
 }
 
 /** Exposed for tests that want the same cents rule as the booking form. */
-export function orderProcessingFee(subtotal: number, promotions = 0, fees = 0): number {
-  return processingFee(Math.max(0, subtotal - promotions + fees));
+export function orderProcessingFee(subtotal: number, promotions = 0, fees = 0, travel = 0): number {
+  return processingFee(Math.max(0, subtotal - promotions + fees + travel));
 }

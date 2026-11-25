@@ -41,11 +41,18 @@ export function orderServiceLines(
   return synthesized ? [synthesized] : [];
 }
 
+function isProcessingCharge(line: OrderServiceLine): boolean {
+  const id = String(line.id || "");
+  if (id === "processing" || id === "adjustment-processing") return true;
+  return /^processing\b/i.test(line.name.trim());
+}
+
 export function orderChargeSummary(
   record: Record<string, unknown> | null | undefined,
   lines: OrderServiceLine[],
 ): { subtotal: number; tax: number; total: number } {
-  const lineSubtotal = roundMoney(lines.reduce((sum, line) => sum + line.price, 0));
+  const priced = lines.filter((line) => !isProcessingCharge(line));
+  const lineSubtotal = roundMoney(priced.reduce((sum, line) => sum + line.price, 0));
   const pricing = nested(record?.pricing);
   const tax = moneyOrNull(record?.tax) ?? moneyOrNull(pricing.tax) ?? 0;
   const storedTotal = moneyOrNull(record?.total) ?? moneyOrNull(pricing.total);

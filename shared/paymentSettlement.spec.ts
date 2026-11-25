@@ -2,6 +2,14 @@ import { describe, expect, it } from "vitest";
 import { paymentFaceLabel, paymentSettlementStatus } from "./paymentSettlement";
 
 describe("payment settlement status", () => {
+  it("keeps a 50% deposit of the new total partial until the balance is paid", () => {
+    const total = 250.83;
+    const deposit = 125.42;
+    expect(paymentSettlementStatus(total, deposit)).toBe("partial");
+    expect(paymentFaceLabel({ total, amountPaid: deposit, depositPaid: deposit })).toBe("Deposit paid");
+    expect(paymentSettlementStatus(total, total)).toBe("paid");
+  });
+
   it("treats a Pay at Booking charge that includes the 2.8% fee as paid", () => {
     // $139 package + $3.89 processing − $5 Pay Now savings.
     expect(paymentSettlementStatus(137.89, 137.89)).toBe("paid");
