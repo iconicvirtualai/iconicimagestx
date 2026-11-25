@@ -1,9 +1,11 @@
+import { useState } from "react";
 import {
   Download,
   ExternalLink,
   FileArchive,
   FileText,
   Lock,
+  X,
 } from "lucide-react";
 import { orderedGalleryMedia } from "@shared/gallerySequence";
 import {
@@ -30,34 +32,102 @@ export function ClientGalleryBoard({
   items,
   onCopyLink,
   zipHref,
+  webZipHref,
+  printZipHref,
 }: {
   items: ClientGalleryItem[];
   onCopyLink?: (url: string) => void;
   zipHref?: string;
+  webZipHref?: string;
+  printZipHref?: string;
 }) {
   const ordered = orderedGalleryMedia(items);
   const canZip = Boolean(zipHref) && ordered.some((item) => galleryOffersDownload(item));
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
+  const openItem = openIndex != null ? ordered[openIndex] : null;
   return (
     <div data-testid="client-gallery-board">
       {canZip && zipHref ? (
-        <div className="mb-4 flex justify-end">
+        <div className="mb-4 flex flex-wrap justify-end gap-2">
           <a
             href={zipHref}
-            data-testid="gallery-download-zip"
-            className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-black px-4 text-[10px] font-black uppercase tracking-widest text-white"
+            data-testid="gallery-download-all"
+            className="inline-flex min-h-11 items-center gap-2 rounded-full bg-black px-4 text-[11px] font-semibold uppercase tracking-widest text-white"
           >
             <Download className="h-3.5 w-3.5" /> Download all
           </a>
+          {webZipHref ? (
+            <a
+              href={webZipHref}
+              data-testid="gallery-download-web"
+              className="inline-flex min-h-11 items-center gap-2 rounded-full border border-black/10 bg-white px-4 text-[11px] font-semibold uppercase tracking-widest text-black"
+            >
+              Web size
+            </a>
+          ) : null}
+          {printZipHref ? (
+            <a
+              href={printZipHref}
+              data-testid="gallery-download-print"
+              className="inline-flex min-h-11 items-center gap-2 rounded-full border border-black/10 bg-white px-4 text-[11px] font-semibold uppercase tracking-widest text-black"
+            >
+              Print size
+            </a>
+          ) : null}
         </div>
       ) : null}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {ordered.map((item, index) => (
         <ClientGalleryMediaCard
           key={item.id || index}
           item={item}
           onCopyLink={onCopyLink}
+          onOpen={() => setOpenIndex(index)}
         />
       ))}
+      </div>
+      {openItem ? (
+        <GalleryLightbox
+          item={openItem}
+          onClose={() => setOpenIndex(null)}
+          onStep={(delta) => setOpenIndex((current) => {
+            if (current == null) return current;
+            return (current + delta + ordered.length) % ordered.length;
+          })}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function GalleryLightbox({
+  item,
+  onClose,
+  onStep,
+}: {
+  item: ClientGalleryItem;
+  onClose: () => void;
+  onStep: (delta: number) => void;
+}) {
+  const kind = classifyClientGalleryItem(item);
+  return (
+    <div data-testid="gallery-lightbox" className="fixed inset-0 z-50 flex flex-col bg-black/95 text-white" role="dialog" aria-modal="true" aria-label="Full screen photo">
+      <div className="flex items-center justify-between gap-3 px-4 py-3">
+        <p className="truncate text-sm font-semibold">{galleryItemName(item)}</p>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={() => onStep(-1)} className="min-h-11 rounded-full border border-white/20 px-3 text-xs font-semibold">Previous</button>
+          <button type="button" onClick={() => onStep(1)} className="min-h-11 rounded-full border border-white/20 px-3 text-xs font-semibold">Next</button>
+          <button type="button" data-testid="gallery-lightbox-close" onClick={onClose} className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full bg-white text-black" aria-label="Close">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+      <div className="flex min-h-0 flex-1 items-center justify-center p-4">
+        {isVideoKind(kind) ? (
+          <VideoFrame item={item} kind={kind} name={galleryItemName(item)} />
+        ) : (
+          <ClientGalleryMediaFrame item={item} />
+        )}
       </div>
     </div>
   );
@@ -66,9 +136,11 @@ export function ClientGalleryBoard({
 export function ClientGalleryMediaCard({
   item,
   onCopyLink,
+  onOpen,
 }: {
   item: ClientGalleryItem;
   onCopyLink?: (url: string) => void;
+  onOpen?: () => void;
 }) {
   const kind = classifyClientGalleryItem(item);
   const name = galleryItemName(item);
@@ -89,6 +161,16 @@ export function ClientGalleryMediaCard({
       data-gallery-kind={kind}
     >
       <ClientGalleryMediaFrame item={item} />
+      {onOpen && kind !== "locked" && kind !== "file" ? (
+        <button
+          type="button"
+          data-testid={`gallery-open-${item.id || kind}`}
+          onClick={onOpen}
+          className="mt-2 inline-flex min-h-11 w-full items-center justify-center rounded-full border border-black/10 text-[11px] font-semibold uppercase tracking-widest"
+        >
+          View full screen
+        </button>
+      ) : null}
       {kind !== "locked" &&
         kind !== "file" &&
         kind !== "floorplan-pdf" &&
@@ -170,6 +252,7 @@ export function ClientGalleryMediaFrame({ item }: { item: ClientGalleryItem }) {
           src={src}
           alt={name}
           loading="lazy"
+          decoding="async"
           data-testid={`gallery-image-${item.id || kind}`}
           style={galleryFrameStyle(kind, item)}
           className="mx-auto block h-auto w-full max-w-full object-contain"
@@ -202,6 +285,7 @@ function VideoFrame({
             src={poster}
             alt={name}
             loading="lazy"
+          decoding="async"
             data-testid={`gallery-poster-${item.id || kind}`}
             className="mx-auto block h-auto w-full max-w-full object-contain"
           />
@@ -267,6 +351,7 @@ function TourFrame({ item, name }: { item: ClientGalleryItem; name: string }) {
             allow="fullscreen; xr-spatial-tracking"
             allowFullScreen
             loading="lazy"
+          decoding="async"
             data-testid={`gallery-tour-${item.id || "tour"}`}
             className="absolute inset-0 h-full w-full border-0"
           />

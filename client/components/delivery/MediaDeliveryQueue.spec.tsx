@@ -42,7 +42,7 @@ describe("staff delivery queue", () => {
     expect(html).toContain("Undelivered");
     expect(html).toContain("Delivered");
     expect(html).toContain("22 River Road, Austin, TX");
-    expect(html).toContain('href="/admin/studio/editing?listingId=listingReady001"');
+    expect(html).toContain('href="/admin/studio?listingId=listingReady001"');
     expect(html).not.toContain("/admin/iconic-studio");
     expect(html).toContain("Studio: 1 in review · 1 approved");
     expect(html).not.toContain("Iconic Studio");
@@ -67,9 +67,9 @@ describe("staff delivery queue", () => {
     expect(html).toContain("123 Iconic Test Lane");
     expect(html).toContain("delivery-project-missing-galleryOrphan01");
     expect(html).toContain("Project missing");
-    expect(html).not.toContain('href="/admin/studio/editing?listingId=zT9VnzBHtPjzEY3LFKGJ"');
+    expect(html).not.toContain('href="/admin/studio?listingId=zT9VnzBHtPjzEY3LFKGJ"');
     expect(html).not.toMatch(/href="[^"]*galleryOrphan01/);
-    expect(html).toContain('href="/admin/studio/editing?listingId=listingDone0001"');
+    expect(html).toContain('href="/admin/studio?listingId=listingDone0001"');
     expect(html).toContain("8 Cedar Lane, Austin, TX");
     expect(html).not.toContain("10 Oak Street");
     expect(html).toContain("delivery-move-galleryOrphan01-pending");
@@ -99,8 +99,8 @@ describe("staff delivery queue", () => {
     );
     expect(html).toContain("delivery-gallery-missing-listing:listingBare0001");
     expect(html).toContain("Gallery missing");
-    expect(html).toContain('href="/admin/studio/editing?listingId=listingDone0001"');
-    expect(html).toContain('href="/admin/studio/editing?listingId=listingBare0001"');
+    expect(html).toContain('href="/admin/studio?listingId=listingDone0001"');
+    expect(html).toContain('href="/admin/studio?listingId=listingBare0001"');
     expect(html).not.toMatch(/href="[^"]*galleryDelivered1/);
     expect(html).not.toContain("Project missing");
   });

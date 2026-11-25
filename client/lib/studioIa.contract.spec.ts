@@ -6,15 +6,16 @@ const scratch = readFileSync(new URL("../pages/AdminStudioScratch.tsx", import.m
 const redirect = readFileSync(new URL("../components/studio/LegacyStudioRedirect.tsx", import.meta.url), "utf8");
 
 describe("studio information architecture routes", () => {
-  it("lands staff on one Studio home with three subsections", () => {
-    expect(app).toContain('path="/admin/studio" element={<ProtectedRoute requiredRole="staff"><AdminStudioHome /></ProtectedRoute>}');
-    expect(app).toContain('path="/admin/studio/projects" element={<ProtectedRoute requiredRole="staff"><AdminStudioProjects /></ProtectedRoute>}');
-    expect(app).toContain('path="/admin/studio/marketing" element={<ProtectedRoute requiredRole="staff"><AdminStudioMarketing /></ProtectedRoute>}');
+  it("lands staff on the studio desk", () => {
+    expect(app).toContain('path="/admin/studio" element={<ProtectedRoute requiredRole="staff"><AdminStudioScratch /></ProtectedRoute>}');
+    expect(app).toContain('path="/admin/studio/projects" element={<LegacyStudioRedirect />}');
+    expect(app).toContain('path="/admin/studio/marketing" element={<LegacyStudioRedirect />}');
+    expect(app).not.toContain("AdminStudioHome");
   });
 
-  it("keeps the scratch editor on its pathway and on the photo editing alias", () => {
-    expect(app).toContain('path="/admin/studio/scratch" element={<ProtectedRoute requiredRole="staff"><AdminStudioScratch /></ProtectedRoute>}');
-    expect(app).toContain('path="/admin/studio/editing" element={<ProtectedRoute requiredRole="staff"><AdminStudioScratch /></ProtectedRoute>}');
+  it("keeps the scratch editor on the studio landing and redirects the old aliases", () => {
+    expect(app).toContain('path="/admin/studio/scratch" element={<LegacyStudioRedirect />}');
+    expect(app).toContain('path="/admin/studio/editing" element={<LegacyStudioRedirect />}');
     expect(scratch).toContain("StudioScratchPad");
     expect(scratch).toContain("studioEditorListingId");
   });

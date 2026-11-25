@@ -22,6 +22,7 @@ import {
 } from "../../shared/listingAccess";
 import { galleryUploadExtra } from "../../shared/galleryUpload";
 import { jsonSafe } from "../lib/firestoreJson";
+import { advanceStudioPipeline } from "./studioPipeline";
 
 const db = () => admin.firestore();
 const bucket = () => admin.storage().bucket();
@@ -55,6 +56,11 @@ export function ensureBucketCors(): Promise<void> {
 }
 
 export function firebaseDownloadUrl(bucketName: string, storagePath: string, token: string): string {
+  const emulator = process.env.FIREBASE_STORAGE_EMULATOR_HOST || "";
+  if (emulator && !emulator.includes("googleapis.com")) {
+    const host = emulator.startsWith("http") ? emulator.replace(/\/$/, "") : `http://${emulator}`;
+    return `${host}/v0/b/${bucketName}/o/${encodeURIComponent(storagePath)}?alt=media&token=${token}`;
+  }
   return `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodeURIComponent(storagePath)}?alt=media&token=${token}`;
 }
 
@@ -162,6 +168,9 @@ export async function registerListingPhoto(options: {
     });
     await syncPlaytestGallery(listingId, listing, image);
     await syncListingGallery(listing, image);
+    await advanceStudioPipeline(listingId, "upload").catch((err: unknown) => {
+      console.error("[Studio] Photo saved, but the order status was not moved to editing.", err);
+    });
   }
 
   return { image: already || image, listingId };

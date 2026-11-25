@@ -73,7 +73,7 @@ describe("photographer portal view", () => {
     expect(html).toContain("Studio is editing 1 photo.");
     expect(html).toContain("In Studio");
     expect(html).not.toContain("Iconic Studio");
-    expect(html).toContain('href="/admin/studio/editing?listingId=editing-job"');
+    expect(html).toContain('href="/admin/studio?listingId=editing-job"');
     expect(html).not.toContain("/admin/iconic-studio");
     expect(html).toContain("Add photos");
   });
@@ -93,7 +93,7 @@ describe("photographer portal view", () => {
     const html = renderPortal({ readOnly: true, tab: "all" });
     expect(html).toContain("Photographer portal");
     expect(html).toContain("disabled");
-    expect(html).not.toContain('href="/admin/studio/editing?listingId=editing-job"');
+    expect(html).not.toContain('href="/admin/studio?listingId=editing-job"');
     expect(html).not.toContain('href="/admin/upload');
     expect(html).not.toContain('data-testid="portal-messages"');
     const messages = renderPortal({ readOnly: true, tab: "messages" });

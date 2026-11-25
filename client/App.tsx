@@ -114,9 +114,6 @@ import AdminPersonProfile from "./pages/AdminPersonProfile";
 import AdminPermissions from "./pages/AdminPermissions";
 import AdminPeopleGroup from "./pages/AdminPeopleGroup";
 import PortalPerson from "./pages/PortalPerson";
-import AdminStudioHome from "./pages/AdminStudioHome";
-import AdminStudioProjects from "./pages/AdminStudioProjects";
-import AdminStudioMarketing from "./pages/AdminStudioMarketing";
 import AdminStudioScratch from "./pages/AdminStudioScratch";
 import LegacyStudioRedirect from "./components/studio/LegacyStudioRedirect";
 import AdminInsights from "./pages/AdminInsights";
@@ -276,11 +273,11 @@ const App = () => (
             {/* ─── Admin / Staff ────────────────────────────────────────── */}
             <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
             <Route path="/admin/dashboard" element={<ProtectedRoute requiredRole="coordinator"><AdminDashboard /></ProtectedRoute>} />
-            <Route path="/admin/studio" element={<ProtectedRoute requiredRole="staff"><AdminStudioHome /></ProtectedRoute>} />
-            <Route path="/admin/studio/editing" element={<ProtectedRoute requiredRole="staff"><AdminStudioScratch /></ProtectedRoute>} />
-            <Route path="/admin/studio/scratch" element={<ProtectedRoute requiredRole="staff"><AdminStudioScratch /></ProtectedRoute>} />
-            <Route path="/admin/studio/projects" element={<ProtectedRoute requiredRole="staff"><AdminStudioProjects /></ProtectedRoute>} />
-            <Route path="/admin/studio/marketing" element={<ProtectedRoute requiredRole="staff"><AdminStudioMarketing /></ProtectedRoute>} />
+            <Route path="/admin/studio" element={<ProtectedRoute requiredRole="staff"><AdminStudioScratch /></ProtectedRoute>} />
+            <Route path="/admin/studio/editing" element={<LegacyStudioRedirect />} />
+            <Route path="/admin/studio/scratch" element={<LegacyStudioRedirect />} />
+            <Route path="/admin/studio/projects" element={<LegacyStudioRedirect />} />
+            <Route path="/admin/studio/marketing" element={<LegacyStudioRedirect />} />
             <Route path="/admin/insights" element={<ProtectedRoute requiredRole="admin"><AdminInsights /></ProtectedRoute>} />
             <Route path="/admin/insights/social" element={<ProtectedRoute requiredRole="admin"><AdminInsights /></ProtectedRoute>} />
             <Route path="/admin/studio/operations" element={<LegacyStudioRedirect />} />

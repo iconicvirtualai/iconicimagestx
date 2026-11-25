@@ -791,10 +791,10 @@
 }
 .portal-inbox .order-number strong {
   display: block;
-  font-size: 28px;
-  font-weight: 900;
-  letter-spacing: -0.03em;
-  line-height: 1;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
 }
 .portal-inbox .btn.ib-fab {
   display: none;

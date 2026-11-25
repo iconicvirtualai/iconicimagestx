@@ -300,7 +300,8 @@ describe("scratch pad desk", () => {
     expect(html).toContain('data-testid="scratch-check-front"');
     expect(html).toContain('data-testid="scratch-sort"');
     expect(html).toContain("Select all");
-    expect(html).toContain("Nothing is added to an order or a gallery");
+    expect(html).toContain("+ Add files");
+    expect(html).toContain('data-compact="true"');
   });
 
   it("offers upload preferences, polish rules, and a note that Process sends", () => {
