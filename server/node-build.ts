@@ -58,8 +58,8 @@ app.get(["/pricing-v1", "/pricing-v1/"], (_req, res) => {
   res.redirect(301, "/pricing");
 });
 
-// Bare /studio has no project id. Studio 105 is the public studio page.
-app.get(["/studio", "/studio/"], (_req, res) => {
+// Bare /studio and /studios have no project id. Studio 105 is the public studio page.
+app.get(["/studio", "/studio/", "/studios", "/studios/"], (_req, res) => {
   res.redirect(302, "/studio-105");
 });
 
