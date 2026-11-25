@@ -551,12 +551,17 @@ export function normalizePersonName(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
 }
 
+/** Comma-separated names each count. "Mike Luna, Cadi" matches either person. */
+export function directoryNeedles(query: string): string[] {
+  return query.split(",").map((part) => normalizePersonName(part)).filter(Boolean);
+}
+
 export function directoryHit(profile: PersonProfile, query: string, role: string): boolean {
   if (role && role !== "all" && profile.role !== role) return false;
-  const needle = normalizePersonName(query);
-  if (!needle) return true;
+  const needles = directoryNeedles(query);
+  if (needles.length === 0) return true;
   const hay = normalizePersonName(`${profile.displayName} ${profile.legalName} ${profile.email} ${ROLE_LABEL[profile.role]}`);
-  return hay.includes(needle);
+  return needles.some((needle) => hay.includes(needle));
 }
 
 export function groupDelivery(group: PeopleGroup, senderUid: string): { ok: true; participantUids: string[]; notifyUids: string[] } | { ok: false; error: string } {

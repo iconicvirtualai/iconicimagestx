@@ -28,6 +28,7 @@ import {
   buildDraft,
   buildOutbound,
   directoryHit,
+  normalizePersonName,
   previewGroups,
   previewProfiles,
   previewThreads,
@@ -57,6 +58,61 @@ import {
   type PortalThreadFlag,
 } from "@shared/portalInbox";
 import "@/styles/portal-inbox.css";
+
+const FLAG_STORE = "iconic-portal-inbox-flags";
+
+function readStoredFlags(uid: string): PortalThreadFlag[] {
+  if (!uid || typeof localStorage === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(`${FLAG_STORE}:${uid}`);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter((flag) => flag && typeof flag.threadKey === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeStoredFlags(uid: string, flags: PortalThreadFlag[]) {
+  if (!uid || typeof localStorage === "undefined") return;
+  try {
+    localStorage.setItem(`${FLAG_STORE}:${uid}`, JSON.stringify(flags));
+  } catch {
+    /* The inbox still saves on the server when that write succeeds. */
+  }
+}
+
+function pickCommaNames(
+  query: string,
+  profiles: PersonProfile[],
+  setPeople: (update: (current: string[]) => string[]) => void,
+  setGroup: (id: string) => void,
+) {
+  const parts = query.split(",");
+  if (parts.length < 2) return;
+  const finished = parts.slice(0, -1).map((part) => normalizePersonName(part)).filter(Boolean);
+  if (finished.length === 0) return;
+  setPeople((current) => {
+    const next = new Set(current);
+    for (const needle of finished) {
+      const exact = profiles.filter((profile) => normalizePersonName(profile.displayName) === needle || normalizePersonName(profile.legalName) === needle);
+      const loose = exact.length > 0 ? exact : profiles.filter((profile) => directoryHit(profile, needle, ""));
+      const chosen = exact.length > 0 ? exact : loose.length === 1 ? loose : [];
+      for (const profile of chosen) next.add(profile.id);
+    }
+    return [...next];
+  });
+  setGroup("");
+}
+
+function mergeStoredFlags(server: PortalThreadFlag[], local: PortalThreadFlag[]): PortalThreadFlag[] {
+  const map = new Map<string, PortalThreadFlag>();
+  for (const flag of server) map.set(flag.threadKey, flag);
+  for (const flag of local) {
+    const current = map.get(flag.threadKey);
+    if (!current || (flag.updatedAt || "") >= (current.updatedAt || "")) map.set(flag.threadKey, flag);
+  }
+  return [...map.values()];
+}
 
 const SAMPLE_VIEWER: DeskActor = {
   uid: "sample-jane",
@@ -232,10 +288,14 @@ export function PortalMessages({
     if (!mine.ok)
       throw new Error(mineBody.error || "Couldn't load your messages.");
     setConversations(Array.isArray(mineBody.threads) ? mineBody.threads : []);
+    const serverFlags: PortalThreadFlag[] = [];
     if (flagRes.ok) {
       const flagBody = await flagRes.json().catch(() => ({}));
-      setFlags(Array.isArray(flagBody.flags) ? flagBody.flags : []);
+      if (Array.isArray(flagBody.flags)) serverFlags.push(...flagBody.flags);
     }
+    const merged = mergeStoredFlags(serverFlags, readStoredFlags(viewer.uid));
+    setFlags(merged);
+    writeStoredFlags(viewer.uid, merged);
     const threads: InboxThread[] = [];
     for (const response of folders) {
       if (!response.ok) continue;
@@ -276,9 +336,7 @@ export function PortalMessages({
     setFlags((current) => {
       const map = new Map(current.map((flag) => [flag.threadKey, flag]));
       for (const patch of patches) {
-        const nextPatch = patch.threadKey.startsWith("direct:")
-          ? { ...patch, folder: undefined }
-          : patch;
+        const nextPatch = patch;
         if (
           nextPatch.folder === undefined &&
           nextPatch.starred === undefined &&
@@ -293,7 +351,9 @@ export function PortalMessages({
         );
         map.set(next.threadKey, next);
       }
-      return [...map.values()];
+      const nextFlags = [...map.values()];
+      writeStoredFlags(viewer.uid, nextFlags);
+      return nextFlags;
     });
     setDirect((current) =>
       current.map((thread) => {
@@ -321,7 +381,11 @@ export function PortalMessages({
     const data = await res.json().catch(() => ({}));
     if (!res.ok)
       throw new Error(data.error || "Couldn't update that conversation.");
-    if (Array.isArray(data.flags)) setFlags(data.flags);
+    if (Array.isArray(data.flags)) {
+      const merged = mergeStoredFlags(data.flags, readStoredFlags(viewer.uid));
+      setFlags(merged);
+      writeStoredFlags(viewer.uid, merged);
+    }
     if (
       patches.some(
         (patch) => patch.threadKey.startsWith("direct:") && patch.folder,
@@ -1156,17 +1220,17 @@ function ComposePane({
           ...group.canMessageProfileIds,
         ]),
       );
-      setProfiles(
-        previewProfiles().filter((profile) => {
-          if (
-            viewer.kind === "client" &&
-            profile.uid !== viewer.uid &&
-            !allowed.has(profile.id)
-          )
-            return false;
-          return directoryHit(profile, query, role);
-        }),
-      );
+      const found = previewProfiles().filter((profile) => {
+        if (
+          viewer.kind === "client" &&
+          profile.uid !== viewer.uid &&
+          !allowed.has(profile.id)
+        )
+          return false;
+        return directoryHit(profile, query, role);
+      });
+      setProfiles(found);
+      pickCommaNames(query, found, setPickedPeople, setPickedGroup);
       return;
     }
     const handle = window.setTimeout(() => {
@@ -1181,8 +1245,10 @@ function ComposePane({
           const data = await res.json().catch(() => ({}));
           if (!res.ok)
             throw new Error(data.error || "Could not search people.");
-          setProfiles(data.profiles || []);
+          const found = (data.profiles || []) as PersonProfile[];
+          setProfiles(found);
           setGroups(data.groups || []);
+          pickCommaNames(query, found, setPickedPeople, setPickedGroup);
         } catch (err) {
           setError(
             err instanceof Error ? err.message : "Could not search people.",
@@ -1331,7 +1397,7 @@ function ComposePane({
                 <input
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Search people or groups"
+                  placeholder="Search names, or several separated by commas"
                   aria-label="Search people or groups"
                 />
               </label>

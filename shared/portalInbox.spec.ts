@@ -262,4 +262,23 @@ describe("portal inbox", () => {
     };
     expect(buildPortalInbox([], [thread], riley, [])).toHaveLength(1);
   });
+
+  it("keeps a direct thread in Trash from the saved flag after the thread copy reloads", () => {
+    const thread: InboxThread = {
+      ...previewThreads()[1],
+      folderByUid: { "sample-jane": "inbox" },
+    };
+    const key = `direct:${thread.id}`;
+    const filed = buildPortalInbox([], [thread], jane, [{
+      threadKey: key,
+      folder: "trash",
+      starred: true,
+      readAt: "2026-11-01T00:00:00.000Z",
+      forceUnread: false,
+      updatedAt: "2026-11-01T00:00:00.000Z",
+    }]);
+    expect(itemsInFolder(filed, "trash").map((item) => item.id)).toContain(thread.id);
+    expect(itemsInFolder(filed, "inbox").map((item) => item.id)).not.toContain(thread.id);
+    expect(filed.find((item) => item.id === thread.id)?.starred).toBe(true);
+  });
 });

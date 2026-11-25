@@ -139,6 +139,7 @@ export function PortalShell({
   onSignOut,
   active,
   example = false,
+  headshotUrl = "",
   counts,
   onSection,
   children,
@@ -148,6 +149,7 @@ export function PortalShell({
   onSignOut?: () => void;
   active: PortalNavId;
   example?: boolean;
+  headshotUrl?: string;
   counts?: { listings?: number; schedule?: number; messages?: number };
   onSection?: (section: PortalHomeSection) => void;
   children: ReactNode;
@@ -223,7 +225,7 @@ export function PortalShell({
                 aria-expanded={accountOpen}
                 onClick={() => setAccountOpen((open) => !open)}
               >
-                {initials(name)}
+                {headshotUrl ? <img src={headshotUrl} alt="" /> : initials(name)}
               </button>
               {accountOpen ? (
                 <div className="acct-menu desk-only" role="menu">

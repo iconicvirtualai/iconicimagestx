@@ -8,10 +8,12 @@ import BookingForm, { type PortalOrderPrefill } from "@/components/BookingForm";
 import { PortalShell } from "@/components/client-hub/PortalShell";
 import { useExampleMode } from "@/pages/PortalSettings";
 import { exampleBilling, samplePortalProfile } from "@/lib/exampleHub";
+import { usePortalHeadshot } from "@/lib/usePortalHeadshot";
 
 export default function PortalOrder() {
   const example = useExampleMode();
   const { user, userType, staffProfile, clientProfile, loading, mustChangePassword, signOutUser } = useAuth();
+  const headshotUrl = usePortalHeadshot(example ? null : user, example);
   const [prefill, setPrefill] = useState<PortalOrderPrefill | null>(example ? billingPrefill(samplePortalProfile(), exampleBilling()) : null);
   const [error, setError] = useState("");
 
@@ -57,13 +59,16 @@ export default function PortalOrder() {
         firstName={firstName}
         accountName={accountName}
         example={example}
+        headshotUrl={headshotUrl}
         active="order"
         onSignOut={() => void signOutUser().then(() => { window.location.assign(example ? "/portal?example=1" : "/portal"); })}
       >
-        <div className="portal-tailwind portal-order-intro bg-white rounded-2xl border border-gray-100 min-w-0 max-w-full overflow-x-clip">
-          <div className="px-4 pt-6 sm:px-6 min-w-0">
-            <h2 className="text-2xl font-black">Place an order</h2>
-            <p className="text-sm text-gray-500 mt-1">Packages, add-ons, and appointment times are the same as the public order form.</p>
+        <div className="portal-tailwind portal-order-intro min-w-0 max-w-full overflow-x-clip">
+          <div className="page-head">
+            <div>
+              <div className="kicker">Place Order</div>
+              <h1>Place an order</h1>
+              <p className="sub">Packages, add-ons, and appointment times are the same as the public order form.</p>
             {prefill ? (
               <p className="mt-3 max-w-full break-words text-sm text-gray-700" data-testid="portal-order-who">
                 Ordering as {prefill.firstName} {prefill.lastName} · {prefill.email}
@@ -72,6 +77,7 @@ export default function PortalOrder() {
               </p>
             ) : null}
             {error ? <p className="mt-3 text-sm font-bold">{error}</p> : null}
+            </div>
           </div>
           {prefill ? <BookingForm prefill={prefill} source="portal" /> : <Pending />}
         </div>

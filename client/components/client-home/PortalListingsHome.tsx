@@ -264,14 +264,16 @@ function FreshFromIconic({ example }: { example: boolean }) {
   return (
     <section className="fresh" id="studio-tools">
       <div className="sec-h"><h2>Fresh from Iconic</h2></div>
-      <div className="fresh-row">
-        {tiles.map((tile) => (
-          <Link key={tile.title} className={tile.className} to={href}>
-            <img src={tile.src} alt="" />
-            <div className="veil" />
-            <div className="cap"><h4>{tile.title}</h4><p>{tile.copy}</p></div>
-          </Link>
-        ))}
+      <div className="fresh-carousel" aria-label="Fresh from Iconic">
+        <div className="fresh-track">
+          {[...tiles, ...tiles].map((tile, index) => (
+            <Link key={`${tile.title}-${index}`} className={tile.className} to={href} tabIndex={index >= tiles.length ? -1 : undefined} aria-hidden={index >= tiles.length ? true : undefined}>
+              <img src={tile.src} alt="" />
+              <div className="veil" />
+              <div className="cap"><h4>{tile.title}</h4><p>{tile.copy}</p></div>
+            </Link>
+          ))}
+        </div>
       </div>
     </section>
   );
@@ -280,8 +282,8 @@ function FreshFromIconic({ example }: { example: boolean }) {
 function Studios({ example }: { example: boolean }) {
   const href = portalHref("/portal/order", example);
   return (
-    <section id="studios" style={{ marginBottom: 36 }}>
-      <div className="sec-h"><h2>Book the studio</h2></div>
+    <section id="studios" className="studios">
+      <div className="sec-h"><h2>Book the studio</h2><span className="muted">Optional</span></div>
       <div className="fresh-row three">
         <Link className="tile noir" to={href}>
           <img src={`${MEDIA}/studio-noir.jpg`} alt="" />

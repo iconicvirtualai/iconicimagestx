@@ -17,6 +17,7 @@ import { BillingSettings, ClientsSettings, ProfileSettings, TeamSettings } from 
 import { ClientFilesPanel } from "@/components/portal/ClientFilesPanel";
 import type { ClientPreferences } from "@shared/clientHubSettings";
 import { exampleBilling, exampleContacts, exampleInvoice, exampleListing, exampleMembers, exampleOrders, samplePortalProfile } from "@/lib/exampleHub";
+import { usePortalHeadshot } from "@/lib/usePortalHeadshot";
 
 const SECTIONS = new Set(["profile", "team", "clients", "billing", "files"]);
 const SECTION_LABEL: Record<string, string> = {
@@ -51,6 +52,7 @@ export default function PortalSettings() {
   const { section = "" } = useParams();
   const example = useExampleMode();
   const { user, userType, staffProfile, clientProfile, loading, mustChangePassword, signOutUser } = useAuth();
+  const headshotUrl = usePortalHeadshot(example ? null : user, example);
   const active = SECTIONS.has(section) ? section as PortalSettingsSection : null;
 
   if (!active) {
@@ -75,6 +77,7 @@ export default function PortalSettings() {
         firstName={firstName}
         accountName={accountName}
         example={example}
+        headshotUrl={headshotUrl}
         active={active}
         onSignOut={() => void signOutUser().then(() => { window.location.assign(portalHref("/portal", example)); })}
       >
@@ -244,6 +247,20 @@ function TeamRoute({ example }: { example: boolean }) {
         const body = await hubFetch<{ inviteEmail: string }>(`/api/clients/me/hub/team/members/${id}/invite`, () => user!.getIdToken(), { method: "POST" });
         await reload();
         return body.inviteEmail;
+      }}
+      onPermissions={async (id, permissions) => {
+        if (example) {
+          setState({
+            ...state,
+            members: state.members.map((member) => member.id === id ? { ...member, permissions } : member),
+          });
+          return;
+        }
+        await hubFetch(`/api/clients/me/hub/team/members/${id}`, () => user!.getIdToken(), {
+          method: "PATCH",
+          body: JSON.stringify({ permissions }),
+        });
+        await reload();
       }}
     />
   );
