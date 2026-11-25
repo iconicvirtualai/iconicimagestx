@@ -24,7 +24,7 @@
   "functions": {
     "api/index.mjs": {
       "maxDuration": 60,
-      "includeFiles": "{dist/spa/index.html,public/studio/grass-reference.jpg}",
+      "includeFiles": "{dist/spa/index.html,public/studio/grass-reference.jpg,content/news/**}",
       "excludeFiles": "{node_modules/sharp/**,node_modules/@img/**,node_modules/.pnpm/sharp@*/**,node_modules/.pnpm/@img+sharp*/**}"
     },
     "api/media-display.mjs": {
@@ -85,6 +85,46 @@
       "source": "/gallery/",
       "destination": "/portal",
       "permanent": false
+    },
+    {
+      "source": "/news",
+      "destination": "/",
+      "statusCode": 302
+    },
+    {
+      "source": "/news/",
+      "destination": "/",
+      "statusCode": 302
+    },
+    {
+      "source": "/flash-sale",
+      "destination": "/black-friday",
+      "statusCode": 302
+    },
+    {
+      "source": "/flash-sale/",
+      "destination": "/black-friday",
+      "statusCode": 302
+    },
+    {
+      "source": "/insights/news/promos/:slug",
+      "destination": "/news/promos/:slug",
+      "statusCode": 302
+    },
+    {
+      "source": "/insights/news/promos/:slug/",
+      "destination": "/news/promos/:slug",
+      "statusCode": 302
+    },
+    {
+      "source": "/insights/news/:slug",
+      "destination": "/news/:slug",
+      "statusCode": 302
+    },
+    {
+      "source": "/insights/news/:slug/",
+      "destination": "/news/:slug",
+      "statusCode": 302
     },
     {
       "source": "/booking",
@@ -1579,6 +1619,30 @@
       "destination": "/seo/app.html"
     },
     {
+      "source": "/insights/news",
+      "destination": "/seo/private.html"
+    },
+    {
+      "source": "/insights/news/",
+      "destination": "/seo/private.html"
+    },
+    {
+      "source": "/news/promos/:slug",
+      "destination": "/seo/private.html"
+    },
+    {
+      "source": "/news/promos/:slug/",
+      "destination": "/seo/private.html"
+    },
+    {
+      "source": "/news/:slug",
+      "destination": "/seo/private.html"
+    },
+    {
+      "source": "/news/:slug/",
+      "destination": "/seo/private.html"
+    },
+    {
       "source": "/insights/:slug",
       "destination": "/api/index"
     },
@@ -1804,6 +1868,14 @@
     },
     {
       "source": "/services/virtual-staging/pro-order/",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/black-friday",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/black-friday/",
       "destination": "/seo/app.html"
     },
     {
@@ -2334,6 +2406,60 @@
     },
     {
       "source": "/headshots-10/location/",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/news",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/news/",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/news/(.*)",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/insights/news",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/insights/news/",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/insights/news/(.*)",
       "headers": [
         {
           "key": "X-Robots-Tag",

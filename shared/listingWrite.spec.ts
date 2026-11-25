@@ -145,6 +145,14 @@ describe("visibleToPortalClient", () => {
     expect(visibleToPortalClient({ clientEmail: "marty@example.com" }, marty)).toBe(true);
     expect(visibleToPortalClient({ clientId: "someone-else", email: "marty@example.com" }, marty)).toBe(false);
     expect(visibleToPortalClient({ clientId: "someone-else", email: "other@example.com" }, marty)).toBe(false);
+    expect(visibleToPortalClient(
+      { clientId: "deleted-old-client", email: "marty@example.com" },
+      { ...marty, otherClientIds: [] },
+    )).toBe(true);
+    expect(visibleToPortalClient(
+      { clientId: "someone-else", email: "marty@example.com" },
+      { ...marty, otherClientIds: ["someone-else"] },
+    )).toBe(false);
   });
 });
 

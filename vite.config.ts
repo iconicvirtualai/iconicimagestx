@@ -16,7 +16,7 @@ export default defineConfig(({ mode }) => {
       host: "::",
       port: 8080,
       fs: {
-        allow: ["./client", "./shared"],
+        allow: ["./client", "./shared", "./content"],
         deny: [".env", ".env.*", "*.{crt,pem}", "**/.git/**", "server/**"],
       },
     },
@@ -67,6 +67,9 @@ function expressPlugin(): Plugin {
           res.setHeader("Location", "/pricing");
           res.end();
           return;
+        }
+        if (pathOnly === "/news" || pathOnly.startsWith("/news/")) {
+          res.setHeader("X-Robots-Tag", "noindex, nofollow");
         }
         const launchRedirect = matchingRedirect(pathOnly, devHostname(req.headers.host));
         if (launchRedirect) {

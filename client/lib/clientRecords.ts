@@ -67,8 +67,9 @@ export function asTags(value: unknown): string[] {
 export function belongsToClient(
   record: any,
   client: Pick<ClientRecord, "id" | "email"> & { firebaseUid?: string | null; linkedClientId?: string | null },
+  otherClientIds?: string[],
 ): boolean {
-  return recordLinkedToClient(record, client);
+  return recordLinkedToClient(record, client, otherClientIds);
 }
 
 export function money(value: unknown): number | null {

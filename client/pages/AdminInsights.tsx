@@ -107,6 +107,7 @@ export default function AdminInsights() {
           </div>
           <div className="flex gap-2">
             <Link to="/admin/insights" className={`rounded-full px-4 py-2 text-xs font-bold ${queue ? "bg-white text-gray-500" : "bg-gray-900 text-white"}`}>Posts</Link>
+            <Link to="/insights/news" className="rounded-full bg-white px-4 py-2 text-xs font-bold text-gray-500">Newsletters</Link>
             <Link to="/admin/insights/social" className={`rounded-full px-4 py-2 text-xs font-bold ${queue ? "bg-gray-900 text-white" : "bg-white text-gray-500"}`}>
               Social queue ({posts.filter((post) => post.readyForSocial).length})
             </Link>

@@ -7,8 +7,9 @@ import {
   Camera, Share2, Contact, Megaphone, Sparkles, Presentation, ExternalLink, Save,
 } from "lucide-react";
 import { db } from "@/lib/firebase";
-import { collection, doc, onSnapshot, query, updateDoc, serverTimestamp, where } from "firebase/firestore";
-import { clientProfileIdsFor, linkIdsFor } from "@shared/clientLink";
+import { collection, doc, getDoc, getDocs, limit, onSnapshot, query, updateDoc, serverTimestamp, where } from "firebase/firestore";
+import { clientProfileIdsFor, foreignIdCandidates, knownClientIds, linkIdsFor } from "@shared/clientLink";
+import { normalizeEmail } from "@shared/listingAccess";
 import { OrderNumberMark } from "@/components/OrderNumberMark";
 import { ClientFilesPanel } from "@/components/portal/ClientFilesPanel";
 import { useAuth } from "@/contexts/AuthContext";
@@ -53,6 +54,7 @@ export default function AdminClientAccount() {
   const [listings, setListings] = React.useState<any[]>([]);
   const [orders, setOrders] = React.useState<any[]>([]);
   const [invoices, setInvoices] = React.useState<any[]>([]);
+  const [otherClientIds, setOtherClientIds] = React.useState<string[] | undefined>(undefined);
   const [section, setSection] = React.useState<SectionId>("billing");
   const [saving, setSaving] = React.useState(false);
 
@@ -75,7 +77,7 @@ export default function AdminClientAccount() {
     return () => unsub();
   }, [id]);
 
-  const linkKey = client ? [...linkIdsFor(client), ...clientProfileIdsFor(client)].join("|") : "";
+  const linkKey = client ? [...linkIdsFor(client), ...clientProfileIdsFor(client), normalizeEmail(client.email)].join("|") : "";
   React.useEffect(() => {
     if (!client) return;
     const ids = linkIdsFor(client).slice(0, 8);
@@ -116,8 +118,41 @@ export default function AdminClientAccount() {
       watch("orders", "orderRequests", "clientProfileId", value);
       watch("invoices", "invoices", "clientProfileId", value);
     }
+    const emails = [...new Set([client.email, normalizeEmail(client.email)].map((value) => String(value || "").trim()).filter(Boolean))].slice(0, 4);
+    for (const value of emails) {
+      watch("orders", "orderRequests", "email", value);
+      watch("orders", "orderRequests", "clientEmail", value);
+    }
     return () => unsubs.forEach((unsub) => unsub());
   }, [linkKey]);
+
+  const identityKey = client ? [...linkIdsFor(client), ...clientProfileIdsFor(client)].join("|") : "";
+  const foreignKey = client ? foreignIdCandidates(orders, [...linkIdsFor(client), ...clientProfileIdsFor(client)]).join("|") : "";
+  React.useEffect(() => {
+    if (!client) return undefined;
+    const mine = [...linkIdsFor(client), ...clientProfileIdsFor(client)];
+    const candidates = foreignKey ? foreignKey.split("|") : [];
+    if (candidates.length === 0) {
+      setOtherClientIds([]);
+      return undefined;
+    }
+    let cancelled = false;
+    setOtherClientIds(undefined);
+    void Promise.all(candidates.slice(0, 30).map(async (id) => {
+      const direct = await getDoc(doc(db, "clients", id));
+      if (direct.exists()) return { id: direct.id, firebaseUid: direct.data()?.firebaseUid };
+      const found = await getDocs(query(collection(db, "clients"), where("firebaseUid", "==", id), limit(1)));
+      const first = found.docs[0];
+      return first ? { id: first.id, firebaseUid: first.data()?.firebaseUid } : null;
+    })).then((docs) => {
+      if (cancelled) return;
+      setOtherClientIds(knownClientIds(docs.filter((entry): entry is { id: string; firebaseUid?: unknown } => Boolean(entry)), mine));
+    }).catch((err) => {
+      console.error("[Admin client] Could not check other client ids.", err);
+      if (!cancelled) setOtherClientIds(undefined);
+    });
+    return () => { cancelled = true; };
+  }, [identityKey, foreignKey]);
 
   const save = async (patch: Record<string, unknown>, message = "Saved.") => {
     if (!id) return;
@@ -153,7 +188,7 @@ export default function AdminClientAccount() {
   }
 
   const projects = listings.filter((listing) => belongsToClient(listing, client));
-  const history = orders.filter((order) => belongsToClient(order, client));
+  const history = orders.filter((order) => belongsToClient(order, client, otherClientIds));
   const storedInvoices = invoices.filter((invoice) => belongsToClient(invoice, client));
   const orderInvoices = history.filter((order) => order.invoice?.invoiceNumber || money(order.invoice?.total) !== null);
   const taxLines = [

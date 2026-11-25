@@ -59,6 +59,8 @@ import photosInboxRouter from "./routes/photosInbox";
 import { mountOwners } from "./routes/owners";
 import siteContentRouter from "./routes/siteContent";
 import insightsRouter, { handleInsightShell } from "./routes/insights";
+import newsRouter from "./routes/news";
+import flashSaleRouter from "./routes/flashSale";
 import testDataCleanupRouter from "./routes/testDataCleanup";
 import holyGrailRouter from "./routes/holyGrail";
 import { originForHost, robotsTxt, sitemapXml } from "../shared/siteSeo.ts";
@@ -290,6 +292,8 @@ export function createServer() {
   app.use("/api/account", accountPasswordRouter);
   app.use("/api/site-content", siteContentRouter);
   app.use("/api/insights", insightsRouter);
+  app.use("/api/news", newsRouter);
+  app.use("/api/flash-sale", flashSaleRouter);
   // Vercel does not chain rewrites. /present/:token is rewritten to this
   // function and the original path is what arrives here. Vite dev leaves the
   // request to the SPA so ListingPresentation still boots from the client.
@@ -303,7 +307,7 @@ export function createServer() {
   });
   app.get("/insights/:slug", (req, res, next) => {
     if (process.env.ICONIC_VITE_DEV === "1") return next();
-    if (req.params.slug === "prep") return next();
+    if (req.params.slug === "prep" || req.params.slug === "news") return next();
     return handleInsightShell(req, res, next);
   });
   app.use("/api", presentationsRouter);

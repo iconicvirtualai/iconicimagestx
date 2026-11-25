@@ -234,6 +234,9 @@ export function isNoIndexPath(pathname: string): boolean {
   if (path.startsWith("/studio/")) return true;
   if (path.startsWith("/gallery/")) return true;
   if (path === "/invoice" || path.startsWith("/invoice/")) return true;
+  if (path === "/news" || path.startsWith("/news/")) return true;
+  if (path === "/insights/news" || path.startsWith("/insights/news/")) return true;
+  if (path === "/black-friday") return false;
   return false;
 }
 
@@ -261,6 +264,18 @@ export function metaPlan(pathname: string, origin = SITE_ORIGIN): MetaPlan {
     };
   }
   if (path === "/present" || path.startsWith("/present/")) return { kind: "hands-off" };
+  if (path === "/news" || path.startsWith("/news/") || path === "/insights/news" || path.startsWith("/insights/news/")) {
+    return { kind: "noindex", title: "News | Iconic Images" };
+  }
+  if (path === "/black-friday") {
+    return {
+      kind: "public",
+      title: "Black Friday Sale | Iconic Images",
+      description: "Prepaid listing shoot bundles from Iconic Images in Spring, The Woodlands, and Houston.",
+      canonical: canonicalUrl(path, origin),
+      image: ogImageUrl(origin),
+    };
+  }
   if (path.startsWith("/insights/") && path !== "/insights/prep") return { kind: "hands-off" };
   if (path === "/go") return { kind: "preserve-title" };
   if (path.startsWith("/studio-105/")) {
@@ -350,10 +365,11 @@ export function injectNoIndex(html: string): string {
   return injectHead(html, tags);
 }
 
-export function sitemapXml(origin = DEFAULT_SITE_ORIGIN): string {
-  const urls = PUBLIC_PAGES.map(
-    (page) => `  <url><loc>${escapeHtml(canonicalUrl(page.path, origin))}</loc></url>`,
-  ).join("\n");
+export function sitemapXml(origin = DEFAULT_SITE_ORIGIN, extraPaths: readonly string[] = []): string {
+  const paths = [...PUBLIC_PAGES.map((page) => page.path), ...extraPaths];
+  const urls = paths
+    .map((path) => `  <url><loc>${escapeHtml(canonicalUrl(path, origin))}</loc></url>`)
+    .join("\n");
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;
 }
 

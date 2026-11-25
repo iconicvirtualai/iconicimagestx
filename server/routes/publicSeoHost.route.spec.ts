@@ -45,6 +45,7 @@ describe("host-aware sitemap and robots", () => {
       const robots = await get("/robots.txt", host);
       expect(sitemap.status, host).toBe(200);
       expect(sitemap.body).toBe(sitemapXml(DEFAULT_SITE_ORIGIN));
+      expect(sitemap.body).not.toContain("/news");
       expect(sitemap.body).not.toContain("iconicimagestx.com");
       expect(robots.body).toBe(robotsTxt(DEFAULT_SITE_ORIGIN));
       expect(String(sitemap.vary).toLowerCase()).toContain("host");
@@ -56,6 +57,7 @@ describe("host-aware sitemap and robots", () => {
       const sitemap = await get("/sitemap.xml", host);
       const robots = await get("/robots.txt", host);
       expect(sitemap.body).toBe(sitemapXml(CANONICAL_WWW_ORIGIN));
+      expect(sitemap.body).not.toContain("/insights/news");
       expect(sitemap.body).toContain(`${CANONICAL_WWW_ORIGIN}/about`);
       expect(sitemap.body).not.toContain("vercel.app");
       expect(robots.body).toBe(robotsTxt(CANONICAL_WWW_ORIGIN));
