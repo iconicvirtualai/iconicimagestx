@@ -29,6 +29,7 @@ import { chargedServiceLines, normalizeBookingLineItems, orderTotalLabel, resolv
 import { applyServerTravel, isTravelFeeLine, travelInvoiceLine, travelSummaryText, type TravelAssessment } from "../../shared/travelZones";
 import { planOrderPackageRepair } from "../../shared/orderPackageRepair";
 import { notifyOfficeOfOrder } from "../services/officeOrderNotify";
+import { dispatchClientEmailNotifications } from "../services/aryeoEmailNotify";
 import { bumpAdminUnreadChannel } from "../services/adminUnread";
 import { orderRequestSignal } from "../../shared/adminUnread";
 import { HOLIDAY_RSVP_LEAD, HOLIDAY_SEASON_LEAD, HOLIDAY_SOCIAL_SAVES_LEAD, holidayCheckoutKind, holidayOrderReceivedHtml } from "../../shared/holidayCheckout";
@@ -1070,6 +1071,29 @@ router.post("/", async (req, res) => {
       }
     }
 
+    void dispatchClientEmailNotifications({
+      type: "order_placed",
+      record: {
+        orderNumber,
+        clientName,
+        firstName,
+        lastName,
+        clientEmail: email,
+        email,
+        phone,
+        address: displayAddress,
+        addressLabel: displayAddress,
+        scheduledDate: orderRequest.scheduledDate,
+        scheduledTime: orderRequest.scheduledTime,
+        lineItems,
+        total: Number(total) || 0,
+        balanceDue: Number(total) || 0,
+      },
+      recordId: docRef.id,
+      collection: "orderRequests",
+      requestId: docRef.id,
+    }).catch((err) => console.error("[Bookings] Client email notify failed:", err));
+
     return res.status(201).json({
       success: true,
       requestId: docRef.id,
@@ -1771,6 +1795,40 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
     }).catch((err) => console.error("[Bookings] Confirmation email failed:", err));
 
     // Confirm schedules the shoot. Square billing waits until after the shoot.
+    const confirmedRecord = {
+      orderNumber: typeof request.orderNumber === "string" ? request.orderNumber : "",
+      clientName: requestClientName,
+      clientEmail: requestEmail,
+      email: requestEmail,
+      phone: requestPhone,
+      address: requestAddressLabel,
+      scheduledDate: confirmDate ? confirmDate.toISOString() : null,
+      scheduledTime: confirmTime,
+      assignedPhotographerId: assignedPhotographerId || "",
+      assignedPhotographerName: assignedPhotographerName || "",
+      photographerEmail: photographer?.email || "",
+      lineItems: requestLineItems,
+      total: requestTotal,
+      balanceDue: requestTotal,
+      listingId: listingId || listingIdForGallery || "",
+      galleryId: galleryRef.id,
+    };
+    void dispatchClientEmailNotifications({
+      type: "order_placed",
+      record: confirmedRecord,
+      recordId: orderRef.id,
+      collection: "orders",
+      requestId: req.params.id,
+    }).catch((err) => console.error("[Bookings] Client email notify failed:", err));
+    if (confirmDate || confirmTime) {
+      void dispatchClientEmailNotifications({
+        type: "appointment_scheduled",
+        record: confirmedRecord,
+        recordId: orderRef.id,
+        collection: "orders",
+        requestId: req.params.id,
+      }).catch((err) => console.error("[Bookings] Appointment email notify failed:", err));
+    }
 
     return res.json({
       success: true,
@@ -1827,6 +1885,17 @@ router.patch("/:id/cancel", requireCoordinator, async (req: AuthenticatedRequest
         : hadEvent ? { calendarHold: "none" } : {}),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
+    void dispatchClientEmailNotifications({
+      type: "appointment_canceled",
+      record: {
+        ...data,
+        clientEmail: typeof data.email === "string" ? data.email : data.clientEmail,
+        address: typeof data.addressLabel === "string" ? data.addressLabel : data.address,
+      },
+      recordId: doc.id,
+      collection: "orderRequests",
+      requestId: doc.id,
+    }).catch((err) => console.error("[Bookings] Cancel email notify failed:", err));
     return res.json({ success: true, calendarDeleted: !calendarError });
   } catch (err) {
     console.error("[Bookings] Cancel error:", err);

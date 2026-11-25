@@ -63,6 +63,7 @@ import newsRouter from "./routes/news";
 import flashSaleRouter from "./routes/flashSale";
 import testDataCleanupRouter from "./routes/testDataCleanup";
 import holyGrailRouter from "./routes/holyGrail";
+import aryeoEmailNotifyRouter from "./routes/aryeoEmailNotify";
 import { originForHost, robotsTxt, sitemapXml } from "../shared/siteSeo.ts";
 import { amenityMediaRequestAllowed } from "../shared/amenityStock.ts";
 import stockFootageRouter from "./routes/stockFootage";
@@ -336,6 +337,7 @@ export function createServer() {
   app.use("/api/apprenticeship", apprenticeshipRouter);
   app.use("/api/admin/test-data", testDataCleanupRouter);
   app.use("/api/holy-grail", holyGrailRouter);
+  app.use("/api/client-email-notify", aryeoEmailNotifyRouter);
 
   // ─── Error handler ─────────────────────────────────────────────────
   app.use(

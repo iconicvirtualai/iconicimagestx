@@ -81,6 +81,7 @@ import AdminCustomerCenter from "./pages/AdminCustomerCenter";
 import AdminClientAccount from "./pages/AdminClientAccount";
 import AdminSiteEditor from "./pages/AdminSiteEditor";
 import AdminEmailTemplates from "./pages/AdminEmailTemplates";
+import AdminNotifications from "./pages/AdminNotifications";
 import AdminOrderDetail from "./pages/AdminOrderDetail";
 import AdminOrderRequest from "./pages/AdminOrderRequest";
 import AdminInvoiceEditor from "./pages/AdminInvoiceEditor";
@@ -338,6 +339,7 @@ const App = () => (
             <Route path="/admin/permissions" element={<ProtectedRoute requiredRole="admin"><AdminPermissions /></ProtectedRoute>} />
             <Route path="/admin/edit-site" element={<ProtectedRoute requiredRole="staff"><AdminSiteEditor /></ProtectedRoute>} />
             <Route path="/admin/email-templates" element={<ProtectedRoute requiredRole="admin"><AdminEmailTemplates /></ProtectedRoute>} />
+            <Route path="/admin/notifications" element={<ProtectedRoute requiredRole="admin"><AdminNotifications /></ProtectedRoute>} />
             <Route path="/admin/current-pricing" element={<Navigate to="/admin/pricing" replace />} />
             
             <Route path="/admin/revenue" element={<ProtectedRoute requiredRole="admin"><AdminRevenue /></ProtectedRoute>} />
