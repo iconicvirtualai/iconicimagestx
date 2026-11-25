@@ -5080,12 +5080,15 @@ function cardSummaryFrom(data) {
 function normalizePersonName$1(value) {
   return value.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
 }
+function directoryNeedles(query) {
+  return query.split(",").map((part) => normalizePersonName$1(part)).filter(Boolean);
+}
 function directoryHit(profile, query, role) {
   if (role && role !== "all" && profile.role !== role) return false;
-  const needle = normalizePersonName$1(query);
-  if (!needle) return true;
+  const needles = directoryNeedles(query);
+  if (needles.length === 0) return true;
   const hay = normalizePersonName$1(`${profile.displayName} ${profile.legalName} ${profile.email} ${ROLE_LABEL[profile.role]}`);
-  return hay.includes(needle);
+  return needles.some((needle) => hay.includes(needle));
 }
 function groupDelivery(group, senderUid) {
   if (!group.canMessageUids.includes(senderUid)) {
@@ -23105,6 +23108,36 @@ function orderForInvoice(invoice, sources) {
   if (order && (!orderId || text$9(order.id) === orderId)) return order;
   return null;
 }
+function readInvoiceLines(invoice) {
+  const rows = [invoice.lineItems, invoice.items, invoice.services].find(Array.isArray);
+  if (!rows) return [];
+  return rows.slice(0, 40).map((row) => {
+    const item = row && typeof row === "object" ? row : {};
+    const qty = Number(item.qty ?? item.quantity);
+    const amount = Number(item.amount ?? item.price ?? item.total ?? item.unitPrice);
+    return {
+      name: text$9(item.name || item.description || item.title) || "Service",
+      qty: Number.isFinite(qty) ? qty : null,
+      amount: Number.isFinite(amount) ? amount : null
+    };
+  });
+}
+function personLabel(value) {
+  if (typeof value === "string") return value.trim();
+  if (!value || typeof value !== "object") return "";
+  const row = value;
+  return [text$9(row.firstName), text$9(row.lastName)].filter(Boolean).join(" ") || text$9(row.name || row.displayName);
+}
+function shootPerson(invoice, linked, sources) {
+  const appointment = (sources.appointments || [])[0] || null;
+  return personLabel(invoice.photographerName) || personLabel(invoice.photographer) || personLabel(linked?.photographerName) || personLabel(linked?.photographer) || personLabel(linked?.assignedPhotographer) || personLabel(appointment?.photographerName) || personLabel(appointment?.photographer) || "";
+}
+function shootWhen(invoice, linked, sources) {
+  const appointment = (sources.appointments || [])[0] || null;
+  const date = text$9(appointment?.scheduledDate || appointment?.date || linked?.appointmentDate || linked?.scheduledDate || invoice.appointmentDate);
+  const time = text$9(appointment?.scheduledTime || appointment?.time || linked?.appointmentTime || linked?.scheduledTime || invoice.appointmentTime);
+  return [date, time].filter(Boolean).join(" · ");
+}
 function readInvoices(invoices, sources) {
   const seen = /* @__PURE__ */ new Set();
   const summaries = [];
@@ -23113,13 +23146,19 @@ function readInvoices(invoices, sources) {
     if (!id || seen.has(id)) continue;
     seen.add(id);
     const total = money$1(invoice.total);
+    const linked = orderForInvoice(invoice, sources);
     summaries.push({
       id,
-      invoiceNumber: portalDisplayedInvoiceNumber(invoice, orderForInvoice(invoice, sources)),
-      orderNumber: shortOrderNumber(invoice.orderNumber) || shortOrderNumber(orderForInvoice(invoice, sources)?.orderNumber),
+      invoiceNumber: portalDisplayedInvoiceNumber(invoice, linked),
+      orderNumber: shortOrderNumber(invoice.orderNumber) || shortOrderNumber(linked?.orderNumber),
       status: text$9(invoice.status) || "draft",
       total,
-      amountDue: invoice.amountDue == null ? total : money$1(invoice.amountDue)
+      amountDue: invoice.amountDue == null ? total : money$1(invoice.amountDue),
+      amountPaid: invoice.amountPaid == null ? null : money$1(invoice.amountPaid),
+      payPath: invoicePayLinkFor({ id, payToken: invoice.payToken, status: invoice.status }),
+      lineItems: readInvoiceLines(invoice),
+      photographer: shootPerson(invoice, linked, sources),
+      shootWhen: shootWhen(invoice, linked, sources)
     });
   }
   return summaries;
@@ -36813,17 +36852,20 @@ async function readCollection(name, limit) {
   const snap = await db$3().collection(name).limit(limit).get();
   return snap.docs.map((doc) => ({ id: doc.id, data: doc.data() }));
 }
-async function loadProfiles() {
+async function loadProfiles(limits) {
+  const staffLimit = limits?.staff ?? 80;
+  const clientLimit = limits?.clients ?? 80;
+  const agentLimit = limits?.agents ?? 40;
   const map = /* @__PURE__ */ new Map();
   if (previewOn()) {
     for (const profile of previewProfiles()) map.set(profile.id, profile);
   }
   if (firestoreOn()) {
     const [staff, clients, agents, billing] = await Promise.all([
-      readCollection("staff", 80),
-      readCollection("clients", 80),
-      readCollection("agentContacts", 40),
-      readCollection("clientBilling", 80)
+      readCollection("staff", staffLimit),
+      readCollection("clients", clientLimit),
+      readCollection("agentContacts", agentLimit),
+      readCollection("clientBilling", Math.max(clientLimit, 80))
     ]);
     const cards = new Map(billing.map((row) => [row.id, cardSummaryFrom(row.data)]));
     for (const row of staff) map.set(`staff:${row.id}`, profileFromStaff(row.id, row.data));
@@ -36884,7 +36926,8 @@ async function directory(actor2, query, role) {
   }
   const groups = await loadGroups();
   const visibleGroups = visibleGroupsFor(actor2, groups);
-  let profiles = await loadProfiles();
+  const wide = Boolean(query.trim());
+  let profiles = await loadProfiles(wide ? { staff: 400, clients: 400, agents: 200 } : void 0);
   if (actor2.kind === "client") {
     const allowed = new Set(visibleGroups.flatMap((group) => [...group.memberProfileIds, ...group.canMessageProfileIds]));
     profiles = profiles.filter((profile) => profile.uid === actor2.uid || allowed.has(profile.id));
