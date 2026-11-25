@@ -45,10 +45,12 @@ import type { PortalUploadKind } from "@shared/portalClientUpload";
 import { ArrowLeft, Download, Eye, EyeOff, MapPin } from "lucide-react";
 import { OrderNumberMark } from "@/components/OrderNumberMark";
 import { toast } from "sonner";
+import { openTitusEstimateModal } from "@/lib/titusSdk";
 import NotFound from "./NotFound";
 import { marketingMaterialFromProfile, type ClientHubProfile, type HubAgentBranding } from "@shared/clientHubSettings";
 import { MarketingAgentCard } from "@/components/client-hub/MarketingAgentCard";
 import { exampleProfile } from "@/lib/exampleHub";
+import { usePortalHeadshot } from "@/lib/usePortalHeadshot";
 
 export function PortalListingDetailView({
   detail,
@@ -71,6 +73,7 @@ export function PortalListingDetailView({
   marketingAgent = null,
   onUpload,
   example = false,
+  headshotUrl = "",
   accountName,
   onSignOut,
 }: {
@@ -94,6 +97,7 @@ export function PortalListingDetailView({
   marketingAgent?: HubAgentBranding | null;
   onUpload?: (kind: PortalUploadKind, file: File, onProgress: (pct: number) => void) => Promise<void>;
   example?: boolean;
+  headshotUrl?: string;
   accountName?: string;
   onSignOut?: () => void;
 }) {
@@ -133,9 +137,23 @@ export function PortalListingDetailView({
             <div className="due"><span>Amount due</span>{money(amountStillDue({ status: dueInvoice.status, total: dueInvoice.total, amountDue: dueInvoice.amountDue }))}</div>
             <p className="muted">{dueInvoice.invoiceNumber}</p>
             <div className="unlock-actions">
-              <button type="button" className="btn btn-ghost btn-sm" onClick={() => onTab("orders")}>View invoice</button>
-              <Link className="btn btn-ink btn-sm" to={portalHref("/portal/home", example, "orders")}>Pay now</Link>
-              <Link className="btn btn-outline btn-sm" to="/pay-at-close">Pay at Close</Link>
+              {dueInvoice.payPath ? (
+                <Link className="btn btn-ghost btn-sm" to={dueInvoice.payPath}>View invoice</Link>
+              ) : (
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => onTab("orders")}>View invoice</button>
+              )}
+              {dueInvoice.payPath ? (
+                <Link className="btn btn-ink btn-sm" to={dueInvoice.payPath}>Pay now</Link>
+              ) : (
+                <button type="button" className="btn btn-ink btn-sm" onClick={() => onTab("orders")}>Pay now</button>
+              )}
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                onClick={() => void openTitusEstimateModal(amountStillDue({ status: dueInvoice.status, total: dueInvoice.total, amountDue: dueInvoice.amountDue }))}
+              >
+                Pay at Close
+              </button>
             </div>
             <p className="muted" style={{ marginTop: 8, fontSize: 12 }}>$0 due until closing with financing arranged by Titus.</p>
           </div>
@@ -174,17 +192,40 @@ export function PortalListingDetailView({
           />
         )}
         {tab === "photos" && (
-          <PortalPhotoGallery
-            items={shown.photos}
-            groups={shown.photoGroups || []}
-            canEdit={canEdit}
-            editing={mediaEditing === "photo"}
-            saving={saving}
-            photoEditRequests={shown.photoEditRequests || []}
-            onToggleEditing={() => onToggleEditing("photo")}
-            onMedia={onMedia}
-            onRequestPhotoEdit={canEdit ? onRequestPhotoEdit : undefined}
-          />
+          <div className="listing-photos">
+            {shown.photos[0]?.url ? (
+              <div className="g-hero">
+                <img src={(shown.photos.find((item) => !item.hidden) || shown.photos[0]).url} alt="" />
+              </div>
+            ) : null}
+            <div className="photo-tools">
+              <span>Shown in presentation order. High and Web downloads open when this invoice is paid.</span>
+            </div>
+            <div className="g-layout">
+              <PortalPhotoGallery
+                items={shown.photos}
+                groups={shown.photoGroups || []}
+                canEdit={canEdit}
+                editing={mediaEditing === "photo"}
+                saving={saving}
+                photoEditRequests={shown.photoEditRequests || []}
+                onToggleEditing={() => onToggleEditing("photo")}
+                onMedia={onMedia}
+                onRequestPhotoEdit={canEdit ? onRequestPhotoEdit : undefined}
+              />
+              <aside className="card">
+                <div className="kicker">Marketing Kit</div>
+                <h3>Listing Kit</h3>
+                <p className="ink3">Marketing pieces sit with the photos. Open the Marketing Kit tab for uploads and files.</p>
+                {shown.marketing.map((card) => (
+                  <p key={card.id} className="ink3" style={{ padding: "10px 0", borderTop: "1px solid var(--line)" }}>
+                    <strong>{card.title}.</strong> {card.note}
+                  </p>
+                ))}
+                <button type="button" className="btn btn-teal btn-sm" onClick={() => onTab("marketing")}>Open the full kit</button>
+              </aside>
+            </div>
+          </div>
         )}
         {tab === "video" && (
           <div>
@@ -273,6 +314,7 @@ export function PortalListingDetailView({
       firstName={first}
       accountName={accountName}
       example={example}
+      headshotUrl={headshotUrl}
       active="listings"
       onSignOut={onSignOut}
     >
@@ -286,6 +328,7 @@ export default function PortalListingDetail() {
   const id = portalListingId(listingId);
   const [searchParams, setSearchParams] = useSearchParams();
   const { user, userType, loading, mustChangePassword, signOutUser, clientProfile } = useAuth();
+  const headshotUrl = usePortalHeadshot(user, false);
   const [detail, setDetail] = useState<PortalListingDetailModel | null>(null);
   const [website, setWebsite] = useState<PortalWebsiteSettings | null>(null);
   const [error, setError] = useState("");
@@ -487,6 +530,7 @@ export default function PortalListingDetail() {
             setWebsite(saved.website);
           }}
           example={searchParams.get("example") === "1"}
+          headshotUrl={headshotUrl}
           accountName={canEdit ? [clientProfile?.firstName, clientProfile?.lastName].filter(Boolean).join(" ") || clientProfile?.firstName || "there" : undefined}
           onSignOut={canEdit ? () => void signOutUser() : undefined}
           onDataSave={() => {
@@ -534,7 +578,7 @@ function DataTab({
   const address = detail.address;
   const addressDraft = draft.address;
   return (
-    <div className="space-y-6" data-testid="listing-data">
+    <div className="space-y-6 data-pad" data-testid="listing-data">
       {canEdit && (
         <div className="flex items-center justify-between gap-3">
           <p className="text-xs text-gray-500">Facts stay read-only until Edit is on.</p>
@@ -564,7 +608,7 @@ function DataTab({
           </div>
         </div>
       )}
-      <section className="bg-white rounded-2xl border border-gray-100 p-5">
+      <section className="card data-pad">
         <h2 className="text-xs font-black uppercase tracking-widest text-[#0d9488] mb-4">Address</h2>
         <div className="grid sm:grid-cols-2 gap-4">
           <AddressFact id="line1" label="Address line 1" value={showEditor ? addressDraft.line1 : address.line1} editing={showEditor} maxLength={PORTAL_ADDRESS_LIMITS.line1} onChange={(line1) => onDraft({ ...draft, address: { ...addressDraft, line1 } })} />
@@ -588,7 +632,7 @@ function DataTab({
           <p className="text-xs text-gray-500 mt-3">The map pin stays on the coordinates already saved with this order.</p>
         )}
       </section>
-      <section className="bg-white rounded-2xl border border-gray-100 p-5">
+      <section className="card data-pad">
         <h2 className="text-xs font-black uppercase tracking-widest text-[#0d9488] mb-1">Property</h2>
         <p className="text-xs text-gray-500 mb-4">Shown from the booking and listing file. Public record lookups are not part of this page.</p>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -633,7 +677,7 @@ function AddressFact({
 }) {
   if (!editing) return <Field label={label} value={value} />;
   return (
-    <label className="block">
+    <label className="data-fact block">
       <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">{label}</span>
       <input
         data-testid={`data-field-${id}`}
@@ -650,7 +694,7 @@ function AddressFact({
 
 function Field({ label, value, placeholder = "—" }: { label: string; value: string; placeholder?: string }) {
   return (
-    <div>
+    <div className="data-fact">
       <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">{label}</p>
       <p className={`text-sm font-bold mt-1 ${value ? "text-black" : "text-gray-400"}`}>{value || placeholder}</p>
     </div>
@@ -1034,7 +1078,19 @@ const EXAMPLE_WEBSITE_DETAIL = buildPortalListingDetail({
     yearBuilt: "2012",
     neighborhood: "Example Grove",
   },
-  invoices: [{ id: "example-invoice", invoiceNumber: "#001", orderNumber: "#001", status: "partial", total: 250, amountDue: 128.5, amountPaid: 121.5 }],
+  invoices: [{
+    id: "example-invoice",
+    invoiceNumber: "#001",
+    orderNumber: "#001",
+    status: "partial",
+    total: 250,
+    amountDue: 128.5,
+    amountPaid: 121.5,
+    photographerName: "Mike Luna",
+    appointmentDate: "Oct 4, 2026",
+    appointmentTime: "Delivered",
+    lineItems: [{ name: "Example photos", qty: 1, price: 250 }],
+  }],
 });
 EXAMPLE_WEBSITE_DETAIL.photos = SAMPLE_GALLERY.map(([url, name], index) => ({
   id: `example-photo-${index}`,
@@ -1047,6 +1103,19 @@ EXAMPLE_WEBSITE_DETAIL.photos = SAMPLE_GALLERY.map(([url, name], index) => ({
   groupId: "",
   uploadedAt: "2026-10-04T00:00:00.000Z",
 }));
+EXAMPLE_WEBSITE_DETAIL.tours = [{
+  id: "example-tour",
+  kind: "tour",
+  name: "3D tour",
+  url: "https://my.matterport.com/show/?m=SxQL3iGyoDo",
+  embedUrl: "https://my.matterport.com/show/?m=SxQL3iGyoDo",
+  contentType: "text/html",
+  hidden: false,
+  order: 0,
+  groupId: "",
+  uploadedAt: "2026-10-04T00:00:00.000Z",
+  provider: "Matterport",
+}];
 EXAMPLE_WEBSITE_DETAIL.floorplans = [{
   id: "example-plan",
   kind: "floorplan",
@@ -1103,25 +1172,55 @@ function ExampleListingExperience({
 function OrdersTab({ detail }: { detail: PortalListingDetailModel }) {
   return (
     <section>
-      <h2 className="text-xs font-black uppercase tracking-widest text-[#0d9488] mb-1">Orders</h2>
+      <h2 className="text-xs font-black uppercase tracking-widest text-[#0d9488] mb-1">Order</h2>
       <p className="text-xs text-gray-500 mb-4">Invoice status for this listing. Nothing is sent for payment from this page.</p>
       {detail.invoices.length === 0 ? (
         <Empty>No invoice is linked to this listing yet.</Empty>
       ) : (
         <div className="grid gap-3">
-          {detail.invoices.map((invoice) => (
-            <article key={invoice.id} className="bg-white rounded-2xl border border-gray-100 p-5" data-testid={`invoice-${invoice.id}`}>
-              <OrderNumberMark value={invoice.orderNumber || detail.orderNumber} />
-              <div className="flex items-center justify-between gap-3">
-                <p className="font-black">{invoice.invoiceNumber}</p>
-                <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">{invoice.status.replace(/_/g, " ")}</p>
-              </div>
-              <p className="mt-2 flex items-baseline justify-between gap-3 text-sm text-gray-600">
-                <span className="min-w-0">Total</span>
-                <MoneyAmount className="font-black text-black">{money(invoice.total)}</MoneyAmount>
-              </p>
-            </article>
-          ))}
+          {detail.invoices.map((invoice) => {
+            const due = amountStillDue({ status: invoice.status, total: invoice.total, amountDue: invoice.amountDue });
+            return (
+              <article key={invoice.id} className="card" data-testid={`invoice-${invoice.id}`}>
+                <OrderNumberMark value={invoice.orderNumber || detail.orderNumber} />
+                <div className="flex items-center justify-between gap-3">
+                  <p className="font-black">{invoice.invoiceNumber}</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">{invoice.status.replace(/_/g, " ")}</p>
+                </div>
+                <div className="facts" style={{ marginTop: 14 }}>
+                  <div className="data-fact"><label>Photographer</label><p>{invoice.photographer || "Not on file yet"}</p></div>
+                  <div className="data-fact"><label>Shoot</label><p>{invoice.shootWhen || "Not on file yet"}</p></div>
+                  <div className="data-fact"><label>Status</label><p>{invoice.status.replace(/_/g, " ")}</p></div>
+                </div>
+                <table>
+                  <thead>
+                    <tr><th>Service</th><th className="r">Qty</th><th className="r">Amount</th></tr>
+                  </thead>
+                  <tbody>
+                    {invoice.lineItems.length === 0 ? (
+                      <tr><td colSpan={3}>No line items are stored on this invoice.</td></tr>
+                    ) : invoice.lineItems.map((item, index) => (
+                      <tr key={`${item.name}-${index}`}>
+                        <td>{item.name}</td>
+                        <td className="r">{item.qty ?? ""}</td>
+                        <td className="r">{item.amount == null ? "" : <MoneyAmount>{money(item.amount)}</MoneyAmount>}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div className="totals">
+                  <div><span>Total</span><MoneyAmount className="font-black text-black">{money(invoice.total)}</MoneyAmount></div>
+                  <div><span>Payments</span><span>{invoice.amountPaid == null ? "Not on file yet" : <MoneyAmount>{money(invoice.amountPaid)}</MoneyAmount>}</span></div>
+                  <div className="due"><span>Balance</span><MoneyAmount>{money(due)}</MoneyAmount></div>
+                </div>
+                <div className="actions-inline">
+                  {invoice.payPath ? <Link className="btn btn-ghost btn-sm" to={invoice.payPath}>View invoice</Link> : <span className="btn btn-ghost btn-sm">View invoice</span>}
+                  {invoice.payPath ? <Link className="btn btn-ink btn-sm" to={invoice.payPath}>Pay now</Link> : <span className="btn btn-ink btn-sm">Pay now</span>}
+                  <button type="button" className="btn btn-outline btn-sm" onClick={() => void openTitusEstimateModal(due)}>Pay at Close</button>
+                </div>
+              </article>
+            );
+          })}
         </div>
       )}
     </section>

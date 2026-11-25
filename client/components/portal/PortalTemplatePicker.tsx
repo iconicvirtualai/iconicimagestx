@@ -230,8 +230,12 @@ function presetFor(website: PortalWebsiteSettings, design: ListingSiteDesign): P
   return { ...website, design, font: template.font, color: template.color, style: template.style };
 }
 
+function quietMediaName(name: string): string {
+  return /\.[a-z0-9]{2,5}$/i.test(name) ? "" : name;
+}
+
 function previewSite(detail: PortalListingDetail, website: PortalWebsiteSettings): PublicListingSite {
-  const photos = website.showPhotos ? detail.photos.filter((item) => !item.hidden).map((item) => ({ name: item.name, url: item.url })) : [];
+  const photos = website.showPhotos ? detail.photos.filter((item) => !item.hidden).map((item) => ({ name: quietMediaName(item.name), url: item.url })) : [];
   const floor = website.showFloorplans ? detail.floorplans.find((item) => !item.hidden) : null;
   const tour = website.showTours ? detail.tours.find((item) => !item.hidden && item.embedUrl) : null;
   return {
@@ -248,7 +252,7 @@ function previewSite(detail: PortalListingDetail, website: PortalWebsiteSettings
     photos,
     filmPosterUrl: website.showVideo ? photos[0]?.url || "" : "",
     tourEmbedUrl: tour?.embedUrl || "",
-    floorplan: floor ? { name: floor.name, url: floor.url } : null,
+    floorplan: floor ? { name: quietMediaName(floor.name), url: floor.url } : null,
     agent: { name: "", brokerage: "", license: "", phone: "", email: "" },
   };
 }

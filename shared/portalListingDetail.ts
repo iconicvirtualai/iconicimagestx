@@ -7,6 +7,7 @@
  */
 
 import { addressText } from "./addressText.ts";
+import { invoicePayLinkFor } from "./invoicePayLink.ts";
 import { listingKitFieldShown } from "./galleryUpload.ts";
 import { arrangementActive, isHiddenFromClientGallery, isHiddenFromListingSites, readMediaArrangement } from "./mediaArrangement.ts";
 import { portalDisplayedInvoiceNumber, shortOrderNumber } from "./orderProjectInvoice.ts";
@@ -21,7 +22,7 @@ export const PORTAL_LISTING_TABS = [
   { id: "floorplans", label: "Floorplans" },
   { id: "marketing", label: "Marketing Kit" },
   { id: "website", label: "Website" },
-  { id: "orders", label: "Orders" },
+  { id: "orders", label: "Order" },
   { id: "activity", label: "Activity" },
 ] as const;
 
@@ -145,13 +146,25 @@ export interface PortalWebsiteSettings {
   tileLook: ListingCardLook | "";
 }
 
+export interface PortalInvoiceLine {
+  name: string;
+  qty: number | null;
+  amount: number | null;
+}
+
 export interface PortalInvoiceSummary {
   id: string;
   invoiceNumber: string;
   status: string;
   total: number;
   amountDue: number;
+  amountPaid: number | null;
   orderNumber?: string;
+  /** Tokenized invoice page, when this invoice can be opened. */
+  payPath: string | null;
+  lineItems: PortalInvoiceLine[];
+  photographer: string;
+  shootWhen: string;
 }
 
 export interface PortalActivityEvent {
@@ -1255,6 +1268,47 @@ function orderForInvoice(invoice: Record<string, unknown>, sources: PortalListin
   return null;
 }
 
+function readInvoiceLines(invoice: Record<string, unknown>): PortalInvoiceLine[] {
+  const rows = [invoice.lineItems, invoice.items, invoice.services].find(Array.isArray);
+  if (!rows) return [];
+  return (rows as unknown[]).slice(0, 40).map((row) => {
+    const item = row && typeof row === "object" ? row as Record<string, unknown> : {};
+    const qty = Number(item.qty ?? item.quantity);
+    const amount = Number(item.amount ?? item.price ?? item.total ?? item.unitPrice);
+    return {
+      name: text(item.name || item.description || item.title) || "Service",
+      qty: Number.isFinite(qty) ? qty : null,
+      amount: Number.isFinite(amount) ? amount : null,
+    };
+  });
+}
+
+function personLabel(value: unknown): string {
+  if (typeof value === "string") return value.trim();
+  if (!value || typeof value !== "object") return "";
+  const row = value as Record<string, unknown>;
+  return [text(row.firstName), text(row.lastName)].filter(Boolean).join(" ") || text(row.name || row.displayName);
+}
+
+function shootPerson(invoice: Record<string, unknown>, linked: Record<string, unknown> | null, sources: PortalListingSources): string {
+  const appointment = (sources.appointments || [])[0] || null;
+  return personLabel(invoice.photographerName)
+    || personLabel(invoice.photographer)
+    || personLabel(linked?.photographerName)
+    || personLabel(linked?.photographer)
+    || personLabel(linked?.assignedPhotographer)
+    || personLabel(appointment?.photographerName)
+    || personLabel(appointment?.photographer)
+    || "";
+}
+
+function shootWhen(invoice: Record<string, unknown>, linked: Record<string, unknown> | null, sources: PortalListingSources): string {
+  const appointment = (sources.appointments || [])[0] || null;
+  const date = text(appointment?.scheduledDate || appointment?.date || linked?.appointmentDate || linked?.scheduledDate || invoice.appointmentDate);
+  const time = text(appointment?.scheduledTime || appointment?.time || linked?.appointmentTime || linked?.scheduledTime || invoice.appointmentTime);
+  return [date, time].filter(Boolean).join(" · ");
+}
+
 function readInvoices(invoices: Array<Record<string, unknown>>, sources: PortalListingSources): PortalInvoiceSummary[] {
   const seen = new Set<string>();
   const summaries: PortalInvoiceSummary[] = [];
@@ -1263,13 +1317,19 @@ function readInvoices(invoices: Array<Record<string, unknown>>, sources: PortalL
     if (!id || seen.has(id)) continue;
     seen.add(id);
     const total = money(invoice.total);
+    const linked = orderForInvoice(invoice, sources);
     summaries.push({
       id,
-      invoiceNumber: portalDisplayedInvoiceNumber(invoice, orderForInvoice(invoice, sources)),
-      orderNumber: shortOrderNumber(invoice.orderNumber) || shortOrderNumber(orderForInvoice(invoice, sources)?.orderNumber),
+      invoiceNumber: portalDisplayedInvoiceNumber(invoice, linked),
+      orderNumber: shortOrderNumber(invoice.orderNumber) || shortOrderNumber(linked?.orderNumber),
       status: text(invoice.status) || "draft",
       total,
       amountDue: invoice.amountDue == null ? total : money(invoice.amountDue),
+      amountPaid: invoice.amountPaid == null ? null : money(invoice.amountPaid),
+      payPath: invoicePayLinkFor({ id, payToken: invoice.payToken, status: invoice.status }),
+      lineItems: readInvoiceLines(invoice),
+      photographer: shootPerson(invoice, linked, sources),
+      shootWhen: shootWhen(invoice, linked, sources),
     });
   }
   return summaries;

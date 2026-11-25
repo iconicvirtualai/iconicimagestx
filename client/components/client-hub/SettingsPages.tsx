@@ -129,13 +129,23 @@ export function ProfileSettings({
         <h3 className="sm:col-span-2 text-xs font-black uppercase tracking-widest text-[#0d9488]">Social links</h3>
         {HUB_SOCIAL_PLATFORMS.map((platform) => (
           <Field key={platform.id} label={platform.label}>
-            <input
-              className={fieldClass}
-              value={draft.socials[platform.id]}
-              onChange={(event) => setDraft({ ...draft, socials: { ...draft.socials, [platform.id]: event.target.value } })}
-              inputMode="url"
-              placeholder="https://"
-            />
+            <div className="flex gap-2">
+              <input
+                className={fieldClass}
+                value={draft.socials[platform.id]}
+                onChange={(event) => setDraft({ ...draft, socials: { ...draft.socials, [platform.id]: event.target.value } })}
+                inputMode="url"
+                placeholder="https://"
+                aria-label={`${platform.label} profile URL`}
+              />
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => void linkSocial(platform.label, draft.socials[platform.id])}
+              >
+                {draft.socials[platform.id] ? "Linked" : "Link"}
+              </button>
+            </div>
           </Field>
         ))}
         <div className="sm:col-span-2 space-y-3">
@@ -169,16 +179,37 @@ export function ProfileSettings({
       <fieldset className="bg-white rounded-2xl border border-gray-100 p-4 space-y-2" data-testid="portal-preferences">
         <legend className="text-xs font-black uppercase tracking-widest text-[#0d9488]">Preferences</legend>
         <p className="text-sm text-gray-500">These switches are saved on your account. They do not send email, text, or a push.</p>
-        <label className="flex items-center gap-2 text-sm font-bold"><input type="checkbox" checked={prefs.email} onChange={(event) => setPrefs({ ...prefs, email: event.target.checked })} /> Email updates</label>
-        <label className="flex items-center gap-2 text-sm font-bold"><input type="checkbox" checked={prefs.sms} onChange={(event) => setPrefs({ ...prefs, sms: event.target.checked })} /> Text updates</label>
-        <label className="flex items-center gap-2 text-sm font-bold"><input type="checkbox" checked={prefs.push} onChange={(event) => setPrefs({ ...prefs, push: event.target.checked })} /> In-app updates</label>
+        <label className="flex items-center gap-2 text-sm font-bold"><input type="checkbox" checked={prefs.email} onChange={(event) => savePref("email", event.target.checked)} /> Email updates</label>
+        <label className="flex items-center gap-2 text-sm font-bold"><input type="checkbox" checked={prefs.sms} onChange={(event) => savePref("sms", event.target.checked)} /> Text updates</label>
+        <label className="flex items-center gap-2 text-sm font-bold"><input type="checkbox" checked={prefs.push} onChange={(event) => savePref("push", event.target.checked)} /> In-app updates</label>
       </fieldset>
       {message ? <p role="status" className="text-sm font-bold">{message}</p> : null}
-      <button type="submit" disabled={saving} className="min-h-12 rounded-2xl bg-black text-white px-5 text-xs font-black uppercase tracking-widest">
+      <div className="actions-inline" data-testid="profile-share">
+        <ShareButton label="Share listing" text="Listing" />
+        <ShareButton label="Share media" text="Media" />
+        <ShareButton label="Share flyer" text="Flyer" />
+      </div>
+      <button type="submit" disabled={saving} className="btn btn-ink btn-md">
         {saving ? "Saving" : "Save profile"}
       </button>
     </form>
   );
+
+  function savePref(key: "email" | "sms" | "push", checked: boolean) {
+    const next = { ...prefs, [key]: checked };
+    setPrefs(next);
+    void onSave({ ...draft, phone: hubPhone(draft.phone) }, next).catch((err: Error) => setMessage(err.message));
+  }
+
+  async function linkSocial(label: string, url: string) {
+    const trimmed = url.trim();
+    if (!trimmed) {
+      setMessage(`Paste the ${label} profile URL, then choose Link.`);
+      return;
+    }
+    await onSave({ ...draft, phone: hubPhone(draft.phone) }, prefs);
+    setMessage(`${label} linked on this profile.`);
+  }
 
   function updateCustom(index: number, patch: { label?: string; url?: string }) {
     setDraft({
@@ -186,6 +217,32 @@ export function ProfileSettings({
       customSocials: draft.customSocials.map((entry, item) => item === index ? { ...entry, ...patch } : entry),
     });
   }
+}
+
+function ShareButton({ label, text }: { label: string; text: string }) {
+  const [note, setNote] = useState("");
+  return (
+    <button
+      type="button"
+      className="btn btn-outline btn-sm"
+      onClick={() => {
+        const url = typeof window === "undefined" ? "" : window.location.href;
+        const payload = `${text} from Iconic Images ${url}`.trim();
+        const share = typeof navigator !== "undefined" ? navigator.share : undefined;
+        if (share) {
+          void share({ title: label, text: payload, url }).then(() => setNote("Shared")).catch(() => setNote(""));
+          return;
+        }
+        if (typeof navigator !== "undefined" && navigator.clipboard) {
+          void navigator.clipboard.writeText(payload).then(() => setNote("Link copied"));
+          return;
+        }
+        setNote(url);
+      }}
+    >
+      {note || label}
+    </button>
+  );
 }
 
 function ImageField({ label, url, onFile, monogram = "", hint = "" }: { label: string; url: string; onFile: (file: File | undefined) => void; monogram?: string; hint?: string }) {
@@ -215,6 +272,7 @@ export function TeamSettings({
   onSaveTeam,
   onAdd,
   onInvite,
+  onPermissions,
 }: {
   teamName: string;
   logoUrl: string;
@@ -225,6 +283,7 @@ export function TeamSettings({
   onSaveTeam: (input: { name: string; logoUrl: string }) => Promise<void>;
   onAdd: (input: { name: string; email: string; phone: string; permissions: TeamPermission[]; logoUrl: string; invite: boolean }) => Promise<void>;
   onInvite: (id: string) => Promise<string>;
+  onPermissions?: (id: string, permissions: TeamPermission[]) => Promise<void>;
 }) {
   const [name, setName] = useState(teamName);
   const [logo, setLogo] = useState(logoUrl);
@@ -261,7 +320,7 @@ export function TeamSettings({
           if (!file) return;
           void uploadAsset("teamLogo", file, example).then(setLogo).catch((err: Error) => setMessage(err.message));
         }} />
-        <button type="submit" className="sm:col-span-2 min-h-12 rounded-2xl bg-black text-white px-5 text-xs font-black uppercase tracking-widest w-fit">Save team</button>
+        <button type="submit" className="btn btn-ink btn-md">Save team</button>
       </form>
       <ul className="space-y-3">
         {members.length === 0 ? <li className="text-sm text-gray-500">No teammates yet.</li> : null}
@@ -271,14 +330,33 @@ export function TeamSettings({
               <div>
                 <p className="font-black">{member.name}</p>
                 <p className="text-sm text-gray-500">{member.email}{member.phone ? ` · ${member.phone}` : ""}</p>
-                <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mt-2">{member.permissions.join(" · ")}</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {TEAM_PERMISSIONS.map((permission) => (
+                    <label key={permission} className="inline-flex items-center gap-2 text-sm font-bold capitalize">
+                      <input
+                        type="checkbox"
+                        checked={member.permissions.includes(permission)}
+                        onChange={() => {
+                          const has = member.permissions.includes(permission);
+                          const permissions = has
+                            ? member.permissions.filter((item) => item !== permission)
+                            : [...member.permissions, permission];
+                          const next = (permissions.length ? permissions : ["view"]) as TeamPermission[];
+                          if (!onPermissions) return;
+                          void onPermissions(member.id, next).then(() => setMessage("Permissions saved.")).catch((err: Error) => setMessage(err.message));
+                        }}
+                      />
+                      {permission}
+                    </label>
+                  ))}
+                </div>
                 <p className="notice">{member.inviteEmail === "paused"
                   ? example
                     ? "Invite email is paused on this sample account. You can still queue Send invite; the email goes out when invites are on."
                     : "Invite email is paused. You can still queue Send invite; the email goes out when invites are on."
                   : member.inviteEmail === "sent" ? "Invite email sent." : "No invite email yet."}</p>
               </div>
-              {member.logoUrl ? <img src={member.logoUrl} alt="" className="h-12 w-12 rounded-xl object-cover" /> : null}
+              {member.logoUrl ? <img src={member.logoUrl} alt="" className="h-12 w-12 rounded-full object-cover" /> : null}
             </div>
             <button
               type="button"
