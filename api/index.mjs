@@ -44320,11 +44320,6 @@ function quoteFlashSale(shoots) {
 function formatFlashCents(cents2) {
   return (cents2 / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
 }
-function flashSaleUseBy(purchasedAt) {
-  const expires = new Date(purchasedAt.getTime());
-  expires.setUTCDate(expires.getUTCDate() + 90);
-  return expires.toISOString();
-}
 const ORDER_REQUESTS = "orderRequests";
 const ORDERS = "orders";
 const memory = [];
@@ -44442,10 +44437,9 @@ router$6.post("/checkout", async (req, res) => {
     },
     notes: [
       `Each shoot: 50 photos + 3 aerials + ${addon.label}.`,
-      "Paid upfront. Use the shoots within 90 days.",
-      `Use by ${flashSaleUseBy(purchasedAt).slice(0, 10)}.`
+      "Paid upfront.",
+      "Shoots never expire. Use your shoots whenever — no rush — or transfer them to another Iconic customer."
     ].join(" "),
-    useBy: flashSaleUseBy(purchasedAt),
     orderNumber: number,
     squareLinkId: linked.linkId || "",
     squareOrderId: linked.squareOrderId || "",
