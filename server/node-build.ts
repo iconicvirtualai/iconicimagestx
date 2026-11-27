@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { createServer } from "./index";
 import { handleMediaDisplay } from "./routes/mediaDisplay";
+import clientDeliveryMediaRouter from "./routes/clientDeliveryMedia";
 import * as express from "express";
 import { htmlFileForRequestPath, matchingRedirect, redirectLocation, redirectStatus } from "@shared/spaRouting";
 import { renderPresentationShell } from "./routes/presentations";
@@ -11,6 +12,7 @@ const app = createServer();
 app.get("/api/media/display/p/:token/:index", handleMediaDisplay);
 app.get("/api/media/display/o/:signedToken/:index", handleMediaDisplay);
 app.get("/api/media/display/:listingId/:index", handleMediaDisplay);
+app.use("/api/deliver", clientDeliveryMediaRouter);
 const port = process.env.PORT || 3000;
 
 // In production, serve the built SPA files

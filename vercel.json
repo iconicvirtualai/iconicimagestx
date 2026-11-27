@@ -1611,6 +1611,14 @@
       "destination": "/api/media-display"
     },
     {
+      "source": "/api/deliver/(.*)/media/(.*)",
+      "destination": "/api/media-display"
+    },
+    {
+      "source": "/api/deliver/(.*)/download.zip",
+      "destination": "/api/media-display"
+    },
+    {
       "source": "/api",
       "destination": "/api/index"
     },
@@ -2163,6 +2171,30 @@
       "destination": "/seo/private.html"
     },
     {
+      "source": "/deliver/:deliveryId",
+      "destination": "/seo/private.html"
+    },
+    {
+      "source": "/deliver/:deliveryId/",
+      "destination": "/seo/private.html"
+    },
+    {
+      "source": "/dev/order-number-faces",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/dev/order-number-faces/",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/dev/projects-send",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/dev/projects-send/",
+      "destination": "/seo/app.html"
+    },
+    {
       "source": "/admin",
       "destination": "/seo/private.html"
     },
@@ -2253,6 +2285,51 @@
     },
     {
       "source": "/gallery/(.*)",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/deliver/(.*)",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/dev/order-number-faces",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/dev/order-number-faces/",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/dev/projects-send",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/dev/projects-send/",
       "headers": [
         {
           "key": "X-Robots-Tag",

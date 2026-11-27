@@ -1,6 +1,9 @@
+import fs from "node:fs";
 import type { Server } from "node:http";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createServer } from "../index";
+import clientDeliveryMediaRouter from "./clientDeliveryMedia";
+import { firstMatchingRewrite } from "../../shared/spaRouting";
 
 let server: Server;
 let baseUrl = "";
@@ -9,6 +12,7 @@ beforeAll(async () => {
   delete process.env.CLIENT_NOTIFY_LIVE;
   delete process.env.CLIENT_EMAIL_NOTIFY_LIVE;
   const app = createServer();
+  app.use("/api/deliver", clientDeliveryMediaRouter);
   server = await new Promise<Server>((resolve) => {
     const listening = app.listen(0, "127.0.0.1", () => resolve(listening));
   });
@@ -26,6 +30,19 @@ afterAll(async () => {
 });
 
 describe("client delivery presentation", () => {
+  it("keeps sharp on the media function and the JSON route on the main API", () => {
+    const route = fs.readFileSync("server/routes/clientDelivery.ts", "utf8");
+    const index = fs.readFileSync("server/index.ts", "utf8");
+    const handler = fs.readFileSync("server/vercel-handler.ts", "utf8");
+    expect(route).not.toMatch(/from ["']sharp["']|deliveryWatermark|clientDeliveryMedia/);
+    expect(index).not.toMatch(/from ["']sharp["']|deliveryWatermark|clientDeliveryMedia/);
+    expect(handler).not.toMatch(/from ["']sharp["']|deliveryWatermark|clientDeliveryMedia/);
+    expect(firstMatchingRewrite("/api/deliver/preview/media/0")?.destination).toBe("/api/media-display");
+    expect(firstMatchingRewrite("/api/deliver/preview-paid/download.zip")?.destination).toBe("/api/media-display");
+    expect(firstMatchingRewrite("/api/deliver/preview")?.destination).toBe("/api/index");
+    expect(firstMatchingRewrite("/api/deliver/preview/send")?.destination).toBe("/api/index");
+  });
+
   it("serves an unpaid sample without download URLs or storage keys", async () => {
     const res = await fetch(`${baseUrl}/api/deliver/preview`);
     const body = await res.json();

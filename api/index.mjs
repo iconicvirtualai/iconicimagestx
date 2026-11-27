@@ -219,15 +219,15 @@ function parseContactLine(line) {
   };
 }
 const BUSINESS_CONTACT = parseContactLine(BUSINESS_CONTACT_LINE);
-function escapeHtml$e(value) {
+function escapeHtml$f(value) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 function clientEmailContactLineHtml(color = "#666666") {
   const style = `color:${color};text-decoration:underline;`;
   return [
-    escapeHtml$e(BUSINESS_CONTACT.address),
-    `<a href="${BUSINESS_CONTACT.phoneHref}" style="${style}">${escapeHtml$e(BUSINESS_CONTACT.phoneDisplay)}</a>`,
-    `<a href="${BUSINESS_CONTACT.emailHref}" style="${style}">${escapeHtml$e(BUSINESS_CONTACT.email)}</a>`
+    escapeHtml$f(BUSINESS_CONTACT.address),
+    `<a href="${BUSINESS_CONTACT.phoneHref}" style="${style}">${escapeHtml$f(BUSINESS_CONTACT.phoneDisplay)}</a>`,
+    `<a href="${BUSINESS_CONTACT.emailHref}" style="${style}">${escapeHtml$f(BUSINESS_CONTACT.email)}</a>`
   ].join(" | ");
 }
 const __vite_import_meta_env__ = {};
@@ -275,13 +275,13 @@ function dotOptInPath(token) {
   params.set("t", token);
   return `/api/orders/dot-opt-in?${params.toString()}`;
 }
-function escapeHtml$d(value) {
+function escapeHtml$e(value) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 function linkDoorsOpenTour(sentence) {
   const at = sentence.indexOf(DOORS_OPEN_TOUR_NAME);
-  if (at < 0) return escapeHtml$d(sentence);
-  return escapeHtml$d(sentence.slice(0, at)) + `<a href="${DOORS_OPEN_TOUR_URL}" rel="noreferrer" style="color:#111111;font-weight:600;">${DOORS_OPEN_TOUR_NAME}</a>` + escapeHtml$d(sentence.slice(at + DOORS_OPEN_TOUR_NAME.length));
+  if (at < 0) return escapeHtml$e(sentence);
+  return escapeHtml$e(sentence.slice(0, at)) + `<a href="${DOORS_OPEN_TOUR_URL}" rel="noreferrer" style="color:#111111;font-weight:600;">${DOORS_OPEN_TOUR_NAME}</a>` + escapeHtml$e(sentence.slice(at + DOORS_OPEN_TOUR_NAME.length));
 }
 const noteStyle = "font-family:Inter,ui-sans-serif,system-ui,sans-serif;font-size:15px;line-height:1.5;color:#333333;margin:16px 0;";
 function doorsOpenDeliveryEmailHtml() {
@@ -291,7 +291,7 @@ function doorsOpenReceiptEmailHtml(optInUrl) {
   const sentence = `<p style="${noteStyle}">${linkDoorsOpenTour(DOT_RECEIPT_LINE)}</p>`;
   const url = optInUrl.trim();
   if (!url.startsWith("https://") || url.includes(" ")) return sentence;
-  return sentence + `<p style="margin:16px 0;"><a href="${escapeHtml$d(url)}" style="font-family:Inter,ui-sans-serif,system-ui,sans-serif;background:#000000;color:#ffffff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">${DOT_OPT_IN_ACTION_LABEL}</a></p>`;
+  return sentence + `<p style="margin:16px 0;"><a href="${escapeHtml$e(url)}" style="font-family:Inter,ui-sans-serif,system-ui,sans-serif;background:#000000;color:#ffffff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">${DOT_OPT_IN_ACTION_LABEL}</a></p>`;
 }
 function dotOptInResultHtml(ok) {
   const title = ok === true ? "Your open house is listed." : ok === "wait" ? "Please try that link again in a moment." : "This link is not valid.";
@@ -1897,6 +1897,65 @@ function invoiceAdjustmentLine(kind, amount) {
     category: ADJUSTMENT_LINE_IDS[kind]
   };
 }
+function invoiceChargeTotal(face) {
+  return roundMoney$9(
+    Math.max(0, roundMoney$9(face.subtotal) - roundMoney$9(face.promotions)) + (face.processing != null ? roundMoney$9(face.processing) : 0) + roundMoney$9(face.fees) + roundMoney$9(face.travel) + roundMoney$9(face.tax)
+  );
+}
+function invoiceFaceFromStored(data) {
+  const lines = normalizeBookingLineItems(data.lineItems);
+  const services2 = lines.filter((item) => {
+    if (isPromoInvoiceLine(item)) return false;
+    const kind = adjustmentKind(item);
+    return kind !== "processing" && kind !== "fees";
+  });
+  const serviceSum = roundMoney$9(services2.reduce((sum, item) => sum + item.price, 0));
+  const travelOnLines = lines.some((item) => isTravelFeeLine(item) && item.price !== 0);
+  const explicitSubtotal = explicitAmount(data.subtotal);
+  const subtotal = travelOnLines ? serviceSum : explicitSubtotal ?? serviceSum;
+  const processingAmount = explicitAmount(data.processing) ?? lineAmount(lines, "processing");
+  const processing = processingAmount != null && processingAmount !== 0 ? processingAmount : null;
+  const fees = explicitAmount(data.fees) ?? lineAmount(lines, "fees") ?? 0;
+  const travel = travelOnLines ? 0 : explicitAmount(data.travel) ?? lineAmount(lines, "travel") ?? 0;
+  const promoFromLines = roundMoney$9(lines.filter(isPromoInvoiceLine).reduce((sum, item) => sum + Math.abs(item.price), 0));
+  const fieldPromo = explicitAmount(data.promoDiscount);
+  const promotions = promoFromLines > 0 ? promoFromLines : fieldPromo ?? 0;
+  const promoCode = typeof data.promoCode === "string" ? data.promoCode.trim() : "";
+  const tax = explicitAmount(data.tax) ?? 0;
+  const amountPaid = explicitAmount(data.amountPaid) ?? 0;
+  const computed = invoiceChargeTotal({ subtotal, processing, promotions, fees, travel, tax });
+  const total = explicitAmount(data.total) ?? computed;
+  const amountDue = explicitAmount(data.amountDue) ?? roundMoney$9(Math.max(0, total - amountPaid));
+  return {
+    services: services2.map((item) => ({
+      name: item.name,
+      description: item.description,
+      qty: item.qty,
+      price: item.price
+    })),
+    subtotal,
+    processing,
+    promotions,
+    promoCode,
+    fees,
+    travel,
+    tax,
+    total,
+    amountPaid,
+    amountDue
+  };
+}
+function lineAmount(lines, kind) {
+  const match = lines.find((item) => adjustmentKind(item) === kind);
+  if (!match) return null;
+  return roundMoney$9(match.price);
+}
+function explicitAmount(value) {
+  if (value == null || value === "") return null;
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return null;
+  return roundMoney$9(amount);
+}
 function roundMoney$9(value) {
   if (!Number.isFinite(value)) return 0;
   return Math.round(value * 100) / 100;
@@ -2076,6 +2135,17 @@ function computeInvoiceTotals(input) {
     processingPolicy
   };
 }
+function formatInvoiceAmount(value) {
+  const numeric2 = Number(value);
+  const cents2 = Number.isFinite(numeric2) ? Math.round(numeric2 * 100) : 0;
+  const sign = cents2 < 0 ? "-" : "";
+  const abs = Math.abs(cents2);
+  const dollars2 = Math.floor(abs / 100);
+  const rem = abs % 100;
+  const digits2 = dollars2.toLocaleString("en-US");
+  const body = rem === 0 ? digits2 : `${digits2}.${String(rem).padStart(2, "0")}`;
+  return `${sign}$ ${body}`;
+}
 function toCents$1(value) {
   if (!Number.isFinite(value) || value <= 0) return 0;
   return Math.round(value * 100);
@@ -2188,7 +2258,7 @@ function receiptHtml(content) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${escapeHtml$c(content.invoiceNumber)} receipt</title>
+<title>${escapeHtml$d(content.invoiceNumber)} receipt</title>
 <style>
 @media only screen and (max-width: 480px) {
   .totals-desktop { display: none !important; }
@@ -2202,7 +2272,7 @@ function receiptHtml(content) {
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:700px;font-family:${FONT};color:#111111;">
 ${headerBlock(content)}
 <tr><td style="padding:28px 28px 8px;font-family:${FONT};font-size:14px;line-height:1.5;color:#222222;">
-Hi ${escapeHtml$c(content.clientName)}, we received your payment for invoice ${escapeHtml$c(content.invoiceNumber)}.
+Hi ${escapeHtml$d(content.clientName)}, we received your payment for invoice ${escapeHtml$d(content.invoiceNumber)}.
 </td></tr>
 <tr><td style="padding:0 28px 4px;font-family:${FONT};font-size:14px;line-height:1.5;color:#111111;">${BOOKING_PROCESSING_LABEL}</td></tr>
 <tr><td style="padding:12px 20px 0;">
@@ -2219,19 +2289,19 @@ ${rows}
 <tr><td style="padding:22px 20px 8px;">
 <table class="totals-desktop" role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:2px solid #000000;border-collapse:separate;font-family:${FONT};">
 <tr>
-${totalCell("SUB TOTAL", money$9(content.subtotal), false)}
-${totalCell("PROCESSING", money$9(content.processing), false)}
-${totalCell("PROMOTIONS", money$9(content.promotions), false)}
-${totalCell("FEES", money$9(content.fees), false)}
-${totalCell("TOTAL PAID", money$9(content.totalPaid), true)}
+${totalCell("SUB TOTAL", money$a(content.subtotal), false)}
+${totalCell("PROCESSING", money$a(content.processing), false)}
+${totalCell("PROMOTIONS", money$a(content.promotions), false)}
+${totalCell("FEES", money$a(content.fees), false)}
+${totalCell("TOTAL PAID", money$a(content.totalPaid), true)}
 </tr>
 </table>
 <table class="totals-mobile" role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="display:none;border:2px solid #000000;border-collapse:separate;font-family:${FONT};">
-${totalRow("SUB TOTAL", money$9(content.subtotal), false)}
-${totalRow("PROCESSING", money$9(content.processing), false)}
-${totalRow("PROMOTIONS", money$9(content.promotions), false)}
-${totalRow("FEES", money$9(content.fees), false)}
-${totalRow("TOTAL PAID", money$9(content.totalPaid), true)}
+${totalRow("SUB TOTAL", money$a(content.subtotal), false)}
+${totalRow("PROCESSING", money$a(content.processing), false)}
+${totalRow("PROMOTIONS", money$a(content.promotions), false)}
+${totalRow("FEES", money$a(content.fees), false)}
+${totalRow("TOTAL PAID", money$a(content.totalPaid), true)}
 </table>
 </td></tr>
 ${downloads}
@@ -2249,11 +2319,11 @@ function headerBlock(content) {
 <td valign="top" style="font-family:${FONT};">
 <div style="font-family:${FONT};font-size:32px;line-height:1;font-weight:bold;letter-spacing:6px;color:${YELLOW};">RECEIPT</div>
 <div style="font-family:${FONT};font-size:12px;line-height:1.4;font-weight:bold;letter-spacing:3px;color:${YELLOW};padding-top:10px;">PAYMENT RECEIVED</div>
-<div style="font-family:${FONT};font-size:13px;line-height:1.5;color:#ffffff;padding-top:16px;">INVOICE NO : ${escapeHtml$c(content.invoiceNumber)}</div>
-<div style="font-family:${FONT};font-size:13px;line-height:1.5;color:#ffffff;padding-top:4px;">${escapeHtml$c(content.paidAtLabel)}</div>
+<div style="font-family:${FONT};font-size:13px;line-height:1.5;color:#ffffff;padding-top:16px;">INVOICE NO : ${escapeHtml$d(content.invoiceNumber)}</div>
+<div style="font-family:${FONT};font-size:13px;line-height:1.5;color:#ffffff;padding-top:4px;">${escapeHtml$d(content.paidAtLabel)}</div>
 </td>
 <td valign="top" align="right" width="160" style="padding-left:12px;">
-<img src="${escapeHtml$c(content.logoUrl)}" alt="Iconic Images" width="140" style="display:block;border:0;outline:none;text-decoration:none;width:140px;max-width:140px;height:auto;">
+<img src="${escapeHtml$d(content.logoUrl)}" alt="Iconic Images" width="140" style="display:block;border:0;outline:none;text-decoration:none;width:140px;max-width:140px;height:auto;">
 </td>
 </tr>
 </table>
@@ -2262,10 +2332,10 @@ function headerBlock(content) {
 function lineRow(line, index) {
   const bg = index % 2 === 0 ? ROW : "#ffffff";
   return `<tr>
-<td bgcolor="${bg}" style="background:${bg};font-family:${FONT};font-size:13px;font-weight:bold;letter-spacing:0.5px;color:${TEAL};padding:14px;border-bottom:1px solid #e5e7eb;">${escapeHtml$c(line.name.toUpperCase())}</td>
-<td bgcolor="${bg}" align="right" style="background:${bg};font-family:${FONT};font-size:13px;color:#374151;padding:14px 10px;border-bottom:1px solid #e5e7eb;">${escapeHtml$c(String(line.qty))}</td>
-<td bgcolor="${bg}" align="right" style="background:${bg};font-family:${FONT};font-size:13px;color:#374151;padding:14px 10px;border-bottom:1px solid #e5e7eb;">${escapeHtml$c(money$9(line.unit))}</td>
-<td bgcolor="${bg}" align="right" style="background:${bg};font-family:${FONT};font-size:13px;color:#111111;padding:14px;border-bottom:1px solid #e5e7eb;">${escapeHtml$c(money$9(line.total))}</td>
+<td bgcolor="${bg}" style="background:${bg};font-family:${FONT};font-size:13px;font-weight:bold;letter-spacing:0.5px;color:${TEAL};padding:14px;border-bottom:1px solid #e5e7eb;">${escapeHtml$d(line.name.toUpperCase())}</td>
+<td bgcolor="${bg}" align="right" style="background:${bg};font-family:${FONT};font-size:13px;color:#374151;padding:14px 10px;border-bottom:1px solid #e5e7eb;">${escapeHtml$d(String(line.qty))}</td>
+<td bgcolor="${bg}" align="right" style="background:${bg};font-family:${FONT};font-size:13px;color:#374151;padding:14px 10px;border-bottom:1px solid #e5e7eb;">${escapeHtml$d(money$a(line.unit))}</td>
+<td bgcolor="${bg}" align="right" style="background:${bg};font-family:${FONT};font-size:13px;color:#111111;padding:14px;border-bottom:1px solid #e5e7eb;">${escapeHtml$d(money$a(line.total))}</td>
 </tr>`;
 }
 function totalRow(label, value, emphasis, note) {
@@ -2273,7 +2343,7 @@ function totalRow(label, value, emphasis, note) {
   const noteHtml = "";
   return `<tr>
 <td style="padding:12px 16px;font-family:${FONT};font-size:11px;font-weight:bold;letter-spacing:0.8px;color:#111111;border-bottom:1px solid #e5e7eb;">${label}</td>
-<td align="right" style="padding:12px 16px;font-family:${FONT};${valueStyle}border-bottom:1px solid #e5e7eb;">${escapeHtml$c(value)}${noteHtml}</td>
+<td align="right" style="padding:12px 16px;font-family:${FONT};${valueStyle}border-bottom:1px solid #e5e7eb;">${escapeHtml$d(value)}${noteHtml}</td>
 </tr>`;
 }
 function totalCell(label, value, emphasis, note) {
@@ -2281,7 +2351,7 @@ function totalCell(label, value, emphasis, note) {
   const noteHtml = "";
   return `<td valign="top" align="center" style="padding:14px 6px;font-family:${FONT};">
 <div style="font-family:${FONT};font-size:10px;font-weight:bold;letter-spacing:0.8px;color:#111111;">${label}</div>
-<div style="font-family:${FONT};${valueStyle}padding-top:6px;">${escapeHtml$c(value)}</div>
+<div style="font-family:${FONT};${valueStyle}padding-top:6px;">${escapeHtml$d(value)}</div>
 ${noteHtml}
 </td>`;
 }
@@ -2292,13 +2362,13 @@ function downloadsBlock(content) {
   const primaryHref = presentation || gallery;
   const primaryLabel = presentation ? "View your listing presentation" : "Your downloads &amp; invoice";
   const secondary = presentation && gallery ? `<tr><td align="center" style="padding-top:12px;font-family:${FONT};font-size:14px;">
-<a href="${escapeHtml$c(gallery)}" style="color:${TEAL};font-family:${FONT};font-weight:bold;text-decoration:underline;">Your downloads &amp; invoice</a>
+<a href="${escapeHtml$d(gallery)}" style="color:${TEAL};font-family:${FONT};font-weight:bold;text-decoration:underline;">Your downloads &amp; invoice</a>
 </td></tr>` : "";
   return `<tr><td style="padding:28px 24px 12px;">
 <div style="font-family:${FONT};font-size:22px;line-height:1.3;font-weight:bold;color:#111111;">Your downloads are ready</div>
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:16px;">
 <tr><td bgcolor="#000000" style="background:#000000;border-radius:4px;">
-<a href="${escapeHtml$c(primaryHref)}" style="display:inline-block;padding:14px 22px;font-family:${FONT};font-size:15px;font-weight:bold;color:${YELLOW};text-decoration:none;">${primaryLabel}</a>
+<a href="${escapeHtml$d(primaryHref)}" style="display:inline-block;padding:14px 22px;font-family:${FONT};font-size:15px;font-weight:bold;color:${YELLOW};text-decoration:none;">${primaryLabel}</a>
 </td></tr>
 ${secondary}
 </table>
@@ -2307,7 +2377,7 @@ ${secondary}
 function balanceBlock(content) {
   if (content.balance <= 0) return "";
   return `<tr><td style="padding:20px 24px 8px;font-family:${FONT};font-size:14px;color:#111111;">
-Balance due: <strong>${escapeHtml$c(money$9(content.balance))}</strong>. Downloads stay locked until the invoice is paid in full.
+Balance due: <strong>${escapeHtml$d(money$a(content.balance))}</strong>. Downloads stay locked until the invoice is paid in full.
 </td></tr>`;
 }
 function footerBlock() {
@@ -2316,12 +2386,12 @@ function footerBlock() {
 <tr>
 <td valign="top" style="font-family:${FONT};font-size:13px;line-height:1.55;color:#ffffff;">
 <div style="font-family:${FONT};font-size:12px;font-weight:bold;letter-spacing:0.6px;color:${GREEN};padding-bottom:8px;">PAYMENT INFORMATION:</div>
-${escapeHtml$c(LEGAL_BUSINESS_NAME)}<br>
+${escapeHtml$d(LEGAL_BUSINESS_NAME)}<br>
 <div style="font-family:${FONT};font-size:13px;line-height:1.55;color:#ffffff;padding-top:8px;">${clientEmailContactLineHtml("#ffffff")}</div>
 </td>
 <td valign="top" align="right" style="font-family:${FONT};font-size:13px;line-height:1.55;color:#ffffff;">
-${escapeHtml$c(BUSINESS_CONTACT.streetAddress)}<br>
-${escapeHtml$c(BUSINESS_CONTACT.addressLine2)}
+${escapeHtml$d(BUSINESS_CONTACT.streetAddress)}<br>
+${escapeHtml$d(BUSINESS_CONTACT.addressLine2)}
 </td>
 </tr>
 </table>
@@ -2334,14 +2404,14 @@ function receiptText(content) {
     qty: 1,
     unit: content.totalPaid,
     total: content.totalPaid
-  }]).map((line) => `${line.name}  qty ${line.qty}  ${money$9(line.unit)}  ${money$9(line.total)}`);
+  }]).map((line) => `${line.name}  qty ${line.qty}  ${money$a(line.unit)}  ${money$a(line.total)}`);
   const links = [];
   if (content.unlocked) {
     links.push("Your downloads are ready");
     if (content.presentationUrl) links.push(`View your listing presentation: ${content.presentationUrl}`);
     if (content.galleryUrl) links.push(`Your downloads & invoice: ${content.galleryUrl}`);
   } else if (content.balance > 0) {
-    links.push(`Balance due: ${money$9(content.balance)}. Downloads stay locked until the invoice is paid in full.`);
+    links.push(`Balance due: ${money$a(content.balance)}. Downloads stay locked until the invoice is paid in full.`);
   }
   return [
     "RECEIPT",
@@ -2354,11 +2424,11 @@ function receiptText(content) {
     "",
     ...itemLines,
     "",
-    `SUB TOTAL ${money$9(content.subtotal)}`,
-    `PROCESSING ${money$9(content.processing)}`,
-    `PROMOTIONS ${money$9(content.promotions)}`,
-    `FEES ${money$9(content.fees)}`,
-    `TOTAL PAID ${money$9(content.totalPaid)}`,
+    `SUB TOTAL ${money$a(content.subtotal)}`,
+    `PROCESSING ${money$a(content.processing)}`,
+    `PROMOTIONS ${money$a(content.promotions)}`,
+    `FEES ${money$a(content.fees)}`,
+    `TOTAL PAID ${money$a(content.totalPaid)}`,
     "",
     ...links,
     "",
@@ -2369,7 +2439,7 @@ function receiptText(content) {
     "THANK YOU FOR BEING ICONIC"
   ].filter((line) => line !== void 0).join("\n");
 }
-function money$9(value) {
+function money$a(value) {
   return (Number(value) || 0).toLocaleString("en-US", { style: "currency", currency: "USD" });
 }
 function roundCents$1(value) {
@@ -2391,7 +2461,7 @@ function dollars$1(value) {
 function text$A(value) {
   return typeof value === "string" ? value.trim() : "";
 }
-function escapeHtml$c(value) {
+function escapeHtml$d(value) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 const EMAIL_QUESTIONS_WITH_PORTAL = "Questions? Reply to this email or message us through your client portal.";
@@ -3687,14 +3757,14 @@ async function syncCustomerContacts(store = getMarketingStore()) {
   };
 }
 const MERGE = /\{([A-Za-z]+)(?:\|([^}]*))?\}/g;
-function escapeHtml$b(value) {
+function escapeHtml$c(value) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 function applyMerge(template, values) {
   return template.replace(MERGE, (full, key, fallback) => {
     const value = values[key];
-    if (value) return key === "UnsubscribeUrl" ? value : escapeHtml$b(value);
-    if (fallback !== void 0) return escapeHtml$b(fallback);
+    if (value) return key === "UnsubscribeUrl" ? value : escapeHtml$c(value);
+    if (fallback !== void 0) return escapeHtml$c(fallback);
     return full;
   });
 }
@@ -4642,22 +4712,22 @@ function campaignSmsBody(template, firstName) {
 Reply STOP to opt out.`.trim();
   return body.slice(0, 1600);
 }
-function escapeHtml$a(value) {
+function escapeHtml$b(value) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 function compileBlocks(blocks, preheader) {
-  const hidden = preheader ? `<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">${escapeHtml$a(preheader)}</div>` : "";
+  const hidden = preheader ? `<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">${escapeHtml$b(preheader)}</div>` : "";
   const rows = blocks.map((block2) => {
     if (block2.type === "heading") {
-      return `<h1 style="margin:0 0 12px;font-family:Inter,Arial,sans-serif;font-size:28px;line-height:1.2;color:#111827;">${escapeHtml$a(block2.text)}</h1>`;
+      return `<h1 style="margin:0 0 12px;font-family:Inter,Arial,sans-serif;font-size:28px;line-height:1.2;color:#111827;">${escapeHtml$b(block2.text)}</h1>`;
     }
     if (block2.type === "image" && block2.url) {
-      return `<p style="margin:0 0 16px;"><img src="${escapeHtml$a(block2.url)}" alt="${escapeHtml$a(block2.text)}" style="max-width:100%;border-radius:12px;display:block;" /></p>`;
+      return `<p style="margin:0 0 16px;"><img src="${escapeHtml$b(block2.url)}" alt="${escapeHtml$b(block2.text)}" style="max-width:100%;border-radius:12px;display:block;" /></p>`;
     }
     if (block2.type === "button" && block2.href) {
-      return `<p style="margin:0 0 16px;"><a href="${escapeHtml$a(block2.href)}" style="display:inline-block;background:#0d9488;color:#ffffff;font-family:Inter,Arial,sans-serif;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;text-decoration:none;padding:12px 18px;border-radius:12px;">${escapeHtml$a(block2.text || "Open")}</a></p>`;
+      return `<p style="margin:0 0 16px;"><a href="${escapeHtml$b(block2.href)}" style="display:inline-block;background:#0d9488;color:#ffffff;font-family:Inter,Arial,sans-serif;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;text-decoration:none;padding:12px 18px;border-radius:12px;">${escapeHtml$b(block2.text || "Open")}</a></p>`;
     }
-    return `<p style="margin:0 0 14px;font-family:Inter,Arial,sans-serif;font-size:16px;line-height:1.55;color:#1f2937;">${escapeHtml$a(block2.text)}</p>`;
+    return `<p style="margin:0 0 14px;font-family:Inter,Arial,sans-serif;font-size:16px;line-height:1.55;color:#1f2937;">${escapeHtml$b(block2.text)}</p>`;
   }).join("");
   return `<!DOCTYPE html><html><body style="margin:0;background:#f5f2ea;">${hidden}<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f5f2ea;"><tr><td align="center" style="padding:24px;"><table role="presentation" width="100%" style="max-width:560px;background:#ffffff;border-radius:16px;"><tr><td style="padding:28px;">${rows || `<p style="font-family:Inter,Arial,sans-serif;color:#1f2937;">Hello {FirstName},</p>`}</td></tr></table></td></tr></table></body></html>`;
 }
@@ -4665,7 +4735,7 @@ function campaignHtml(email) {
   if (email.mode === "html") {
     const html = email.html || "";
     if (email.preheader && !html.includes(email.preheader)) {
-      return `<div style="display:none;max-height:0;overflow:hidden;">${escapeHtml$a(email.preheader)}</div>${html}`;
+      return `<div style="display:none;max-height:0;overflow:hidden;">${escapeHtml$b(email.preheader)}</div>${html}`;
     }
     return html;
   }
@@ -8058,12 +8128,12 @@ function namesFrom(value) {
 function firstTotal(group) {
   for (const doc of [...group.orders, ...group.invoices, ...group.orderRequests]) {
     if (doc.data.total != null && doc.data.total !== "") {
-      const parsed = money$8(doc.data.total);
+      const parsed = money$9(doc.data.total);
       if (parsed != null) return parsed;
     }
     const pricing = doc.data.pricing;
     if (pricing && typeof pricing === "object") {
-      const parsed = money$8(pricing.total);
+      const parsed = money$9(pricing.total);
       if (pricing.total != null && pricing.total !== "" && parsed != null) return parsed;
     }
   }
@@ -8191,7 +8261,7 @@ function hasAddress(value) {
 function statusKey(value) {
   return String(value || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
 }
-function money$8(value) {
+function money$9(value) {
   const parsed = typeof value === "number" ? value : typeof value === "string" && value.trim() ? Number(value.replace(/[$,\s]/g, "")) : Number.NaN;
   if (!Number.isFinite(parsed)) return null;
   return Math.round(parsed * 100) / 100;
@@ -8928,7 +8998,7 @@ function nestedTotal(pricing) {
   return pricing.total;
 }
 function warnWhenStoredTotalDiffers(record2, lineItems) {
-  const stored = [money$7(record2.total), money$7(nestedTotal(record2.pricing))].filter((amount) => amount != null);
+  const stored = [money$8(record2.total), money$8(nestedTotal(record2.pricing))].filter((amount) => amount != null);
   if (stored.length === 0) return;
   const rebuilt = roundMoney$6(sumLineItemPrices(chargedServiceLines(lineItems)));
   const drifted = [...new Set(stored.filter((amount) => Math.abs(amount - rebuilt) > 9e-3))];
@@ -8937,7 +9007,7 @@ function warnWhenStoredTotalDiffers(record2, lineItems) {
     `[Bookings] Package repair kept stored total ${drifted.join(" / ")}; catalog lines total ${rebuilt}.`
   );
 }
-function money$7(value) {
+function money$8(value) {
   if (typeof value === "number" && Number.isFinite(value)) return roundMoney$6(value);
   if (typeof value === "string" && value.trim()) {
     const parsed = Number(value.replace(/[$,\s]/g, ""));
@@ -9198,8 +9268,8 @@ function paidState(record2) {
   const invoice = nested$1(record2.invoice);
   const explicit = [record2.paymentStatus, record2.invoiceStatus, invoice.status].map((value) => normalize(value)).join(" ");
   if (/\bpartial\b/.test(explicit) || normalize(record2.status) === "partial") return "partial";
-  const total = money$6(invoice.total ?? record2.total ?? record2.amount);
-  const paid = money$6(invoice.amountPaid ?? record2.amountPaid);
+  const total = money$7(invoice.total ?? record2.total ?? record2.amount);
+  const paid = money$7(invoice.amountPaid ?? record2.amountPaid);
   if (paid > 0 && total > 0 && paid + 9e-3 < total) return "partial";
   if (/\bpaid\b/.test(explicit) || record2.paidAt || paid > 0 && (total === 0 || paid >= total)) return "paid";
   const status2 = normalize(record2.status);
@@ -9219,7 +9289,7 @@ function nested$1(value) {
 function normalize(value) {
   return String(value ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
 }
-function money$6(value) {
+function money$7(value) {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string" && value.trim()) {
     const parsed = Number(value.replace(/[$,\s]/g, ""));
@@ -9292,7 +9362,7 @@ function officeNewOrderEmail(saved, options) {
   const subjectCore = `New order ${orderNumber2} — ${packageName} — ${address} — ${requestedDate}`;
   const subject = isTestOrder(clientName2, notes) ? `[TEST] ${subjectCore}` : subjectCore;
   const plain = fields.map(([label, value]) => `${label}: ${value}`).join("\n");
-  const html = `<div style="font-family:Arial,sans-serif;max-width:640px;color:#111"><h1 style="font-size:18px">${escapeHtml$9(subject)}</h1><table style="width:100%;border-collapse:collapse">${fields.map(([label, value]) => `<tr><td style="padding:6px 10px;border-bottom:1px solid #eee;font-weight:bold;vertical-align:top">${escapeHtml$9(label)}</td><td style="padding:6px 10px;border-bottom:1px solid #eee;white-space:pre-wrap">${escapeHtml$9(value)}</td></tr>`).join("")}</table></div>`;
+  const html = `<div style="font-family:Arial,sans-serif;max-width:640px;color:#111"><h1 style="font-size:18px">${escapeHtml$a(subject)}</h1><table style="width:100%;border-collapse:collapse">${fields.map(([label, value]) => `<tr><td style="padding:6px 10px;border-bottom:1px solid #eee;font-weight:bold;vertical-align:top">${escapeHtml$a(label)}</td><td style="padding:6px 10px;border-bottom:1px solid #eee;white-space:pre-wrap">${escapeHtml$a(value)}</td></tr>`).join("")}</table></div>`;
   return { subject, text: plain, html, orderNumber: orderNumber2, packageName };
 }
 function isTestOrder(clientName2, notes) {
@@ -9529,7 +9599,7 @@ function nested(value) {
 function text$r(value) {
   return typeof value === "string" ? value.trim() : "";
 }
-function escapeHtml$9(value) {
+function escapeHtml$a(value) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 const OFFICE_NEW_ORDER_EMAIL_TEMPLATE = "office_new_order";
@@ -9732,10 +9802,10 @@ function notificationEnabled(settings, key) {
 function text$q(value) {
   return typeof value === "string" ? value.trim() : "";
 }
-function escapeHtml$8(value) {
+function escapeHtml$9(value) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
-function money$5(value) {
+function money$6(value) {
   if (typeof value === "string" && value.trim().startsWith("$")) return value.trim();
   const amount = typeof value === "number" ? value : Number(value);
   if (!Number.isFinite(amount)) return "";
@@ -9789,7 +9859,7 @@ function lineItemsOf(record2) {
     if (typeof item === "string") return { name: item, price: "" };
     if (!item || typeof item !== "object") return { name: "", price: "" };
     const row = item;
-    return { name: text$q(row.name) || text$q(row.label) || text$q(row.service), price: money$5(row.price ?? row.amount ?? row.total) };
+    return { name: text$q(row.name) || text$q(row.label) || text$q(row.service), price: money$6(row.price ?? row.amount ?? row.total) };
   }).filter((item) => item.name);
 }
 function dateFromUnknown(value) {
@@ -9917,8 +9987,8 @@ function contextFromRecord(record2, extras = {}) {
     email: firstText$1(record2, ["clientEmail", "email", "customerEmail"]),
     phone: firstText$1(record2, ["clientPhone", "phone"]),
     lineItems: lineItemsOf(record2),
-    total: money$5(record2.total),
-    balanceDue: money$5(record2.balanceDue ?? record2.amountDue),
+    total: money$6(record2.total),
+    balanceDue: money$6(record2.balanceDue ?? record2.amountDue),
     appointmentWhen: formatChicagoWhen(start, timeLabel),
     appointmentStartIso: start ? start.toISOString() : "",
     photographerName: firstText$1(record2, ["assignedPhotographerName", "photographerName"]),
@@ -9934,7 +10004,7 @@ function contextFromRecord(record2, extras = {}) {
     mediaOutstanding: outstanding.outstanding,
     mediaOutstandingDetail: outstanding.detail,
     unpaid: orderUnpaid(record2),
-    paymentAmount: money$5(record2.paymentAmount ?? record2.amount),
+    paymentAmount: money$6(record2.paymentAmount ?? record2.amount),
     paymentMethod: firstText$1(record2, ["paymentMethod"]),
     paymentWhen: firstText$1(record2, ["paidAt", "paymentWhen"]),
     paymentId: firstText$1(record2, ["paymentId", "squarePaymentId", "stripePaymentIntentId"]),
@@ -10007,15 +10077,15 @@ function p(html) {
   return `<div style="margin:0 0 12px;">${html}</div>`;
 }
 function orderDetailsHtml(ctx) {
-  const rows = ctx.lineItems.map((item) => `<tr><td style="padding:6px 0;color:#333;">${escapeHtml$8(item.name)}</td><td style="padding:6px 0;text-align:right;">${escapeHtml$8(item.price)}</td></tr>`).join("");
+  const rows = ctx.lineItems.map((item) => `<tr><td style="padding:6px 0;color:#333;">${escapeHtml$9(item.name)}</td><td style="padding:6px 0;text-align:right;">${escapeHtml$9(item.price)}</td></tr>`).join("");
   return `
     <div style="margin:16px 0;padding:16px;border:1px solid #eee;border-radius:8px;">
-      <div style="font-weight:bold;margin-bottom:8px;">Order ${escapeHtml$8(orderCode(ctx))}</div>
-      <div>${escapeHtml$8(ctx.address || "Address not on the order")}</div>
+      <div style="font-weight:bold;margin-bottom:8px;">Order ${escapeHtml$9(orderCode(ctx))}</div>
+      <div>${escapeHtml$9(ctx.address || "Address not on the order")}</div>
       ${rows ? `<table style="width:100%;border-collapse:collapse;margin-top:8px;">${rows}</table>` : ""}
-      ${ctx.total ? `<div style="margin-top:8px;"><strong>Total:</strong> ${escapeHtml$8(ctx.total)}</div>` : ""}
-      ${ctx.balanceDue ? `<div><strong>Balance due:</strong> ${escapeHtml$8(ctx.balanceDue)}</div>` : ""}
-      <div style="margin-top:12px;">Please remember: <strong>${escapeHtml$8(INVOICE_LICENSE_NOTE)}</strong></div>
+      ${ctx.total ? `<div style="margin-top:8px;"><strong>Total:</strong> ${escapeHtml$9(ctx.total)}</div>` : ""}
+      ${ctx.balanceDue ? `<div><strong>Balance due:</strong> ${escapeHtml$9(ctx.balanceDue)}</div>` : ""}
+      <div style="margin-top:12px;">Please remember: <strong>${escapeHtml$9(INVOICE_LICENSE_NOTE)}</strong></div>
     </div>
   `;
 }
@@ -10024,9 +10094,9 @@ function appointmentsHtml(ctx) {
   return `
     <div style="margin:16px 0;">
       <div style="font-weight:bold;">Appointment</div>
-      <div>${escapeHtml$8(ctx.appointmentWhen || "Time to be confirmed")}</div>
-      <div>${escapeHtml$8(ctx.address)}</div>
-      ${ctx.photographerName ? `<div>Photographer: ${escapeHtml$8(ctx.photographerName)}</div>` : ""}
+      <div>${escapeHtml$9(ctx.appointmentWhen || "Time to be confirmed")}</div>
+      <div>${escapeHtml$9(ctx.address)}</div>
+      ${ctx.photographerName ? `<div>Photographer: ${escapeHtml$9(ctx.photographerName)}</div>` : ""}
     </div>
   `;
 }
@@ -10038,33 +10108,33 @@ function calendarLinksHtml(ctx) {
     details: `Order ${ctx.orderNumber}`.trim()
   });
   const links = [
-    ctx.calendarUrl ? `<a href="${escapeHtml$8(ctx.calendarUrl)}">View the calendar event</a>` : "",
-    generated ? `<a href="${escapeHtml$8(generated)}">Add to Google Calendar</a>` : ""
+    ctx.calendarUrl ? `<a href="${escapeHtml$9(ctx.calendarUrl)}">View the calendar event</a>` : "",
+    generated ? `<a href="${escapeHtml$9(generated)}">Add to Google Calendar</a>` : ""
   ].filter(Boolean);
   if (links.length === 0) return "";
   return p(links.join("<br>"));
 }
 function actionsHtml() {
-  return p(`Questions or a new time? Call <a href="${BUSINESS_CONTACT.phoneHref}">${escapeHtml$8(BUSINESS_CONTACT.phoneDisplay)}</a> or email <a href="${BUSINESS_CONTACT.emailHref}">${escapeHtml$8(BUSINESS_CONTACT.email)}</a>.`);
+  return p(`Questions or a new time? Call <a href="${BUSINESS_CONTACT.phoneHref}">${escapeHtml$9(BUSINESS_CONTACT.phoneDisplay)}</a> or email <a href="${BUSINESS_CONTACT.emailHref}">${escapeHtml$9(BUSINESS_CONTACT.email)}</a>.`);
 }
 function statusBlock(ctx) {
   if (!ctx.statusUrl) return "";
-  return p(`You can view the most up to date status of your order here: <a href="${escapeHtml$8(ctx.statusUrl)}">${escapeHtml$8(ctx.statusUrl)}</a>`);
+  return p(`You can view the most up to date status of your order here: <a href="${escapeHtml$9(ctx.statusUrl)}">${escapeHtml$9(ctx.statusUrl)}</a>`);
 }
 function pendingLine(ctx) {
   if (!ctx.mediaOutstanding) return "";
-  return p(`<strong>Pending:</strong> ${escapeHtml$8(ctx.mediaOutstandingDetail)}`);
+  return p(`<strong>Pending:</strong> ${escapeHtml$9(ctx.mediaOutstandingDetail)}`);
 }
 function contactBlock() {
   return `
     <div>Iconic Images Crew<br>
-    <a href="${BUSINESS_CONTACT.emailHref}">${escapeHtml$8(BUSINESS_CONTACT.email)}</a><br>
-    <a href="${BUSINESS_CONTACT.phoneHref}">${escapeHtml$8(BUSINESS_CONTACT.phoneDisplay)}</a></div>
-    <div>${escapeHtml$8(BUSINESS_CONTACT.address)}</div>
+    <a href="${BUSINESS_CONTACT.emailHref}">${escapeHtml$9(BUSINESS_CONTACT.email)}</a><br>
+    <a href="${BUSINESS_CONTACT.phoneHref}">${escapeHtml$9(BUSINESS_CONTACT.phoneDisplay)}</a></div>
+    <div>${escapeHtml$9(BUSINESS_CONTACT.address)}</div>
   `;
 }
 function innerHtml(key, ctx) {
-  const number = escapeHtml$8(orderCode(ctx));
+  const number = escapeHtml$9(orderCode(ctx));
   switch (key) {
     case "customer_order_confirmation":
       return [
@@ -10111,13 +10181,13 @@ function innerHtml(key, ctx) {
       ].join("");
     case "listing_delivery":
       return [
-        p(`Hi ${escapeHtml$8(ctx.firstName || "there")}!`),
-        p(`Your media for ${escapeHtml$8(ctx.address || "your listing")} is ready for download! Check out the link below to access your content:`),
+        p(`Hi ${escapeHtml$9(ctx.firstName || "there")}!`),
+        p(`Your media for ${escapeHtml$9(ctx.address || "your listing")} is ready for download! Check out the link below to access your content:`),
         pendingLine(ctx),
-        ctx.downloadUrl ? p(`<strong>Iconic Media:</strong> <a href="${escapeHtml$8(ctx.downloadUrl)}">${escapeHtml$8(ctx.downloadUrl)}</a>`) : "",
-        ctx.brandedTourUrl ? p(`<strong>This listing also includes 3D Virtual content URL(s). Access with the links below:</strong><br><strong>3D Tour Branded:</strong> <a href="${escapeHtml$8(ctx.brandedTourUrl)}">${escapeHtml$8(ctx.brandedTourUrl)}</a>`) : "",
-        ctx.unbrandedTourUrl ? p(`<strong>3D Tour Unbranded:</strong> <a href="${escapeHtml$8(ctx.unbrandedTourUrl)}">${escapeHtml$8(ctx.unbrandedTourUrl)}</a>`) : "",
-        ctx.brandedWebsiteUrl || ctx.unbrandedWebsiteUrl ? p(`<strong>This listing also includes a property website. Login to your account if you'd like to customize it further.</strong><br>${ctx.brandedWebsiteUrl ? `<strong>Branded Property Website:</strong> <a href="${escapeHtml$8(ctx.brandedWebsiteUrl)}">${escapeHtml$8(ctx.brandedWebsiteUrl)}</a><br>` : ""}${ctx.unbrandedWebsiteUrl ? `<strong>Unbranded Property Website:</strong> <a href="${escapeHtml$8(ctx.unbrandedWebsiteUrl)}">${escapeHtml$8(ctx.unbrandedWebsiteUrl)}</a>` : ""}`) : "",
+        ctx.downloadUrl ? p(`<strong>Iconic Media:</strong> <a href="${escapeHtml$9(ctx.downloadUrl)}">${escapeHtml$9(ctx.downloadUrl)}</a>`) : "",
+        ctx.brandedTourUrl ? p(`<strong>This listing also includes 3D Virtual content URL(s). Access with the links below:</strong><br><strong>3D Tour Branded:</strong> <a href="${escapeHtml$9(ctx.brandedTourUrl)}">${escapeHtml$9(ctx.brandedTourUrl)}</a>`) : "",
+        ctx.unbrandedTourUrl ? p(`<strong>3D Tour Unbranded:</strong> <a href="${escapeHtml$9(ctx.unbrandedTourUrl)}">${escapeHtml$9(ctx.unbrandedTourUrl)}</a>`) : "",
+        ctx.brandedWebsiteUrl || ctx.unbrandedWebsiteUrl ? p(`<strong>This listing also includes a property website. Login to your account if you'd like to customize it further.</strong><br>${ctx.brandedWebsiteUrl ? `<strong>Branded Property Website:</strong> <a href="${escapeHtml$9(ctx.brandedWebsiteUrl)}">${escapeHtml$9(ctx.brandedWebsiteUrl)}</a><br>` : ""}${ctx.unbrandedWebsiteUrl ? `<strong>Unbranded Property Website:</strong> <a href="${escapeHtml$9(ctx.unbrandedWebsiteUrl)}">${escapeHtml$9(ctx.unbrandedWebsiteUrl)}</a>` : ""}`) : "",
         p("Happy Listing!"),
         contactBlock(),
         p("<strong>Book your Podcast Studio Rental, Photo Studio Rental, Headshots &amp; More @ Iconic Studios Ste 105</strong>"),
@@ -10125,11 +10195,11 @@ function innerHtml(key, ctx) {
       ].join("");
     case "listing_delivery_showcase_select":
       return [
-        p(`Hello ${escapeHtml$8(ctx.fullName || "there")},`),
-        p(`Your content for ${escapeHtml$8(ctx.address || "your listing")} is ready for download in your Showcase agent experience dashboard!`),
-        ctx.showcaseMediaUrl ? p(`Access your media with this link: <a href="${escapeHtml$8(ctx.showcaseMediaUrl)}">${escapeHtml$8(ctx.showcaseMediaUrl)}</a>`) : "",
+        p(`Hello ${escapeHtml$9(ctx.fullName || "there")},`),
+        p(`Your content for ${escapeHtml$9(ctx.address || "your listing")} is ready for download in your Showcase agent experience dashboard!`),
+        ctx.showcaseMediaUrl ? p(`Access your media with this link: <a href="${escapeHtml$9(ctx.showcaseMediaUrl)}">${escapeHtml$9(ctx.showcaseMediaUrl)}</a>`) : "",
         p("Thank you for your business,"),
-        p(escapeHtml$8(ARYEO_COMPANY_NAME))
+        p(escapeHtml$9(ARYEO_COMPANY_NAME))
       ].join("");
     case "customer_order_payment_required":
       return [
@@ -10137,7 +10207,7 @@ function innerHtml(key, ctx) {
         statusBlock(ctx),
         orderDetailsHtml(ctx),
         p("Thank you for your business,"),
-        p(escapeHtml$8(ARYEO_COMPANY_NAME))
+        p(escapeHtml$9(ARYEO_COMPANY_NAME))
       ].join("");
     case "customer_order_payment_overdue":
       return [
@@ -10145,12 +10215,12 @@ function innerHtml(key, ctx) {
         statusBlock(ctx),
         orderDetailsHtml(ctx),
         p("Thank you for your business,"),
-        p(escapeHtml$8(ARYEO_COMPANY_NAME))
+        p(escapeHtml$9(ARYEO_COMPANY_NAME))
       ].join("");
     case "creator_order_received":
       return [
         p("You have received a new order! This is an automated email notification. Please review the details below and take any further actions in your account."),
-        ctx.editUrl ? p(`You can manage your order here: <a href="${escapeHtml$8(ctx.editUrl)}">${escapeHtml$8(ctx.editUrl)}</a>`) : "",
+        ctx.editUrl ? p(`You can manage your order here: <a href="${escapeHtml$9(ctx.editUrl)}">${escapeHtml$9(ctx.editUrl)}</a>`) : "",
         orderDetailsHtml(ctx),
         appointmentsHtml(ctx)
       ].join("");
@@ -10162,7 +10232,7 @@ function innerHtml(key, ctx) {
       return [
         p("This is an automated message letting you know your appointment has been confirmed and scheduled."),
         appointmentsHtml(ctx),
-        ctx.teamMembers.length ? p(`<strong>Team:</strong> ${escapeHtml$8(ctx.teamMembers.join(", "))}`) : ctx.photographerName ? p(`<strong>Team:</strong> ${escapeHtml$8(ctx.photographerName)}`) : "",
+        ctx.teamMembers.length ? p(`<strong>Team:</strong> ${escapeHtml$9(ctx.teamMembers.join(", "))}`) : ctx.photographerName ? p(`<strong>Team:</strong> ${escapeHtml$9(ctx.photographerName)}`) : "",
         calendarLinksHtml(ctx),
         actionsHtml(),
         orderDetailsHtml(ctx)
@@ -10176,43 +10246,43 @@ function innerHtml(key, ctx) {
     case "creator_appointment_reminder":
       return [p(`This is an automated message reminding you of your scheduled appointment for Order ${number}.`), appointmentsHtml(ctx), calendarLinksHtml(ctx), actionsHtml(), orderDetailsHtml(ctx)].join("");
     case "creator_upcoming_appointments_summary": {
-      const rows = ctx.dailyAppointments.map((item) => `<li style="margin:0 0 8px;">${escapeHtml$8(item.when)} — ${escapeHtml$8(item.address)} — ${escapeHtml$8(item.orderNumber)} — ${escapeHtml$8(item.clientName)}</li>`).join("");
+      const rows = ctx.dailyAppointments.map((item) => `<li style="margin:0 0 8px;">${escapeHtml$9(item.when)} — ${escapeHtml$9(item.address)} — ${escapeHtml$9(item.orderNumber)} — ${escapeHtml$9(item.clientName)}</li>`).join("");
       return [p("This is an automated email with your daily schedule of appointments. Here are your upcoming appointments:"), `<ul>${rows}</ul>`].join("");
     }
     case "creator_order_payment_processed":
       return [
         p("Hello,"),
         p(`You have received a payment for Order ${number}.`),
-        p(`${escapeHtml$8(ctx.paymentAmount || "Payment")} ${ctx.paymentMethod ? `via ${escapeHtml$8(ctx.paymentMethod)}` : ""} ${ctx.paymentWhen ? `on ${escapeHtml$8(ctx.paymentWhen)}` : ""}`.trim()),
-        ctx.editUrl ? p(`You can manage your order here: <a href="${escapeHtml$8(ctx.editUrl)}">${escapeHtml$8(ctx.editUrl)}</a>`) : ""
+        p(`${escapeHtml$9(ctx.paymentAmount || "Payment")} ${ctx.paymentMethod ? `via ${escapeHtml$9(ctx.paymentMethod)}` : ""} ${ctx.paymentWhen ? `on ${escapeHtml$9(ctx.paymentWhen)}` : ""}`.trim()),
+        ctx.editUrl ? p(`You can manage your order here: <a href="${escapeHtml$9(ctx.editUrl)}">${escapeHtml$9(ctx.editUrl)}</a>`) : ""
       ].join("");
     case "customer_team_invitation":
       return [
-        p(`Hi ${escapeHtml$8(ctx.firstName || "there")},`),
-        p(`You've been invited by ${escapeHtml$8(ctx.invitingName || "a teammate")} (${escapeHtml$8(ctx.invitingEmail)}) to activate your account as a ${escapeHtml$8(ctx.teamRole)} of team ${escapeHtml$8(ctx.teamName)}.`),
+        p(`Hi ${escapeHtml$9(ctx.firstName || "there")},`),
+        p(`You've been invited by ${escapeHtml$9(ctx.invitingName || "a teammate")} (${escapeHtml$9(ctx.invitingEmail)}) to activate your account as a ${escapeHtml$9(ctx.teamRole)} of team ${escapeHtml$9(ctx.teamName)}.`),
         ctx.teamRole === "admin" ? "<ul><li>View and manage team members listings</li><li>Place orders on behalf of team members</li><li>Update the team roster</li><li>View and manage team settings.</li></ul>" : "<ul><li>Access your projects and files</li><li>Review upcoming appointments</li><li>Receive important account notifications and communication</li><li>Automatically share your listings with team admin</li></ul>",
-        ctx.activationUrl ? p(`Button not working? Copy and paste the link below into your browser: <a href="${escapeHtml$8(ctx.activationUrl)}">${escapeHtml$8(ctx.activationUrl)}</a>`) : ""
+        ctx.activationUrl ? p(`Button not working? Copy and paste the link below into your browser: <a href="${escapeHtml$9(ctx.activationUrl)}">${escapeHtml$9(ctx.activationUrl)}</a>`) : ""
       ].join("");
     case "customer_user_activation":
       return [
-        p(`Hi ${escapeHtml$8(ctx.firstName || "there")},`),
-        p(`You've been invited to activate your account with ${escapeHtml$8(ARYEO_COMPANY_NAME)}. This will allow you to:`),
+        p(`Hi ${escapeHtml$9(ctx.firstName || "there")},`),
+        p(`You've been invited to activate your account with ${escapeHtml$9(ARYEO_COMPANY_NAME)}. This will allow you to:`),
         "<ul><li>Access your projects and files</li><li>Review upcoming appointments</li><li>Receive important account notifications and communication</li></ul>",
-        ctx.activationUrl ? p(`Button not working? Copy and paste the link below into your browser: <a href="${escapeHtml$8(ctx.activationUrl)}">${escapeHtml$8(ctx.activationUrl)}</a>`) : ""
+        ctx.activationUrl ? p(`Button not working? Copy and paste the link below into your browser: <a href="${escapeHtml$9(ctx.activationUrl)}">${escapeHtml$9(ctx.activationUrl)}</a>`) : ""
       ].join("");
     case "customer_user_reset_password":
       return [
-        p(`Hi ${escapeHtml$8(ctx.firstName || "there")},`),
-        p(`You are receiving this email because we received a password reset request for your account with ${escapeHtml$8(ARYEO_COMPANY_NAME)}.`),
+        p(`Hi ${escapeHtml$9(ctx.firstName || "there")},`),
+        p(`You are receiving this email because we received a password reset request for your account with ${escapeHtml$9(ARYEO_COMPANY_NAME)}.`),
         p("This password reset link will expire in 60 minutes."),
         p("If you did not request a password reset, no further action is required."),
-        ctx.activationUrl ? p(`Button not working? Copy and paste the link below into your browser: <a href="${escapeHtml$8(ctx.activationUrl)}">${escapeHtml$8(ctx.activationUrl)}</a>`) : ""
+        ctx.activationUrl ? p(`Button not working? Copy and paste the link below into your browser: <a href="${escapeHtml$9(ctx.activationUrl)}">${escapeHtml$9(ctx.activationUrl)}</a>`) : ""
       ].join("");
     case "customer_user_verification":
       return [
-        p(`Hi ${escapeHtml$8(ctx.firstName || "there")},`),
-        p(`Your verification code for your account with ${escapeHtml$8(ARYEO_COMPANY_NAME)} is listed below. Please enter it along with a new password of your choosing and do not share this email.`),
-        ctx.verificationCode ? `<h1>${escapeHtml$8(ctx.verificationCode)}</h1>` : ""
+        p(`Hi ${escapeHtml$9(ctx.firstName || "there")},`),
+        p(`Your verification code for your account with ${escapeHtml$9(ARYEO_COMPANY_NAME)} is listed below. Please enter it along with a new password of your choosing and do not share this email.`),
+        ctx.verificationCode ? `<h1>${escapeHtml$9(ctx.verificationCode)}</h1>` : ""
       ].join("");
     default:
       return "";
@@ -10251,15 +10321,15 @@ function wrapEmailHtml(inner, env) {
   <div style="padding:24px 12px;">
     <div style="max-width:600px;margin:0 auto;background:#ffffff;font-family:Arial,Helvetica,sans-serif;color:${BRAND_INK};">
       <div style="background:#111111;padding:20px;text-align:center;">
-        <img src="${escapeHtml$8(logo)}" alt="Iconic Images" width="180" style="width:180px;max-width:70%;height:auto;border:0;">
+        <img src="${escapeHtml$9(logo)}" alt="Iconic Images" width="180" style="width:180px;max-width:70%;height:auto;border:0;">
       </div>
       <div style="height:6px;background:${BRAND_YELLOW};line-height:6px;font-size:0;">&nbsp;</div>
       <div style="padding:28px 24px;font-size:15px;line-height:1.5;">
         ${inner}
       </div>
       <div style="padding:8px 24px 28px;font-size:12px;line-height:1.5;color:#555555;text-align:center;">
-        <div>${escapeHtml$8(BUSINESS_CONTACT.line)}</div>
-        <div style="margin-top:6px;">${escapeHtml$8(ARYEO_EMAIL_FROM_NAME)}</div>
+        <div>${escapeHtml$9(BUSINESS_CONTACT.line)}</div>
+        <div style="margin-top:6px;">${escapeHtml$9(ARYEO_EMAIL_FROM_NAME)}</div>
       </div>
     </div>
   </div>
@@ -11650,7 +11720,7 @@ const THANKFUL_RSVP_CONFIRM_ENV = "THANKFUL_RSVP_CONFIRM_LIVE";
 function thankfulRsvpConfirmLive(env = process.env) {
   return env[THANKFUL_RSVP_CONFIRM_ENV] === "true";
 }
-function escapeHtml$7(value) {
+function escapeHtml$8(value) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 function escapeIcsText(value) {
@@ -11683,9 +11753,9 @@ function thankfulRsvpConfirmHtml(input) {
   if (input.santa?.trim()) rows.push(["Photos with Santa", input.santa.trim()]);
   if (input.notes?.trim()) rows.push(["Notes", input.notes.trim()]);
   const detailRows = rows.map(
-    ([label, value]) => `<tr><td style="padding:8px 0;color:#8a7464;font-size:13px;width:140px;vertical-align:top;">${escapeHtml$7(label)}</td><td style="padding:8px 0;color:#1a120e;font-size:15px;font-weight:500;">${escapeHtml$7(value)}</td></tr>`
+    ([label, value]) => `<tr><td style="padding:8px 0;color:#8a7464;font-size:13px;width:140px;vertical-align:top;">${escapeHtml$8(label)}</td><td style="padding:8px 0;color:#1a120e;font-size:15px;font-weight:500;">${escapeHtml$8(value)}</td></tr>`
   ).join("");
-  const requestLine = input.requestId?.trim() ? `<p style="color:#8a7464;font-size:12px;margin:24px 0 0;">Confirmation ID: <strong style="color:#1a120e;">${escapeHtml$7(input.requestId.trim())}</strong></p>` : "";
+  const requestLine = input.requestId?.trim() ? `<p style="color:#8a7464;font-size:12px;margin:24px 0 0;">Confirmation ID: <strong style="color:#1a120e;">${escapeHtml$8(input.requestId.trim())}</strong></p>` : "";
   return `<div style="font-family:Georgia,'Times New Roman',serif;max-width:600px;margin:0 auto;padding:0;background:#f6efe4;">
   <div style="background:#1a120e;padding:28px 24px;text-align:center;">
     <p style="color:#e7d3a1;margin:0;font-size:11px;letter-spacing:0.18em;text-transform:uppercase;">Iconic Images</p>
@@ -11693,16 +11763,16 @@ function thankfulRsvpConfirmHtml(input) {
     <p style="color:#c4a574;margin:8px 0 0;font-size:14px;">Iconic Client Holiday Event · Thankful for You, ALWAYS ♥</p>
   </div>
   <div style="padding:28px 24px 8px;background:#ffffff;">
-    <p style="color:#1a120e;font-size:17px;line-height:1.55;margin:0 0 16px;">Hi ${escapeHtml$7(first)},</p>
+    <p style="color:#1a120e;font-size:17px;line-height:1.55;margin:0 0 16px;">Hi ${escapeHtml$8(first)},</p>
     <p style="color:#1a120e;font-size:16px;line-height:1.6;margin:0 0 16px;">Your RSVP went through — we can't wait to see you. Come hungry, bring everyone, and let us make you look amazing for 2027.</p>
     <table role="presentation" style="width:100%;border-collapse:collapse;margin:8px 0 20px;">${detailRows}</table>
-    <p style="color:#1a120e;font-size:15px;line-height:1.6;margin:0 0 8px;">Need to change your time or headcount? Call us at <a href="${BUSINESS_CONTACT.phoneHref}" style="color:#9b2c3a;font-weight:600;text-decoration:underline;">${escapeHtml$7(BUSINESS_CONTACT.phoneDisplay)}</a>.</p>
-    <p style="margin:22px 0 8px;text-align:center;"><a href="${escapeHtml$7(pageUrl)}" style="display:inline-block;background:#9b2c3a;color:#f6efe4;text-decoration:none;padding:12px 22px;border-radius:999px;font-size:14px;letter-spacing:0.04em;">View the event page</a></p>
+    <p style="color:#1a120e;font-size:15px;line-height:1.6;margin:0 0 8px;">Need to change your time or headcount? Call us at <a href="${BUSINESS_CONTACT.phoneHref}" style="color:#9b2c3a;font-weight:600;text-decoration:underline;">${escapeHtml$8(BUSINESS_CONTACT.phoneDisplay)}</a>.</p>
+    <p style="margin:22px 0 8px;text-align:center;"><a href="${escapeHtml$8(pageUrl)}" style="display:inline-block;background:#9b2c3a;color:#f6efe4;text-decoration:none;padding:12px 22px;border-radius:999px;font-size:14px;letter-spacing:0.04em;">View the event page</a></p>
     ${requestLine}
   </div>
   <div style="border-top:1px solid #e8dcc8;padding:18px 24px 28px;background:#ffffff;text-align:center;color:#8a7464;font-size:12px;line-height:1.6;">
     <p style="margin:0 0 6px;">${clientEmailContactLineHtml("#8a7464")}</p>
-    <p style="margin:0;"><a href="${escapeHtml$7(pageUrl)}" style="color:#8a7464;text-decoration:underline;">iconicimagestx.vercel.app/thankful</a></p>
+    <p style="margin:0;"><a href="${escapeHtml$8(pageUrl)}" style="color:#8a7464;text-decoration:underline;">iconicimagestx.vercel.app/thankful</a></p>
   </div>
 </div>`;
 }
@@ -14675,7 +14745,7 @@ function headshotsWeek() {
     days: [null, null, tuesday, null, null, null, null]
   };
 }
-function money$4(value) {
+function money$5(value) {
   return `$${value.toFixed(2)}`;
 }
 function roundMoney$2(value) {
@@ -14716,7 +14786,7 @@ function quoteHeadshots(quantity, applyProcessing = true, maxQuantity = HEADSHOT
   const processing = roundMoney$2(dueTodayProcessing + balanceProcessing);
   const total = roundMoney$2(subtotal + processing);
   const percentLabel = percent == null || Math.round(percent * 100) === 280 ? "2.8%" : `${Math.round(percent * 100) / 100}%`;
-  const balanceLine = balanceSubtotal > 0 ? applyProcessing ? `Balance on delivery: ${money$4(balanceSubtotal)} + ${percentLabel}` : `Balance on delivery: ${money$4(balanceSubtotal)}` : null;
+  const balanceLine = balanceSubtotal > 0 ? applyProcessing ? `Balance on delivery: ${money$5(balanceSubtotal)} + ${percentLabel}` : `Balance on delivery: ${money$5(balanceSubtotal)}` : null;
   return {
     quantity: qty,
     unitPrice,
@@ -14730,8 +14800,8 @@ function quoteHeadshots(quantity, applyProcessing = true, maxQuantity = HEADSHOT
     balanceProcessing,
     balanceTotal,
     balanceLine,
-    dueTodayLine: `Due today: ${money$4(dueToday)}`,
-    priceLine: applyProcessing ? HEADSHOTS_PRICE_LINE : `${money$4(unitPrice)} per headshot.`,
+    dueTodayLine: `Due today: ${money$5(dueToday)}`,
+    priceLine: applyProcessing ? HEADSHOTS_PRICE_LINE : `${money$5(unitPrice)} per headshot.`,
     slotsNeeded: headshotSlotsNeeded(qty)
   };
 }
@@ -14847,25 +14917,25 @@ function headshotHoldExpired(order, now) {
 function headshotClientMailEnabled(env = typeof process === "undefined" ? {} : process.env) {
   return clientNotifyLive(env);
 }
-function escapeHtml$6(value) {
+function escapeHtml$7(value) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 function headshotConfirmationEmailHtml(input) {
-  const balance = input.quote.balanceLine ? `<p>${escapeHtml$6(input.quote.balanceLine)}. That charge is ${escapeHtml$6(money$4(input.quote.balanceTotal))}.</p>` : "<p>This booking is paid in full once the booking fee is received. Nothing further is due on delivery.</p>";
+  const balance = input.quote.balanceLine ? `<p>${escapeHtml$7(input.quote.balanceLine)}. That charge is ${escapeHtml$7(money$5(input.quote.balanceTotal))}.</p>` : "<p>This booking is paid in full once the booking fee is received. Nothing further is due on delivery.</p>";
   return `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#081228;">
-    <h1 style="font-size:24px;">${escapeHtml$6(HEADSHOTS_H1)}</h1>
-    <p>Hi ${escapeHtml$6(input.clientName)},</p>
+    <h1 style="font-size:24px;">${escapeHtml$7(HEADSHOTS_H1)}</h1>
+    <p>Hi ${escapeHtml$7(input.clientName)},</p>
     <p>Your Tuesday time is reserved once the $10 booking fee is paid. The $10 counts toward your headshots.</p>
-    <p><strong>${escapeHtml$6(input.whenDate)}</strong> at <strong>${escapeHtml$6(input.whenTime)}</strong><br/>
+    <p><strong>${escapeHtml$7(input.whenDate)}</strong> at <strong>${escapeHtml$7(input.whenTime)}</strong><br/>
     ${input.quantity} headshot${input.quantity === 1 ? "" : "s"}<br/>
-    ${escapeHtml$6(input.quote.dueTodayLine)}<br/>
-    Order total ${escapeHtml$6(money$4(input.quote.total))}</p>
+    ${escapeHtml$7(input.quote.dueTodayLine)}<br/>
+    Order total ${escapeHtml$7(money$5(input.quote.total))}</p>
     ${balance}
-    <p>${escapeHtml$6(HEADSHOTS_STUDIO_LINE)}</p>
-    <p><a href="${escapeHtml$6(input.wearUrl)}">What to wear</a></p>
-    <p>Confirmation: <strong>${escapeHtml$6(input.orderNumber)}</strong></p>
-    <p style="font-size:13px;">${escapeHtml$6(LEGAL_BUSINESS_NAME)} · ${escapeHtml$6(BUSINESS_CONTACT.line)}</p>
-    <p><a href="${escapeHtml$6(input.pageUrl)}">${escapeHtml$6(input.pageUrl)}</a></p>
+    <p>${escapeHtml$7(HEADSHOTS_STUDIO_LINE)}</p>
+    <p><a href="${escapeHtml$7(input.wearUrl)}">What to wear</a></p>
+    <p>Confirmation: <strong>${escapeHtml$7(input.orderNumber)}</strong></p>
+    <p style="font-size:13px;">${escapeHtml$7(LEGAL_BUSINESS_NAME)} · ${escapeHtml$7(BUSINESS_CONTACT.line)}</p>
+    <p><a href="${escapeHtml$7(input.pageUrl)}">${escapeHtml$7(input.pageUrl)}</a></p>
   </div>`;
 }
 const APPRENTICESHIP_HOLD_PREFIX = "HOLD · $25 fee due · ";
@@ -15565,7 +15635,7 @@ function createRateLimiter(options) {
     }
   };
 }
-const router$G = Router();
+const router$H = Router();
 const db$x = () => admin.firestore();
 async function portalOrderLink(header2, source) {
   if (source !== "portal" || !header2?.startsWith("Bearer ") || !admin.apps.length) return null;
@@ -15603,7 +15673,7 @@ function toDate$1(value) {
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
-function money$3(value) {
+function money$4(value) {
   return orderTotalLabel(value);
 }
 function calendarHoldFailureMessage(err) {
@@ -15624,7 +15694,7 @@ async function loadBookingCatalog() {
     return packagesForStaffEditor([]);
   }
 }
-router$G.post("/", async (req, res) => {
+router$H.post("/", async (req, res) => {
   const limit = bookingSubmitLimiter.check(clientIp(req));
   if (!limit.allowed) {
     res.setHeader("Retry-After", String(limit.retryAfterSec));
@@ -16101,7 +16171,7 @@ router$G.post("/", async (req, res) => {
       serviceName: typeof selectedService === "string" && selectedService.trim() ? selectedService : "Holiday order",
       whenDate: bookingDateLabel(scheduledDate, "TBD — we'll confirm shortly"),
       whenTime: shownTime,
-      total: money$3(total),
+      total: money$4(total),
       requestId: docRef.id,
       pagePath: leadSource === HOLIDAY_SEASON_LEAD ? "/tis-the-season" : "/thankful",
       complimentary: holidayMailKind === "free"
@@ -16171,9 +16241,9 @@ router$G.post("/", async (req, res) => {
           clientName: clientName2,
           address: displayAddress,
           orderNumber: orderNumber2,
-          processing: money$3(sale.processing ?? 0),
-          subtotal: money$3(sale.subtotal),
-          total: money$3(total),
+          processing: money$4(sale.processing ?? 0),
+          subtotal: money$4(sale.subtotal),
+          total: money$4(total),
           requestId: docRef.id,
           scheduledDate: bookingDateLabel(scheduledDate, "TBD — we'll confirm shortly"),
           scheduledTime: shownTime,
@@ -16219,7 +16289,7 @@ router$G.post("/", async (req, res) => {
               firstName,
               bookingDateLabel(scheduledDate, "TBD — we'll confirm shortly"),
               displayAddress,
-              money$3(total)
+              money$4(total)
             )
           }).then((result) => "suppressed" in result && result.suppressed ? "failed" : "sent").catch((err) => {
             console.error("[Bookings] Confirmation SMS failed:", err);
@@ -16497,13 +16567,13 @@ async function socialRateCaller(req) {
     return { role: null, email: null };
   }
 }
-router$G.get("/social-rate", async (req, res) => {
+router$H.get("/social-rate", async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   const requested = typeof req.query.date === "string" ? req.query.date : "";
   const previewAllowed = requested ? socialRatePreviewAllowed(await socialRateCaller(req)) : false;
   return res.json(socialRateView(/* @__PURE__ */ new Date(), requested || null, previewAllowed));
 });
-router$G.post("/holiday-calendar-backfill", requireAdmin, async (_req, res) => {
+router$H.post("/holiday-calendar-backfill", requireAdmin, async (_req, res) => {
   try {
     return res.json(await backfillHolidayCalendarEvents());
   } catch (err) {
@@ -16511,7 +16581,7 @@ router$G.post("/holiday-calendar-backfill", requireAdmin, async (_req, res) => {
     return res.status(500).json({ error: "Holiday calendar backfill failed." });
   }
 });
-router$G.get("/holiday-slots", async (_req, res) => {
+router$H.get("/holiday-slots", async (_req, res) => {
   res.setHeader("Cache-Control", "no-store");
   try {
     return res.json(holidayTakenFromOrders(await loadHolidaySlotOrders()));
@@ -16520,13 +16590,13 @@ router$G.get("/holiday-slots", async (_req, res) => {
     return res.status(500).json({ error: "Holiday slots are unavailable." });
   }
 });
-router$G.get("/photographers", (_req, res) => {
+router$H.get("/photographers", (_req, res) => {
   return res.json({
     noPreference: { id: NO_PREFERENCE_ID, name: NO_PREFERENCE_NAME },
     photographers: publicBookingPhotographers()
   });
 });
-router$G.get("/realestate-75/slots", async (req, res) => {
+router$H.get("/realestate-75/slots", async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   const pkg = realEstate75Package(typeof req.query.package === "string" ? req.query.package : "");
   try {
@@ -16550,7 +16620,7 @@ function postedDurationMinutes(value) {
   if (!Number.isInteger(parsed) || parsed < 15 || parsed > 24 * 60) return void 0;
   return parsed;
 }
-router$G.get("/slots", async (req, res) => {
+router$H.get("/slots", async (req, res) => {
   const basics = typeof req.query.basics === "string" ? req.query.basics.split(",").map((id) => id.trim()).filter(Boolean) : [];
   const preferenceId = preferenceFromRequest(req.query.photographer, "");
   try {
@@ -16575,7 +16645,7 @@ router$G.get("/slots", async (req, res) => {
     return res.json({ live: false, durationMinutes: 90, slots: [], suggestions: [] });
   }
 });
-router$G.get("/catalog", async (_req, res) => {
+router$H.get("/catalog", async (_req, res) => {
   const catalog = await loadBookingCatalog();
   const adjustments = await loadPricingAdjustments();
   const rates = pricingRates(adjustments);
@@ -16592,7 +16662,7 @@ router$G.get("/catalog", async (_req, res) => {
     payAtClose: payAtClosePublicOffer(process.env, adjustments)
   });
 });
-router$G.get("/", requireCoordinator, async (_req, res) => {
+router$H.get("/", requireCoordinator, async (_req, res) => {
   try {
     const snapshot = await db$x().collection("orderRequests").orderBy("createdAt", "desc").limit(100).get();
     const requests = snapshot.docs.map((doc) => ({
@@ -16605,7 +16675,7 @@ router$G.get("/", requireCoordinator, async (_req, res) => {
     return res.status(500).json({ error: "Failed to fetch booking requests." });
   }
 });
-router$G.get("/:id", requireCoordinator, async (req, res) => {
+router$H.get("/:id", requireCoordinator, async (req, res) => {
   try {
     const doc = await db$x().collection("orderRequests").doc(req.params.id).get();
     if (!doc.exists) {
@@ -16617,7 +16687,7 @@ router$G.get("/:id", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch booking request." });
   }
 });
-router$G.post("/:id/assign-photographer", requireCoordinator, async (req, res) => {
+router$H.post("/:id/assign-photographer", requireCoordinator, async (req, res) => {
   try {
     const requestDoc = await db$x().collection("orderRequests").doc(req.params.id).get();
     if (!requestDoc.exists) return res.status(404).json({ error: "Booking request not found." });
@@ -16632,7 +16702,7 @@ router$G.post("/:id/assign-photographer", requireCoordinator, async (req, res) =
     return res.status(500).json({ error: "Could not assign the photographer." });
   }
 });
-router$G.patch("/:id/confirm", requireCoordinator, async (req, res) => {
+router$H.patch("/:id/confirm", requireCoordinator, async (req, res) => {
   try {
     const { assignedPhotographerId, assignedPhotographerName: postedPhotographerName, scheduledDate, scheduledTime, internalNotes } = req.body;
     const requestDoc = await db$x().collection("orderRequests").doc(req.params.id).get();
@@ -17114,7 +17184,7 @@ async function releaseOrderCalendar(data) {
     return calendarHoldFailureMessage(err);
   }
 }
-router$G.patch("/:id/cancel", requireCoordinator, async (req, res) => {
+router$H.patch("/:id/cancel", requireCoordinator, async (req, res) => {
   try {
     const doc = await db$x().collection("orderRequests").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Not found." });
@@ -17154,7 +17224,7 @@ router$G.patch("/:id/cancel", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to cancel booking." });
   }
 });
-router$G.patch("/:id/decline", requireCoordinator, async (req, res) => {
+router$H.patch("/:id/decline", requireCoordinator, async (req, res) => {
   try {
     const { reason } = req.body;
     const doc = await db$x().collection("orderRequests").doc(req.params.id).get();
@@ -17835,7 +17905,7 @@ async function resolveLateHeadshotPayment(orderId) {
   }
   return "flagged";
 }
-const router$F = Router();
+const router$G = Router();
 const limiter$4 = createRateLimiter({ windowMs: 15 * 60 * 1e3, max: 8 });
 const db$v = () => admin.firestore();
 async function nextInvoiceNumber$2() {
@@ -17848,7 +17918,7 @@ async function nextInvoiceNumber$2() {
     return `INV-${year}-${String(Date.now()).slice(-6)}`;
   }
 }
-router$F.get("/config", (_req, res) => {
+router$G.get("/config", (_req, res) => {
   const config = headshotConfig(process.env);
   res.json({
     ...config,
@@ -17859,7 +17929,7 @@ router$F.get("/config", (_req, res) => {
     holdMinutes: 60
   });
 });
-router$F.get("/slots", async (req, res) => {
+router$G.get("/slots", async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   const config = headshotConfig(process.env);
   const quantity = Number(req.query.quantity);
@@ -17885,7 +17955,7 @@ router$F.get("/slots", async (req, res) => {
     });
   }
 });
-router$F.post("/order", async (req, res) => {
+router$G.post("/order", async (req, res) => {
   const limit = limiter$4.check(clientIp(req));
   if (!limit.allowed) {
     res.setHeader("Retry-After", String(limit.retryAfterSec));
@@ -18340,6 +18410,17 @@ function resolveB2ObjectKey(item, parent) {
   if (!prefix || own.includes("/") || own === prefix || own.startsWith(`${prefix}/`)) return own;
   return safeB2Key(`${prefix}/${own}`);
 }
+function stableMediaKey(row) {
+  for (const key of ["id", "path", "storagePath", "b2Key"]) {
+    const value = typeof row[key] === "string" ? row[key].trim() : "";
+    if (value) return value;
+  }
+  for (const key of ["url", "shareUrl"]) {
+    const value = typeof row[key] === "string" ? row[key].trim() : "";
+    if (value) return value;
+  }
+  return "";
+}
 function savedDownloadName(row, objectKey = "") {
   for (const key of ["deliveryName", "fileName", "name", "title"]) {
     const value = typeof row[key] === "string" ? row[key].trim() : "";
@@ -18653,7 +18734,7 @@ function amzDate(now) {
   const iso = now.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
   return iso;
 }
-const router$E = Router();
+const router$F = Router();
 const db$t = () => admin.firestore();
 const dotOptInLimiter = createRateLimiter({ windowMs: 10 * 60 * 1e3, max: 30 });
 function sendDotOptInPage(res, status2, ok) {
@@ -18666,7 +18747,7 @@ function sendDotOptInPage(res, status2, ok) {
   });
   res.send(dotOptInResultHtml(ok));
 }
-router$E.get("/dot-opt-in", async (req, res) => {
+router$F.get("/dot-opt-in", async (req, res) => {
   const limit = dotOptInLimiter.check(clientIp(req));
   if (!limit.allowed) {
     res.set("Retry-After", String(limit.retryAfterSec));
@@ -18682,7 +18763,7 @@ router$E.get("/dot-opt-in", async (req, res) => {
     sendDotOptInPage(res, 500, false);
   }
 });
-router$E.get("/", requireStaff, async (req, res) => {
+router$F.get("/", requireStaff, async (req, res) => {
   try {
     const { status: status2, photographerId, limit = "50", startAfter } = req.query;
     let query = db$t().collection("orders").orderBy("createdAt", "desc");
@@ -18710,7 +18791,7 @@ router$E.get("/", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch orders." });
   }
 });
-router$E.get("/dashboard", requireStaff, async (_req, res) => {
+router$F.get("/dashboard", requireStaff, async (_req, res) => {
   try {
     const now = /* @__PURE__ */ new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -18740,7 +18821,7 @@ router$E.get("/dashboard", requireStaff, async (_req, res) => {
     return res.status(500).json({ error: "Failed to fetch dashboard stats." });
   }
 });
-router$E.get("/:id", requireStaff, async (req, res) => {
+router$F.get("/:id", requireStaff, async (req, res) => {
   try {
     const orderDoc = await db$t().collection("orders").doc(req.params.id).get();
     if (!orderDoc.exists) return res.status(404).json({ error: "Order not found." });
@@ -18775,7 +18856,7 @@ router$E.get("/:id", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch order." });
   }
 });
-router$E.patch("/:id/revenue", requireCoordinator, async (req, res) => {
+router$F.patch("/:id/revenue", requireCoordinator, async (req, res) => {
   if (typeof req.body?.countsTowardRevenue !== "boolean") {
     return res.status(400).json({ error: "countsTowardRevenue must be true or false." });
   }
@@ -18804,7 +18885,7 @@ router$E.patch("/:id/revenue", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Could not update revenue acceptance." });
   }
 });
-router$E.patch("/:id", requireCoordinator, async (req, res) => {
+router$F.patch("/:id", requireCoordinator, async (req, res) => {
   try {
     const allowed = [
       "status",
@@ -18873,7 +18954,7 @@ const VALID_TRANSITIONS = {
   completed: [],
   cancelled: []
 };
-router$E.patch("/:id/status", requireCoordinator, async (req, res) => {
+router$F.patch("/:id/status", requireCoordinator, async (req, res) => {
   try {
     const { status: status2, note } = req.body;
     const orderDoc = await db$t().collection("orders").doc(req.params.id).get();
@@ -18946,7 +19027,7 @@ router$E.patch("/:id/status", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to update order status." });
   }
 });
-router$E.get("/:id/timeline", requireStaff, async (req, res) => {
+router$F.get("/:id/timeline", requireStaff, async (req, res) => {
   try {
     const [messages, editRequests, agentLogs] = await Promise.all([
       db$t().collection("messages").where("orderId", "==", req.params.id).orderBy("createdAt", "asc").get(),
@@ -22949,6 +23030,17 @@ async function downloadGateForGallery$1(gallery) {
     lockDownloads: listing.lockDownloads
   };
 }
+function safeDeliveryUrl(value, fallback) {
+  const raw = value?.trim() || "";
+  if (!raw) return fallback;
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== "https:") return fallback;
+    return url.toString();
+  } catch {
+    return fallback;
+  }
+}
 async function deliverGalleryToClient(galleryId, options) {
   const galleryDoc = await db$p().collection("galleries").doc(galleryId).get();
   if (!galleryDoc.exists) throw httpError$4(404, "Gallery not found.");
@@ -22963,7 +23055,7 @@ async function deliverGalleryToClient(galleryId, options) {
   const expiresAt = admin.firestore.Timestamp.fromDate(
     new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1e3)
   );
-  const deliveryUrl = galleryDeliveryUrl(galleryId);
+  const deliveryUrl = safeDeliveryUrl(options?.deliveryUrl, galleryDeliveryUrl(galleryId));
   await galleryDoc.ref.update({
     status: "delivered",
     deliveryUrl,
@@ -22984,7 +23076,7 @@ async function deliverGalleryToClient(galleryId, options) {
   const address = recordAddressText(gallery) || "the property";
   const invoice = await invoiceForGallery$1(gallery);
   const payUrl = galleryDeliveryPayUrl(invoice);
-  const recipients = typeof client?.email === "string" && client.email.trim() ? client.email.split(/[,;]/).map((item) => item.trim()).filter(Boolean) : [];
+  const recipients = options?.notice ? [options.notice.to, options.notice.cc || ""].join(",").split(/[,;]/).map((item) => item.trim()).filter(Boolean) : typeof client?.email === "string" && client.email.trim() ? client.email.split(/[,;]/).map((item) => item.trim()).filter(Boolean) : [];
   let emailDelivery = "suppressed";
   try {
     if (recipients.length > 0) {
@@ -22998,7 +23090,16 @@ async function deliverGalleryToClient(galleryId, options) {
         paymentUrl: payUrl || "",
         expiresAt: `${expiresInDays} days`
       };
-      const result = await sendEmail({
+      const result = options?.notice ? await sendEmail({
+        to: options.notice.to,
+        cc: options.notice.cc,
+        template: "gallery_delivery",
+        subject: options.notice.subject,
+        html: options.notice.html,
+        text: options.notice.text,
+        lockHtml: true,
+        variables
+      }) : await sendEmail({
         to: recipients.join(", "),
         template: "gallery_delivery",
         subject: galleryDeliverySubject(address),
@@ -23055,7 +23156,7 @@ async function deliverGalleryToClient(galleryId, options) {
       collection: "orders"
     }).catch((err) => console.error("[Galleries] Payment required email notify failed:", err));
   }
-  if (client?.phone) {
+  if (!options?.skipSms && client?.phone) {
     const orderSnap = gallery.orderId ? await db$p().collection("orders").doc(String(gallery.orderId)).get() : null;
     const order = orderSnap?.exists ? orderSnap.data() : null;
     const consentBlock = transactionalSmsBlockReason({
@@ -23341,7 +23442,7 @@ const handlePublicGalleryLink = async (req, res) => {
     return res.status(500).json({ code: "lookup_failed", error: message, message });
   }
 };
-const router$D = Router();
+const router$E = Router();
 const db$n = () => admin.firestore();
 const storage = () => admin.storage().bucket();
 function cleanPosterUrl(value) {
@@ -23438,7 +23539,7 @@ function clientGalleryPayload(id, gallery, gate2) {
     mediaItems: showMedia ? lockedClientGalleryMedia(id, media, unlocked) : []
   };
 }
-router$D.get("/", requireStaff, async (req, res) => {
+router$E.get("/", requireStaff, async (req, res) => {
   try {
     const { status: status2, orderId } = req.query;
     let query = db$n().collection("galleries").orderBy("createdAt", "desc");
@@ -23484,7 +23585,7 @@ async function readGalleryPhotoBytes(item) {
     return null;
   }
 }
-router$D.get("/public/:id/photos.zip", async (req, res) => {
+router$E.get("/public/:id/photos.zip", async (req, res) => {
   const id = typeof req.params.id === "string" ? req.params.id : "";
   if (malformedPublicGalleryId(id)) return publicGalleryNotFound(res);
   if (!admin.apps.length) return publicGalleryNotFound(res);
@@ -23525,7 +23626,7 @@ router$D.get("/public/:id/photos.zip", async (req, res) => {
     return res.status(500).json({ error: "We couldn't build that download." });
   }
 });
-router$D.get("/public/:id", async (req, res) => {
+router$E.get("/public/:id", async (req, res) => {
   const id = typeof req.params.id === "string" ? req.params.id : "";
   if (malformedPublicGalleryId(id)) {
     console.warn("[Galleries] Public gallery id rejected.");
@@ -23553,8 +23654,8 @@ router$D.get("/public/:id", async (req, res) => {
     return res.status(500).json({ error: "We couldn't open this gallery." });
   }
 });
-router$D.get("/link/:id", handlePublicGalleryLink);
-router$D.get("/:id", requireAuth, async (req, res) => {
+router$E.get("/link/:id", handlePublicGalleryLink);
+router$E.get("/:id", requireAuth, async (req, res) => {
   try {
     const doc = await db$n().collection("galleries").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Gallery not found." });
@@ -23578,7 +23679,7 @@ router$D.get("/:id", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch gallery." });
   }
 });
-router$D.post("/:id/upload-url", requirePhotographer, async (req, res) => {
+router$E.post("/:id/upload-url", requirePhotographer, async (req, res) => {
   try {
     const { fileName: fileName2, fileType, isRaw: isRaw2 = false } = req.body;
     if (!fileName2 || !fileType) {
@@ -23603,7 +23704,7 @@ router$D.post("/:id/upload-url", requirePhotographer, async (req, res) => {
     return res.status(500).json({ error: "Failed to generate upload URL." });
   }
 });
-router$D.post("/:id/media", requirePhotographer, async (req, res) => {
+router$E.post("/:id/media", requirePhotographer, async (req, res) => {
   try {
     const {
       storagePath,
@@ -23657,7 +23758,7 @@ router$D.post("/:id/media", requirePhotographer, async (req, res) => {
     return res.status(500).json({ error: "Failed to register media." });
   }
 });
-router$D.post("/:id/media-link", requireCoordinator, async (req, res) => {
+router$E.post("/:id/media-link", requireCoordinator, async (req, res) => {
   try {
     const { url, title, type = "video", embedUrl, thumbnailUrl, downloadable = false, poster, posterUrl } = req.body;
     if (!url) return res.status(400).json({ error: "url required." });
@@ -23693,7 +23794,7 @@ router$D.post("/:id/media-link", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to register media link." });
   }
 });
-router$D.get("/:id/release", requireCoordinator, async (req, res) => {
+router$E.get("/:id/release", requireCoordinator, async (req, res) => {
   if (!adminReady$5(res)) return;
   try {
     const report = await loadGalleryReleaseForGallery(req.params.id);
@@ -23705,7 +23806,7 @@ router$D.get("/:id/release", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to check gallery release." });
   }
 });
-router$D.patch("/:id/status", requireCoordinator, async (req, res) => {
+router$E.patch("/:id/status", requireCoordinator, async (req, res) => {
   try {
     const { status: status2 } = req.body;
     const validStatuses = ["pending_upload", "raw_uploaded", "editing", "ready_for_review", "approved", "delivered"];
@@ -23727,7 +23828,7 @@ router$D.patch("/:id/status", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to update gallery status." });
   }
 });
-router$D.post("/:id/deliver", requireCoordinator, async (req, res) => {
+router$E.post("/:id/deliver", requireCoordinator, async (req, res) => {
   try {
     if (!adminReady$5(res)) return;
     const result = await deliverGalleryToClient(req.params.id, {
@@ -23756,7 +23857,7 @@ router$D.post("/:id/deliver", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to deliver gallery." });
   }
 });
-router$D.patch("/:id/downloads", requireCoordinator, async (req, res) => {
+router$E.patch("/:id/downloads", requireCoordinator, async (req, res) => {
   if (!adminReady$5(res)) return;
   try {
     if (typeof req.body?.released !== "boolean") {
@@ -23793,7 +23894,7 @@ router$D.patch("/:id/downloads", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to update gallery downloads." });
   }
 });
-router$D.delete("/:id/media/:mediaId", requireCoordinator, async (req, res) => {
+router$E.delete("/:id/media/:mediaId", requireCoordinator, async (req, res) => {
   try {
     const galleryDoc = await db$n().collection("galleries").doc(req.params.id).get();
     if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
@@ -23809,6 +23910,639 @@ router$D.delete("/:id/media/:mediaId", requireCoordinator, async (req, res) => {
   } catch (err) {
     return res.status(500).json({ error: "Failed to remove media item." });
   }
+});
+const CLIENT_DELIVERY_PREVIEW_ID = "preview";
+const CLIENT_DELIVERY_PREVIEW_PAID_ID = "preview-paid";
+const MEDIA_KEYS = ["images", "videos", "floorplans", "floorPlans", "mediaItems", "files", "tours", "videoLinks", "tourLinks"];
+function isClientDeliveryPreview(id) {
+  return id === CLIENT_DELIVERY_PREVIEW_ID || id === CLIENT_DELIVERY_PREVIEW_PAID_ID;
+}
+function clientDeliveryPreviewPaid(id) {
+  return id === CLIENT_DELIVERY_PREVIEW_PAID_ID;
+}
+function clientDeliveryPath(id) {
+  return `/deliver/${encodeURIComponent(id)}`;
+}
+function clientDeliveryPresentationUrl(id, env) {
+  return publicClientUrl(clientDeliveryPath(id), env);
+}
+function clientDeliveryNotifyMode(env = process.env) {
+  const clientNotifyLive2 = env.CLIENT_NOTIFY_LIVE === "true";
+  const emailNotifyLive = clientEmailNotifyLive(env);
+  const live = clientNotifyLive2 && emailNotifyLive;
+  return {
+    live,
+    mode: live ? "live" : "preview",
+    clientNotifyLive: clientNotifyLive2,
+    clientEmailNotifyLive: emailNotifyLive,
+    testSink: CLIENT_EMAIL_NOTIFY_TEST_SINK,
+    banner: live ? "Live delivery is on. Send emails the client. Test send goes only to internal QA." : "Safe preview. CLIENT_NOTIFY_LIVE and CLIENT_EMAIL_NOTIFY_LIVE are off, so Send does not email the client. Copy the presentation link, or send a test that stays with internal QA."
+  };
+}
+function deliveryPaymentLabel(status2) {
+  return status2 === "unpaid" ? "Unpaid" : "Paid";
+}
+function escapeHtml$6(value) {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+function withDeliveryFooter(message) {
+  const body = message.trim();
+  if (body.includes(BUSINESS_CONTACT_LINE)) return body;
+  return `${body}
+
+${BUSINESS_CONTACT_LINE}`;
+}
+function clientDeliveryEmailHtml(message) {
+  const text2 = withDeliveryFooter(message);
+  const blocks = text2.split(/\n{2,}/).map(
+    (part) => `<p style="margin:0 0 14px;font-size:15px;line-height:1.5;color:#111;">${escapeHtml$6(part).replace(/\n/g, "<br>")}</p>`
+  ).join("");
+  return `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+    <div style="background:#000;padding:20px;text-align:center;margin-bottom:24px;">
+      <h1 style="color:#fff;margin:0;font-size:22px;letter-spacing:2px;">ICONIC IMAGES</h1>
+    </div>
+    ${blocks}
+  </div>`;
+}
+function prepareDeliveryMessage(message) {
+  const trimmed = message.trim();
+  if (!trimmed) return { ok: false, error: "Write a message before sending." };
+  if (/cadi@/i.test(trimmed)) return { ok: false, error: "Client delivery mail uses photos@iconicimagestx.com." };
+  if (trimmed.length > 8e3) return { ok: false, error: "That message is too long." };
+  const text2 = withDeliveryFooter(trimmed);
+  const html = clientDeliveryEmailHtml(text2);
+  if (/cadi@/i.test(html)) return { ok: false, error: "Client delivery mail uses photos@iconicimagestx.com." };
+  return { ok: true, text: text2, html };
+}
+function deliveryEmailList(value) {
+  return value.split(/[,;]/).map((item) => item.trim()).filter((item) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(item));
+}
+function money$3(value) {
+  return formatInvoiceAmount(value);
+}
+function clientDeliveryMessage(input) {
+  const status2 = deliveryPaymentLabel(input.invoice.status);
+  const pay = input.invoice.status === "unpaid" ? "Downloads stay watermarked until this invoice is paid. Pay from the presentation page." : "This invoice is paid. Watermark-free downloads are open on the presentation page.";
+  const processing = input.invoice.processing && input.invoice.processing > 0 ? `Processing ${money$3(input.invoice.processing)}.` : "";
+  return [
+    `Hi ${input.clientName || "there"},`,
+    "",
+    `Your photos for ${input.address || "the property"} are edited and ready.`,
+    "",
+    "Open your delivery presentation:",
+    input.presentationUrl,
+    "",
+    `Invoice ${input.invoice.number} · ${money$3(input.invoice.total)} · ${status2}`,
+    processing,
+    pay,
+    "",
+    BUSINESS_CONTACT_LINE
+  ].filter((line, index, all) => line !== "" || all[index - 1] !== "").join("\n").replace(/\n{3,}/g, "\n\n");
+}
+const SAMPLE_LINES = [
+  { name: "Real estate photography", qty: 1, price: 275 },
+  { name: "Twilight photos", qty: 1, price: 125 },
+  { name: "Floor plan", qty: 1, price: 75 }
+];
+function sampleDeliveryInvoice(paid) {
+  const subtotal = 475;
+  const processing = 14.25;
+  const total = 489.25;
+  return {
+    id: paid ? "sample-paid" : "sample-unpaid",
+    number: "INV-1042",
+    status: paid ? "paid" : "unpaid",
+    total,
+    subtotal,
+    processing,
+    amountDue: paid ? 0 : total,
+    amountPaid: paid ? total : 0,
+    lines: SAMPLE_LINES,
+    payPath: null,
+    paidNote: paid ? "Paid at booking. Receipt is on this page." : ""
+  };
+}
+function sampleDeliveryAssets() {
+  const photo = (file, name) => ({
+    name,
+    kind: "photo",
+    section: "Photos",
+    raster: true,
+    downloadable: true,
+    localFile: file
+  });
+  return [
+    photo("portal-v2/deliver-hero.jpg", "Front elevation.jpg"),
+    photo("portal-v2/deliver-living.jpg", "Living room.jpg"),
+    photo("portal-v2/deliver-kitchen.jpg", "Kitchen.jpg"),
+    photo("portal-v2/deliver-bath.jpg", "Primary bath.jpg"),
+    photo("portal-v2/deliver-yard.jpg", "Backyard.jpg"),
+    { name: "Walkthrough.mp4", kind: "video", section: "Video", raster: true, downloadable: false, localFile: "portal-v2/deliver-dining.jpg" },
+    { name: "3D tour", kind: "tour", section: "3D Tour", raster: true, downloadable: false, localFile: "portal-v2/deliver-angle.jpg" },
+    { name: "Floor plan.png", kind: "floorplan", section: "Floor plans", raster: true, downloadable: true, localFile: "playtest/TEST-delivery-qa-floorplan.png" }
+  ];
+}
+function sectionFor(kind) {
+  if (kind === "video") return "Video";
+  if (kind === "tour") return "3D Tour";
+  if (kind === "floorplan") return "Floor plans";
+  if (kind === "file") return "Files";
+  return "Photos";
+}
+function kindOf$1(row, name) {
+  const type = String(row.type || row.assetType || row.category || "").toLowerCase();
+  const lower = name.toLowerCase();
+  if (type.includes("tour") || type.includes("matterport") || lower.includes("matterport")) return "tour";
+  if (type === "video" || type === "reel" || /\.(mp4|mov|m4v|webm)$/.test(lower)) return "video";
+  if (type.includes("floor") || type === "floorplan") return "floorplan";
+  if (type === "file" || type === "document" || /\.(pdf|zip)$/.test(lower)) return "file";
+  return "photo";
+}
+function httpsUrl$1(value) {
+  if (typeof value !== "string") return "";
+  const url = value.trim();
+  if (!url.startsWith("https://") || url.length > 2e3) return "";
+  return url;
+}
+function localMedia(value) {
+  if (typeof value !== "string") return "";
+  const path2 = value.trim().split("?")[0].split("#")[0];
+  if (!path2.startsWith("/media/")) return "";
+  const relative = path2.slice("/media/".length);
+  if (!relative || relative.includes("..") || relative.includes("\\")) return "";
+  return relative;
+}
+function storagePathOf(row) {
+  for (const key of ["storagePath", "path"]) {
+    const value = typeof row[key] === "string" ? row[key].trim() : "";
+    if (!value || value.includes("..") || value.startsWith("/") || value.startsWith("http")) continue;
+    return value;
+  }
+  return "";
+}
+function assetFromRow(row, parent, section, fallbackName) {
+  const name = [row.deliveryName, row.fileName, row.name, row.title].find((value) => typeof value === "string" && value.trim());
+  const label = (name || fallbackName).trim();
+  if (!label) return null;
+  const kind = kindOf$1(row, label);
+  const imageFile = /\.(jpe?g|png|webp|gif)$/i.test(label);
+  const photoLike = kind === "photo" || kind === "floorplan" && !/\.pdf$/i.test(label);
+  return {
+    name: label,
+    kind,
+    section: section || sectionFor(kind),
+    raster: photoLike || imageFile,
+    downloadable: kind !== "tour" && kind !== "video",
+    localFile: localMedia(row.url) || localMedia(row.shareUrl) || void 0,
+    b2Key: resolveB2ObjectKey(row, parent) || void 0,
+    storagePath: storagePathOf(row) || void 0,
+    httpsUrl: httpsUrl$1(row.url) || httpsUrl$1(row.shareUrl) || void 0
+  };
+}
+function rawRows(record2) {
+  const map = /* @__PURE__ */ new Map();
+  for (const key of MEDIA_KEYS) {
+    const rows = Array.isArray(record2[key]) ? record2[key] : [];
+    rows.forEach((row, index) => {
+      if (!row || typeof row !== "object") return;
+      const item = row;
+      const id = stableMediaKey(item) || `${key}-${index}`;
+      if (!map.has(id)) map.set(id, item);
+    });
+  }
+  return map;
+}
+function deliveryAssetsFromRecords(listing, gallery) {
+  const listingMedia = listing ? collectArrangementMedia(listing) : [];
+  const source = listingMedia.length > 0 ? listing || {} : {
+    ...listing || {},
+    ...gallery?.storageBackend ? { storageBackend: gallery.storageBackend, b2Key: gallery.b2Key } : {},
+    images: Array.isArray(gallery?.mediaItems) ? gallery.mediaItems : listing?.images,
+    videos: gallery?.videos || listing?.videos,
+    floorplans: gallery?.floorplans || listing?.floorplans,
+    tours: gallery?.tourLinks || listing?.tours
+  };
+  const parent = source;
+  const media = collectArrangementMedia(parent);
+  if (!media.length) return [];
+  const arrangement = readMediaArrangement(parent.mediaArrangement);
+  const address = recordAddressText(parent) || "property";
+  const sequenced = sequenceArrangement(media, arrangement, address).filter((item) => !item.hiddenFromGallery);
+  const rows = rawRows(parent);
+  const assets = [];
+  for (const item of sequenced) {
+    const row = rows.get(item.id) || { name: item.name, url: item.url, type: item.kind, path: item.path };
+    const section = arrangement.sections.find((entry2) => entry2.id === item.sectionId)?.name || sectionFor(item.kind);
+    const asset = assetFromRow(row, parent, section, item.deliveryName || item.name);
+    if (asset) assets.push(asset);
+  }
+  return assets;
+}
+function publicDeliveryMedia(id, assets, unlocked) {
+  return assets.map((asset, index) => {
+    const base = `/api/deliver/${encodeURIComponent(id)}/media/${index}`;
+    const web = unlocked && asset.raster && asset.downloadable;
+    return {
+      id: String(index),
+      name: asset.name,
+      kind: asset.kind,
+      section: asset.section,
+      watermarked: !unlocked,
+      previewUrl: `${base}?variant=preview`,
+      highUrl: unlocked && asset.downloadable ? `${base}?variant=print` : null,
+      webUrl: web ? `${base}?variant=web` : null
+    };
+  });
+}
+function packageSummary(record2, assets) {
+  const services2 = Array.isArray(record2?.services) ? record2.services.filter((item) => typeof item === "string" && item.trim().length > 0).map((item) => item.trim()) : [];
+  if (services2.length) return services2.join(", ");
+  const sections = [...new Set(assets.map((item) => item.section))];
+  return sections.join(", ") || "Media delivery";
+}
+function dateText(value) {
+  if (typeof value === "string" && value.trim()) return value.trim();
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+  }
+  if (value && typeof value === "object" && "toDate" in value && typeof value.toDate === "function") {
+    const date = value.toDate();
+    if (date instanceof Date && !Number.isNaN(date.getTime())) {
+      return date.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+    }
+  }
+  return "";
+}
+function deliveryInvoiceFromStored(invoice, env) {
+  if (!invoice) {
+    return {
+      id: "",
+      number: "Invoice",
+      status: "unpaid",
+      total: 0,
+      subtotal: 0,
+      processing: null,
+      amountDue: 0,
+      amountPaid: 0,
+      lines: [],
+      payPath: null,
+      paidNote: ""
+    };
+  }
+  const face = invoiceFaceFromStored(invoice);
+  const statusText = String(invoice.status || "").toLowerCase();
+  const settled2 = statusText === "comped" ? "comped" : invoiceAllowsDownload(invoice) ? "paid" : "unpaid";
+  const id = typeof invoice.id === "string" ? invoice.id : "";
+  const number = typeof invoice.invoiceNumber === "string" && invoice.invoiceNumber.trim() ? invoice.invoiceNumber.trim() : id ? `Invoice ${id.slice(0, 8)}` : "Invoice";
+  return {
+    id,
+    number,
+    status: settled2,
+    total: face.total,
+    subtotal: face.subtotal,
+    processing: face.processing,
+    amountDue: settled2 === "unpaid" ? face.amountDue : 0,
+    amountPaid: face.amountPaid,
+    lines: face.services.map((line) => ({ name: line.name, qty: line.qty, price: line.price })),
+    payPath: settled2 === "unpaid" && id ? invoicePayLinkFor({ id, payToken: invoice.payToken, status: invoice.status }, env) : null,
+    paidNote: settled2 === "comped" ? "Comped. Downloads are open." : settled2 === "paid" ? "Paid. Receipt details are on this page." : ""
+  };
+}
+function buildClientDeliveryPresentation(input) {
+  const unlocked = input.paid;
+  return {
+    id: input.id,
+    sample: input.sample === true,
+    address: input.address,
+    orderNumber: input.orderNumber,
+    clientName: input.clientName,
+    packageSummary: input.packageSummary,
+    shootDate: input.shootDate,
+    deliveryDate: input.deliveryDate,
+    contactLine: BUSINESS_CONTACT_LINE,
+    paid: unlocked,
+    invoice: input.invoice,
+    media: publicDeliveryMedia(input.id, input.assets, unlocked),
+    zipPrintUrl: unlocked ? `/api/deliver/${encodeURIComponent(input.id)}/download.zip?variant=print` : null,
+    zipWebUrl: unlocked ? `/api/deliver/${encodeURIComponent(input.id)}/download.zip?variant=web` : null
+  };
+}
+function sampleDeliveryPresentation(id) {
+  if (!isClientDeliveryPreview(id)) return null;
+  const paid = clientDeliveryPreviewPaid(id);
+  return buildClientDeliveryPresentation({
+    id,
+    sample: true,
+    paid,
+    address: "1842 Live Oak Lane, Spring, TX 77380",
+    orderNumber: shortOrderNumber("#1042") || "#1042",
+    clientName: "Jordan Hale",
+    packageSummary: "Photos, twilight, floor plan, walkthrough, and 3D tour",
+    shootDate: "November 20, 2026",
+    deliveryDate: "November 27, 2026",
+    invoice: sampleDeliveryInvoice(paid),
+    assets: sampleDeliveryAssets()
+  });
+}
+function presentationFromRecords(input) {
+  const record2 = input.listing || input.gallery || {};
+  const assets = deliveryAssetsFromRecords(input.listing, input.gallery);
+  const orderNumber2 = shortOrderNumber(record2.orderNumber) || shortOrderNumber(input.gallery?.orderNumber) || "";
+  return buildClientDeliveryPresentation({
+    id: input.id,
+    paid: input.paid,
+    address: recordAddressText(record2) || recordAddressText(input.gallery || {}) || "Your property",
+    orderNumber: orderNumber2,
+    clientName: String(record2.clientName || input.gallery?.clientName || ""),
+    packageSummary: packageSummary(record2, assets),
+    shootDate: dateText(record2.apptDate || record2.shootDate || input.gallery?.shootDate),
+    deliveryDate: dateText(record2.deliveredAt || input.gallery?.deliveredAt),
+    invoice: deliveryInvoiceFromStored(input.invoice, input.env),
+    assets
+  });
+}
+function clientDeliveryDraft(input) {
+  const galleryId = (input.galleryId || "").trim();
+  const listingId = (input.listingId || "").trim();
+  const id = galleryId || listingId || CLIENT_DELIVERY_PREVIEW_ID;
+  const presentationPath2 = clientDeliveryPath(id);
+  const presentationUrl = clientDeliveryPresentationUrl(id, input.env);
+  const address = input.address?.trim() || "the property";
+  const toName = input.clientName?.trim() || "";
+  const invoice = input.invoice;
+  return {
+    listingId,
+    galleryId,
+    toName,
+    toEmail: input.clientEmail?.trim() || "",
+    cc: input.cc?.trim() || "",
+    subject: galleryDeliverySubject(address),
+    message: clientDeliveryMessage({ clientName: toName, address, presentationUrl, invoice }),
+    presentationUrl,
+    presentationPath: presentationPath2,
+    invoice,
+    notify: input.notify || clientDeliveryNotifyMode()
+  };
+}
+function sampleDeliveryDraft(env) {
+  return clientDeliveryDraft({
+    listingId: CLIENT_DELIVERY_PREVIEW_ID,
+    galleryId: CLIENT_DELIVERY_PREVIEW_ID,
+    clientName: "Jordan Hale",
+    clientEmail: "jordan.hale@example.com",
+    address: "1842 Live Oak Lane, Spring, TX 77380",
+    invoice: sampleDeliveryInvoice(false),
+    notify: clientDeliveryNotifyMode({}),
+    env
+  });
+}
+function previewResult(id, note) {
+  return {
+    ok: true,
+    sent: false,
+    mode: "preview",
+    delivery: "skipped",
+    presentationUrl: clientDeliveryPresentationUrl(id),
+    note
+  };
+}
+async function sendClientDelivery(input) {
+  const id = input.id.trim();
+  const prepared = prepareDeliveryMessage(input.message);
+  if (prepared.ok === false) {
+    return { ...previewResult(id, prepared.error), ok: false };
+  }
+  const subject = input.subject.trim() || "Your gallery is ready";
+  if (/cadi@/i.test(subject)) {
+    return { ...previewResult(id, "Client delivery mail uses photos@iconicimagestx.com."), ok: false };
+  }
+  const presentationUrl = clientDeliveryPresentationUrl(id);
+  if (isClientDeliveryPreview(id)) {
+    return previewResult(id, "Sample delivery. No email was sent and nothing was saved.");
+  }
+  const notify = clientDeliveryNotifyMode();
+  if (input.action === "test") {
+    if (!notify.clientNotifyLive) {
+      return previewResult(
+        id,
+        `Safe preview. No email was sent. A test would go only to ${CLIENT_EMAIL_NOTIFY_TEST_SINK}, and the notify flags are off.`
+      );
+    }
+    const result = await sendEmail({
+      to: CLIENT_EMAIL_NOTIFY_TEST_SINK,
+      template: "gallery_delivery",
+      subject,
+      html: prepared.html,
+      text: prepared.text,
+      lockHtml: true,
+      variables: { galleryUrl: presentationUrl, address: "" }
+    });
+    return {
+      ok: true,
+      sent: result.sent,
+      mode: "test",
+      delivery: result.delivery,
+      presentationUrl,
+      note: result.sent ? `Test sent only to ${CLIENT_EMAIL_NOTIFY_TEST_SINK}. The client was not emailed.` : `Test stayed inside the notify gate. Nothing was sent to the client. QA sink: ${CLIENT_EMAIL_NOTIFY_TEST_SINK}.`
+    };
+  }
+  if (!notify.live) {
+    return previewResult(
+      id,
+      "Safe preview. CLIENT_NOTIFY_LIVE and CLIENT_EMAIL_NOTIFY_LIVE are off, so no client email was sent. Copy the presentation link for internal QA."
+    );
+  }
+  const recipients = deliveryEmailList(input.to);
+  if (recipients.length !== 1 || recipients[0] !== input.to.trim()) {
+    return { ...previewResult(id, "Enter one client email before sending."), ok: false };
+  }
+  const cc = (input.cc || "").trim();
+  if (cc && deliveryEmailList(cc).length === 0) {
+    return { ...previewResult(id, "The CC address is not a valid email."), ok: false };
+  }
+  if (/cadi@/i.test(input.to) || /cadi@/i.test(cc)) {
+    return { ...previewResult(id, "Client delivery mail uses photos@iconicimagestx.com."), ok: false };
+  }
+  try {
+    await deliverGalleryToClient(id, {
+      actor: input.actor,
+      deliveryUrl: presentationUrl,
+      skipSms: true,
+      notice: {
+        to: recipients[0],
+        cc: cc || void 0,
+        subject,
+        text: prepared.text,
+        html: prepared.html
+      }
+    });
+  } catch (err) {
+    const status2 = err.status;
+    if (status2 === 404) {
+      const mailed = await sendEmail({
+        to: recipients[0],
+        cc: cc || void 0,
+        template: "gallery_delivery",
+        subject,
+        html: prepared.html,
+        text: prepared.text,
+        lockHtml: true,
+        variables: { galleryUrl: presentationUrl }
+      });
+      return {
+        ok: true,
+        sent: mailed.sent,
+        mode: "live",
+        delivery: mailed.delivery,
+        presentationUrl,
+        note: mailed.sent ? "Delivery email sent. This project has no gallery record yet, so the gallery status was left unchanged." : "The notify gate held the email. No message was sent."
+      };
+    }
+    const message = err instanceof Error ? err.message : "Could not send this delivery.";
+    return { ...previewResult(id, message), ok: false };
+  }
+  return {
+    ok: true,
+    sent: true,
+    mode: "live",
+    delivery: "sent",
+    presentationUrl,
+    note: "Delivery email sent."
+  };
+}
+function deliveryTextId(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+function malformedDeliveryId(id) {
+  if (!id || id.length > 200) return true;
+  if (id === "." || id === "..") return true;
+  if (id.includes("/") || id.includes("\\") || id.includes("..")) return true;
+  return /[\u0000-\u001F\u007F]/.test(id);
+}
+async function invoiceForDelivery(gallery, listing) {
+  if (!admin.apps.length) return null;
+  const db2 = admin.firestore();
+  const load = async (id) => db2.collection("invoices").doc(id).get();
+  const direct = deliveryTextId(gallery?.invoiceId) || deliveryTextId(listing?.invoiceId);
+  if (direct) {
+    const doc2 = await readInvoiceDoc(load, direct);
+    if (doc2) return { id: doc2.id, ...doc2.data };
+  }
+  const orderId = deliveryTextId(gallery?.orderId) || deliveryTextId(listing?.orderId);
+  if (!orderId) return null;
+  const snap = await db2.collection("invoices").where("orderId", "==", orderId).limit(1).get();
+  if (snap.empty) return null;
+  const doc = await readInvoiceDoc(load, snap.docs[0].id);
+  return doc ? { id: doc.id, ...doc.data } : null;
+}
+async function loadDeliveryContext(id) {
+  if (!admin.apps.length) return null;
+  const db2 = admin.firestore();
+  const gallerySnap = await db2.collection("galleries").doc(id).get();
+  let gallery = gallerySnap.exists ? { id: gallerySnap.id, ...gallerySnap.data() || {} } : null;
+  let listing = null;
+  const listingId = deliveryTextId(gallery?.listingId);
+  if (listingId) {
+    const listingSnap = await db2.collection("listings").doc(listingId).get();
+    if (listingSnap.exists) listing = { id: listingSnap.id, ...listingSnap.data() || {} };
+  }
+  if (!gallery) {
+    const listingSnap = await db2.collection("listings").doc(id).get();
+    if (!listingSnap.exists) return null;
+    listing = { id: listingSnap.id, ...listingSnap.data() || {} };
+    const found = await db2.collection("galleries").where("listingId", "==", id).limit(1).get();
+    if (!found.empty) gallery = { id: found.docs[0].id, ...found.docs[0].data() || {} };
+  }
+  const invoice = await invoiceForDelivery(gallery, listing);
+  return { listing, gallery, invoice };
+}
+function deliveryPaid(gallery, listing, invoice) {
+  return clientGalleryDownloadsUnlocked({
+    invoice,
+    downloadEnabled: gallery?.downloadEnabled,
+    downloadsReleased: gallery?.downloadsReleased === true || listing?.downloadsReleased === true,
+    lockDownloads: listing?.lockDownloads
+  });
+}
+const router$D = Router();
+router$D.get("/notify-mode", (_req, res) => {
+  res.json(clientDeliveryNotifyMode());
+});
+router$D.get("/draft", requireStaff, async (req, res) => {
+  const listingId = deliveryTextId(req.query.listingId);
+  const galleryId = deliveryTextId(req.query.galleryId);
+  const id = galleryId || listingId;
+  if (!id || malformedDeliveryId(id)) return res.status(400).json({ error: "That project link is not valid." });
+  if (isClientDeliveryPreview(id)) return res.json(sampleDeliveryDraft());
+  try {
+    const context = await loadDeliveryContext(id);
+    if (!context) return res.status(404).json({ error: "This project is not ready to send." });
+    const record2 = context.listing || context.gallery || {};
+    const paid = deliveryPaid(context.gallery, context.listing, context.invoice);
+    const invoice = context.invoice ? deliveryInvoiceFromStored(context.invoice) : sampleDeliveryInvoice(paid);
+    if (!context.invoice) {
+      invoice.number = deliveryTextId(record2.invoiceNumber) || "Invoice";
+      invoice.total = Number(record2.total) || 0;
+      invoice.amountDue = paid ? 0 : invoice.total;
+      invoice.status = paid ? "paid" : "unpaid";
+    }
+    return res.json(clientDeliveryDraft({
+      listingId: deliveryTextId(context.listing?.id) || listingId,
+      galleryId: deliveryTextId(context.gallery?.id) || galleryId,
+      clientName: deliveryTextId(record2.clientName),
+      clientEmail: deliveryTextId(record2.clientEmail),
+      address: recordAddressText(record2),
+      invoice,
+      notify: clientDeliveryNotifyMode()
+    }));
+  } catch (err) {
+    console.error("[delivery] draft read failed", err instanceof Error ? err.message : "read failed");
+    return res.status(500).json({ error: "The delivery draft could not be opened." });
+  }
+});
+router$D.get("/:id", async (req, res) => {
+  const id = deliveryTextId(req.params.id);
+  if (malformedDeliveryId(id)) return res.status(404).json({ error: "This delivery link is not active." });
+  const sample = sampleDeliveryPresentation(id);
+  if (sample) return res.json(sample);
+  try {
+    const context = await loadDeliveryContext(id);
+    if (!context) return res.status(404).json({ error: "This delivery link is not active." });
+    const paid = deliveryPaid(context.gallery, context.listing, context.invoice);
+    return res.json(presentationFromRecords({
+      id,
+      listing: context.listing,
+      gallery: context.gallery,
+      invoice: context.invoice,
+      paid
+    }));
+  } catch (err) {
+    console.error("[delivery] presentation read failed", err instanceof Error ? err.message : "read failed");
+    return res.status(500).json({ error: "This delivery could not be opened." });
+  }
+});
+router$D.post("/:id/send", (req, res, next) => {
+  const id = deliveryTextId(req.params.id);
+  if (isClientDeliveryPreview(id)) return next();
+  return requireCoordinator(req, res, next);
+}, async (req, res) => {
+  const id = deliveryTextId(req.params.id);
+  if (malformedDeliveryId(id)) return res.status(400).json({ error: "That delivery link is not valid." });
+  const action = req.body?.action === "test" ? "test" : "send";
+  const result = await sendClientDelivery({
+    id,
+    action,
+    to: typeof req.body?.to === "string" ? req.body.to : "",
+    cc: typeof req.body?.cc === "string" ? req.body.cc : "",
+    subject: typeof req.body?.subject === "string" ? req.body.subject : "",
+    message: typeof req.body?.message === "string" ? req.body.message : "",
+    actor: {
+      email: req.user?.email || null,
+      name: typeof req.user?.name === "string" ? req.user.name : null,
+      uid: req.user?.uid || null
+    }
+  });
+  return res.status(result.ok ? 200 : 400).json(result);
 });
 function presentationLinkForReceipt(listing) {
   return null;
@@ -46001,11 +46735,12 @@ function createServer() {
     res.json({ live: clientNotifyLive() });
   });
   mountOwners(app);
-  app.use("/api/bookings", router$G);
-  app.use("/api/headshots-10", router$F);
-  app.use("/api/orders", router$E);
+  app.use("/api/bookings", router$H);
+  app.use("/api/headshots-10", router$G);
+  app.use("/api/orders", router$F);
   app.patch("/api/admin/orders/:id/approval", handleOrderApproval);
-  app.use("/api/galleries", router$D);
+  app.use("/api/galleries", router$E);
+  app.use("/api/deliver", router$D);
   app.use("/api/payments", router$C);
   app.use("/api/vsai", router$B);
   app.use("/api/messages", router$A);
