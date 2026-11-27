@@ -39,6 +39,7 @@ import placesRouter from "./routes/places";
 import smsRouter from "./routes/sms";
 import contactRouter from "./routes/contact";
 import seniorLivingRouter from "./routes/seniorLiving";
+import videoTeamRouter from "./routes/videoTeam";
 import apprenticeshipRouter from "./routes/apprenticeship";
 import liveChatRouter from "./routes/liveChat";
 import contactThreadsRouter from "./routes/contactThreads";
@@ -332,6 +333,7 @@ export function createServer() {
   app.use("/api/contact", liveChatRouter);
   app.use("/api/contact", contactRouter);
   app.use("/api/senior-living", seniorLivingRouter);
+  app.use("/api/video-team", videoTeamRouter);
   app.use("/api/virtual-staging-pro", virtualStagingProRouter);
   app.use("/api/stock-footage", stockFootageRouter);
   app.use("/api/apprenticeship", apprenticeshipRouter);
