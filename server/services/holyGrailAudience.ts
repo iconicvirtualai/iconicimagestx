@@ -119,6 +119,7 @@ function peopleFromContacts(rows: string[][]): ChannelPerson[] {
       emailVerified: true,
       source: "sheet",
       doNotContact: isDncStatus(live) || isEmailOkNo(emailOk),
+      marketingSmsOptIn: false,
     });
   }
   return people;

@@ -131,6 +131,7 @@ describe("public business contact", () => {
         || source.includes(BUSINESS_CONTACT_LINE)
         || source.includes("PublicContactLine")
         || source.includes("LegalContact")
+        || source.includes("LegalArticle")
         || source.includes("LocalBusinessJsonLd");
       expect(usesConstant, rel).toBe(true);
     }

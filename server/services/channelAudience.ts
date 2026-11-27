@@ -39,6 +39,8 @@ function asContact(row: FirebaseFirestore.DocumentData): MarketingContact {
     lastName: String(row.lastName || ""),
     company: String(row.company || ""),
     phone: String(row.phone || ""),
+    marketingSmsOptIn: row.marketingSmsOptIn === true,
+    smsStopped: row.smsStopped === true,
     tags: Array.isArray(row.tags) ? row.tags.map(String) : [],
     custom: row.custom && typeof row.custom === "object" ? row.custom as Record<string, string> : {},
     source: row.source === "client" || row.source === "manual" ? row.source : "import",
@@ -58,6 +60,36 @@ function asClient(row: FirebaseFirestore.DocumentData): ClientSource {
     phone: String(row.phone || ""),
     company: String(row.company || ""),
   };
+}
+
+function optedInPhone(row: { phone?: unknown; id?: unknown; marketingSmsOptIn?: unknown; smsOptIn?: unknown; smsStopped?: unknown; stopped?: unknown }): string {
+  if (row.smsStopped === true || row.stopped === true) return "";
+  if (row.marketingSmsOptIn !== true && row.smsOptIn !== true) return "";
+  return phoneDigits(String(row.phone || row.id || ""));
+}
+
+async function explicitOptInPhones(): Promise<Set<string>> {
+  if (memoryMarketing() || !admin.apps.length) return new Set();
+  const [optIns, clients, contacts] = await Promise.all([
+    pageDocs("marketingSmsOptIns"),
+    pageDocs("clients"),
+    pageDocs("marketingContacts"),
+  ]);
+  const phones = new Set<string>();
+  for (const row of [...optIns.rows, ...clients.rows, ...contacts.rows]) {
+    const phone = optedInPhone(row);
+    if (phone) phones.add(phone);
+  }
+  return phones;
+}
+
+async function stoppedPhones(): Promise<string[]> {
+  if (memoryMarketing() || !admin.apps.length) return [];
+  const page = await pageDocs("smsStops");
+  return page.rows
+    .filter((row) => row.stopped !== false)
+    .map((row) => phoneDigits(String(row.phone || row.id || "")))
+    .filter(Boolean);
 }
 
 async function loadContacts(): Promise<{ contacts: MarketingContact[]; clients: ClientSource[]; suppression: SuppressionEntry[]; truncated: boolean }> {
@@ -95,6 +127,7 @@ function fromContact(contact: MarketingContact): ChannelPerson {
     emailVerified: contact.emailVerified,
     source: contact.source,
     doNotContact: false,
+    marketingSmsOptIn: contact.marketingSmsOptIn === true && contact.smsStopped !== true,
   };
 }
 
@@ -114,6 +147,7 @@ export async function loadChannelAudience(segmentId = "", excludeCampaignId = ""
     const person = fromContact(contact);
     if (previous) {
       person.doNotContact = previous.doNotContact;
+      person.marketingSmsOptIn = person.marketingSmsOptIn || previous.marketingSmsOptIn;
       person.phone = person.phone || previous.phone;
       person.tags = [...new Set([...previous.tags, ...person.tags])];
       if (!person.firstName) person.firstName = previous.firstName;
@@ -134,7 +168,7 @@ export async function loadChannelAudience(segmentId = "", excludeCampaignId = ""
       person.doNotContact = true;
     }
   }
-  const [segments, settings, sends, campaigns, stops] = await Promise.all([
+  const [segments, settings, sends, campaigns, stops, extraOptIns, extraStops] = await Promise.all([
     store.listSegments(),
     store.getSettings(),
     memoryMarketing() ? store.listSends() : pageDocs("marketingSends").then((page) => page.rows.map((row) => ({
@@ -146,7 +180,27 @@ export async function loadChannelAudience(segmentId = "", excludeCampaignId = ""
       ? store.listCampaigns()
       : admin.firestore().collection("marketingCampaigns").limit(50).get().then((snap) => snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }))),
     getChannelCampaignStore().phoneStops(),
+    explicitOptInPhones(),
+    stoppedPhones(),
   ]);
+  for (const person of byEmail.values()) {
+    if (extraOptIns.has(phoneDigits(person.phone))) person.marketingSmsOptIn = true;
+  }
+  for (const phone of extraOptIns) {
+    if ([...byEmail.values()].some((person) => phoneDigits(person.phone) === phone)) continue;
+    byEmail.set(`phone:${phone}`, {
+      email: "",
+      firstName: "",
+      lastName: "",
+      phone,
+      company: "",
+      tags: [],
+      emailVerified: false,
+      source: "manual",
+      doNotContact: false,
+      marketingSmsOptIn: true,
+    });
+  }
   const segment = segments.find((item: Segment) => item.id === segmentId) || null;
   const overlap: OverlapCampaign[] = (campaigns as { id?: string; name?: string; status?: string; sentAt?: string; scheduledAt?: string; recipientEmails?: string[] }[]).map((campaign) => ({
     id: String(campaign.id || ""),
@@ -159,7 +213,7 @@ export async function loadChannelAudience(segmentId = "", excludeCampaignId = ""
   return buildChannelAudience({
     people: [...byEmail.values()],
     suppression: loaded.suppression,
-    phoneStops: stops,
+    phoneStops: [...stops, ...extraStops],
     segment,
     settings,
     sends,

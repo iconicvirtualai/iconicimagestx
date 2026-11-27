@@ -41,6 +41,7 @@ const APP_SHELL_SOURCES = [
   "/services/virtual-staging/pro-order",
   "/black-friday",
   "/dev/invoice-template",
+  "/dev/listing-style-shots",
   ...STUDIO105_APP_SOURCES,
 ];
 
@@ -189,6 +190,8 @@ export const NOINDEX_HEADER_SOURCES = [
   "/podcast-guest-prep/",
   "/dev/invoice-template",
   "/dev/invoice-template/",
+  "/dev/listing-style-shots",
+  "/dev/listing-style-shots/",
   "/forgot-password",
   "/forgot-password/",
   "/change-password",

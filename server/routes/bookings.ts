@@ -9,6 +9,8 @@ import admin from "firebase-admin";
 import { requireAdmin, requireCoordinator, type AuthenticatedRequest } from "../middleware/auth";
 import { clientOrderReceivedSubject, sendEmail } from "../services/email";
 import { sendSMS, SMS_TEMPLATES } from "../services/sms";
+import { isSmsStopped } from "../services/smsProgram";
+import { TRANSACTIONAL_SMS_CONSENT_TEXT, TRANSACTIONAL_SMS_CONSENT_VERSION, transactionalSmsBlockReason } from "../../shared/a2p";
 import { createCalendarBookingEvent } from "../services/calendar";
 import { attachBookingClient, createRequestedAppointment, sendFirebasePasswordEmail } from "../services/bookingClient";
 import { clientLinkStamp } from "../../shared/clientLink";
@@ -509,6 +511,10 @@ router.post("/", async (req, res) => {
       // Draft add-on. Quote only — do not price it or mention it in client email/SMS.
       lifeOfTheListingCare: lifeOfTheListingCareSelected(lifeOfTheListingCare),
       dotOptIn: dotOptInSelected(req.body.dotOptIn),
+      smsConsent: req.body.smsConsent === true,
+      smsConsentAt: req.body.smsConsent === true ? admin.firestore.FieldValue.serverTimestamp() : null,
+      smsConsentTextVersion: req.body.smsConsent === true ? TRANSACTIONAL_SMS_CONSENT_VERSION : null,
+      smsConsentText: req.body.smsConsent === true ? TRANSACTIONAL_SMS_CONSENT_TEXT : null,
       dotOptInToken: createPayToken(),
       status: "new",
       source: req.body.source === "portal" ? "portal" : "booking_form",
@@ -652,6 +658,8 @@ router.post("/", async (req, res) => {
           bookingPhotographerId: decision.slot?.photographerId || null,
           services: traveled.lineItems,
           notes: typeof vibeNote === "string" ? vibeNote : "",
+          smsConsent: req.body.smsConsent === true,
+          smsConsentTextVersion: req.body.smsConsent === true ? TRANSACTIONAL_SMS_CONSENT_VERSION : null,
         });
       } catch (err) {
         console.error("[Bookings] Appointment attach failed:", err);
@@ -829,8 +837,17 @@ router.post("/", async (req, res) => {
       // gate. smsAllowed still lets kind booking_confirmation through, so the
       // route has to skip the Twilio call itself.
       if (phone) {
-        const clientSmsAllowed = clientNotifyLive() || isNotifyTestAllowlisted(normalizedEmail);
-        if (!clientSmsAllowed) {
+        const consentBlock = transactionalSmsBlockReason({
+          smsConsent: req.body.smsConsent,
+          stopped: await isSmsStopped(String(phone)),
+        });
+        const clientSmsAllowed = !consentBlock && (clientNotifyLive() || isNotifyTestAllowlisted(normalizedEmail));
+        if (consentBlock) {
+          smsStatus = "skipped";
+          console.info(
+            `[Bookings] Client confirmation SMS skipped for request ${docRef.id}. ${consentBlock}. No message sent.`,
+          );
+        } else if (!clientSmsAllowed) {
           smsStatus = "gated";
           console.info(
             `[Bookings] Client confirmation SMS skipped for request ${docRef.id}. ${clientNotifyBlockReason()}. No message sent.`,
@@ -1537,6 +1554,10 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
       internalNotes: internalNotes || "",
       lifeOfTheListingCare: lifeOfTheListingCareSelected(request.lifeOfTheListingCare),
       dotOptIn: dotOptInSelected(request.dotOptIn),
+      smsConsent: request.smsConsent === true,
+      smsConsentAt: request.smsConsent === true ? request.smsConsentAt || admin.firestore.FieldValue.serverTimestamp() : null,
+      smsConsentTextVersion: request.smsConsent === true ? request.smsConsentTextVersion || TRANSACTIONAL_SMS_CONSENT_VERSION : null,
+      smsConsentText: request.smsConsent === true ? request.smsConsentText || TRANSACTIONAL_SMS_CONSENT_TEXT : null,
       dotOptInToken: typeof request.dotOptInToken === "string" && request.dotOptInToken.trim()
         ? request.dotOptInToken.trim()
         : createPayToken(),
@@ -1570,6 +1591,8 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
       status: "confirmed",
       notes: request.vibeNote || "",
       internalNotes: internalNotes || "",
+      smsConsent: request.smsConsent === true,
+      smsConsentTextVersion: request.smsConsent === true ? request.smsConsentTextVersion || TRANSACTIONAL_SMS_CONSENT_VERSION : null,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       ...revenueFields,
     };
@@ -1604,6 +1627,7 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
       status: "pending_upload",
       mediaItems: [],
       downloadEnabled: false,
+      smsConsent: request.smsConsent === true,
       ...(listingIdForGallery ? { listingId: listingIdForGallery } : {}),
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),

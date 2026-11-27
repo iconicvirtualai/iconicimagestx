@@ -75,8 +75,8 @@ async function api(path: string, init: RequestInit = {}, token = "temp-admin-tok
 
 async function seedPeople() {
   const people = [
-    { email: "ada@example.com", firstName: "Ada", lastName: "Lovelace", phone: "2815550101", emailVerified: true },
-    { email: "sam@example.com", firstName: "Sam", lastName: "Rivera", phone: "2815550144", emailVerified: true },
+    { email: "ada@example.com", firstName: "Ada", lastName: "Lovelace", phone: "2815550101", emailVerified: true, marketingSmsOptIn: true },
+    { email: "sam@example.com", firstName: "Sam", lastName: "Rivera", phone: "2815550144", emailVerified: true, marketingSmsOptIn: true },
     { email: "unsub@example.com", firstName: "Una", lastName: "Subbed", emailVerified: true },
     { email: "dnc@example.com", firstName: "Dana", lastName: "Quiet", phone: "2815550177", emailVerified: true },
   ];
@@ -138,6 +138,7 @@ describe("channel campaigns", () => {
     const id = await readyCampaign();
     const audience = await api("/api/channel-campaigns/audience");
     expect(audience.data.audience.emailCount).toBe(2);
+    expect(audience.data.audience.smsOptedIn).toBe(2);
     expect(audience.data.audience.smsCount).toBe(2);
     expect(audience.data.audience.unsubscribe).toBe(1);
     expect(audience.data.audience.doNotContact).toBe(1);

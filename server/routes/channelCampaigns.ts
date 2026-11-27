@@ -342,6 +342,7 @@ router.post("/:id/test", staffGate, async (req: AuthenticatedRequest, res) => {
     emailVerified: true,
     source: "manual",
     doNotContact: false,
+    marketingSmsOptIn: false,
   };
   const rendered = renderCampaignEmail(campaign.email, person, unsubscribeFor(to, campaign.id));
   const html = `${addClickTracking(rendered.html, marketingPublicUrl(), campaign.id, to, secret())}${openPixel(marketingPublicUrl(), campaign.id, to, secret())}`;
@@ -421,7 +422,7 @@ router.post("/:id/send", staffGate, async (req: AuthenticatedRequest, res) => {
     await runBatches(preview.smsPeople, async (person) => {
       const body = campaignSmsBody(campaign.sms.body, person.firstName);
       try {
-        await sendCampaignText(phoneDigits(person.phone), body);
+        await sendCampaignText(phoneDigits(person.phone), body, person.marketingSmsOptIn === true);
         sent += 1;
         delivered += 1;
         await store.rememberPhone(person.phone, campaign.id, at);

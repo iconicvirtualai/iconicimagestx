@@ -243,7 +243,7 @@ function skipLines(): string[] {
     .filter((line) => line.includes("Client confirmation SMS skipped"));
 }
 
-async function postBooking(email = CLIENT_EMAIL) {
+async function postBooking(email = CLIENT_EMAIL, smsConsent = true) {
   const response = await fetch(`${baseUrl}/api/bookings`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -256,6 +256,7 @@ async function postBooking(email = CLIENT_EMAIL) {
       selectedBasics: ["photos-20"],
       slotStart: SLOT.start,
       photographerId: "mike-luna",
+      smsConsent,
     }),
   });
   const body = await response.json();
@@ -279,6 +280,15 @@ describe("client booking confirmation SMS", () => {
       expect(skipLines().some((line) => line.includes("No message sent."))).toBe(true);
       expect(sent.some((message) => message.to.includes(CLIENT_EMAIL))).toBe(true);
     }
+  });
+
+  it("skips the client SMS when the consent box is unchecked, even if notifications are live", async () => {
+    process.env.CLIENT_NOTIFY_LIVE = "true";
+    const { response, body } = await postBooking(CLIENT_EMAIL, false);
+    expect(response.status).toBe(201);
+    expect(sendSMS).not.toHaveBeenCalled();
+    expect(body.notifications?.sms).toBe("skipped");
+    expect(skipLines().some((line) => line.includes("no_sms_consent") && line.includes("No message sent."))).toBe(true);
   });
 
   it("attempts the client SMS when CLIENT_NOTIFY_LIVE is exactly true", async () => {

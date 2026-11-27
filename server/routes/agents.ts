@@ -11,6 +11,8 @@ import { requireStaff, requireCoordinator, type AuthenticatedRequest } from "../
 import { recordAddressText } from "../../shared/addressText";
 import { bookingDateLabel } from "../../shared/clientHome";
 import { sendSMS, SMS_TEMPLATES, normalisePhone } from "../services/sms";
+import { isSmsStopped } from "../services/smsProgram";
+import { transactionalSmsBlockReason } from "../../shared/a2p";
 
 const router = Router();
 const db = () => admin.firestore();
@@ -263,6 +265,14 @@ async function runReminderSweep(req: any, res: any) {
       for (const type of dueTypes) {
         if (!phone) {
           results.push({ appointmentId: appointmentDoc.id, orderId, type, skipped: "missing_phone" });
+          continue;
+        }
+        const consentBlock = transactionalSmsBlockReason({
+          smsConsent: merged.smsConsent,
+          stopped: await isSmsStopped(String(phone)),
+        });
+        if (consentBlock) {
+          results.push({ appointmentId: appointmentDoc.id, orderId, type, skipped: consentBlock });
           continue;
         }
 

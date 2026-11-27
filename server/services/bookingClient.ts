@@ -143,6 +143,8 @@ export async function createRequestedAppointment(input: {
   bookingPhotographerId?: string | null;
   services: unknown[];
   notes: string;
+  smsConsent?: boolean;
+  smsConsentTextVersion?: string | null;
 }) {
   const now = admin.firestore.FieldValue.serverTimestamp();
   await db().collection("appointments").add({
@@ -161,6 +163,8 @@ export async function createRequestedAppointment(input: {
     status: "requested",
     source: "booking_form",
     notes: input.notes,
+    smsConsent: input.smsConsent === true,
+    smsConsentTextVersion: input.smsConsent === true ? input.smsConsentTextVersion || null : null,
     createdAt: now,
     updatedAt: now,
   });

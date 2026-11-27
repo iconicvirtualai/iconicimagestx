@@ -6,6 +6,9 @@ export interface MarketingContact {
   lastName: string;
   company: string;
   phone: string;
+  /** Explicit promotional SMS consent. Missing means not opted in. */
+  marketingSmsOptIn?: boolean;
+  smsStopped?: boolean;
   tags: string[];
   custom: Record<string, string>;
   source: ContactSource;

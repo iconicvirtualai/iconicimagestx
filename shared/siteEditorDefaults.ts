@@ -96,6 +96,7 @@ const PAGES: ContentPage[] = [
       linkItem("insights", "Insights", "/insights"),
       linkItem("studio", "Studio 105", "/studio-105"),
       linkItem("contact", "Contact Us", "/contact"),
+      linkItem("sms", "Text updates", "/sms"),
       linkItem("login", "Client Login", "/login"),
     ]),
     block("socials", "Social profiles", [], [

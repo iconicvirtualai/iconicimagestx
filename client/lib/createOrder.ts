@@ -66,6 +66,7 @@ export async function createOrder(formData: any) {
     // Unpriced draft add-on. Kept off lineItems so it cannot change the total.
     lifeOfTheListingCare:   lifeOfTheListingCareSelected(formData.lifeOfTheListingCare),
     dotOptIn:               dotOptInSelected(formData.dotOptIn),
+    smsConsent:             formData.smsConsent === true,
     paymentMethod:          formData.paymentMethod === "pay_at_close" || formData.paymentMethod === "pay_now" || formData.paymentMethod === "pay_later"
                               ? formData.paymentMethod
                               : undefined,

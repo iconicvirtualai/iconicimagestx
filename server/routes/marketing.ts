@@ -125,6 +125,8 @@ router.post("/contacts", requireMarketing("manage"), async (req, res) => {
     lastName: String(req.body?.lastName || existing?.lastName || "").trim(),
     company: String(req.body?.company || existing?.company || "").trim(),
     phone: String(req.body?.phone || existing?.phone || "").trim(),
+    marketingSmsOptIn: req.body?.marketingSmsOptIn === true || existing?.marketingSmsOptIn === true,
+    smsStopped: req.body?.smsStopped === true || existing?.smsStopped === true,
     tags: Array.isArray(req.body?.tags) ? req.body.tags.map(String) : existing?.tags || [],
     custom: existing?.custom || {},
     source: existing?.source || "manual",

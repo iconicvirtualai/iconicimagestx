@@ -47,6 +47,7 @@ export interface ChannelCampaignStore {
   rememberPhone(phone: string, campaignId: string, at: string): Promise<void>;
   phoneIndex(phone: string): Promise<SmsIndex | null>;
   suppressPhone(phone: string, at: string): Promise<void>;
+  clearPhoneStop(phone: string): Promise<void>;
   phoneStops(): Promise<string[]>;
   markEvent(id: string): Promise<boolean>;
   queuePost(item: SocialHandoff): Promise<void>;
@@ -127,6 +128,10 @@ export function createMemoryChannelCampaignStore(): ChannelCampaignStore {
       if (!key) return;
       stops.add(key);
       void at;
+    },
+    async clearPhoneStop(phone) {
+      const key = phoneDigits(phone);
+      if (key) stops.delete(key);
     },
     async phoneStops() {
       return [...stops];
@@ -237,6 +242,11 @@ const firestoreStore: ChannelCampaignStore = {
     const key = phoneDigits(phone);
     if (!key) return;
     await db().collection("channelSmsStops").doc(key).set({ phone: key, at, reason: "stop" });
+  },
+  async clearPhoneStop(phone) {
+    const key = phoneDigits(phone);
+    if (!key) return;
+    await db().collection("channelSmsStops").doc(key).delete();
   },
   async phoneStops() {
     const stops: string[] = [];

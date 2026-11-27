@@ -93,6 +93,8 @@ export async function sendSMS({ to, body, from, kind }: SendSMSOptions) {
 export interface BulkSMSRecipient {
   phone: string;
   name?: string;
+  /** Required before a live campaign text. Missing is not consent. */
+  marketingOptIn?: boolean;
 }
 
 export async function sendSMSCampaign(
@@ -113,6 +115,10 @@ export async function sendSMSCampaign(
 
   for (const recipient of recipients) {
     if (!recipient.phone) continue;
+    if (recipient.marketingOptIn !== true) {
+      results.push({ phone: recipient.phone, error: "no_marketing_opt_in" });
+      continue;
+    }
     const body = bodyTemplate.replace(/\{\{name\}\}/gi, recipient.name || "there");
 
     try {
@@ -139,7 +145,10 @@ export async function sendSMSCampaign(
  * One campaign text. The caller checks CAMPAIGN_SEND_LIVE.
  * This does not read CLIENT_NOTIFY_LIVE. STOP stays in the body the caller sends.
  */
-export async function deliverCampaignSms(to: string, body: string): Promise<{ sid: string; status: string }> {
+export async function deliverCampaignSms(to: string, body: string, marketingOptIn = false): Promise<{ sid: string; status: string }> {
+  if (marketingOptIn !== true) {
+    throw new Error("Marketing SMS requires an explicit opt-in.");
+  }
   const client = getClient();
   const sid = process.env.TWILIO_MESSAGING_SERVICE_SID;
   const fromNumber = process.env.TWILIO_PHONE_NUMBER;

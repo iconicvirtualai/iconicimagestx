@@ -28,9 +28,12 @@ export async function sendCampaignEmail(message: OutboundMail): Promise<void> {
   await deliverRawEmail(message);
 }
 
-export async function sendCampaignText(to: string, body: string): Promise<{ sid: string }> {
+export async function sendCampaignText(to: string, body: string, marketingOptIn = false): Promise<{ sid: string }> {
+  if (marketingOptIn !== true) {
+    throw new Error("Marketing SMS requires an explicit opt-in.");
+  }
   if (texter) return texter(to, body);
-  const result = await deliverCampaignSms(to, body);
+  const result = await deliverCampaignSms(to, body, true);
   return { sid: result.sid };
 }
 

@@ -56,6 +56,7 @@ import FlashSale from "./pages/FlashSale";
 import AgentLandingPage from "./pages/AgentLandingPage";
 import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
+import SmsOptIn from "./pages/SmsOptIn";
 import ClientStudio from "./pages/ClientStudio";
 import ClientInvoice from "./pages/ClientInvoice";
 import InvoiceTemplatePreview from "./pages/InvoiceTemplatePreview";
@@ -235,6 +236,7 @@ const App = () => (
             <Route path="/flash-sale" element={<PortalQueryRedirect to="/black-friday" />} />
             <Route path="/stock-footage" element={<StockFootage />} />
             <Route path="/privacy" element={<Privacy />} />
+            <Route path="/sms" element={<SmsOptIn />} />
             <Route path="/unsubscribe" element={<Unsubscribe />} />
             <Route path="/terms" element={<Terms />} />
             {/* Shirt QR destination. /go/ matches here too (trailing slash is ignored). */}
