@@ -19,6 +19,7 @@ import { clientGalleryDownloadsUnlocked, type GalleryDownloadGate } from "../../
 import { loadGalleryReleaseForGallery } from "./galleryReleaseGate";
 import { sendEmail } from "./email";
 import { sendSMS, SMS_TEMPLATES } from "./sms";
+import { dispatchClientEmailNotifications } from "./aryeoEmailNotify";
 
 const db = () => admin.firestore();
 
@@ -169,6 +170,40 @@ export async function deliverGalleryToClient(
     recipients,
     email: emailDelivery,
   });
+
+  const orderId = typeof gallery.orderId === "string" ? gallery.orderId : "";
+  void dispatchClientEmailNotifications({
+    type: "listing_delivered",
+    record: {
+      ...gallery,
+      clientEmail: recipients[0] || gallery.clientEmail || client?.email || "",
+      clientName: gallery.clientName || client?.name || "",
+      address,
+      galleryId,
+      downloadCenterUrl: deliveryUrl,
+      balanceDue: invoice ? (invoice as { amountDue?: unknown }).amountDue ?? (invoice as { balanceDue?: unknown }).balanceDue : undefined,
+      paymentStatus: invoice ? (invoice as { status?: unknown }).status : gallery.paymentStatus,
+      total: invoice ? (invoice as { total?: unknown }).total : gallery.total,
+    },
+    recordId: orderId,
+    collection: "orders",
+    requestId: typeof gallery.orderRequestId === "string" ? gallery.orderRequestId : "",
+  }).catch((err) => console.error("[Galleries] Listing delivery email notify failed:", err));
+  if (orderId) {
+    void dispatchClientEmailNotifications({
+      type: "order_fulfilled",
+      record: {
+        ...gallery,
+        clientEmail: recipients[0] || client?.email || "",
+        address,
+        balanceDue: invoice ? (invoice as { amountDue?: unknown }).amountDue ?? (invoice as { balanceDue?: unknown }).balanceDue : gallery.balanceDue,
+        paymentStatus: invoice ? (invoice as { paymentStatus?: unknown }).paymentStatus ?? (invoice as { status?: unknown }).status : gallery.paymentStatus,
+        total: invoice ? (invoice as { total?: unknown }).total : gallery.total,
+      },
+      recordId: orderId,
+      collection: "orders",
+    }).catch((err) => console.error("[Galleries] Payment required email notify failed:", err));
+  }
 
   if (client?.phone) {
     await sendSMS({

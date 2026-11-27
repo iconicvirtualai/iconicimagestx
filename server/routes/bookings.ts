@@ -29,6 +29,8 @@ import { chargedServiceLines, normalizeBookingLineItems, orderTotalLabel, resolv
 import { applyServerTravel, isTravelFeeLine, travelInvoiceLine, travelSummaryText, type TravelAssessment } from "../../shared/travelZones";
 import { planOrderPackageRepair } from "../../shared/orderPackageRepair";
 import { notifyOfficeOfOrder } from "../services/officeOrderNotify";
+import { dispatchClientEmailNotifications } from "../services/aryeoEmailNotify";
+import { legacyClientOrderEmailEnabled } from "../../shared/aryeoEmailNotify";
 import { bumpAdminUnreadChannel } from "../services/adminUnread";
 import { orderRequestSignal } from "../../shared/adminUnread";
 import { HOLIDAY_RSVP_LEAD, HOLIDAY_SEASON_LEAD, HOLIDAY_SOCIAL_SAVES_LEAD, holidayCheckoutKind, holidayOrderReceivedHtml } from "../../shared/holidayCheckout";
@@ -781,10 +783,11 @@ router.post("/", async (req, res) => {
       console.info(
         `[Bookings] Studio 105 request ${docRef.id} was saved. booking_received was not sent.`,
       );
-    } else {
+    } else if (legacyClientOrderEmailEnabled()) {
       // Order-received confirmation to the client. booking_received is excluded from the
       // RED blast kill and sends even when CLIENT_NOTIFY_LIVE is unset.
       // Holiday paid/season orders send their own HTML so a stored real-estate template cannot replace it.
+      // Skipped only when the Aryeo order confirmation is live, so the client gets one email.
       clientEmailStatus = await sendEmail({
         to: email,
         template: "booking_received",
@@ -812,7 +815,14 @@ router.post("/", async (req, res) => {
         console.error("[Bookings] Confirmation email failed:", err);
         return "failed" as const;
       });
+    } else {
+      clientEmailStatus = "gated";
+      console.info(
+        `[Bookings] booking_received was not sent for request ${docRef.id}. The Aryeo order confirmation replaces it.`,
+      );
+    }
 
+    if (!studio105Request && !isThankfulRsvp) {
       // Client confirmation text uses the same CLIENT_NOTIFY_LIVE / RED check as
       // other client mail and the admin text. An exact NOTIFY_TEST_ALLOWLIST
       // address can still receive it. booking_received email is not part of this
@@ -1069,6 +1079,29 @@ router.post("/", async (req, res) => {
         console.error("[Pay at Close] Booking checkout failed:", err instanceof Error ? err.message : "error");
       }
     }
+
+    void dispatchClientEmailNotifications({
+      type: "order_placed",
+      record: {
+        orderNumber,
+        clientName,
+        firstName,
+        lastName,
+        clientEmail: email,
+        email,
+        phone,
+        address: displayAddress,
+        addressLabel: displayAddress,
+        scheduledDate: orderRequest.scheduledDate,
+        scheduledTime: orderRequest.scheduledTime,
+        lineItems,
+        total: Number(total) || 0,
+        balanceDue: Number(total) || 0,
+      },
+      recordId: docRef.id,
+      collection: "orderRequests",
+      requestId: docRef.id,
+    }).catch((err) => console.error("[Bookings] Client email notify failed:", err));
 
     return res.status(201).json({
       success: true,
@@ -1753,24 +1786,61 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
       }
     }
 
-    // Send confirmation email to client
-    await sendEmail({
-      to: requestEmail,
-      template: "order_confirmed",
-      variables: {
-        clientName: requestClientName,
-        address: requestAddressLabel,
-        orderNumber: typeof request.orderNumber === "string" ? request.orderNumber : "",
-        scheduledDate: bookingDateLabel(confirmSource, "To be confirmed"),
-        scheduledTime: confirmTime || "To be confirmed",
-        photographerName: assignedPhotographerName || "Our team",
-        travelFee: travelSummaryText(travel),
-        orderId: orderRef.id,
-        portalUrl: publicClientUrl("/portal"),
-      },
-    }).catch((err) => console.error("[Bookings] Confirmation email failed:", err));
+    // Older appointment confirmation. Sent only while the Aryeo order confirmation is off,
+    // so a client does not receive both.
+    if (legacyClientOrderEmailEnabled()) {
+      await sendEmail({
+        to: requestEmail,
+        template: "order_confirmed",
+        variables: {
+          clientName: requestClientName,
+          address: requestAddressLabel,
+          orderNumber: typeof request.orderNumber === "string" ? request.orderNumber : "",
+          scheduledDate: bookingDateLabel(confirmSource, "To be confirmed"),
+          scheduledTime: confirmTime || "To be confirmed",
+          photographerName: assignedPhotographerName || "Our team",
+          travelFee: travelSummaryText(travel),
+          orderId: orderRef.id,
+          portalUrl: publicClientUrl("/portal"),
+        },
+      }).catch((err) => console.error("[Bookings] Confirmation email failed:", err));
+    }
 
     // Confirm schedules the shoot. Square billing waits until after the shoot.
+    const confirmedRecord = {
+      orderNumber: typeof request.orderNumber === "string" ? request.orderNumber : "",
+      clientName: requestClientName,
+      clientEmail: requestEmail,
+      email: requestEmail,
+      phone: requestPhone,
+      address: requestAddressLabel,
+      scheduledDate: confirmDate ? confirmDate.toISOString() : null,
+      scheduledTime: confirmTime,
+      assignedPhotographerId: assignedPhotographerId || "",
+      assignedPhotographerName: assignedPhotographerName || "",
+      photographerEmail: photographer?.email || "",
+      lineItems: requestLineItems,
+      total: requestTotal,
+      balanceDue: requestTotal,
+      listingId: listingId || listingIdForGallery || "",
+      galleryId: galleryRef.id,
+    };
+    void dispatchClientEmailNotifications({
+      type: "order_placed",
+      record: confirmedRecord,
+      recordId: orderRef.id,
+      collection: "orders",
+      requestId: req.params.id,
+    }).catch((err) => console.error("[Bookings] Client email notify failed:", err));
+    if (confirmDate || confirmTime) {
+      void dispatchClientEmailNotifications({
+        type: "appointment_scheduled",
+        record: confirmedRecord,
+        recordId: orderRef.id,
+        collection: "orders",
+        requestId: req.params.id,
+      }).catch((err) => console.error("[Bookings] Appointment email notify failed:", err));
+    }
 
     return res.json({
       success: true,
@@ -1827,6 +1897,17 @@ router.patch("/:id/cancel", requireCoordinator, async (req: AuthenticatedRequest
         : hadEvent ? { calendarHold: "none" } : {}),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
+    void dispatchClientEmailNotifications({
+      type: "appointment_canceled",
+      record: {
+        ...data,
+        clientEmail: typeof data.email === "string" ? data.email : data.clientEmail,
+        address: typeof data.addressLabel === "string" ? data.addressLabel : data.address,
+      },
+      recordId: doc.id,
+      collection: "orderRequests",
+      requestId: doc.id,
+    }).catch((err) => console.error("[Bookings] Cancel email notify failed:", err));
     return res.json({ success: true, calendarDeleted: !calendarError });
   } catch (err) {
     console.error("[Bookings] Cancel error:", err);

@@ -15,6 +15,7 @@ import { createRateLimiter } from "../lib/rateLimit";
 import { clientIp } from "../lib/clientIp";
 import { planRevenueAcceptanceUpdates, sumTransactionAmounts } from "../../shared/revenueCount";
 import { loadRevenueDocs } from "../services/revenueAcceptance";
+import { dispatchClientEmailNotifications } from "../services/aryeoEmailNotify";
 
 const router = Router();
 const db = () => admin.firestore();
@@ -245,7 +246,31 @@ router.patch("/:id", requireCoordinator, async (req, res) => {
       }
     }
 
+    const watchKeys = ["status", "assignedPhotographerId", "scheduledDate", "scheduledTime"];
+    let beforeRecord: Record<string, unknown> | null = null;
+    if (watchKeys.some((key) => key in req.body)) {
+      const existing = await db().collection("orders").doc(req.params.id).get();
+      if (existing.exists) beforeRecord = { id: existing.id, ...(existing.data() || {}) };
+    }
+
     await db().collection("orders").doc(req.params.id).update(updates);
+
+    if (beforeRecord) {
+      const postedStatus = typeof req.body.status === "string" ? req.body.status.toLowerCase() : "";
+      const type = postedStatus === "cancelled" || postedStatus === "canceled"
+        ? "appointment_canceled"
+        : postedStatus === "postponed"
+          ? "appointment_postponed"
+          : "appointment_changed";
+      void dispatchClientEmailNotifications({
+        type,
+        before: beforeRecord,
+        record: { ...beforeRecord, ...req.body },
+        recordId: req.params.id,
+        collection: "orders",
+        requestId: typeof beforeRecord.orderRequestId === "string" ? beforeRecord.orderRequestId : "",
+      }).catch((err) => console.error("[Orders] Client email notify failed:", err));
+    }
 
     return res.json({ success: true });
   } catch (err) {
@@ -325,6 +350,34 @@ router.patch("/:id/status", requireCoordinator, async (req, res) => {
       details: note || "",
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
+
+    const orderRecord: Record<string, unknown> = { ...(orderDoc.data() || {}), status };
+    const requestId = typeof orderRecord.orderRequestId === "string" ? orderRecord.orderRequestId : "";
+    if (status === "cancelled") {
+      void dispatchClientEmailNotifications({
+        type: "appointment_canceled",
+        record: orderRecord,
+        recordId: req.params.id,
+        collection: "orders",
+        requestId,
+      }).catch((err) => console.error("[Orders] Client email notify failed:", err));
+    }
+    if (status === "delivered" || status === "completed") {
+      void dispatchClientEmailNotifications({
+        type: "listing_delivered",
+        record: orderRecord,
+        recordId: req.params.id,
+        collection: "orders",
+        requestId,
+      }).catch((err) => console.error("[Orders] Delivery email notify failed:", err));
+      void dispatchClientEmailNotifications({
+        type: "order_fulfilled",
+        record: orderRecord,
+        recordId: req.params.id,
+        collection: "orders",
+        requestId,
+      }).catch((err) => console.error("[Orders] Payment email notify failed:", err));
+    }
 
     return res.json({ success: true, status });
   } catch (err) {

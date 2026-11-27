@@ -10,6 +10,7 @@ import admin from "firebase-admin";
 import { requireCoordinator, requireAuth, type AuthenticatedRequest } from "../middleware/auth";
 import { appFirestore } from "../lib/appFirestore";
 import { sendEmail, type EmailDelivery } from "../services/email";
+import { dispatchClientEmailNotifications } from "../services/aryeoEmailNotify";
 import { buildPaymentReceipt, receiptProcessing } from "../services/paymentReceiptEmail";
 import { ensureDotOptInLink } from "../services/doorsOpenTour";
 import { doorsOpenReceiptEmailHtml } from "../../shared/doorsOpenTour";
@@ -570,6 +571,30 @@ async function applySuccessfulPayment({
     unlocked,
     auditEntry,
   });
+
+  if (resolvedOrderId) {
+    void dispatchClientEmailNotifications({
+      type: "payment_processed",
+      record: {
+        clientEmail: typeof invoice.clientEmail === "string" ? invoice.clientEmail : "",
+        clientName: clientName || invoice.clientName,
+        orderNumber: invoice.orderNumber,
+        address: invoice.address || invoice.addressLabel,
+        paymentAmount: amount,
+        amount,
+        paymentMethod: method,
+        paymentId: squarePaymentId || stripePaymentIntentId || titusCheckoutId || invoiceId,
+        squarePaymentId,
+        stripePaymentIntentId,
+        balanceDue: newAmountDue,
+        paymentStatus: newAmountDue <= 0 ? "paid" : "partial",
+        total,
+      },
+      recordId: resolvedOrderId,
+      collection: "orders",
+      requestId: orderRequestId,
+    }).catch((err) => console.error("[Payments] Payment email notify failed:", err));
+  }
 
   return { applied: true, unlocked, duplicate: false, email };
 }
