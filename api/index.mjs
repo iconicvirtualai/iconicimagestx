@@ -1561,6 +1561,310 @@ function unpricedCatalogBookingError(body, catalog) {
   const verb = listNames.length === 1 ? "is" : "are";
   return `${joinCatalogNames(listNames)} ${verb} not available to book until a price is set. ${CALL_FOR_PRICING_LABEL}.`;
 }
+const RECORD_ADDRESS_KEYS = ["addressLabel", "address", "propertyAddress", "shootLocation", "location"];
+function addressText(value) {
+  if (!value) return "";
+  if (typeof value === "string") return value.trim();
+  if (typeof value !== "object" || Array.isArray(value)) return "";
+  const address = value;
+  const formatted = text$z(address.formatted) || text$z(address.label);
+  if (formatted) return formatted;
+  return [address.street, address.city, address.state, address.zip].filter((part) => typeof part === "string" && part.trim()).join(", ");
+}
+function recordAddressText(record2) {
+  if (!record2 || typeof record2 !== "object") return addressText(record2);
+  const row = record2;
+  for (const key of RECORD_ADDRESS_KEYS) {
+    const label = addressText(row[key]);
+    if (label) return label;
+  }
+  return "";
+}
+function text$z(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+const ADDRESS_LIMIT = 300;
+const PLACE_ID_LIMIT = 300;
+function serviceLocationFromInput(value) {
+  if (typeof value === "string") {
+    const formatted2 = clip$2(value, ADDRESS_LIMIT);
+    return formatted2 ? { kind: "text", formatted: formatted2 } : null;
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const row = value;
+  const formatted = clip$2(firstString(row, ["formatted", "description", "label"]), ADDRESS_LIMIT);
+  const placeId = clip$2(firstString(row, ["placeId", "place_id"]), PLACE_ID_LIMIT);
+  const lat = readCoord$1(row.lat ?? row.latitude, "lat");
+  const lng = readCoord$1(row.lng ?? row.longitude, "lng");
+  if (formatted && placeId && lat != null && lng != null) {
+    return { kind: "picked", place: { placeId, formatted, lat, lng } };
+  }
+  if (formatted) return { kind: "text", formatted };
+  return null;
+}
+function storedServiceLocationFields(value) {
+  const location = serviceLocationFromInput(value);
+  if (!location) return { address: "" };
+  if (location.kind === "text") return { address: location.formatted };
+  const { place } = location;
+  return {
+    address: place,
+    lat: place.lat,
+    lng: place.lng,
+    latitude: place.lat,
+    longitude: place.lng,
+    placeId: place.placeId
+  };
+}
+function storedRecordPin(record2) {
+  if (!record2) return null;
+  for (const key of ["address", "propertyAddress", "shootLocation"]) {
+    const location = serviceLocationFromInput(record2[key]);
+    if (location?.kind === "picked") return { lat: location.place.lat, lng: location.place.lng };
+  }
+  const lat = readCoord$1(record2.lat ?? record2.latitude, "lat");
+  const lng = readCoord$1(record2.lng ?? record2.longitude, "lng");
+  if (lat != null && lng != null) return { lat, lng };
+  return null;
+}
+function firstString(row, keys) {
+  for (const key of keys) {
+    const value = row[key];
+    if (typeof value === "string" && value.trim()) return value;
+  }
+  return "";
+}
+function clip$2(value, limit) {
+  if (typeof value !== "string") return "";
+  return value.trim().slice(0, limit);
+}
+function readCoord$1(value, axis) {
+  const number = typeof value === "number" ? value : typeof value === "string" && value.trim() ? Number(value) : NaN;
+  if (!Number.isFinite(number)) return null;
+  if (axis === "lat" && (number < -90 || number > 90)) return null;
+  if (axis === "lng" && (number < -180 || number > 180)) return null;
+  return number;
+}
+const TX_ZIP_CENTROIDS = {
+  // Spring / The Woodlands — studio ZIP
+  "77380": { lat: 30.1441, lng: -95.4703 },
+  // The Woodlands — $75 apprentice service area. Zippopotam place points.
+  "77381": { lat: 30.1716, lng: -95.4985 },
+  "77382": { lat: 30.2106, lng: -95.5257 },
+  "77384": { lat: 30.2257, lng: -95.4924 },
+  "77385": { lat: 30.1877, lng: -95.4288 },
+  // Spring
+  "77373": { lat: 30.0532, lng: -95.3773 },
+  "77379": { lat: 30.0377, lng: -95.5326 },
+  "77386": { lat: 30.1288, lng: -95.4239 },
+  "77388": { lat: 30.0505, lng: -95.4695 },
+  "77389": { lat: 30.1044, lng: -95.5066 },
+  // Conroe
+  "77301": { lat: 30.3125, lng: -95.4527 },
+  "77302": { lat: 30.2238, lng: -95.3577 },
+  "77303": { lat: 30.3814, lng: -95.3749 },
+  "77304": { lat: 30.3217, lng: -95.5285 },
+  "77306": { lat: 30.2277, lng: -95.2851 },
+  // Willis and Cypress. The $75 page does not charge these until travel is decided.
+  "77318": { lat: 30.4416, lng: -95.5394 },
+  "77378": { lat: 30.4441, lng: -95.4506 },
+  "77410": { lat: 29.834, lng: -95.4342 },
+  "77429": { lat: 29.9766, lng: -95.6358 },
+  "77433": { lat: 29.8836, lng: -95.7025 },
+  // Downtown Houston
+  "77002": { lat: 29.7594, lng: -95.3594 },
+  // Katy
+  "77494": { lat: 29.7404, lng: -95.8304 },
+  // Huntsville
+  "77340": { lat: 30.6448, lng: -95.5798 },
+  // Galveston
+  "77550": { lat: 29.2983, lng: -94.793 },
+  // Beaumont
+  "77701": { lat: 30.0688, lng: -94.1039 },
+  // Austin — past zone 6, so the quote is "Travel quoted"
+  "78701": { lat: 30.2713, lng: -97.7426 }
+};
+const EARTH_RADIUS_MILES = 3958.7613;
+const TRAVEL_ORIGIN = {
+  lat: 30.145492547135,
+  lng: -95.448893600358
+};
+const TRAVEL_ZONES = [
+  { zone: 1, outerMiles: 17, feeCents: 0 },
+  { zone: 2, outerMiles: 30, feeCents: 5e3 },
+  { zone: 3, outerMiles: 42, feeCents: 7500 },
+  { zone: 4, outerMiles: 55, feeCents: 1e4 },
+  { zone: 5, outerMiles: 69, feeCents: 12500 },
+  { zone: 6, outerMiles: 84, feeCents: 15e3 }
+];
+const TRAVEL_LINE_ID = "travel-fee";
+const TRAVEL_QUOTED_NOTE = "Staff must price travel before publishing.";
+const TX_ZIP = /\b(7[5-9]\d{3})(?:-\d{4})?\b/g;
+const BOUNDARY_EPSILON_MILES = 1e-6;
+function haversineMiles(from, to) {
+  const dLat = toRad(to.lat - from.lat);
+  const dLng = toRad(to.lng - from.lng);
+  const lat1 = toRad(from.lat);
+  const lat2 = toRad(to.lat);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return 2 * EARTH_RADIUS_MILES * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+function assessTravel(value, zones = TRAVEL_ZONES) {
+  const pin = pinFrom(value);
+  if (pin) return quoteFromMiles(haversineMiles(TRAVEL_ORIGIN, pin), zones);
+  const zip = zipFrom(value);
+  if (zip) {
+    const centroid = TX_ZIP_CENTROIDS[zip];
+    if (centroid) return quoteFromMiles(haversineMiles(TRAVEL_ORIGIN, centroid), zones);
+  }
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const row = value;
+    if (row.address != null && row.address !== value) return assessTravel(row.address);
+  }
+  return unresolved();
+}
+function travelPriceKnown(travel) {
+  return typeof travel.travelZone === "number" && Number.isFinite(travel.travelZone) && travel.travelZone > 0 && typeof travel.travelFeeCents === "number" && Number.isFinite(travel.travelFeeCents) && travel.travelFeeCents >= 0;
+}
+function travelCustomerLine(travel) {
+  if (travel.travelQuoted || travel.travelZone == null) {
+    return { label: "Travel quoted", amount: null };
+  }
+  if (travel.travelZone === 1) {
+    return { label: "Travel fee — Zone 1", amount: "FREE (Zone 1)" };
+  }
+  return {
+    label: `Travel fee — Zone ${travel.travelZone}`,
+    amount: sidebarMoney(travel.travelFeeCents ?? 0)
+  };
+}
+function travelSummaryText(travel, options) {
+  const line = travelCustomerLine(travel);
+  const miles2 = options?.miles && travel.travelMiles != null ? ` (${travel.travelMiles.toFixed(2)} mi)` : "";
+  if (travel.travelQuoted || travel.travelZone == null) return `${line.label}${miles2}`;
+  if (travel.travelZone === 1) return `FREE (Zone 1)${miles2}`;
+  return `${line.label} — ${emailMoney(travel.travelFeeCents ?? 0)}${miles2}`;
+}
+function isTravelFeeLine(item) {
+  if (!item) return false;
+  if (String(item.id || "") === TRAVEL_LINE_ID) return true;
+  const name = String(item.name || "").trim();
+  return name === "Travel quoted" || name === "FREE (Zone 1)" || /^Travel fee\b/i.test(name);
+}
+function travelInvoiceLine(travel) {
+  if (travel.travelQuoted || travel.travelZone == null) {
+    return {
+      id: TRAVEL_LINE_ID,
+      name: "Travel quoted",
+      description: TRAVEL_QUOTED_NOTE,
+      unitPrice: 0,
+      qty: 1,
+      price: 0
+    };
+  }
+  const price = travel.travelFeeCents == null ? 0 : travel.travelFeeCents / 100;
+  return {
+    id: TRAVEL_LINE_ID,
+    name: `Travel fee — Zone ${travel.travelZone}`,
+    unitPrice: price,
+    qty: 1,
+    price
+  };
+}
+function applyServerTravel(lineItems, address, clientTravelFeeCents, zones = TRAVEL_ZONES) {
+  const travel = assessTravel(address, zones);
+  const kept = normalizeBookingLineItems(lineItems).filter((item) => !isTravelFeeLine(item));
+  const next = [...kept, travelInvoiceLine(travel)];
+  return {
+    lineItems: next,
+    total: roundMoney$a(sumLineItemPrices(next)),
+    travel
+  };
+}
+function travelFromRecord(record2) {
+  if (!record2 || typeof record2.travelQuoted !== "boolean") return null;
+  return {
+    travelZone: finiteOrNull(record2.travelZone),
+    travelMiles: finiteOrNull(record2.travelMiles),
+    travelFeeCents: finiteOrNull(record2.travelFeeCents),
+    travelQuoted: record2.travelQuoted
+  };
+}
+function travelTextForRecord(record2, options) {
+  if (!record2) return null;
+  const stored = travelFromRecord(record2);
+  if (stored) return travelSummaryText(stored, options);
+  const address = record2.address ?? record2.propertyAddress ?? record2.shootLocation ?? record2.addressLabel;
+  if (address == null || address === "") return null;
+  return travelSummaryText(assessTravel(address), options);
+}
+function quoteFromMiles(miles2, zones = TRAVEL_ZONES) {
+  const travelMiles = roundMiles(miles2);
+  const bands = [...zones].sort((a, b) => a.outerMiles - b.outerMiles);
+  if (bands.length === 0) {
+    return {
+      travelZone: null,
+      travelMiles,
+      travelFeeCents: null,
+      travelQuoted: true
+    };
+  }
+  for (const zone of bands) {
+    if (miles2 <= zone.outerMiles + BOUNDARY_EPSILON_MILES) {
+      return {
+        travelZone: zone.zone,
+        travelMiles,
+        travelFeeCents: zone.feeCents,
+        travelQuoted: false
+      };
+    }
+  }
+  return {
+    travelZone: null,
+    travelMiles,
+    travelFeeCents: null,
+    travelQuoted: true
+  };
+}
+function unresolved() {
+  return {
+    travelZone: null,
+    travelMiles: null,
+    travelFeeCents: null,
+    travelQuoted: true
+  };
+}
+function pinFrom(value) {
+  const location = serviceLocationFromInput(value);
+  if (location?.kind === "picked") return { lat: location.place.lat, lng: location.place.lng };
+  return null;
+}
+function zipFrom(value) {
+  const text2 = addressText(value) || (typeof value === "string" ? value : "");
+  if (!text2) return null;
+  const matches = text2.match(TX_ZIP);
+  if (!matches || matches.length === 0) return null;
+  return matches[matches.length - 1].slice(0, 5);
+}
+function finiteOrNull(value) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+function sidebarMoney(cents2) {
+  const dollars2 = cents2 / 100;
+  return Number.isInteger(dollars2) ? `$${dollars2}` : `$${dollars2.toFixed(2)}`;
+}
+function emailMoney(cents2) {
+  return `$${(cents2 / 100).toFixed(2)}`;
+}
+function roundMiles(miles2) {
+  return Math.round(miles2 * 100) / 100;
+}
+function roundMoney$a(value) {
+  return Math.round(value * 100) / 100;
+}
+function toRad(degrees) {
+  return degrees * Math.PI / 180;
+}
 const ADJUSTMENT_LINE_IDS = {
   processing: "adjustment-processing",
   fees: "adjustment-fees",
@@ -1582,7 +1886,7 @@ function adjustmentKind(item) {
   return null;
 }
 function invoiceAdjustmentLine(kind, amount) {
-  const price = roundMoney$a(Math.max(0, amount));
+  const price = roundMoney$9(Math.max(0, amount));
   const name = kind === "processing" ? "Processing" : kind === "fees" ? "Fees" : "Travel";
   return {
     id: ADJUSTMENT_LINE_IDS[kind],
@@ -1593,7 +1897,7 @@ function invoiceAdjustmentLine(kind, amount) {
     category: ADJUSTMENT_LINE_IDS[kind]
   };
 }
-function roundMoney$a(value) {
+function roundMoney$9(value) {
   if (!Number.isFinite(value)) return 0;
   return Math.round(value * 100) / 100;
 }
@@ -1738,9 +2042,9 @@ function computeInvoiceTotals(input) {
   const travel = nonNegativeMoney(input.travel);
   const tax = nonNegativeMoney(input.tax);
   const amountPaid = nonNegativeMoney(input.amountPaid);
-  const netServices = roundMoney$9(Math.max(0, subtotal - promotions));
-  const processingBase = roundMoney$9(Math.max(0, netServices + fees));
-  const saleBeforeProcessing = roundMoney$9(netServices + fees + travel + tax);
+  const netServices = roundMoney$8(Math.max(0, subtotal - promotions));
+  const processingBase = roundMoney$8(Math.max(0, netServices + fees + travel));
+  const saleBeforeProcessing = roundMoney$8(processingBase + tax);
   const comped = input.comped === true;
   const stored = input.processing == null || !Number.isFinite(Number(input.processing)) ? null : nonNegativeMoney(input.processing);
   let processing = 0;
@@ -1755,7 +2059,7 @@ function computeInvoiceTotals(input) {
     processing = processingFee(processingBase, input.processingPercent);
     processingPolicy = "included";
   }
-  const total = roundMoney$9(saleBeforeProcessing + processing);
+  const total = roundMoney$8(saleBeforeProcessing + processing);
   return {
     subtotal,
     promotions,
@@ -1766,7 +2070,7 @@ function computeInvoiceTotals(input) {
     processing,
     total,
     amountPaid,
-    amountDue: roundMoney$9(Math.max(0, total - amountPaid)),
+    amountDue: roundMoney$8(Math.max(0, total - amountPaid)),
     processingPolicy
   };
 }
@@ -1775,14 +2079,14 @@ function toCents$1(value) {
   return Math.round(value * 100);
 }
 function fromCents(cents2) {
-  return roundMoney$9(cents2 / 100);
+  return roundMoney$8(cents2 / 100);
 }
 function nonNegativeMoney(value) {
   const amount = Number(value);
   if (!Number.isFinite(amount) || amount <= 0) return 0;
-  return roundMoney$9(amount);
+  return roundMoney$8(amount);
 }
-function roundMoney$9(value) {
+function roundMoney$8(value) {
   if (!Number.isFinite(value)) return 0;
   return Math.round(value * 100) / 100;
 }
@@ -1792,8 +2096,8 @@ const TEAL = "#14B8C4";
 const GREEN = "#16A34A";
 const ROW = "#F3F4F6";
 function receiptProcessing(input) {
-  const status2 = text$z(input.invoice.status).toLowerCase();
-  const paymentStatus = text$z(input.invoice.paymentStatus).toLowerCase();
+  const status2 = text$y(input.invoice.status).toLowerCase();
+  const paymentStatus = text$y(input.invoice.paymentStatus).toLowerCase();
   if (status2 === "comped" || paymentStatus === "comped") return 0;
   const base = roundCents$1(input.subtotal - input.promotions + input.fees);
   const stored = finite$2(input.invoice.processing);
@@ -2082,7 +2386,7 @@ function dollars$1(value) {
   const amount = Number(String(value).replace(/[^0-9.-]/g, ""));
   return Number.isFinite(amount) ? amount : 0;
 }
-function text$z(value) {
+function text$y(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function escapeHtml$b(value) {
@@ -2206,7 +2510,8 @@ const HTML_SOURCE = {
         <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Access Method</td><td style="padding:10px 14px;border-bottom:1px solid #eee;"><strong>{{accessMethod}}</strong></td></tr>
         <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Square Footage</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">{{squareFootage}}</td></tr>
         <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Travel</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">{{travelFee}}</td></tr>
-        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">${BOOKING_PROCESSING_LABEL}</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">{{processing}}</td></tr>
+        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Subtotal</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">{{subtotal}}</td></tr>
+        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">${BOOKING_PROCESSING_LABEL}</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">{{processing}}</td></tr>
         <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;">Order Total</td><td style="padding:10px 14px;font-weight:bold;color:#0d9488;">{{total}}</td></tr>
       </table>
       <p style="color:#888;font-size:13px;">Confirmation ID: <strong>{{requestId}}</strong> — keep this for your records.</p>
@@ -2782,28 +3087,6 @@ Questions or edits? Just reply here. — Iconic Images`,
 
 Check dashboard for details.`
 };
-const RECORD_ADDRESS_KEYS = ["addressLabel", "address", "propertyAddress", "shootLocation", "location"];
-function addressText(value) {
-  if (!value) return "";
-  if (typeof value === "string") return value.trim();
-  if (typeof value !== "object" || Array.isArray(value)) return "";
-  const address = value;
-  const formatted = text$y(address.formatted) || text$y(address.label);
-  if (formatted) return formatted;
-  return [address.street, address.city, address.state, address.zip].filter((part) => typeof part === "string" && part.trim()).join(", ");
-}
-function recordAddressText(record2) {
-  if (!record2 || typeof record2 !== "object") return addressText(record2);
-  const row = record2;
-  for (const key of RECORD_ADDRESS_KEYS) {
-    const label = addressText(row[key]);
-    if (label) return label;
-  }
-  return "";
-}
-function text$y(value) {
-  return typeof value === "string" ? value.trim() : "";
-}
 const PLAYTEST_ADDRESS = "100 Playtest Lane, Austin, TX 78701";
 const STAFF_ROLES$1 = ["admin", "coordinator", "photographer", "editor"];
 function normalizeEmail$1(value) {
@@ -2863,288 +3146,6 @@ function clientCanViewListing(listing, identity) {
   const email = normalizeEmail$1(identity.email);
   const listingEmail = normalizeEmail$1(listing.clientEmail);
   return Boolean(email && listingEmail && email === listingEmail);
-}
-const ADDRESS_LIMIT = 300;
-const PLACE_ID_LIMIT = 300;
-function serviceLocationFromInput(value) {
-  if (typeof value === "string") {
-    const formatted2 = clip$2(value, ADDRESS_LIMIT);
-    return formatted2 ? { kind: "text", formatted: formatted2 } : null;
-  }
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  const row = value;
-  const formatted = clip$2(firstString(row, ["formatted", "description", "label"]), ADDRESS_LIMIT);
-  const placeId = clip$2(firstString(row, ["placeId", "place_id"]), PLACE_ID_LIMIT);
-  const lat = readCoord$1(row.lat ?? row.latitude, "lat");
-  const lng = readCoord$1(row.lng ?? row.longitude, "lng");
-  if (formatted && placeId && lat != null && lng != null) {
-    return { kind: "picked", place: { placeId, formatted, lat, lng } };
-  }
-  if (formatted) return { kind: "text", formatted };
-  return null;
-}
-function storedServiceLocationFields(value) {
-  const location = serviceLocationFromInput(value);
-  if (!location) return { address: "" };
-  if (location.kind === "text") return { address: location.formatted };
-  const { place } = location;
-  return {
-    address: place,
-    lat: place.lat,
-    lng: place.lng,
-    latitude: place.lat,
-    longitude: place.lng,
-    placeId: place.placeId
-  };
-}
-function storedRecordPin(record2) {
-  if (!record2) return null;
-  for (const key of ["address", "propertyAddress", "shootLocation"]) {
-    const location = serviceLocationFromInput(record2[key]);
-    if (location?.kind === "picked") return { lat: location.place.lat, lng: location.place.lng };
-  }
-  const lat = readCoord$1(record2.lat ?? record2.latitude, "lat");
-  const lng = readCoord$1(record2.lng ?? record2.longitude, "lng");
-  if (lat != null && lng != null) return { lat, lng };
-  return null;
-}
-function firstString(row, keys) {
-  for (const key of keys) {
-    const value = row[key];
-    if (typeof value === "string" && value.trim()) return value;
-  }
-  return "";
-}
-function clip$2(value, limit) {
-  if (typeof value !== "string") return "";
-  return value.trim().slice(0, limit);
-}
-function readCoord$1(value, axis) {
-  const number = typeof value === "number" ? value : typeof value === "string" && value.trim() ? Number(value) : NaN;
-  if (!Number.isFinite(number)) return null;
-  if (axis === "lat" && (number < -90 || number > 90)) return null;
-  if (axis === "lng" && (number < -180 || number > 180)) return null;
-  return number;
-}
-const TX_ZIP_CENTROIDS = {
-  // Spring / The Woodlands — studio ZIP
-  "77380": { lat: 30.1441, lng: -95.4703 },
-  // The Woodlands — $75 apprentice service area. Zippopotam place points.
-  "77381": { lat: 30.1716, lng: -95.4985 },
-  "77382": { lat: 30.2106, lng: -95.5257 },
-  "77384": { lat: 30.2257, lng: -95.4924 },
-  "77385": { lat: 30.1877, lng: -95.4288 },
-  // Spring
-  "77373": { lat: 30.0532, lng: -95.3773 },
-  "77379": { lat: 30.0377, lng: -95.5326 },
-  "77386": { lat: 30.1288, lng: -95.4239 },
-  "77388": { lat: 30.0505, lng: -95.4695 },
-  "77389": { lat: 30.1044, lng: -95.5066 },
-  // Conroe
-  "77301": { lat: 30.3125, lng: -95.4527 },
-  "77302": { lat: 30.2238, lng: -95.3577 },
-  "77303": { lat: 30.3814, lng: -95.3749 },
-  "77304": { lat: 30.3217, lng: -95.5285 },
-  "77306": { lat: 30.2277, lng: -95.2851 },
-  // Willis and Cypress. The $75 page does not charge these until travel is decided.
-  "77318": { lat: 30.4416, lng: -95.5394 },
-  "77378": { lat: 30.4441, lng: -95.4506 },
-  "77410": { lat: 29.834, lng: -95.4342 },
-  "77429": { lat: 29.9766, lng: -95.6358 },
-  "77433": { lat: 29.8836, lng: -95.7025 },
-  // Downtown Houston
-  "77002": { lat: 29.7594, lng: -95.3594 },
-  // Katy
-  "77494": { lat: 29.7404, lng: -95.8304 },
-  // Huntsville
-  "77340": { lat: 30.6448, lng: -95.5798 },
-  // Galveston
-  "77550": { lat: 29.2983, lng: -94.793 },
-  // Beaumont
-  "77701": { lat: 30.0688, lng: -94.1039 },
-  // Austin — past zone 6, so the quote is "Travel quoted"
-  "78701": { lat: 30.2713, lng: -97.7426 }
-};
-const EARTH_RADIUS_MILES = 3958.7613;
-const TRAVEL_ORIGIN = {
-  lat: 30.145492547135,
-  lng: -95.448893600358
-};
-const TRAVEL_ZONES = [
-  { zone: 1, outerMiles: 17, feeCents: 0 },
-  { zone: 2, outerMiles: 30, feeCents: 5e3 },
-  { zone: 3, outerMiles: 42, feeCents: 7500 },
-  { zone: 4, outerMiles: 55, feeCents: 1e4 },
-  { zone: 5, outerMiles: 69, feeCents: 12500 },
-  { zone: 6, outerMiles: 84, feeCents: 15e3 }
-];
-const TRAVEL_LINE_ID = "travel-fee";
-const TRAVEL_QUOTED_NOTE = "Staff must price travel before publishing.";
-const TX_ZIP = /\b(7[5-9]\d{3})(?:-\d{4})?\b/g;
-const BOUNDARY_EPSILON_MILES = 1e-6;
-function haversineMiles(from, to) {
-  const dLat = toRad(to.lat - from.lat);
-  const dLng = toRad(to.lng - from.lng);
-  const lat1 = toRad(from.lat);
-  const lat2 = toRad(to.lat);
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
-  return 2 * EARTH_RADIUS_MILES * Math.asin(Math.min(1, Math.sqrt(h)));
-}
-function assessTravel(value, zones = TRAVEL_ZONES) {
-  const pin = pinFrom(value);
-  if (pin) return quoteFromMiles(haversineMiles(TRAVEL_ORIGIN, pin), zones);
-  const zip = zipFrom(value);
-  if (zip) {
-    const centroid = TX_ZIP_CENTROIDS[zip];
-    if (centroid) return quoteFromMiles(haversineMiles(TRAVEL_ORIGIN, centroid), zones);
-  }
-  if (value && typeof value === "object" && !Array.isArray(value)) {
-    const row = value;
-    if (row.address != null && row.address !== value) return assessTravel(row.address);
-  }
-  return unresolved();
-}
-function travelPriceKnown(travel) {
-  return typeof travel.travelZone === "number" && Number.isFinite(travel.travelZone) && travel.travelZone > 0 && typeof travel.travelFeeCents === "number" && Number.isFinite(travel.travelFeeCents) && travel.travelFeeCents >= 0;
-}
-function travelCustomerLine(travel) {
-  if (travel.travelQuoted || travel.travelZone == null) {
-    return { label: "Travel quoted", amount: null };
-  }
-  if (travel.travelZone === 1) {
-    return { label: "Travel fee — Zone 1", amount: "FREE (Zone 1)" };
-  }
-  return {
-    label: `Travel fee — Zone ${travel.travelZone}`,
-    amount: sidebarMoney(travel.travelFeeCents ?? 0)
-  };
-}
-function travelSummaryText(travel, options) {
-  const line = travelCustomerLine(travel);
-  const miles2 = options?.miles && travel.travelMiles != null ? ` (${travel.travelMiles.toFixed(2)} mi)` : "";
-  if (travel.travelQuoted || travel.travelZone == null) return `${line.label}${miles2}`;
-  if (travel.travelZone === 1) return `FREE (Zone 1)${miles2}`;
-  return `${line.label} — ${emailMoney(travel.travelFeeCents ?? 0)}${miles2}`;
-}
-function isTravelFeeLine(item) {
-  if (!item) return false;
-  if (String(item.id || "") === TRAVEL_LINE_ID) return true;
-  const name = String(item.name || "").trim();
-  return name === "Travel quoted" || name === "FREE (Zone 1)" || /^Travel fee\b/i.test(name);
-}
-function travelInvoiceLine(travel) {
-  if (travel.travelQuoted || travel.travelZone == null) {
-    return {
-      id: TRAVEL_LINE_ID,
-      name: "Travel quoted",
-      description: TRAVEL_QUOTED_NOTE,
-      unitPrice: 0,
-      qty: 1,
-      price: 0
-    };
-  }
-  const price = travel.travelFeeCents == null ? 0 : travel.travelFeeCents / 100;
-  return {
-    id: TRAVEL_LINE_ID,
-    name: `Travel fee — Zone ${travel.travelZone}`,
-    unitPrice: price,
-    qty: 1,
-    price
-  };
-}
-function applyServerTravel(lineItems, address, clientTravelFeeCents, zones = TRAVEL_ZONES) {
-  const travel = assessTravel(address, zones);
-  const kept = normalizeBookingLineItems(lineItems).filter((item) => !isTravelFeeLine(item));
-  const next = [...kept, travelInvoiceLine(travel)];
-  return {
-    lineItems: next,
-    total: roundMoney$8(sumLineItemPrices(next)),
-    travel
-  };
-}
-function travelFromRecord(record2) {
-  if (!record2 || typeof record2.travelQuoted !== "boolean") return null;
-  return {
-    travelZone: finiteOrNull(record2.travelZone),
-    travelMiles: finiteOrNull(record2.travelMiles),
-    travelFeeCents: finiteOrNull(record2.travelFeeCents),
-    travelQuoted: record2.travelQuoted
-  };
-}
-function travelTextForRecord(record2, options) {
-  if (!record2) return null;
-  const stored = travelFromRecord(record2);
-  if (stored) return travelSummaryText(stored, options);
-  const address = record2.address ?? record2.propertyAddress ?? record2.shootLocation ?? record2.addressLabel;
-  if (address == null || address === "") return null;
-  return travelSummaryText(assessTravel(address), options);
-}
-function quoteFromMiles(miles2, zones = TRAVEL_ZONES) {
-  const travelMiles = roundMiles(miles2);
-  const bands = [...zones].sort((a, b) => a.outerMiles - b.outerMiles);
-  if (bands.length === 0) {
-    return {
-      travelZone: null,
-      travelMiles,
-      travelFeeCents: null,
-      travelQuoted: true
-    };
-  }
-  for (const zone of bands) {
-    if (miles2 <= zone.outerMiles + BOUNDARY_EPSILON_MILES) {
-      return {
-        travelZone: zone.zone,
-        travelMiles,
-        travelFeeCents: zone.feeCents,
-        travelQuoted: false
-      };
-    }
-  }
-  return {
-    travelZone: null,
-    travelMiles,
-    travelFeeCents: null,
-    travelQuoted: true
-  };
-}
-function unresolved() {
-  return {
-    travelZone: null,
-    travelMiles: null,
-    travelFeeCents: null,
-    travelQuoted: true
-  };
-}
-function pinFrom(value) {
-  const location = serviceLocationFromInput(value);
-  if (location?.kind === "picked") return { lat: location.place.lat, lng: location.place.lng };
-  return null;
-}
-function zipFrom(value) {
-  const text2 = addressText(value) || (typeof value === "string" ? value : "");
-  if (!text2) return null;
-  const matches = text2.match(TX_ZIP);
-  if (!matches || matches.length === 0) return null;
-  return matches[matches.length - 1].slice(0, 5);
-}
-function finiteOrNull(value) {
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
-}
-function sidebarMoney(cents2) {
-  const dollars2 = cents2 / 100;
-  return Number.isInteger(dollars2) ? `$${dollars2}` : `$${dollars2.toFixed(2)}`;
-}
-function emailMoney(cents2) {
-  return `$${(cents2 / 100).toFixed(2)}`;
-}
-function roundMiles(miles2) {
-  return Math.round(miles2 * 100) / 100;
-}
-function roundMoney$8(value) {
-  return Math.round(value * 100) / 100;
-}
-function toRad(degrees) {
-  return degrees * Math.PI / 180;
 }
 function buildBookingInvoiceDraft(input) {
   let lineItems = normalizeBookingLineItems(input.lineItems);
@@ -3247,7 +3248,7 @@ function applyProcessingToDraftLines(lineItems, input) {
   } else if (storedProcessing) {
     next.push(storedProcessing);
   }
-  return { ...totals, lineItems: next };
+  return { ...totals, subtotal: totals.processingBase, lineItems: next };
 }
 function roundDraftMoney(value) {
   if (!Number.isFinite(value)) return 0;
@@ -3330,6 +3331,20 @@ function base64Url(bytes) {
 function formatOrderNumber(n) {
   if (!Number.isInteger(n) || n < 1) throw new Error(`Invalid order number ${n}`);
   return `#${String(n).padStart(3, "0")}`;
+}
+function orderNumberLookupKeys(raw) {
+  if (typeof raw !== "string") return [];
+  const trimmed = raw.trim();
+  if (!trimmed || trimmed.length > 40) return [];
+  const bare = trimmed.replace(/^#/, "");
+  const keys = [trimmed];
+  if (/^\d+$/.test(bare)) {
+    const n = Number(bare);
+    if (Number.isInteger(n) && n > 0 && n < 1e6) {
+      keys.push(formatOrderNumber(n), bare, `#${bare}`);
+    }
+  }
+  return [...new Set(keys)];
 }
 function orderCodeTail(id, salt = 0) {
   const digits2 = id.replace(/\D/g, "");
@@ -6721,8 +6736,14 @@ function orderServiceLines(record2, linked) {
   const synthesized = synthesizePackageLine(record2) || synthesizePackageLine(linked);
   return synthesized ? [synthesized] : [];
 }
+function isProcessingCharge(line) {
+  const id = String(line.id || "");
+  if (id === "processing" || id === "adjustment-processing") return true;
+  return /^processing\b/i.test(line.name.trim());
+}
 function orderChargeSummary(record2, lines) {
-  const lineSubtotal = roundMoney$5(lines.reduce((sum, line) => sum + line.price, 0));
+  const priced = lines.filter((line) => !isProcessingCharge(line));
+  const lineSubtotal = roundMoney$5(priced.reduce((sum, line) => sum + line.price, 0));
   const pricing = nested$2(record2?.pricing);
   const tax = moneyOrNull$1(record2?.tax) ?? moneyOrNull$1(pricing.tax) ?? 0;
   const storedTotal = moneyOrNull$1(record2?.total) ?? moneyOrNull$1(pricing.total);
@@ -6984,6 +7005,7 @@ function officeNewOrderEmail(saved, options) {
   const catalog = options?.catalog ?? packagesForStaffEditor([]);
   const rawLines = orderServiceLines(saved);
   const lines = rawLines.filter((line) => !isTravelFeeLine(line) && !isProcessingChargeLine(line));
+  const subtotalLines = rawLines.filter((line) => !isProcessingChargeLine(line));
   const charges = orderChargeSummary(saved, lines);
   const processingAmount = officeProcessingAmount(saved, rawLines);
   const packageLine = lines.find((line) => !isAddOn(line, catalog)) || lines[0];
@@ -6997,7 +7019,7 @@ function officeNewOrderEmail(saved, options) {
   const requestedDate = firstDate(saved, ["scheduledDate", "requestedDate", "appointmentDate", "requestedDates"]);
   const clientName2 = clientNameOf(saved);
   const notes = notesOf(saved);
-  const subtotal = subtotalBeforeProcessing(saved, lines, processingAmount);
+  const subtotal = subtotalBeforeProcessing(saved, subtotalLines, processingAmount);
   const fields = [
     ["Order number", orderNumber2],
     ["Admin link", text$q(options?.adminUrl) || NOT_PROVIDED],
@@ -7361,6 +7383,9 @@ function holidayPaymentLinkBody(input) {
   const priced = lines.length > 0 ? {
     order: {
       location_id: input.locationId,
+      // Square copies this onto the paid order. The webhook matches it to the invoice
+      // when the payment itself has no note. Max length is 40.
+      reference_id: input.invoiceId.slice(0, 40),
       line_items: lines.filter((line) => line.amountCents > 0).map((line) => ({
         name: line.name.slice(0, 255),
         quantity: "1",
@@ -8920,12 +8945,30 @@ const PAY_LATER_METHOD = "pay_later";
 const PAY_NOW_SAVINGS_LABEL = "Pay Now savings";
 const PAY_NOW_LINE_ID = "pay-now-savings";
 function dollarsToCents(dollars2) {
-  if (!Number.isFinite(dollars2) || dollars2 <= 0) return 0;
+  if (!Number.isFinite(dollars2)) return 0;
   return Math.round(dollars2 * 100);
 }
 function payNowDiscountCents(totalBeforeSavingsCents) {
   const base = Number.isFinite(totalBeforeSavingsCents) ? Math.max(0, Math.round(totalBeforeSavingsCents)) : 0;
   return Math.min(PAY_NOW_DISCOUNT_CENTS, base);
+}
+function presentPayNowPrice(input) {
+  const serviceCents = Math.max(0, dollarsToCents(input.serviceDollars));
+  const travelCents = Math.max(0, dollarsToCents(input.travelDollars || 0));
+  const promoCents = Math.max(0, dollarsToCents(input.promoDollars || 0));
+  const feeCents = Math.max(0, dollarsToCents(input.feeDollars || 0));
+  const taxCents = Math.max(0, dollarsToCents(input.taxDollars || 0));
+  const beforeSavings = Math.max(0, serviceCents - promoCents + feeCents + travelCents);
+  const savingsCents = payNowDiscountCents(beforeSavings);
+  const subtotalCents = beforeSavings - savingsCents;
+  const processingCents = input.processingOn ? processingFeeCents(subtotalCents, input.processingPercent) : 0;
+  return {
+    subtotal: subtotalCents / 100,
+    savings: savingsCents / 100,
+    travel: travelCents / 100,
+    processing: processingCents / 100,
+    total: (subtotalCents + processingCents + taxCents) / 100
+  };
 }
 function payNowSavingsLine(discountCents) {
   if (!Number.isFinite(discountCents) || discountCents <= 0) return null;
@@ -8941,20 +8984,43 @@ function payNowSavingsLine(discountCents) {
 function isProcessingLine(item) {
   return item.id === ADJUSTMENT_LINE_IDS.processing || item.category === ADJUSTMENT_LINE_IDS.processing;
 }
-function applyPayNowSavings(sale) {
-  const beforeCents = dollarsToCents(sale.total);
-  const discountCents = payNowDiscountCents(beforeCents);
-  const line = payNowSavingsLine(discountCents);
-  if (!line) return sale;
-  const without = sale.lineItems.filter((item) => item.id !== PAY_NOW_LINE_ID);
-  const processing = without.filter((item) => isProcessingLine(item));
-  const rest = without.filter((item) => !isProcessingLine(item));
-  const total = (beforeCents - discountCents) / 100;
+function applyPayNowSavings(sale, options) {
+  const without = sale.lineItems.filter((item) => item.id !== PAY_NOW_LINE_ID && !isProcessingLine(item));
+  const centsOf = (items) => items.reduce((sum, item) => sum + Math.round(item.price * 100), 0);
+  const travel = without.filter((item) => isTravelFeeLine(item));
+  const promos = without.filter((item) => isPromoInvoiceLine(item));
+  const fees = without.filter((item) => adjustmentKind(item) === "fees");
+  const services2 = without.filter((item) => !travel.includes(item) && !promos.includes(item) && !fees.includes(item));
+  const processingOn = sale.processingPolicy === "included";
+  const priced = presentPayNowPrice({
+    serviceDollars: centsOf(services2) / 100,
+    travelDollars: centsOf(travel) / 100,
+    promoDollars: Math.abs(centsOf(promos)) / 100,
+    feeDollars: centsOf(fees) / 100,
+    taxDollars: Number(sale.tax) || 0,
+    processingOn,
+    processingPercent: options?.processingPercent
+  });
+  const savings = payNowSavingsLine(Math.round(priced.savings * 100));
+  const next = [...services2, ...promos, ...fees, ...travel];
+  if (savings) next.push(savings);
+  if (priced.processing > 0) {
+    next.push({
+      id: ADJUSTMENT_LINE_IDS.processing,
+      name: "Processing",
+      unitPrice: priced.processing,
+      qty: 1,
+      price: priced.processing,
+      category: ADJUSTMENT_LINE_IDS.processing
+    });
+  }
   return {
     ...sale,
-    lineItems: [...rest, ...processing, line],
-    total,
-    amountDue: total
+    lineItems: next,
+    subtotal: priced.subtotal,
+    processing: priced.processing,
+    total: priced.total,
+    amountDue: priced.total
   };
 }
 function payNowSquareLines(lineItems) {
@@ -8965,6 +9031,31 @@ function payNowSquareLines(lineItems) {
     if (!name) return [];
     return [{ name, amountCents }];
   });
+}
+function roundSettlementMoney(amount) {
+  if (!Number.isFinite(amount)) return 0;
+  return Math.round(amount * 100) / 100;
+}
+function settlementMoney(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value.replace(/[$,\s]/g, ""));
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return 0;
+}
+function explicitStatus(value) {
+  return String(value ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+}
+function paymentSettlementStatus(total, amountPaid, explicit) {
+  const paid = roundSettlementMoney(amountPaid);
+  const dueBase = roundSettlementMoney(total);
+  const status2 = explicitStatus(explicit);
+  if (paid > 0 && dueBase > 0 && paid + 9e-3 < dueBase) return "partial";
+  if (paid > 0 && (dueBase <= 0 || paid + 9e-3 >= dueBase)) return "paid";
+  if (status2 === "partial") return "unpaid";
+  if (status2 === "paid" || status2 === "paid_in_full" || status2 === "succeeded" || status2 === "comped") return "paid";
+  return "unpaid";
 }
 function hmacHex(secret2, payload) {
   return createHmac("sha256", secret2).update(payload).digest("hex");
@@ -12080,7 +12171,7 @@ router$F.post("/", async (req, res) => {
       payAtCloseFee = shaped.payAtCloseFee;
       sale = shaped;
     } else if (wantsPayNow) {
-      sale = applyPayNowSavings(sale);
+      sale = applyPayNowSavings(sale, { processingPercent: rates.processingPercent });
     }
     const lineItems = sale.lineItems;
     const bookedStudio = studioIdFromBooking({
@@ -12181,6 +12272,11 @@ router$F.post("/", async (req, res) => {
       processing: socialSaves ? 0 : sale.processing ?? 0,
       processingPolicy: socialSaves ? "waived" : sale.processingPolicy ?? (processingEnabled() ? "included" : "waived"),
       ...storedPaymentMethod ? { paymentMethod: storedPaymentMethod } : {},
+      ...wantsPayNow ? {
+        paymentStatus: "unpaid",
+        amountPaid: 0,
+        balanceDue: Number(total) || 0
+      } : {},
       ...wantsPayAtClose ? {
         paymentStatus: PAY_AT_CLOSE_PENDING_STATUS,
         payAtCloseFee
@@ -12478,6 +12574,7 @@ router$F.post("/", async (req, res) => {
           address: displayAddress,
           orderNumber: orderNumber2,
           processing: money$3(sale.processing ?? 0),
+          subtotal: money$3(sale.subtotal),
           total: money$3(total),
           requestId: docRef.id,
           scheduledDate: bookingDateLabel(scheduledDate, "TBD — we'll confirm shortly"),
@@ -12668,6 +12765,12 @@ router$F.post("/", async (req, res) => {
             squareOrderId: linked.squareOrderId || null,
             updatedAt: admin.firestore.FieldValue.serverTimestamp()
           }).catch((err) => console.error("[Bookings] Pay Now payment link was not saved:", err));
+          await docRef.update({
+            squarePaymentLinkId: linked.linkId || null,
+            squareOrderId: linked.squareOrderId || null,
+            paymentProvider: "square",
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+          }).catch((err) => console.error("[Bookings] Pay Now order link was not saved:", err));
         }
       } catch (err) {
         console.error("[Bookings] Pay Now checkout failed:", err);
@@ -12964,7 +13067,7 @@ router$F.patch("/:id/confirm", requireCoordinator, async (req, res) => {
     const requestTotal = traveledConfirm.total;
     const requestSubtotal = sumLineItemPrices(requestLineItems.filter((item) => {
       const id = String(item.id || "");
-      return !id.startsWith("promo-") && !item.name.startsWith("Promo Code:");
+      return !id.startsWith("promo-") && !item.name.startsWith("Promo Code:") && id !== "adjustment-processing" && id !== "processing";
     }));
     const confirmSource = scheduledDate || request.scheduledDate || request.appointmentDate || request.requestedDate;
     const confirmDate = toDate$1(confirmSource);
@@ -13044,8 +13147,15 @@ router$F.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       travelMiles: travel.travelMiles,
       travelFeeCents: travel.travelFeeCents,
       travelQuoted: travel.travelQuoted,
-      depositPaid: 0,
-      balanceDue: requestTotal,
+      depositPaid: request.paymentMethod === PAY_NOW_METHOD ? Number(request.amountPaid) || 0 : 0,
+      balanceDue: request.paymentMethod === PAY_NOW_METHOD && request.balanceDue != null ? Number(request.balanceDue) : requestTotal,
+      ...request.paymentMethod === PAY_NOW_METHOD ? {
+        paymentMethod: PAY_NOW_METHOD,
+        paymentStatus: typeof request.paymentStatus === "string" && request.paymentStatus ? request.paymentStatus : "unpaid",
+        amountPaid: Number(request.amountPaid) || 0,
+        ...typeof request.squarePaymentId === "string" && request.squarePaymentId ? { squarePaymentId: request.squarePaymentId } : {},
+        ...request.paidAt ? { paidAt: request.paidAt } : {}
+      } : {},
       ...request.paymentMethod === PAY_AT_CLOSE_METHOD ? {
         paymentMethod: PAY_AT_CLOSE_METHOD,
         paymentStatus: typeof request.paymentStatus === "string" && request.paymentStatus ? request.paymentStatus : PAY_AT_CLOSE_PENDING_STATUS
@@ -13179,6 +13289,7 @@ router$F.patch("/:id/confirm", requireCoordinator, async (req, res) => {
     if (linkedInvoiceId) {
       const existingInvoice = await db$z().collection("invoices").doc(linkedInvoiceId).get();
       if (existingInvoice.exists) {
+        const paidFields = settledFieldsFromInvoice(existingInvoice.data() || {});
         await existingInvoice.ref.update({
           orderId: orderRef.id,
           clientId: clientId2,
@@ -13190,6 +13301,10 @@ router$F.patch("/:id/confirm", requireCoordinator, async (req, res) => {
           ...revenueFields,
           updatedAt: admin.firestore.FieldValue.serverTimestamp()
         });
+        if (paidFields) {
+          await orderRef.update({ ...paidFields, updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+          await requestDoc.ref.update({ ...paidFields, updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+        }
       } else {
         console.error(`[Bookings] Confirm kept invoiceId ${linkedInvoiceId} but the invoice doc is missing. Not creating a second invoice.`);
       }
@@ -13392,6 +13507,20 @@ async function stampDurableLinks(input) {
   if (input.listingId && plan.listingFields) {
     await db$z().collection("listings").doc(input.listingId).update({ ...plan.listingFields, updatedAt: now });
   }
+}
+function settledFieldsFromInvoice(invoice) {
+  const total = roundSettlementMoney(settlementMoney(invoice.total));
+  const amountPaid = roundSettlementMoney(Math.max(settlementMoney(invoice.amountPaid), settlementMoney(invoice.depositPaid)));
+  const status2 = paymentSettlementStatus(total, amountPaid, invoice.paymentStatus || invoice.status);
+  if (status2 === "unpaid") return null;
+  return {
+    paymentStatus: status2,
+    amountPaid,
+    balanceDue: roundSettlementMoney(Math.max(0, total - amountPaid)),
+    depositPaid: roundSettlementMoney(settlementMoney(invoice.depositPaid) || amountPaid),
+    ...typeof invoice.squarePaymentId === "string" && invoice.squarePaymentId ? { squarePaymentId: invoice.squarePaymentId } : {},
+    ...status2 === "paid" && invoice.paidAt ? { paidAt: invoice.paidAt } : {}
+  };
 }
 function linesForConfirmedOrder(request) {
   const raw = Array.isArray(request.lineItems) && request.lineItems.length > 0 ? request.lineItems : Array.isArray(request.services) ? request.services.map((service) => typeof service === "string" ? { name: service, price: 0 } : service) : [];
@@ -20074,8 +20203,68 @@ async function resolveLateApprenticeshipPayment(orderId) {
   });
   return "flagged";
 }
+function squareHeaders(env) {
+  const token = env.SQUARE_ACCESS_TOKEN?.trim();
+  if (!token) return null;
+  return {
+    Authorization: `Bearer ${token}`,
+    "Square-Version": env.SQUARE_VERSION || "2026-08-20"
+  };
+}
+async function fetchSquareOrderSnapshot(orderId, env = process.env, fetchImpl = fetch) {
+  const headers = squareHeaders(env);
+  const id = orderId.trim();
+  if (!headers || !id) return null;
+  let response;
+  try {
+    response = await fetchImpl(`${squareApiBaseUrl(env.SQUARE_ENVIRONMENT)}/v2/orders/${encodeURIComponent(id)}`, {
+      headers
+    });
+  } catch {
+    return null;
+  }
+  if (!response.ok) return null;
+  const body = await response.json().catch(() => null);
+  const order = body?.order;
+  if (!order || typeof order !== "object") return null;
+  const tenders = Array.isArray(order.tenders) ? order.tenders : [];
+  let paidCents = 0;
+  const paymentIds = [];
+  for (const tender of tenders) {
+    if (!tender || typeof tender !== "object") continue;
+    const row = tender;
+    const amount = Number(row.amount_money?.amount);
+    if (Number.isFinite(amount) && amount > 0) paidCents += amount;
+    const paymentId = typeof row.payment_id === "string" ? row.payment_id.trim() : "";
+    if (paymentId) paymentIds.push(paymentId);
+  }
+  return {
+    referenceId: typeof order.reference_id === "string" ? order.reference_id.trim() : "",
+    state: typeof order.state === "string" ? order.state : "",
+    paidCents,
+    paymentIds
+  };
+}
+async function fetchSquarePayment(paymentId, env = process.env, fetchImpl = fetch) {
+  const headers = squareHeaders(env);
+  const id = paymentId.trim();
+  if (!headers || !id) return null;
+  let response;
+  try {
+    response = await fetchImpl(`${squareApiBaseUrl(env.SQUARE_ENVIRONMENT)}/v2/payments/${encodeURIComponent(id)}`, {
+      headers
+    });
+  } catch {
+    return null;
+  }
+  if (!response.ok) return null;
+  const body = await response.json().catch(() => null);
+  const payment = body?.payment;
+  return payment && typeof payment === "object" ? payment : null;
+}
 const router$B = Router();
 const db$n = () => appFirestore();
+const payNowReconcileLimiter = createRateLimiter({ windowMs: 10 * 60 * 1e3, max: 30 });
 const stripe$1 = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
   apiVersion: "2024-06-20"
 });
@@ -20301,6 +20490,32 @@ async function appendOrderHistory(orderId, entry2) {
     console.error("[Payments] Order history update failed:", err);
   }
 }
+async function rememberPaymentOnRecords(input) {
+  if (input.status === "unpaid") return;
+  const patch = {
+    paymentStatus: input.status,
+    amountPaid: input.amountPaid,
+    balanceDue: input.amountDue,
+    ...input.status === "paid" ? { paidAt: admin.firestore.FieldValue.serverTimestamp() } : {},
+    ...input.squarePaymentId ? { squarePaymentId: input.squarePaymentId } : {},
+    ...input.storedPaymentMethod === PAY_NOW_METHOD ? { paymentMethod: PAY_NOW_METHOD } : {},
+    ...input.method === "pay_at_close" ? { paymentMethod: PAY_AT_CLOSE_METHOD, titusCheckoutId: input.titusCheckoutId || null } : {},
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  };
+  const writes = [];
+  if (input.orderId) {
+    writes.push(db$n().collection("orders").doc(input.orderId).update({
+      ...patch,
+      ...input.incrementDeposit ? { depositPaid: admin.firestore.FieldValue.increment(input.incrementDeposit) } : {}
+    }).catch((err) => console.error("[Payments] Order balance update failed:", err)));
+  }
+  if (input.orderRequestId) {
+    writes.push(db$n().collection("orderRequests").doc(input.orderRequestId).update(patch).catch((err) => {
+      console.error("[Payments] Order request balance update failed:", err);
+    }));
+  }
+  await Promise.all(writes);
+}
 async function applySuccessfulPayment({
   invoiceId,
   orderId,
@@ -20311,7 +20526,8 @@ async function applySuccessfulPayment({
   squarePaymentId,
   stripePaymentIntentId,
   titusCheckoutId,
-  titusPaidAt
+  titusPaidAt,
+  skipReceipt
 }) {
   const invoiceRef = db$n().collection("invoices").doc(invoiceId);
   const invoiceDoc = await invoiceRef.get();
@@ -20319,10 +20535,26 @@ async function applySuccessfulPayment({
   const invoice = invoiceDoc.data();
   const resolvedOrderId = orderId || invoice.orderId || "";
   const resolvedClientId = clientId2 || invoice.clientId || "";
+  const orderRequestId = typeof invoice.orderRequestId === "string" ? invoice.orderRequestId : "";
+  const storedPaymentMethod = typeof invoice.paymentMethod === "string" ? invoice.paymentMethod : "";
   const sameSquare = Boolean(squarePaymentId) && invoice.squarePaymentId === squarePaymentId;
   const sameStripe = Boolean(stripePaymentIntentId) && invoice.stripePaymentIntentId === stripePaymentIntentId;
   const duplicate = sameSquare || sameStripe || await paymentAlreadyRecorded({ squarePaymentId, stripePaymentIntentId, titusCheckoutId });
   if (duplicate) {
+    const currentPaid2 = roundSettlementMoney(Number(invoice.amountPaid) || 0);
+    const total2 = roundSettlementMoney(Number(invoice.total) || 0);
+    const due = roundSettlementMoney(Math.max(0, total2 - currentPaid2));
+    await rememberPaymentOnRecords({
+      orderId: resolvedOrderId,
+      orderRequestId,
+      amountPaid: currentPaid2,
+      amountDue: due,
+      status: paymentSettlementStatus(total2, currentPaid2, invoice.status),
+      squarePaymentId,
+      method,
+      storedPaymentMethod,
+      titusCheckoutId
+    });
     if (invoiceAllowsDownload(invoice)) {
       await syncDownloadAccess({
         invoiceId,
@@ -20334,39 +20566,36 @@ async function applySuccessfulPayment({
     return { applied: false, unlocked: false, duplicate: true, email: "suppressed" };
   }
   const currentPaid = Number(invoice.amountPaid) || 0;
-  const total = Number(invoice.total) || 0;
-  const newAmountPaid = currentPaid + amount;
-  const newAmountDue = Math.max(0, total - newAmountPaid);
+  const total = roundSettlementMoney(Number(invoice.total) || 0);
+  const newAmountPaid = roundSettlementMoney(currentPaid + amount);
+  const newAmountDue = roundSettlementMoney(Math.max(0, total - newAmountPaid));
+  const settlement = paymentSettlementStatus(total, newAmountPaid);
+  const paymentMethod = storedPaymentMethod === PAY_NOW_METHOD || storedPaymentMethod === PAY_AT_CLOSE_METHOD ? storedPaymentMethod : method;
   await invoiceRef.update({
     amountPaid: newAmountPaid,
     amountDue: newAmountDue,
-    status: newAmountDue <= 0 ? "paid" : "partial",
-    paidAt: newAmountDue <= 0 ? admin.firestore.FieldValue.serverTimestamp() : null,
-    paymentMethod: method,
+    status: settlement === "paid" ? "paid" : "partial",
+    paidAt: settlement === "paid" ? admin.firestore.FieldValue.serverTimestamp() : null,
+    paymentMethod,
+    ...method === "square" ? { paymentProvider: "square" } : {},
     ...squarePaymentId ? { squarePaymentId } : {},
     ...stripePaymentIntentId ? { stripePaymentIntentId } : {},
     ...titusCheckoutId ? { titusCheckoutId, titusSettledCheckoutId: titusCheckoutId } : {},
     ...titusPaidAt ? { titusPaidAt } : {},
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
   });
-  if (resolvedOrderId) {
-    await db$n().collection("orders").doc(resolvedOrderId).update({
-      depositPaid: admin.firestore.FieldValue.increment(amount),
-      balanceDue: newAmountDue,
-      paymentStatus: newAmountDue <= 0 ? "paid" : "partial",
-      ...method === "pay_at_close" ? { paymentMethod: PAY_AT_CLOSE_METHOD, titusCheckoutId: titusCheckoutId || null } : {},
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
-    }).catch((err) => console.error("[Payments] Order balance update failed:", err));
-  }
-  const orderRequestId = typeof invoice.orderRequestId === "string" ? invoice.orderRequestId : "";
-  if (orderRequestId && method === "pay_at_close") {
-    await db$n().collection("orderRequests").doc(orderRequestId).update({
-      paymentMethod: PAY_AT_CLOSE_METHOD,
-      paymentStatus: newAmountDue <= 0 ? "paid" : "partial",
-      balanceDue: newAmountDue,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
-    }).catch((err) => console.error("[Payments] Order request balance update failed:", err));
-  }
+  await rememberPaymentOnRecords({
+    orderId: resolvedOrderId,
+    orderRequestId,
+    amountPaid: newAmountPaid,
+    amountDue: newAmountDue,
+    status: settlement,
+    squarePaymentId,
+    method,
+    storedPaymentMethod,
+    titusCheckoutId,
+    incrementDeposit: amount
+  });
   const stamp2 = revenueStamp(invoice);
   if (resolvedClientId && stamp2.countsTowardRevenue) {
     await db$n().collection("clients").doc(resolvedClientId).update({
@@ -20394,7 +20623,7 @@ async function applySuccessfulPayment({
   });
   const unlocked = newAmountDue <= 0;
   let email = "suppressed";
-  if (invoice.clientEmail) {
+  if (!skipReceipt && invoice.clientEmail) {
     try {
       email = await deliverPaymentReceipt(invoice, invoiceId, newAmountPaid, newAmountDue, unlocked);
     } catch (err) {
@@ -20551,10 +20780,14 @@ async function applyDepositPayment({
       if (order.source === HEADSHOTS_ORDER_SOURCE && order.status === APPRENTICESHIP_EXPIRED_STATUS && orderId) {
         lateHeadshotOrderId = orderId;
       }
+      const depositStatus = paymentSettlementStatus(total, depositPaid);
       tx.update(orderRef, {
         depositPaid,
+        amountPaid: depositPaid,
         balanceDue: amountDue,
-        paymentStatus: amountDue <= 0 ? "paid" : "partial",
+        paymentStatus: depositStatus,
+        ...paymentKey ? { squarePaymentId: paymentKey } : {},
+        ...depositStatus === "paid" ? { paidAt: admin.firestore.FieldValue.serverTimestamp() } : {},
         ...confirmsBooking || confirmsHeadshot ? {
           status: "confirmed",
           depositStatus: "paid",
@@ -20578,9 +20811,13 @@ async function applyDepositPayment({
     }
     if (requestRef && requestSnap?.exists) {
       const request = requestSnap.data() || {};
+      const requestStatus = paymentSettlementStatus(total, depositPaid);
       tx.update(requestRef, {
         depositPaid,
+        amountPaid: depositPaid,
+        paymentStatus: requestStatus,
         ...request.source === APPRENTICESHIP_ORDER_SOURCE || request.source === HEADSHOTS_ORDER_SOURCE ? { depositStatus: "paid" } : {},
+        ...paymentKey ? { squarePaymentId: paymentKey } : {},
         balanceDue: amountDue,
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
@@ -21321,32 +21558,204 @@ async function findSquareSaleDoc(collectionName2, payment) {
   return null;
 }
 async function markSquareOrderPaid(ref, data, amount, squarePaymentId) {
-  if (data.squarePaymentId === squarePaymentId && data.paymentStatus === "paid") return;
+  if (data.squarePaymentId === squarePaymentId) return;
   const pricing = data.pricing && typeof data.pricing === "object" ? data.pricing : {};
-  const total = Number(data.total) || Number(pricing.total) || amount;
+  const total = roundSettlementMoney(Number(data.total) || Number(pricing.total) || amount);
+  const paid = roundSettlementMoney(amount);
+  const status2 = paymentSettlementStatus(total, paid);
   const current = typeof data.status === "string" ? data.status : "";
   await ref.update({
     status: current === "awaiting-payment" ? "new" : current || "new",
-    paymentStatus: "paid",
-    amountPaid: amount,
-    balanceDue: Math.max(0, Math.round((total - amount) * 100) / 100),
+    paymentStatus: status2,
+    amountPaid: paid,
+    balanceDue: roundSettlementMoney(Math.max(0, total - paid)),
     squarePaymentId,
-    paidAt: admin.firestore.FieldValue.serverTimestamp(),
+    ...status2 === "paid" ? { paidAt: admin.firestore.FieldValue.serverTimestamp() } : {},
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
   });
 }
-async function settlePrepaidOrderRequest(payment, amount) {
+async function settlePrepaidOrderRequest(payment, amount, options) {
   const paymentId = typeof payment.id === "string" ? payment.id.trim() : "";
   if (!paymentId) return false;
   const request = await findSquareSaleDoc("orderRequests", payment);
   const legacy = request ? null : await findSquareSaleDoc("orders", payment);
   const primary = request || legacy;
   if (!primary) return false;
-  await markSquareOrderPaid(primary.ref, primary.data() || {}, amount, paymentId);
+  const data = primary.data() || {};
+  const invoiceId = typeof data.invoiceId === "string" ? data.invoiceId.trim() : "";
+  if (invoiceId) {
+    const invoiceSnap = await db$n().collection("invoices").doc(invoiceId).get();
+    if (invoiceSnap.exists) {
+      const invoice = invoiceSnap.data() || {};
+      if (invoiceProvider(invoice) !== "stripe" && !isMirroredPayAtCloseSquarePayment(payment, invoice)) {
+        if (isDepositSquarePayment(invoice, payment)) {
+          await applyDepositPayment({ invoiceId, amount, squarePaymentId: paymentId });
+          return true;
+        }
+        const linkedOrderId = typeof invoice.orderId === "string" ? invoice.orderId : "";
+        await applySuccessfulPayment({
+          invoiceId,
+          orderId: linkedOrderId || (request ? void 0 : primary.id),
+          clientId: typeof invoice.clientId === "string" ? invoice.clientId : void 0,
+          clientName: typeof invoice.clientName === "string" ? invoice.clientName : void 0,
+          amount,
+          method: "square",
+          squarePaymentId: paymentId,
+          skipReceipt: options?.skipReceipt
+        });
+        return true;
+      }
+    }
+  }
+  await markSquareOrderPaid(primary.ref, data, amount, paymentId);
   const twin = await db$n().collection(request ? "orders" : "orderRequests").doc(primary.id).get();
   if (twin.exists) await markSquareOrderPaid(twin.ref, twin.data() || {}, amount, paymentId);
   return true;
 }
+function squareMoneyCents(payment) {
+  const amountMoney = payment.amount_money;
+  const totalMoney = payment.total_money;
+  const amount = amountMoney && typeof amountMoney === "object" ? Number(amountMoney.amount) : NaN;
+  const total = totalMoney && typeof totalMoney === "object" ? Number(totalMoney.amount) : NaN;
+  if (Number.isFinite(amount)) return amount;
+  if (Number.isFinite(total)) return total;
+  return 0;
+}
+async function paymentWithSquareOrderReference(payment) {
+  if (invoiceIdFromSquareNote(payment.note || payment.payment_note)) return payment;
+  if (typeof payment.reference_id === "string" && payment.reference_id.trim()) return payment;
+  const orderId = typeof payment.order_id === "string" ? payment.order_id.trim() : "";
+  if (!orderId) return payment;
+  const snapshot = await fetchSquareOrderSnapshot(orderId, process.env).catch(() => null);
+  if (!snapshot?.referenceId) return payment;
+  return { ...payment, reference_id: snapshot.referenceId };
+}
+async function settleCompletedSquarePayment(payment, options) {
+  if (!payment?.id || payment.status !== "COMPLETED") return { received: true };
+  const amount = squareMoneyCents(payment) / 100;
+  if (amount <= 0) return { received: true, ignored: "zero-amount" };
+  const matchedPayment = await paymentWithSquareOrderReference(payment);
+  const invoiceDoc = await findInvoiceForSquarePayment(matchedPayment);
+  if (!invoiceDoc) {
+    const settledOrder = await settlePrepaidOrderRequest(matchedPayment, amount, options);
+    if (settledOrder) return { received: true, orderRequest: true };
+    await db$n().collection("agentLogs").add({
+      agent: "travis",
+      action: "Unmatched Square payment",
+      summary: `Square payment ${payment.id} could not be matched to an invoice`,
+      status: "flagged",
+      relatedType: "invoice",
+      priority: "high",
+      requiresHumanReview: true,
+      details: payment.order_id || payment.note || "",
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    return { received: true, unmatched: true };
+  }
+  const invoice = invoiceDoc.data() || {};
+  if (invoiceProvider(invoice) === "stripe") {
+    return { received: true, ignored: "stripe-invoice" };
+  }
+  if (isMirroredPayAtCloseSquarePayment(matchedPayment, invoice)) {
+    return { received: true, ignored: "pay-at-close-external" };
+  }
+  if (isDepositSquarePayment(invoice, matchedPayment)) {
+    await applyDepositPayment({
+      invoiceId: invoiceDoc.id,
+      amount,
+      squarePaymentId: String(payment.id)
+    });
+    return { received: true, deposit: true };
+  }
+  const settled2 = await applySuccessfulPayment({
+    invoiceId: invoiceDoc.id,
+    orderId: typeof invoice.orderId === "string" ? invoice.orderId : void 0,
+    clientId: typeof invoice.clientId === "string" ? invoice.clientId : void 0,
+    clientName: typeof invoice.clientName === "string" ? invoice.clientName : void 0,
+    amount,
+    method: "square",
+    squarePaymentId: String(payment.id),
+    skipReceipt: options?.skipReceipt
+  });
+  return { received: true, ...settled2 ?? {} };
+}
+async function reconcilePayNowOrder(rawOrderNumber) {
+  const keys = orderNumberLookupKeys(rawOrderNumber);
+  const shown = keys[0] || "";
+  if (!shown) return { paymentStatus: "unpaid", orderNumber: "" };
+  let request = null;
+  for (const key of keys) {
+    const snap = await db$n().collection("orderRequests").where("orderNumber", "==", key).limit(1).get();
+    if (!snap.empty) {
+      request = snap.docs[0];
+      break;
+    }
+  }
+  if (!request) return { paymentStatus: "pending", orderNumber: shown };
+  const data = request.data() || {};
+  const orderNumber2 = typeof data.orderNumber === "string" && data.orderNumber ? data.orderNumber : shown;
+  const invoiceId = typeof data.invoiceId === "string" ? data.invoiceId.trim() : "";
+  const invoiceSnap = invoiceId ? await db$n().collection("invoices").doc(invoiceId).get() : null;
+  const invoice = invoiceSnap?.exists ? invoiceSnap.data() || {} : {};
+  const total = roundSettlementMoney(Number(invoice.total) || Number(data.total) || 0);
+  const already = roundSettlementMoney(Math.max(Number(invoice.amountPaid) || 0, Number(data.amountPaid) || 0));
+  const current = paymentSettlementStatus(total, already, invoice.paymentStatus || invoice.status || data.paymentStatus);
+  if (current === "paid" || current === "partial") {
+    await rememberPaymentOnRecords({
+      orderId: typeof invoice.orderId === "string" ? invoice.orderId : "",
+      orderRequestId: request.id,
+      amountPaid: already,
+      amountDue: roundSettlementMoney(Math.max(0, total - already)),
+      status: current,
+      squarePaymentId: typeof invoice.squarePaymentId === "string" ? invoice.squarePaymentId : void 0,
+      method: "square",
+      storedPaymentMethod: typeof invoice.paymentMethod === "string" ? invoice.paymentMethod : typeof data.paymentMethod === "string" ? data.paymentMethod : ""
+    });
+    return { paymentStatus: current, orderNumber: orderNumber2 };
+  }
+  const squareOrderId = String(invoice.squareOrderId || data.squareOrderId || "").trim();
+  if (!squareOrderId) return { paymentStatus: "pending", orderNumber: orderNumber2 };
+  const snapshot = await fetchSquareOrderSnapshot(squareOrderId, process.env);
+  const paymentId = snapshot?.paymentIds[0] || "";
+  if (!paymentId) return { paymentStatus: "pending", orderNumber: orderNumber2 };
+  const payment = await fetchSquarePayment(paymentId, process.env);
+  if (!payment || payment.status !== "COMPLETED") return { paymentStatus: "pending", orderNumber: orderNumber2 };
+  const referenceId = typeof payment.reference_id === "string" && payment.reference_id.trim() ? payment.reference_id : snapshot?.referenceId || invoiceId;
+  await settleCompletedSquarePayment({
+    ...payment,
+    order_id: typeof payment.order_id === "string" && payment.order_id ? payment.order_id : squareOrderId,
+    ...referenceId ? { reference_id: referenceId } : {}
+  }, { skipReceipt: true });
+  const afterInvoice = invoiceId ? await db$n().collection("invoices").doc(invoiceId).get() : null;
+  const afterRequest = await request.ref.get();
+  const afterInvoiceData = afterInvoice?.exists ? afterInvoice.data() || {} : {};
+  const afterRequestData = afterRequest.data() || {};
+  const afterPaid = roundSettlementMoney(Math.max(
+    Number(afterInvoiceData.amountPaid) || 0,
+    Number(afterRequestData.amountPaid) || 0
+  ));
+  const afterTotal = roundSettlementMoney(Number(afterInvoiceData.total) || Number(afterRequestData.total) || total);
+  const after = paymentSettlementStatus(
+    afterTotal,
+    afterPaid,
+    afterInvoiceData.status || afterRequestData.paymentStatus
+  );
+  return { paymentStatus: after === "unpaid" ? "pending" : after, orderNumber: orderNumber2 };
+}
+router$B.post("/pay-now/reconcile", async (req, res) => {
+  const limit = payNowReconcileLimiter.check(clientIp(req));
+  if (!limit.allowed) {
+    res.set("Retry-After", String(limit.retryAfterSec));
+    return res.status(429).json({ error: "Please wait a moment and try again." });
+  }
+  const raw = typeof req.body?.orderNumber === "string" ? req.body.orderNumber : typeof req.body?.order === "string" ? req.body.order : "";
+  try {
+    return res.json(await reconcilePayNowOrder(raw));
+  } catch (err) {
+    console.error("[Payments] Pay Now reconcile failed:", err instanceof Error ? err.message : "error");
+    return res.status(500).json({ error: "Payment could not be confirmed." });
+  }
+});
 router$B.post("/square-webhook", async (req, res) => {
   try {
     const signatureKey = process.env.SQUARE_WEBHOOK_SIGNATURE_KEY;
@@ -21378,52 +21787,7 @@ router$B.post("/square-webhook", async (req, res) => {
     }
     const event = JSON.parse(rawBody);
     const payment = event?.data?.object?.payment || event?.data?.object;
-    if (!payment?.id || payment.status !== "COMPLETED") return res.json({ received: true });
-    const amountCents = Number(payment.amount_money?.amount ?? payment.total_money?.amount ?? 0);
-    const amount = amountCents / 100;
-    if (amount <= 0) return res.json({ received: true, ignored: "zero-amount" });
-    const invoiceDoc = await findInvoiceForSquarePayment(payment);
-    if (!invoiceDoc) {
-      const settledOrder = await settlePrepaidOrderRequest(payment, amount);
-      if (settledOrder) return res.json({ received: true, orderRequest: true });
-      await db$n().collection("agentLogs").add({
-        agent: "travis",
-        action: "Unmatched Square payment",
-        summary: `Square payment ${payment.id} could not be matched to an invoice`,
-        status: "flagged",
-        relatedType: "invoice",
-        priority: "high",
-        requiresHumanReview: true,
-        details: payment.order_id || payment.note || "",
-        createdAt: admin.firestore.FieldValue.serverTimestamp()
-      });
-      return res.json({ received: true, unmatched: true });
-    }
-    const invoice = invoiceDoc.data() || {};
-    if (invoiceProvider(invoice) === "stripe") {
-      return res.json({ received: true, ignored: "stripe-invoice" });
-    }
-    if (isMirroredPayAtCloseSquarePayment(payment, invoice)) {
-      return res.json({ received: true, ignored: "pay-at-close-external" });
-    }
-    if (isDepositSquarePayment(invoice, payment)) {
-      await applyDepositPayment({
-        invoiceId: invoiceDoc.id,
-        amount,
-        squarePaymentId: payment.id
-      });
-      return res.json({ received: true, deposit: true });
-    }
-    const settled2 = await applySuccessfulPayment({
-      invoiceId: invoiceDoc.id,
-      orderId: invoice.orderId,
-      clientId: invoice.clientId,
-      clientName: invoice.clientName,
-      amount,
-      method: "square",
-      squarePaymentId: payment.id
-    });
-    return res.json({ received: true, ...settled2 ?? {} });
+    return res.json(await settleCompletedSquarePayment(payment || {}));
   } catch (err) {
     console.error("[Payments] Square webhook error:", err);
     return res.status(500).json({ error: "Square webhook handler failed." });
@@ -24380,6 +24744,10 @@ router$y.get("/me/home", requireAuth, async (req, res) => {
         address: addressText(data.address || data.shootLocation) || title || "Order",
         status: data.status || "new",
         href: listingId ? clientListingPath(listingId) : "/portal/home?section=orders",
+        paymentStatus: typeof data.paymentStatus === "string" ? data.paymentStatus : null,
+        amountPaid: typeof data.amountPaid === "number" ? data.amountPaid : null,
+        depositPaid: typeof data.depositPaid === "number" ? data.depositPaid : null,
+        total: typeof data.total === "number" ? data.total : null,
         orderNumber: stored.orderNumber ?? null
       });
     }

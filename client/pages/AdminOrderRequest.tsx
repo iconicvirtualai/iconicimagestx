@@ -38,6 +38,7 @@ import {
   orderInvoiceButtonLabel,
 } from "@shared/orderProjectInvoice";
 import { staffInvoicePath } from "@shared/staffInvoice";
+import { OrderPaymentLines } from "@/components/admin/OrderPaymentLines";
 import { ensureLinkedInvoice, resolveLinkedInvoice } from "@/lib/orderProjectInvoice";
 import { syncOrderBillingToInvoice } from "@/lib/staffInvoice";
 import { separatePromoDiscount } from "@shared/bookingPricing";
@@ -153,6 +154,7 @@ export default function AdminOrderRequest() {
   const [sendingReceipt, setSendingReceipt] = React.useState(false);
   const [invoicePhase, setInvoicePhase] = React.useState<"loading" | "missing" | "linked">("loading");
   const [linkedInvoiceId, setLinkedInvoiceId] = React.useState<string | null>(null);
+  const [linkedInvoice, setLinkedInvoice] = React.useState<Record<string, unknown> | null>(null);
   const [invoiceBusy, setInvoiceBusy] = React.useState(false);
   const [staff, setStaff] = React.useState<any[]>([]);
   const [selectedProviders, setSelectedProviders] = React.useState<string[]>([]);
@@ -221,6 +223,17 @@ export default function AdminOrderRequest() {
     });
     return () => { cancel = true; };
   }, [order?.id, order?.invoiceId, order?.listingId, order?.convertedToOrderId, order?.orderId]);
+
+  React.useEffect(() => {
+    if (!linkedInvoiceId) {
+      setLinkedInvoice(null);
+      return undefined;
+    }
+    const unsub = onSnapshot(doc(db, "invoices", linkedInvoiceId), (snap) => {
+      setLinkedInvoice(snap.exists() ? (snap.data() as Record<string, unknown>) : null);
+    }, () => setLinkedInvoice(null));
+    return () => unsub();
+  }, [linkedInvoiceId]);
 
   const applyServicePatch = React.useCallback((patch: OrderServiceSavePatch) => {
     servicePatchRef.current = patch;
@@ -569,6 +582,7 @@ export default function AdminOrderRequest() {
   const extraPromo = separatePromoDiscount(lineItems, promoDiscount);
   const presented = presentOrderCharges(editing ? form : order);
   const shownServices = presented.services;
+  const shownSubtotal = Math.round((shownServices.reduce((sum, line) => sum + (Number(line.price) || 0), 0) - extraPromo) * 100) / 100;
   const shownProcessing = presented.processing;
   const shownTotal = editing && typeof form.total === "number" ? Number(form.total) || 0 : presented.total;
   const clientName = order.clientName || `${order.firstName || ""} ${order.lastName || ""}`.trim() || "—";
@@ -703,6 +717,10 @@ export default function AdminOrderRequest() {
                     <MoneyAmount className="text-sm font-bold text-black">{fmtCurrency(presented.fees)}</MoneyAmount>
                   </div>
                 )}
+                <div data-testid="order-subtotal-line" className="flex items-baseline justify-between gap-3 px-4 py-3 border-t border-gray-200/50">
+                  <span className="min-w-0 text-sm font-bold text-gray-500">Subtotal</span>
+                  <MoneyAmount className="text-sm font-black text-black">{fmtCurrency(shownSubtotal)}</MoneyAmount>
+                </div>
                 {shownProcessing > 0 && (
                   <div data-testid="order-processing-line" className="flex items-baseline justify-between gap-3 px-4 py-3 border-t border-gray-200/50">
                     <span className="min-w-0 text-sm font-bold text-gray-500">{BOOKING_PROCESSING_LABEL}</span>
@@ -764,6 +782,10 @@ export default function AdminOrderRequest() {
                 <MoneyAmount className="text-green-600 font-bold">-{fmtCurrency(extraPromo)}</MoneyAmount>
               </div>
             )}
+            <div className="mb-2 flex items-baseline justify-between gap-3 text-sm">
+              <span className="min-w-0 text-gray-400">Subtotal</span>
+              <MoneyAmount className="font-bold">{fmtCurrency(shownSubtotal)}</MoneyAmount>
+            </div>
             {shownProcessing > 0 && (
               <div data-testid="order-summary-processing" className="flex items-baseline justify-between gap-3 text-sm mb-2">
                 <span className="min-w-0 text-gray-400">{BOOKING_PROCESSING_LABEL}</span>
@@ -778,6 +800,7 @@ export default function AdminOrderRequest() {
             </div>
             <div className="mt-4 pt-4 border-t border-gray-100 space-y-2 text-xs">
               <div className="flex justify-between"><span className={`${labelCls}`}>Status</span><span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${statusInfo.color}`}>{statusInfo.label}</span></div>
+              <OrderPaymentLines dark record={{ ...order, ...(linkedInvoice ? { invoice: { id: linkedInvoiceId, ...linkedInvoice } } : {}) }} />
               <div className="flex justify-between"><span className={`${labelCls}`}>{isScheduledState ? "Scheduled" : "Requested"}</span><span className="font-bold text-white">{fmtDate(order.scheduledDate || order.appointmentDate) || "—"}</span></div>
               {(order.scheduledTime || order.appointmentTime) && (
                 <div className="flex justify-between"><span className={`${labelCls}`}>Time</span><span className="font-bold text-white">{fmtTimeStandard(order.scheduledTime || order.appointmentTime)}</span></div>

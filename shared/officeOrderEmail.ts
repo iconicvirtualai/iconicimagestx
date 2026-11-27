@@ -66,6 +66,7 @@ export function officeNewOrderEmail(
   const catalog = options?.catalog ?? packagesForStaffEditor([]);
   const rawLines = orderServiceLines(saved);
   const lines = rawLines.filter((line) => !isTravelFeeLine(line) && !isProcessingChargeLine(line));
+  const subtotalLines = rawLines.filter((line) => !isProcessingChargeLine(line));
   const charges = orderChargeSummary(saved, lines);
   const processingAmount = officeProcessingAmount(saved, rawLines);
   const packageLine = lines.find((line) => !isAddOn(line, catalog)) || lines[0];
@@ -83,7 +84,7 @@ export function officeNewOrderEmail(
   const requestedDate = firstDate(saved, ["scheduledDate", "requestedDate", "appointmentDate", "requestedDates"]);
   const clientName = clientNameOf(saved);
   const notes = notesOf(saved);
-  const subtotal = subtotalBeforeProcessing(saved, lines, processingAmount);
+  const subtotal = subtotalBeforeProcessing(saved, subtotalLines, processingAmount);
 
   const fields: Array<[string, string]> = [
     ["Order number", orderNumber],

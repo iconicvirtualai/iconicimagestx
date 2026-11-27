@@ -25,6 +25,7 @@
     "report:share-photos": "tsx scripts/report-share-photos.ts",
     "qa:send-delivery": "tsx scripts/qa-send-delivery.ts",
     "qa:square-webhook": "tsx scripts/qa-square-webhook.ts",
+    "report:pay-at-booking-unpaid": "tsx scripts/report-pay-at-booking-unpaid.ts",
     "migrate:invoice-ids": "tsx scripts/migrate-invoice-ids.ts",
     "profiles:match": "tsx scripts/match-profile-names.ts",
     "cleanup:test-data": "tsx scripts/cleanup-test-data.ts",

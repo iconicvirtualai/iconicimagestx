@@ -14,6 +14,8 @@ import { computeInvoiceTotals } from "./invoiceProcessing.ts";
 import { formatAdminMoney, LISTING_PRICE_MISSING, resolveListingPriceLabel } from "./listingPrice.ts";
 import { formatOrderNumber } from "./orderNumber.ts";
 import { cleanPackageName, orderServiceLines } from "./orderPackageLines.ts";
+import { PAY_NOW_METHOD } from "./payNow.ts";
+import { paymentFaceLabel, type PaymentFaceLabel } from "./paymentSettlement.ts";
 
 const CHICAGO = "America/Chicago";
 
@@ -113,7 +115,7 @@ export interface AdminOrderListRow {
  * The list shows — for these instead of issuing another read.
  */
 export const ADMIN_ORDER_LIST_GAPS = [
-  "Payment is Paid, Unpaid, or No invoice when order.invoice is on the row. An invoiceId with no invoice object shows — because paid or unpaid is not on the list payload.",
+  "Payment is Paid, Partial, Deposit paid, or Unpaid from the nested invoice or from paymentStatus, amountPaid, and depositPaid already on the order. Pay at Booking with none of those still shows Unpaid. An invoiceId with no invoice object and no payment fields shows —.",
   "Photographer uses an assigned name on the order, or a provider id matched to staff already loaded for this page. photographerPreference is not an assignment. An id that is not in that staff list shows —.",
   "Gallery / delivery reads galleryStatus, deliveryStatus, gallery.status, or deliveredAt on the order. Gallery documents are not joined. When those fields are missing, the column uses the same delivery label as the order tile.",
 ] as const;
@@ -237,12 +239,23 @@ export function adminOrderTotalSortValue(label: string): number | null {
   return Number.isFinite(amount) ? amount : null;
 }
 
-export function adminOrderPaymentLabel(record: Record<string, unknown>): "Paid" | "Unpaid" | "No invoice" | "—" {
+export function adminOrderPaymentLabel(record: Record<string, unknown>): PaymentFaceLabel | "No invoice" | "—" {
   const invoice = nestedRecord(record.invoice);
   const invoiceId = text(record.invoiceId);
+  const invoiceLabel = invoice ? paymentFaceLabel({
+    status: invoice.status,
+    paymentStatus: invoice.paymentStatus,
+    total: invoice.total ?? invoice.amount,
+    amountPaid: invoice.amountPaid ?? invoice.paid,
+    depositPaid: invoice.depositPaid,
+  }) : null;
+  const orderLabel = orderPaymentFace(record);
+  const best = paymentLabelRank(orderLabel) > paymentLabelRank(invoiceLabel) ? orderLabel : invoiceLabel;
+  if (best) return best;
+  if (text(record.paymentMethod) === PAY_NOW_METHOD) return "Unpaid";
   if (!invoice && !invoiceId) return "No invoice";
   if (!invoice) return "—";
-  return invoiceIsPaid(invoice) ? "Paid" : "Unpaid";
+  return "Unpaid";
 }
 
 export function adminOrderPhotographer(
@@ -595,13 +608,24 @@ function textValue(row: AdminOrderListRow, field: AdminOrderListSortField): stri
   }
 }
 
-function invoiceIsPaid(invoice: Record<string, unknown>): boolean {
-  const status = normalize(invoice.status);
-  if (status === "paid" || status === "paid_in_full" || status === "succeeded") return true;
-  const total = money(invoice.total);
-  const paid = money(invoice.amountPaid ?? invoice.paid);
-  if (total != null && total > 0 && paid != null && paid + 0.009 >= total) return true;
-  return false;
+function orderPaymentFace(record: Record<string, unknown>): PaymentFaceLabel | null {
+  const hasSignal = record.paymentStatus != null || record.amountPaid != null || record.depositPaid != null;
+  if (!hasSignal) return null;
+  const pricing = nestedRecord(record.pricing);
+  return paymentFaceLabel({
+    status: record.paymentStatus,
+    paymentStatus: record.paymentStatus,
+    total: record.total ?? pricing?.total,
+    amountPaid: record.amountPaid,
+    depositPaid: record.depositPaid,
+  });
+}
+
+function paymentLabelRank(label: PaymentFaceLabel | null): number {
+  if (label === "Paid") return 3;
+  if (label === "Deposit paid" || label === "Partial") return 2;
+  if (label === "Unpaid") return 1;
+  return 0;
 }
 
 function providerEntries(record: Record<string, unknown>): { id: string; name: string; role: string }[] {

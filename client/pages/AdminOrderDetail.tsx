@@ -36,6 +36,7 @@ import { OrderServicesFields } from "@/components/OrderServicesFields";
 import { syncOrderBillingToInvoice } from "@/lib/staffInvoice";
 import { orderBillingFromServicePatch, type OrderServiceSavePatch } from "@shared/orderRequestServices";
 import { recordCountsTowardRevenue } from "@shared/revenueCount";
+import { paymentFaceLabel } from "@shared/paymentSettlement";
 
 // ─── Status system ────────────────────────────────────────────────────────────
 const ORDER_STATUSES = [
@@ -739,7 +740,13 @@ export default function AdminOrderDetail() {
               <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-500 mb-3">Invoice</h3>
               <MoneyAmount className="text-2xl font-black">{fmtCurrency(order.total || 0)}</MoneyAmount>
               <p className="text-[10px] text-gray-400 uppercase tracking-widest mt-1">
-                {invoice.status === "paid" ? "Paid" : invoice.amountPaid > 0 ? `$${invoice.amountPaid} paid` : "Unpaid"}
+                {paymentFaceLabel({
+                  status: invoice.status,
+                  paymentStatus: invoice.paymentStatus,
+                  total: invoice.total ?? order.total,
+                  amountPaid: invoice.amountPaid,
+                  depositPaid: invoice.depositPaid,
+                })}
               </p>
               <p className="text-[10px] text-gray-500 mt-2">{invoice.invoiceNumber || "—"}</p>
             </div>

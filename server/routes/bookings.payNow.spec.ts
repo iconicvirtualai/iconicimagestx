@@ -306,24 +306,28 @@ describe("booking payment checkout", () => {
     const onInvoice = savedInvoice();
     const onLines = onInvoice.lineItems as Array<{ id?: string; price?: number }>;
     const onNames = onLines.map((item) => String(item.name || ""));
-    expect(onNames.findIndex((name) => name.includes("18"))).toBeLessThan(onNames.indexOf("Processing"));
-    expect(onNames.indexOf("Processing")).toBeLessThan(onNames.indexOf("Pay Now savings"));
+    expect(onNames.findIndex((name) => name.includes("18"))).toBeLessThan(onNames.indexOf("Pay Now savings"));
+    expect(onNames.indexOf("Pay Now savings")).toBeLessThan(onNames.indexOf("Processing"));
     expect(onLines.find((item) => item.name === "Pay Now savings")?.price).toBe(-5);
     expect(onInvoice.paymentMethod).toBe("pay_now");
-    expect(onInvoice.processing).toBe(3.89);
+    expect(onInvoice.subtotal).toBe(134);
+    expect(onInvoice.processing).toBe(3.75);
     expect(onInvoice.total).toBe(onQuote.totalCents / 100);
-    expect(onInvoice.total).toBe(137.89);
+    expect(onInvoice.total).toBe(137.75);
     expect(squareCheckout).toHaveBeenCalledTimes(1);
     expect(squareCheckout.mock.calls[0][0].amount).toBe(onInvoice.total);
     expect(squareCheckout.mock.calls[0][0].lineItems).toEqual([
       { name: "Photos Only — 18 photos", amountCents: 13900 },
-      { name: "Processing", amountCents: 389 },
       { name: "Pay Now savings", amountCents: -500 },
+      { name: "Processing", amountCents: 375 },
     ]);
     const order = [...docs("orderRequests").values()][0];
     expect(order.paymentMethod).toBe("pay_now");
+    expect(order.paymentStatus).toBe("unpaid");
+    expect(order.squareOrderId).toBe("sq-order-1");
+    expect(order.squarePaymentLinkId).toBe("link-1");
     const orderNames = (order.lineItems as Array<{ name?: string }>).map((item) => String(item.name || ""));
-    expect(orderNames.indexOf("Processing")).toBeLessThan(orderNames.indexOf("Pay Now savings"));
+    expect(orderNames.indexOf("Pay Now savings")).toBeLessThan(orderNames.indexOf("Processing"));
 
     store.collections = {};
     store.seq = 0;
@@ -335,6 +339,7 @@ describe("booking payment checkout", () => {
     expect(off.response.status).toBe(201);
     const offInvoice = savedInvoice();
     expect(offInvoice.total).toBe(offQuote.totalCents / 100);
+    expect(offInvoice.subtotal).toBe(134);
     expect(offInvoice.total).toBe(134);
     expect(squareCheckout.mock.calls[0][0].amount).toBe(134);
     expect(sendSMS).not.toHaveBeenCalled();

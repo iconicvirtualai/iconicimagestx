@@ -78,10 +78,10 @@ describe("computeInvoiceTotals", () => {
     expect(free.processingPolicy).toBe("waived");
   });
 
-  it("adds fees to the base and leaves travel and tax outside it", () => {
+  it("adds fees and travel to the base and leaves tax outside it", () => {
     const totals = computeInvoiceTotals({ subtotal: 549, fees: 10, travel: 25, tax: 8 });
-    expect(totals.processingBase).toBe(559);
-    expect(totals.processing).toBe(processingFee(559));
+    expect(totals.processingBase).toBe(584);
+    expect(totals.processing).toBe(processingFee(584));
     expect(totals.total).toBe(549 + 10 + 25 + 8 + totals.processing);
   });
 
@@ -146,7 +146,7 @@ describe("booking estimate", () => {
     expect(free.total).toBe(0);
   });
 
-  it("adds 2.8% on top of a $75 booking and keeps travel and promo outside the wrong base", () => {
+  it("adds 2.8% on the service plus travel, after a promo", () => {
     expect(processingFee(75)).toBe(2.1);
     expect(processingFeeCents(7500)).toBe(210);
     expect(processingFeeCents(17)).toBe(0);
@@ -158,9 +158,10 @@ describe("booking estimate", () => {
     expect(estimate.total).toBe(87.38);
 
     const traveled = estimateBookingCharge({ selectedBasics: ["apprentice-25"] }, 50);
-    expect(traveled.processing).toBe(2.38);
+    expect(traveled.processingBase).toBe(135);
+    expect(traveled.processing).toBe(processingFee(135));
     expect(traveled.travel).toBe(50);
-    expect(traveled.total).toBe(137.38);
+    expect(traveled.total).toBe(135 + traveled.processing);
 
     const discounted = estimateBookingCharge({
       selectedBasics: ["apprentice-25"],

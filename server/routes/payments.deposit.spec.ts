@@ -903,7 +903,10 @@ describe("Square webhook deposit payment", () => {
       expect.objectContaining({ type: "deposit", amount: 128.5, squarePaymentId: "pay-dep" }),
     ]);
     expect((store.collections.orders.get("order-sl") || {}).balanceDue).toBe(128.5);
+    expect((store.collections.orders.get("order-sl") || {}).paymentStatus).toBe("partial");
     expect((store.collections.orderRequests.get("req-sl") || {}).balanceDue).toBe(128.5);
+    expect((store.collections.orderRequests.get("req-sl") || {}).paymentStatus).toBe("partial");
+    expect((store.collections.orderRequests.get("req-sl") || {}).amountPaid).toBe(128.5);
     expect(store.collections.transactions?.get("square-pay-dep")?.squarePaymentId).toBe("pay-dep");
   });
 

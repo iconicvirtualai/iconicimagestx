@@ -137,7 +137,7 @@ describe("order request service save", () => {
     expect(patch.total).toBe(41.12);
   });
 
-  it("fees the service total after a promo and leaves travel outside the fee", () => {
+  it("fees the service total after a promo and includes travel in the fee", () => {
     const essentials = choices.find((choice) => choice.key === "listing-essentials");
     if (!essentials) throw new Error("missing essentials");
     const quote = orderServiceQuote([lineFromChoice(essentials)], {
@@ -147,8 +147,9 @@ describe("order request service save", () => {
     });
     expect(quote.subtotal).toBe(249);
     expect(quote.promotions).toBe(35);
-    expect(quote.processing).toBe(processingFee(214));
-    expect(quote.total).toBe(214 + processingFee(214) + 50);
+    expect(quote.travel).toBe(50);
+    expect(quote.processing).toBe(processingFee(264));
+    expect(quote.total).toBe(264 + processingFee(264));
   });
 
   it("turns a typed name with no catalog match into a custom line and refills a $0 catalog match", () => {
