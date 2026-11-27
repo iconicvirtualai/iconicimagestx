@@ -219,15 +219,15 @@ function parseContactLine(line) {
   };
 }
 const BUSINESS_CONTACT = parseContactLine(BUSINESS_CONTACT_LINE);
-function escapeHtml$d(value) {
+function escapeHtml$e(value) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 function clientEmailContactLineHtml(color = "#666666") {
   const style = `color:${color};text-decoration:underline;`;
   return [
-    escapeHtml$d(BUSINESS_CONTACT.address),
-    `<a href="${BUSINESS_CONTACT.phoneHref}" style="${style}">${escapeHtml$d(BUSINESS_CONTACT.phoneDisplay)}</a>`,
-    `<a href="${BUSINESS_CONTACT.emailHref}" style="${style}">${escapeHtml$d(BUSINESS_CONTACT.email)}</a>`
+    escapeHtml$e(BUSINESS_CONTACT.address),
+    `<a href="${BUSINESS_CONTACT.phoneHref}" style="${style}">${escapeHtml$e(BUSINESS_CONTACT.phoneDisplay)}</a>`,
+    `<a href="${BUSINESS_CONTACT.emailHref}" style="${style}">${escapeHtml$e(BUSINESS_CONTACT.email)}</a>`
   ].join(" | ");
 }
 const __vite_import_meta_env__ = {};
@@ -275,13 +275,13 @@ function dotOptInPath(token) {
   params.set("t", token);
   return `/api/orders/dot-opt-in?${params.toString()}`;
 }
-function escapeHtml$c(value) {
+function escapeHtml$d(value) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 function linkDoorsOpenTour(sentence) {
   const at = sentence.indexOf(DOORS_OPEN_TOUR_NAME);
-  if (at < 0) return escapeHtml$c(sentence);
-  return escapeHtml$c(sentence.slice(0, at)) + `<a href="${DOORS_OPEN_TOUR_URL}" rel="noreferrer" style="color:#111111;font-weight:600;">${DOORS_OPEN_TOUR_NAME}</a>` + escapeHtml$c(sentence.slice(at + DOORS_OPEN_TOUR_NAME.length));
+  if (at < 0) return escapeHtml$d(sentence);
+  return escapeHtml$d(sentence.slice(0, at)) + `<a href="${DOORS_OPEN_TOUR_URL}" rel="noreferrer" style="color:#111111;font-weight:600;">${DOORS_OPEN_TOUR_NAME}</a>` + escapeHtml$d(sentence.slice(at + DOORS_OPEN_TOUR_NAME.length));
 }
 const noteStyle = "font-family:Inter,ui-sans-serif,system-ui,sans-serif;font-size:15px;line-height:1.5;color:#333333;margin:16px 0;";
 function doorsOpenDeliveryEmailHtml() {
@@ -291,7 +291,7 @@ function doorsOpenReceiptEmailHtml(optInUrl) {
   const sentence = `<p style="${noteStyle}">${linkDoorsOpenTour(DOT_RECEIPT_LINE)}</p>`;
   const url = optInUrl.trim();
   if (!url.startsWith("https://") || url.includes(" ")) return sentence;
-  return sentence + `<p style="margin:16px 0;"><a href="${escapeHtml$c(url)}" style="font-family:Inter,ui-sans-serif,system-ui,sans-serif;background:#000000;color:#ffffff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">${DOT_OPT_IN_ACTION_LABEL}</a></p>`;
+  return sentence + `<p style="margin:16px 0;"><a href="${escapeHtml$d(url)}" style="font-family:Inter,ui-sans-serif,system-ui,sans-serif;background:#000000;color:#ffffff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">${DOT_OPT_IN_ACTION_LABEL}</a></p>`;
 }
 function dotOptInResultHtml(ok) {
   const title = ok === true ? "Your open house is listed." : ok === "wait" ? "Please try that link again in a moment." : "This link is not valid.";
@@ -317,16 +317,16 @@ const SETTLED$1 = /* @__PURE__ */ new Set(["paid", "comped"]);
 function isGuessableInvoiceId(id) {
   return id.startsWith("listing_") || id.startsWith("ordreq_") || id.startsWith("playtest-");
 }
-function text$A(value) {
+function text$B(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function settled$1(invoice) {
-  return SETTLED$1.has(text$A(invoice?.status).toLowerCase());
+  return SETTLED$1.has(text$B(invoice?.status).toLowerCase());
 }
 function invoicePayLinkFor(invoice, env, extra) {
   if (!invoice || settled$1(invoice)) return null;
-  const id = text$A(invoice.id);
-  const token = text$A(invoice.payToken);
+  const id = text$B(invoice.id);
+  const token = text$B(invoice.payToken);
   if (!id || !token) return null;
   const url = new URL(`${publicSiteUrl(env)}/invoice/${encodeURIComponent(id)}`);
   url.searchParams.set("t", token);
@@ -337,7 +337,7 @@ function clientInvoiceUrl(invoice, env, extra) {
   const tokenized = invoicePayLinkFor(invoice, env, extra);
   if (tokenized) return tokenized;
   if (!invoice || settled$1(invoice)) return null;
-  const id = text$A(invoice.id);
+  const id = text$B(invoice.id);
   if (!id || isGuessableInvoiceId(id)) return null;
   const url = new URL(`${publicSiteUrl(env)}/invoice/${encodeURIComponent(id)}`);
   applyQuery(url, extra);
@@ -346,7 +346,7 @@ function clientInvoiceUrl(invoice, env, extra) {
 function applyQuery(url, extra) {
   if (!extra) return;
   for (const [key, value] of Object.entries(extra)) {
-    const textValue = text$A(value);
+    const textValue = text$B(value);
     if (textValue && key !== "t") url.searchParams.set(key, textValue);
   }
 }
@@ -1567,7 +1567,7 @@ function addressText(value) {
   if (typeof value === "string") return value.trim();
   if (typeof value !== "object" || Array.isArray(value)) return "";
   const address = value;
-  const formatted = text$z(address.formatted) || text$z(address.label);
+  const formatted = text$A(address.formatted) || text$A(address.label);
   if (formatted) return formatted;
   return [address.street, address.city, address.state, address.zip].filter((part) => typeof part === "string" && part.trim()).join(", ");
 }
@@ -1580,7 +1580,7 @@ function recordAddressText(record2) {
   }
   return "";
 }
-function text$z(value) {
+function text$A(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 const ADDRESS_LIMIT = 300;
@@ -2096,8 +2096,8 @@ const TEAL = "#14B8C4";
 const GREEN = "#16A34A";
 const ROW = "#F3F4F6";
 function receiptProcessing(input) {
-  const status2 = text$y(input.invoice.status).toLowerCase();
-  const paymentStatus = text$y(input.invoice.paymentStatus).toLowerCase();
+  const status2 = text$z(input.invoice.status).toLowerCase();
+  const paymentStatus = text$z(input.invoice.paymentStatus).toLowerCase();
   if (status2 === "comped" || paymentStatus === "comped") return 0;
   const base = roundCents$1(input.subtotal - input.promotions + input.fees);
   const stored = finite$2(input.invoice.processing);
@@ -2186,7 +2186,7 @@ function receiptHtml(content) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${escapeHtml$b(content.invoiceNumber)} receipt</title>
+<title>${escapeHtml$c(content.invoiceNumber)} receipt</title>
 <style>
 @media only screen and (max-width: 480px) {
   .totals-desktop { display: none !important; }
@@ -2200,7 +2200,7 @@ function receiptHtml(content) {
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:700px;font-family:${FONT};color:#111111;">
 ${headerBlock(content)}
 <tr><td style="padding:28px 28px 8px;font-family:${FONT};font-size:14px;line-height:1.5;color:#222222;">
-Hi ${escapeHtml$b(content.clientName)}, we received your payment for invoice ${escapeHtml$b(content.invoiceNumber)}.
+Hi ${escapeHtml$c(content.clientName)}, we received your payment for invoice ${escapeHtml$c(content.invoiceNumber)}.
 </td></tr>
 <tr><td style="padding:0 28px 4px;font-family:${FONT};font-size:14px;line-height:1.5;color:#111111;">${BOOKING_PROCESSING_LABEL}</td></tr>
 <tr><td style="padding:12px 20px 0;">
@@ -2217,19 +2217,19 @@ ${rows}
 <tr><td style="padding:22px 20px 8px;">
 <table class="totals-desktop" role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:2px solid #000000;border-collapse:separate;font-family:${FONT};">
 <tr>
-${totalCell("SUB TOTAL", money$8(content.subtotal), false)}
-${totalCell("PROCESSING", money$8(content.processing), false)}
-${totalCell("PROMOTIONS", money$8(content.promotions), false)}
-${totalCell("FEES", money$8(content.fees), false)}
-${totalCell("TOTAL PAID", money$8(content.totalPaid), true)}
+${totalCell("SUB TOTAL", money$9(content.subtotal), false)}
+${totalCell("PROCESSING", money$9(content.processing), false)}
+${totalCell("PROMOTIONS", money$9(content.promotions), false)}
+${totalCell("FEES", money$9(content.fees), false)}
+${totalCell("TOTAL PAID", money$9(content.totalPaid), true)}
 </tr>
 </table>
 <table class="totals-mobile" role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="display:none;border:2px solid #000000;border-collapse:separate;font-family:${FONT};">
-${totalRow("SUB TOTAL", money$8(content.subtotal), false)}
-${totalRow("PROCESSING", money$8(content.processing), false)}
-${totalRow("PROMOTIONS", money$8(content.promotions), false)}
-${totalRow("FEES", money$8(content.fees), false)}
-${totalRow("TOTAL PAID", money$8(content.totalPaid), true)}
+${totalRow("SUB TOTAL", money$9(content.subtotal), false)}
+${totalRow("PROCESSING", money$9(content.processing), false)}
+${totalRow("PROMOTIONS", money$9(content.promotions), false)}
+${totalRow("FEES", money$9(content.fees), false)}
+${totalRow("TOTAL PAID", money$9(content.totalPaid), true)}
 </table>
 </td></tr>
 ${downloads}
@@ -2247,11 +2247,11 @@ function headerBlock(content) {
 <td valign="top" style="font-family:${FONT};">
 <div style="font-family:${FONT};font-size:32px;line-height:1;font-weight:bold;letter-spacing:6px;color:${YELLOW};">RECEIPT</div>
 <div style="font-family:${FONT};font-size:12px;line-height:1.4;font-weight:bold;letter-spacing:3px;color:${YELLOW};padding-top:10px;">PAYMENT RECEIVED</div>
-<div style="font-family:${FONT};font-size:13px;line-height:1.5;color:#ffffff;padding-top:16px;">INVOICE NO : ${escapeHtml$b(content.invoiceNumber)}</div>
-<div style="font-family:${FONT};font-size:13px;line-height:1.5;color:#ffffff;padding-top:4px;">${escapeHtml$b(content.paidAtLabel)}</div>
+<div style="font-family:${FONT};font-size:13px;line-height:1.5;color:#ffffff;padding-top:16px;">INVOICE NO : ${escapeHtml$c(content.invoiceNumber)}</div>
+<div style="font-family:${FONT};font-size:13px;line-height:1.5;color:#ffffff;padding-top:4px;">${escapeHtml$c(content.paidAtLabel)}</div>
 </td>
 <td valign="top" align="right" width="160" style="padding-left:12px;">
-<img src="${escapeHtml$b(content.logoUrl)}" alt="Iconic Images" width="140" style="display:block;border:0;outline:none;text-decoration:none;width:140px;max-width:140px;height:auto;">
+<img src="${escapeHtml$c(content.logoUrl)}" alt="Iconic Images" width="140" style="display:block;border:0;outline:none;text-decoration:none;width:140px;max-width:140px;height:auto;">
 </td>
 </tr>
 </table>
@@ -2260,10 +2260,10 @@ function headerBlock(content) {
 function lineRow(line, index) {
   const bg = index % 2 === 0 ? ROW : "#ffffff";
   return `<tr>
-<td bgcolor="${bg}" style="background:${bg};font-family:${FONT};font-size:13px;font-weight:bold;letter-spacing:0.5px;color:${TEAL};padding:14px;border-bottom:1px solid #e5e7eb;">${escapeHtml$b(line.name.toUpperCase())}</td>
-<td bgcolor="${bg}" align="right" style="background:${bg};font-family:${FONT};font-size:13px;color:#374151;padding:14px 10px;border-bottom:1px solid #e5e7eb;">${escapeHtml$b(String(line.qty))}</td>
-<td bgcolor="${bg}" align="right" style="background:${bg};font-family:${FONT};font-size:13px;color:#374151;padding:14px 10px;border-bottom:1px solid #e5e7eb;">${escapeHtml$b(money$8(line.unit))}</td>
-<td bgcolor="${bg}" align="right" style="background:${bg};font-family:${FONT};font-size:13px;color:#111111;padding:14px;border-bottom:1px solid #e5e7eb;">${escapeHtml$b(money$8(line.total))}</td>
+<td bgcolor="${bg}" style="background:${bg};font-family:${FONT};font-size:13px;font-weight:bold;letter-spacing:0.5px;color:${TEAL};padding:14px;border-bottom:1px solid #e5e7eb;">${escapeHtml$c(line.name.toUpperCase())}</td>
+<td bgcolor="${bg}" align="right" style="background:${bg};font-family:${FONT};font-size:13px;color:#374151;padding:14px 10px;border-bottom:1px solid #e5e7eb;">${escapeHtml$c(String(line.qty))}</td>
+<td bgcolor="${bg}" align="right" style="background:${bg};font-family:${FONT};font-size:13px;color:#374151;padding:14px 10px;border-bottom:1px solid #e5e7eb;">${escapeHtml$c(money$9(line.unit))}</td>
+<td bgcolor="${bg}" align="right" style="background:${bg};font-family:${FONT};font-size:13px;color:#111111;padding:14px;border-bottom:1px solid #e5e7eb;">${escapeHtml$c(money$9(line.total))}</td>
 </tr>`;
 }
 function totalRow(label, value, emphasis, note) {
@@ -2271,7 +2271,7 @@ function totalRow(label, value, emphasis, note) {
   const noteHtml = "";
   return `<tr>
 <td style="padding:12px 16px;font-family:${FONT};font-size:11px;font-weight:bold;letter-spacing:0.8px;color:#111111;border-bottom:1px solid #e5e7eb;">${label}</td>
-<td align="right" style="padding:12px 16px;font-family:${FONT};${valueStyle}border-bottom:1px solid #e5e7eb;">${escapeHtml$b(value)}${noteHtml}</td>
+<td align="right" style="padding:12px 16px;font-family:${FONT};${valueStyle}border-bottom:1px solid #e5e7eb;">${escapeHtml$c(value)}${noteHtml}</td>
 </tr>`;
 }
 function totalCell(label, value, emphasis, note) {
@@ -2279,7 +2279,7 @@ function totalCell(label, value, emphasis, note) {
   const noteHtml = "";
   return `<td valign="top" align="center" style="padding:14px 6px;font-family:${FONT};">
 <div style="font-family:${FONT};font-size:10px;font-weight:bold;letter-spacing:0.8px;color:#111111;">${label}</div>
-<div style="font-family:${FONT};${valueStyle}padding-top:6px;">${escapeHtml$b(value)}</div>
+<div style="font-family:${FONT};${valueStyle}padding-top:6px;">${escapeHtml$c(value)}</div>
 ${noteHtml}
 </td>`;
 }
@@ -2290,13 +2290,13 @@ function downloadsBlock(content) {
   const primaryHref = presentation || gallery;
   const primaryLabel = presentation ? "View your listing presentation" : "Your downloads &amp; invoice";
   const secondary = presentation && gallery ? `<tr><td align="center" style="padding-top:12px;font-family:${FONT};font-size:14px;">
-<a href="${escapeHtml$b(gallery)}" style="color:${TEAL};font-family:${FONT};font-weight:bold;text-decoration:underline;">Your downloads &amp; invoice</a>
+<a href="${escapeHtml$c(gallery)}" style="color:${TEAL};font-family:${FONT};font-weight:bold;text-decoration:underline;">Your downloads &amp; invoice</a>
 </td></tr>` : "";
   return `<tr><td style="padding:28px 24px 12px;">
 <div style="font-family:${FONT};font-size:22px;line-height:1.3;font-weight:bold;color:#111111;">Your downloads are ready</div>
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:16px;">
 <tr><td bgcolor="#000000" style="background:#000000;border-radius:4px;">
-<a href="${escapeHtml$b(primaryHref)}" style="display:inline-block;padding:14px 22px;font-family:${FONT};font-size:15px;font-weight:bold;color:${YELLOW};text-decoration:none;">${primaryLabel}</a>
+<a href="${escapeHtml$c(primaryHref)}" style="display:inline-block;padding:14px 22px;font-family:${FONT};font-size:15px;font-weight:bold;color:${YELLOW};text-decoration:none;">${primaryLabel}</a>
 </td></tr>
 ${secondary}
 </table>
@@ -2305,7 +2305,7 @@ ${secondary}
 function balanceBlock(content) {
   if (content.balance <= 0) return "";
   return `<tr><td style="padding:20px 24px 8px;font-family:${FONT};font-size:14px;color:#111111;">
-Balance due: <strong>${escapeHtml$b(money$8(content.balance))}</strong>. Downloads stay locked until the invoice is paid in full.
+Balance due: <strong>${escapeHtml$c(money$9(content.balance))}</strong>. Downloads stay locked until the invoice is paid in full.
 </td></tr>`;
 }
 function footerBlock() {
@@ -2314,12 +2314,12 @@ function footerBlock() {
 <tr>
 <td valign="top" style="font-family:${FONT};font-size:13px;line-height:1.55;color:#ffffff;">
 <div style="font-family:${FONT};font-size:12px;font-weight:bold;letter-spacing:0.6px;color:${GREEN};padding-bottom:8px;">PAYMENT INFORMATION:</div>
-${escapeHtml$b(LEGAL_BUSINESS_NAME)}<br>
+${escapeHtml$c(LEGAL_BUSINESS_NAME)}<br>
 <div style="font-family:${FONT};font-size:13px;line-height:1.55;color:#ffffff;padding-top:8px;">${clientEmailContactLineHtml("#ffffff")}</div>
 </td>
 <td valign="top" align="right" style="font-family:${FONT};font-size:13px;line-height:1.55;color:#ffffff;">
-${escapeHtml$b(BUSINESS_CONTACT.streetAddress)}<br>
-${escapeHtml$b(BUSINESS_CONTACT.addressLine2)}
+${escapeHtml$c(BUSINESS_CONTACT.streetAddress)}<br>
+${escapeHtml$c(BUSINESS_CONTACT.addressLine2)}
 </td>
 </tr>
 </table>
@@ -2332,14 +2332,14 @@ function receiptText(content) {
     qty: 1,
     unit: content.totalPaid,
     total: content.totalPaid
-  }]).map((line) => `${line.name}  qty ${line.qty}  ${money$8(line.unit)}  ${money$8(line.total)}`);
+  }]).map((line) => `${line.name}  qty ${line.qty}  ${money$9(line.unit)}  ${money$9(line.total)}`);
   const links = [];
   if (content.unlocked) {
     links.push("Your downloads are ready");
     if (content.presentationUrl) links.push(`View your listing presentation: ${content.presentationUrl}`);
     if (content.galleryUrl) links.push(`Your downloads & invoice: ${content.galleryUrl}`);
   } else if (content.balance > 0) {
-    links.push(`Balance due: ${money$8(content.balance)}. Downloads stay locked until the invoice is paid in full.`);
+    links.push(`Balance due: ${money$9(content.balance)}. Downloads stay locked until the invoice is paid in full.`);
   }
   return [
     "RECEIPT",
@@ -2352,11 +2352,11 @@ function receiptText(content) {
     "",
     ...itemLines,
     "",
-    `SUB TOTAL ${money$8(content.subtotal)}`,
-    `PROCESSING ${money$8(content.processing)}`,
-    `PROMOTIONS ${money$8(content.promotions)}`,
-    `FEES ${money$8(content.fees)}`,
-    `TOTAL PAID ${money$8(content.totalPaid)}`,
+    `SUB TOTAL ${money$9(content.subtotal)}`,
+    `PROCESSING ${money$9(content.processing)}`,
+    `PROMOTIONS ${money$9(content.promotions)}`,
+    `FEES ${money$9(content.fees)}`,
+    `TOTAL PAID ${money$9(content.totalPaid)}`,
     "",
     ...links,
     "",
@@ -2367,7 +2367,7 @@ function receiptText(content) {
     "THANK YOU FOR BEING ICONIC"
   ].filter((line) => line !== void 0).join("\n");
 }
-function money$8(value) {
+function money$9(value) {
   return (Number(value) || 0).toLocaleString("en-US", { style: "currency", currency: "USD" });
 }
 function roundCents$1(value) {
@@ -2386,10 +2386,10 @@ function dollars$1(value) {
   const amount = Number(String(value).replace(/[^0-9.-]/g, ""));
   return Number.isFinite(amount) ? amount : 0;
 }
-function text$y(value) {
+function text$z(value) {
   return typeof value === "string" ? value.trim() : "";
 }
-function escapeHtml$b(value) {
+function escapeHtml$c(value) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 const EMAIL_QUESTIONS_WITH_PORTAL = "Questions? Reply to this email or message us through your client portal.";
@@ -3937,10 +3937,10 @@ function listingCardAddress(data) {
   let state = "";
   let zip = "";
   for (const record2 of records) {
-    if (!street) street = firstText$3(record2, ["street", "line1", "addressLine1", "streetAddress"]);
-    if (!city) city = firstText$3(record2, ["city"]);
-    if (!state) state = firstText$3(record2, ["state"]);
-    if (!zip) zip = firstText$3(record2, ["zip", "postalCode"]);
+    if (!street) street = firstText$4(record2, ["street", "line1", "addressLine1", "streetAddress"]);
+    if (!city) city = firstText$4(record2, ["city"]);
+    if (!state) state = firstText$4(record2, ["state"]);
+    if (!zip) zip = firstText$4(record2, ["zip", "postalCode"]);
   }
   let locality = joinLocality(city, state, zip);
   if (!street || !locality) {
@@ -4060,7 +4060,7 @@ function poolLabel(value) {
   if (/^\d+(?:\.\d+)?$/.test(text2)) return text2 === "1" || text2 === "1.0" ? "Y" : text2;
   return "";
 }
-function firstText$3(record2, keys) {
+function firstText$4(record2, keys) {
   for (const key of keys) {
     const value = record2[key];
     if (typeof value === "string" && value.trim()) return value.trim();
@@ -4216,7 +4216,7 @@ function buildClientInvoice(id, data, now = /* @__PURE__ */ new Date(), order) {
     id,
     invoiceNumber: portalDisplayedInvoiceNumber({ ...data, id }, order, now),
     status: typeof data.status === "string" && data.status.trim() ? data.status.trim() : "",
-    clientName: text$x(data.clientName),
+    clientName: text$y(data.clientName),
     address: addressText(data.billToAddress || data.address || data.propertyAddress),
     createdAt,
     issuedOn: formatPortalDate(data.createdAt) || formatPortalDate(data.sentAt) || formatPortalDate(data.paidAt),
@@ -4226,7 +4226,7 @@ function buildClientInvoice(id, data, now = /* @__PURE__ */ new Date(), order) {
     fees: storedAmount(data.fees),
     travel: storedAmount(data.travel),
     promoDiscount: storedAmount(data.promoDiscount),
-    promoCode: text$x(data.promoCode),
+    promoCode: text$y(data.promoCode),
     tax: storedAmount(data.tax),
     total: storedAmount(data.total),
     amountPaid: storedAmount(data.amountPaid),
@@ -4308,15 +4308,15 @@ function storedLines(lineItems, services2) {
     if (typeof item === "string" && item.trim()) return [{ name: item.trim(), qty: null, amount: null }];
     if (!item || typeof item !== "object") return [];
     const record2 = item;
-    const named = text$x(record2.name) || text$x(record2.label);
-    const description = text$x(record2.description);
+    const named = text$y(record2.name) || text$y(record2.label);
+    const description = text$y(record2.description);
     const name = named || description;
     const qty = storedQty(record2.qty ?? record2.quantity);
     const amount = storedAmount(record2.price ?? record2.amount ?? record2.total);
     if (!name && amount == null && qty == null) return [];
     const line = { name: name || "Line item", qty, amount };
-    const id = text$x(record2.id);
-    const category = text$x(record2.category);
+    const id = text$y(record2.id);
+    const category = text$y(record2.category);
     if (id) line.id = id;
     if (category) line.category = category;
     if (named && description) line.description = description;
@@ -4352,7 +4352,7 @@ function isoStamp(value) {
   if (typeof value === "number" && Number.isFinite(value)) return new Date(value).toISOString();
   return null;
 }
-function text$x(value) {
+function text$y(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function roundMoney$7(value) {
@@ -4884,22 +4884,22 @@ function emptyHours() {
     sun: { enabled: false, start: "09:00", end: "13:00" }
   };
 }
-function text$w(value, max) {
+function text$x(value, max) {
   return String(value ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 }
 function clock(value, fallback) {
-  const raw = text$w(value, 5);
+  const raw = text$x(value, 5);
   return /^([01]\d|2[0-3]):[0-5]\d$/.test(raw) ? raw : fallback;
 }
 function flag(value, fallback) {
   return typeof value === "boolean" ? value : fallback;
 }
 function colorOf(value, fallback) {
-  const raw = text$w(value, 7);
+  const raw = text$x(value, 7);
   return /^#[0-9a-fA-F]{6}$/.test(raw) ? raw.toLowerCase() : fallback;
 }
 function photoOf(value) {
-  const raw = text$w(value, 400);
+  const raw = text$x(value, 400);
   if (!raw) return "";
   if (raw.startsWith("https://") || raw.startsWith("/")) return raw;
   return "";
@@ -4947,10 +4947,10 @@ function sanitizeStaffSettings(input, role) {
   }
   const comms = raw.comms && typeof raw.comms === "object" ? raw.comms : {};
   const zones = raw.zones && typeof raw.zones === "object" ? raw.zones : {};
-  const zoneList = Array.isArray(zones.zones) ? zones.zones.map((zone) => text$w(zone, 40)).filter(Boolean).slice(0, 12) : [];
+  const zoneList = Array.isArray(zones.zones) ? zones.zones.map((zone) => text$x(zone, 40)).filter(Boolean).slice(0, 12) : [];
   return {
-    displayName: text$w(raw.displayName, 80),
-    bio: text$w(raw.bio, 500),
+    displayName: text$x(raw.displayName, 80),
+    bio: text$x(raw.bio, 500),
     photoUrl: photoOf(raw.photoUrl),
     color: colorOf(raw.color, base.color),
     hours,
@@ -4970,10 +4970,10 @@ function sanitizeClientSettings(input) {
   const raw = input && typeof input === "object" ? input : {};
   const base = defaultClientSettings();
   const notes = raw.notifications && typeof raw.notifications === "object" ? raw.notifications : {};
-  const services2 = Array.isArray(raw.defaultServices) ? raw.defaultServices.map((item) => text$w(item, 40)).filter((item) => CLIENT_SERVICES.includes(item)).slice(0, 8) : base.defaultServices;
-  const tier = text$w(raw.pricingTier, 20);
+  const services2 = Array.isArray(raw.defaultServices) ? raw.defaultServices.map((item) => text$x(item, 40)).filter((item) => CLIENT_SERVICES.includes(item)).slice(0, 8) : base.defaultServices;
+  const tier = text$x(raw.pricingTier, 20);
   return {
-    displayName: text$w(raw.displayName, 80),
+    displayName: text$x(raw.displayName, 80),
     photoUrl: photoOf(raw.photoUrl),
     color: colorOf(raw.color, base.color),
     notifications: {
@@ -4983,7 +4983,7 @@ function sanitizeClientSettings(input) {
     },
     defaultServices: services2.length ? services2 : ["Photos"],
     pricingTier: PRICING_TIERS.includes(tier) ? tier : "Standard",
-    customerTeamId: text$w(raw.customerTeamId, 80)
+    customerTeamId: text$x(raw.customerTeamId, 80)
   };
 }
 function sanitizePermissions(input) {
@@ -5002,19 +5002,19 @@ function asRecord$8(value) {
 }
 function profileFromStaff(sourceId, data, preview = false) {
   const role = isStaffRole(String(data.role || "")) ? String(data.role) : "photographer";
-  const legalName = text$w(`${data.firstName || ""} ${data.lastName || ""}`, 120) || text$w(data.name, 120) || text$w(data.email, 120) || "Staff";
+  const legalName = text$x(`${data.firstName || ""} ${data.lastName || ""}`, 120) || text$x(data.name, 120) || text$x(data.email, 120) || "Staff";
   const settings = sanitizeStaffSettings(data.profileSettings, role);
   if (!settings.displayName) settings.displayName = legalName;
   return {
     id: profileId("staff", sourceId),
     kind: "staff",
     sourceId,
-    uid: text$w(data.uid, 128) || sourceId,
+    uid: text$x(data.uid, 128) || sourceId,
     role,
     legalName,
     displayName: settings.displayName,
-    email: text$w(data.email, 160).toLowerCase(),
-    phone: text$w(data.phone, 40),
+    email: text$x(data.email, 160).toLowerCase(),
+    phone: text$x(data.phone, 40),
     photoUrl: settings.photoUrl,
     color: settings.color,
     bio: settings.bio,
@@ -5022,27 +5022,27 @@ function profileFromStaff(sourceId, data, preview = false) {
     staffSettings: settings,
     clientSettings: null,
     permissions: data.permissions ? sanitizePermissions(data.permissions) : null,
-    groupIds: Array.isArray(data.groupIds) ? data.groupIds.map((id) => text$w(id, 80)).filter(Boolean) : [],
+    groupIds: Array.isArray(data.groupIds) ? data.groupIds.map((id) => text$x(id, 80)).filter(Boolean) : [],
     card: null,
     preview
   };
 }
 function profileFromClient$1(sourceId, data, card = null, preview = false) {
   const hub = asRecord$8(data.hubProfile);
-  const legalName = text$w(`${data.firstName || hub.firstName || ""} ${data.lastName || hub.lastName || ""}`, 120) || text$w(data.name, 120) || "Client";
+  const legalName = text$x(`${data.firstName || hub.firstName || ""} ${data.lastName || hub.lastName || ""}`, 120) || text$x(data.name, 120) || "Client";
   const settings = sanitizeClientSettings(data.profileSettings);
   if (!settings.displayName) settings.displayName = legalName;
-  const brokerage = text$w(hub.brokerage, 120);
+  const brokerage = text$x(hub.brokerage, 120);
   return {
     id: profileId("client", sourceId),
     kind: "client",
     sourceId,
-    uid: text$w(data.firebaseUid, 128) || sourceId,
+    uid: text$x(data.firebaseUid, 128) || sourceId,
     role: "client",
     legalName,
     displayName: settings.displayName,
-    email: text$w(data.email || hub.email, 160).toLowerCase(),
-    phone: text$w(data.phone || hub.phone, 40),
+    email: text$x(data.email || hub.email, 160).toLowerCase(),
+    phone: text$x(data.phone || hub.phone, 40),
     photoUrl: settings.photoUrl || photoOf(hub.headshotUrl),
     color: settings.color,
     bio: "",
@@ -5050,14 +5050,14 @@ function profileFromClient$1(sourceId, data, card = null, preview = false) {
     staffSettings: null,
     clientSettings: settings,
     permissions: null,
-    groupIds: Array.isArray(data.groupIds) ? data.groupIds.map((id) => text$w(id, 80)).filter(Boolean) : [],
+    groupIds: Array.isArray(data.groupIds) ? data.groupIds.map((id) => text$x(id, 80)).filter(Boolean) : [],
     card,
     preview
   };
 }
 function profileFromAgent(sourceId, data, preview = false) {
-  const legalName = text$w(data.name, 120) || "Agent";
-  const linked = text$w(data.linkedClientId, 128);
+  const legalName = text$x(data.name, 120) || "Agent";
+  const linked = text$x(data.linkedClientId, 128);
   return {
     id: profileId("agent", sourceId),
     kind: "agent",
@@ -5066,11 +5066,11 @@ function profileFromAgent(sourceId, data, preview = false) {
     role: "agent",
     legalName,
     displayName: legalName,
-    email: text$w(data.email, 160).toLowerCase(),
-    phone: text$w(data.phone, 40),
+    email: text$x(data.email, 160).toLowerCase(),
+    phone: text$x(data.phone, 40),
     photoUrl: "",
     color: ROLE_COLOR.agent,
-    bio: text$w(data.notes, 500),
+    bio: text$x(data.notes, 500),
     brokerage: "",
     staffSettings: null,
     clientSettings: null,
@@ -5083,10 +5083,10 @@ function profileFromAgent(sourceId, data, preview = false) {
 function cardSummaryFrom(data) {
   if (!data) return null;
   const card = asRecord$8(data.card);
-  const last4 = text$w(card.last4, 4);
+  const last4 = text$x(card.last4, 4);
   if (!/^\d{4}$/.test(last4)) return null;
   return {
-    brand: text$w(card.brand, 20) || "Card",
+    brand: text$x(card.brand, 20) || "Card",
     last4,
     expMonth: Number(card.expMonth) || 0,
     expYear: Number(card.expYear) || 0
@@ -5325,8 +5325,8 @@ function previewThreads() {
   ];
 }
 function buildOutbound(actor2, input, profiles, groups, now = (/* @__PURE__ */ new Date()).toISOString()) {
-  const subject = text$w(input.subject, 140) || "Message";
-  const body = text$w(input.body, 2e3);
+  const subject = text$x(input.subject, 140) || "Message";
+  const body = text$x(input.body, 2e3);
   if (!body) return { ok: false, error: "Write a message first." };
   const sender = profiles.find((profile) => profile.uid === actor2.uid) || null;
   const senderProfileId = sender?.id || profileId(actor2.kind === "client" ? "client" : "staff", actor2.uid);
@@ -5398,8 +5398,8 @@ function buildDraft(actor2, input, now = (/* @__PURE__ */ new Date()).toISOStrin
     id: input.threadId || `draft-${now}`,
     kind: input.groupId ? "group" : "direct",
     status: "draft",
-    subject: text$w(input.subject, 140),
-    body: text$w(input.body, 2e3),
+    subject: text$x(input.subject, 140),
+    body: text$x(input.body, 2e3),
     messages: [],
     ownerUid: actor2.uid,
     senderUid: actor2.uid,
@@ -5528,40 +5528,40 @@ function bookingListingGroups(input) {
   for (const doc of requests) {
     const node = nodeId("orderRequests", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("listings", text$v(doc.data.listingId)));
-    uf.link(node, nodeId("orders", text$v(doc.data.orderId) || text$v(doc.data.convertedToOrderId)));
-    uf.link(node, nodeId("invoices", text$v(doc.data.invoiceId)));
-    uf.link(node, nodeId("galleries", text$v(doc.data.galleryId)));
+    uf.link(node, nodeId("listings", text$w(doc.data.listingId)));
+    uf.link(node, nodeId("orders", text$w(doc.data.orderId) || text$w(doc.data.convertedToOrderId)));
+    uf.link(node, nodeId("invoices", text$w(doc.data.invoiceId)));
+    uf.link(node, nodeId("galleries", text$w(doc.data.galleryId)));
   }
   for (const doc of orders) {
     const node = nodeId("orders", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$v(doc.data.orderRequestId)));
-    uf.link(node, nodeId("listings", text$v(doc.data.listingId)));
-    uf.link(node, nodeId("invoices", text$v(doc.data.invoiceId)));
-    uf.link(node, nodeId("galleries", text$v(doc.data.galleryId)));
+    uf.link(node, nodeId("orderRequests", text$w(doc.data.orderRequestId)));
+    uf.link(node, nodeId("listings", text$w(doc.data.listingId)));
+    uf.link(node, nodeId("invoices", text$w(doc.data.invoiceId)));
+    uf.link(node, nodeId("galleries", text$w(doc.data.galleryId)));
   }
   for (const doc of invoices) {
     const node = nodeId("invoices", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$v(doc.data.orderRequestId)));
-    uf.link(node, nodeId("orders", text$v(doc.data.orderId)));
-    uf.link(node, nodeId("listings", text$v(doc.data.listingId)));
+    uf.link(node, nodeId("orderRequests", text$w(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$w(doc.data.orderId)));
+    uf.link(node, nodeId("listings", text$w(doc.data.listingId)));
   }
   for (const doc of appointments) {
     const node = nodeId("appointments", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$v(doc.data.orderRequestId)));
-    uf.link(node, nodeId("orders", text$v(doc.data.orderId)));
-    uf.link(node, nodeId("listings", text$v(doc.data.listingId)));
+    uf.link(node, nodeId("orderRequests", text$w(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$w(doc.data.orderId)));
+    uf.link(node, nodeId("listings", text$w(doc.data.listingId)));
   }
   for (const doc of galleries) {
     const node = nodeId("galleries", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$v(doc.data.orderRequestId)));
-    uf.link(node, nodeId("orders", text$v(doc.data.orderId)));
-    uf.link(node, nodeId("invoices", text$v(doc.data.invoiceId)));
-    uf.link(node, nodeId("listings", text$v(doc.data.listingId)));
+    uf.link(node, nodeId("orderRequests", text$w(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$w(doc.data.orderId)));
+    uf.link(node, nodeId("invoices", text$w(doc.data.invoiceId)));
+    uf.link(node, nodeId("listings", text$w(doc.data.listingId)));
   }
   const groups = [];
   for (const nodes of uf.components()) {
@@ -5621,7 +5621,7 @@ function fillEmptyListingFields(existing, desired) {
   return patch;
 }
 function clientOwnsListing(listing, clients) {
-  const clientId2 = text$v(listing.clientId);
+  const clientId2 = text$w(listing.clientId);
   const email = normalizeEmail$1(listing.clientEmail || listing.email);
   if (!clientId2 && !email) return true;
   if (clientId2 && clients.ids.includes(clientId2)) return true;
@@ -5643,7 +5643,7 @@ function desiredListingFields(group, identity) {
   assign(fields, "clientId", clientId(group, identity));
   assign(fields, "clientEmail", clientEmail(group, identity));
   assign(fields, "clientName", clientName$1(group));
-  assign(fields, "clientPhone", firstText$2(group, ["clientPhone", "phone"]));
+  assign(fields, "clientPhone", firstText$3(group, ["clientPhone", "phone"]));
   if (address) {
     fields.address = address;
     fields.propertyAddress = address;
@@ -5674,9 +5674,9 @@ function desiredListingFields(group, identity) {
   }
   if (total != null) fields.total = total;
   if (squareFootage != null) fields.squareFootage = squareFootage;
-  assign(fields, "propertyStatus", firstText$2(group, ["propertyStatus"]));
-  assign(fields, "furnishingStatus", firstText$2(group, ["furnishingStatus"]));
-  assign(fields, "accessMethod", firstText$2(group, ["accessMethod"]));
+  assign(fields, "propertyStatus", firstText$3(group, ["propertyStatus"]));
+  assign(fields, "furnishingStatus", firstText$3(group, ["furnishingStatus"]));
+  assign(fields, "accessMethod", firstText$3(group, ["accessMethod"]));
   assign(fields, "accessInfo", accessInfo(group));
   assign(fields, "createdAt", groupCreatedAt(group));
   return fields;
@@ -5693,10 +5693,10 @@ function chooseListing(group, listings, clients) {
 }
 function listingMatches(doc, group) {
   if (doc.id === group.stableId || group.preferredListingIds.includes(doc.id)) return true;
-  const requestId = text$v(doc.data.orderRequestId);
-  const orderId = text$v(doc.data.orderId);
-  const invoiceId = text$v(doc.data.invoiceId);
-  const appointmentId = text$v(doc.data.appointmentId);
+  const requestId = text$w(doc.data.orderRequestId);
+  const orderId = text$w(doc.data.orderId);
+  const invoiceId = text$w(doc.data.invoiceId);
+  const appointmentId = text$w(doc.data.appointmentId);
   return Boolean(
     requestId && group.orderRequestIds.includes(requestId) || orderId && group.orderIds.includes(orderId) || invoiceId && group.invoiceIds.includes(invoiceId) || appointmentId && group.appointmentIds.includes(appointmentId)
   );
@@ -5706,7 +5706,7 @@ function linksFor(group, listingId, listings, clients) {
   const links = [];
   const push = (collection, docs) => {
     for (const doc of docs) {
-      const current = text$v(doc.data.listingId);
+      const current = text$w(doc.data.listingId);
       if (current === listingId) continue;
       if (current && isPortalListingId(current) && ownedIds.has(current)) continue;
       links.push({ collection, id: doc.id });
@@ -5723,7 +5723,7 @@ function clientsFor(group, identity) {
   const ids = /* @__PURE__ */ new Set();
   const emails = /* @__PURE__ */ new Set();
   const addId = (value) => {
-    const id = text$v(value);
+    const id = text$w(value);
     if (id) ids.add(id);
   };
   const addEmail = (value) => {
@@ -5742,7 +5742,7 @@ function clientsFor(group, identity) {
 function preferredListingIds(group) {
   const ids = [];
   const push = (value) => {
-    const id = text$v(value);
+    const id = text$w(value);
     if (id && isPortalListingId(id) && !ids.includes(id)) ids.push(id);
   };
   for (const doc of [...group.orderRequests, ...group.orders, ...group.invoices, ...group.appointments, ...group.galleries]) {
@@ -5777,9 +5777,9 @@ function bestAddress(group) {
   }
   for (const doc of propertyDocs(group)) {
     for (const key of ["address", "propertyAddress", "shootLocation"]) {
-      if (typeof doc.data[key] === "string" && text$v(doc.data[key])) return text$v(doc.data[key]);
+      if (typeof doc.data[key] === "string" && text$w(doc.data[key])) return text$w(doc.data[key]);
     }
-    if (text$v(doc.data.addressLabel)) return text$v(doc.data.addressLabel);
+    if (text$w(doc.data.addressLabel)) return text$w(doc.data.addressLabel);
   }
   return null;
 }
@@ -5795,7 +5795,7 @@ function firstScheduleDate(group) {
 function firstScheduleTime(group) {
   for (const doc of [...group.appointments, ...group.orders, ...group.orderRequests]) {
     for (const key of ["scheduledTime", "appointmentTime", "apptTime", "requestedTime"]) {
-      const value = text$v(doc.data[key]);
+      const value = text$w(doc.data[key]);
       if (value && !/^tbd$/i.test(value)) return value;
     }
   }
@@ -5812,7 +5812,7 @@ function projectType(group) {
     if (doc.data.projectType === "real_estate") return "real_estate";
     const service = doc.data.selectedService;
     if (service && typeof service === "object") {
-      const category = text$v(service.category);
+      const category = text$w(service.category);
       if (category === "business" || category === "branding") return "business";
       if (category === "listings") return "real_estate";
     }
@@ -5838,7 +5838,7 @@ function namesFrom(value) {
   for (const item of value) {
     if (typeof item === "string" && item.trim()) names.push(item.trim());
     else if (item && typeof item === "object") {
-      const name = text$v(item.name);
+      const name = text$w(item.name);
       if (name) names.push(name);
     }
     if (names.length >= 40) break;
@@ -5848,23 +5848,23 @@ function namesFrom(value) {
 function firstTotal(group) {
   for (const doc of [...group.orders, ...group.invoices, ...group.orderRequests]) {
     if (doc.data.total != null && doc.data.total !== "") {
-      const parsed = money$7(doc.data.total);
+      const parsed = money$8(doc.data.total);
       if (parsed != null) return parsed;
     }
     const pricing = doc.data.pricing;
     if (pricing && typeof pricing === "object") {
-      const parsed = money$7(pricing.total);
+      const parsed = money$8(pricing.total);
       if (pricing.total != null && pricing.total !== "" && parsed != null) return parsed;
     }
   }
   return null;
 }
 function accessInfo(group) {
-  return [firstText$2(group, ["accessMethod"]), firstText$2(group, ["lockboxCode"])].filter(Boolean).join(" - ");
+  return [firstText$3(group, ["accessMethod"]), firstText$3(group, ["lockboxCode"])].filter(Boolean).join(" - ");
 }
 function clientId(group, identity) {
-  const bookingIds = propertyDocs(group).map((doc) => text$v(doc.data.clientId)).filter(Boolean);
-  const identityIds2 = (identity?.ids || []).map((id) => text$v(id)).filter(Boolean);
+  const bookingIds = propertyDocs(group).map((doc) => text$w(doc.data.clientId)).filter(Boolean);
+  const identityIds2 = (identity?.ids || []).map((id) => text$w(id)).filter(Boolean);
   return bookingIds.find((id) => identityIds2.includes(id)) || bookingIds[0] || identityIds2[0] || "";
 }
 function clientEmail(group, identity) {
@@ -5878,8 +5878,8 @@ function clientEmail(group, identity) {
 }
 function clientName$1(group) {
   for (const doc of propertyDocs(group)) {
-    if (text$v(doc.data.clientName)) return text$v(doc.data.clientName);
-    const joined = `${text$v(doc.data.firstName)} ${text$v(doc.data.lastName)}`.trim();
+    if (text$w(doc.data.clientName)) return text$w(doc.data.clientName);
+    const joined = `${text$w(doc.data.firstName)} ${text$w(doc.data.lastName)}`.trim();
     if (joined) return joined;
   }
   return "";
@@ -5887,7 +5887,7 @@ function clientName$1(group) {
 function chosenInvoiceId(group) {
   const known = new Set(group.invoiceIds);
   for (const doc of [...group.orderRequests, ...group.orders]) {
-    const id = text$v(doc.data.invoiceId);
+    const id = text$w(doc.data.invoiceId);
     if (id && known.has(id)) return id;
   }
   return newestDoc(group.invoices)?.id || group.invoiceIds[0] || "";
@@ -5896,7 +5896,7 @@ function chosenId(docs, ids, pointers = [], keys = []) {
   const known = new Set(ids);
   for (const doc of pointers) {
     for (const key of keys) {
-      const id = text$v(doc.data[key]);
+      const id = text$w(doc.data[key]);
       if (id && known.has(id)) return id;
     }
   }
@@ -5905,10 +5905,10 @@ function chosenId(docs, ids, pointers = [], keys = []) {
 function propertyDocs(group) {
   return [...group.orderRequests, ...group.orders, ...group.appointments, ...group.invoices, ...group.galleries];
 }
-function firstText$2(group, keys) {
+function firstText$3(group, keys) {
   for (const doc of propertyDocs(group)) {
     for (const key of keys) {
-      const value = text$v(doc.data[key]);
+      const value = text$w(doc.data[key]);
       if (value) return value;
     }
   }
@@ -5976,12 +5976,12 @@ function hasAddress(value) {
   if (typeof value === "string") return value.trim().length > 0;
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const record2 = value;
-  return ["formatted", "label", "street", "line1", "addressLine1", "city", "state", "zip"].some((key) => text$v(record2[key]).length > 0);
+  return ["formatted", "label", "street", "line1", "addressLine1", "city", "state", "zip"].some((key) => text$w(record2[key]).length > 0);
 }
 function statusKey(value) {
   return String(value || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
 }
-function money$7(value) {
+function money$8(value) {
   const parsed = typeof value === "number" ? value : typeof value === "string" && value.trim() ? Number(value.replace(/[$,\s]/g, "")) : Number.NaN;
   if (!Number.isFinite(parsed)) return null;
   return Math.round(parsed * 100) / 100;
@@ -6008,14 +6008,14 @@ function isEmpty(value) {
 function isSentinel$1(value) {
   return Boolean(value && typeof value === "object" && "_methodName" in value);
 }
-function text$v(value) {
+function text$w(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function cleanDocs(docs) {
   const out = [];
   const seen = /* @__PURE__ */ new Set();
   for (const doc of docs || []) {
-    const id = text$v(doc?.id);
+    const id = text$w(doc?.id);
     if (!id || seen.has(id)) continue;
     seen.add(id);
     out.push({ id, data: doc.data && typeof doc.data === "object" ? doc.data : {} });
@@ -6117,7 +6117,7 @@ async function ensureBookingListingForRequest(orderRequestId) {
     galleries: []
   });
   const identity = {
-    ids: text$u(request.data.clientId) ? [text$u(request.data.clientId)] : [],
+    ids: text$v(request.data.clientId) ? [text$v(request.data.clientId)] : [],
     email: normalizeEmail$1(request.data.clientEmail || request.data.email)
   };
   const plans = await plansFor(bundle, identity);
@@ -6170,7 +6170,7 @@ async function applyBookingListingPlan(plan) {
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
       created = true;
-      console.info(`[Listings] Created ${plan.listingId} for booking ${text$u(plan.createFields.orderRequestId) || text$u(plan.createFields.orderId) || text$u(plan.createFields.invoiceId)}`);
+      console.info(`[Listings] Created ${plan.listingId} for booking ${text$v(plan.createFields.orderRequestId) || text$v(plan.createFields.orderId) || text$v(plan.createFields.invoiceId)}`);
     } catch (err) {
       if (!alreadyExists(err)) throw err;
       await fillListing(ref, plan.createFields);
@@ -6199,7 +6199,7 @@ async function linkRecord(collectionName2, id, listingId) {
   const ref = db$D().collection(collectionName2).doc(id);
   const snap = await ref.get();
   if (!snap.exists) return;
-  if (text$u(snap.data()?.listingId) === listingId) return;
+  if (text$v(snap.data()?.listingId) === listingId) return;
   await ref.update({
     listingId,
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
@@ -6248,11 +6248,11 @@ async function loadVisibleSeeds(identity) {
   const dropHidden = (map) => {
     for (const [id, doc] of map) {
       if (!visibleToPortalClient({
-        clientId: text$u(doc.data.clientId),
-        firebaseUid: text$u(doc.data.firebaseUid),
-        clientProfileId: text$u(doc.data.clientProfileId),
-        email: text$u(doc.data.email),
-        clientEmail: text$u(doc.data.clientEmail)
+        clientId: text$v(doc.data.clientId),
+        firebaseUid: text$v(doc.data.firebaseUid),
+        clientProfileId: text$v(doc.data.clientProfileId),
+        email: text$v(doc.data.email),
+        clientEmail: text$v(doc.data.clientEmail)
       }, portalIdentity)) map.delete(id);
     }
   };
@@ -6276,36 +6276,36 @@ async function hydrateBundle(seed2) {
   const galleries = mapDocs(seed2.galleries);
   const requestIds = new Set(requests.keys());
   for (const doc of [...orders.values(), ...invoices.values(), ...appointments.values()]) {
-    const id = text$u(doc.data.orderRequestId);
+    const id = text$v(doc.data.orderRequestId);
     if (id) requestIds.add(id);
   }
   await readMissing("orderRequests", requestIds, requests);
   const orderIds = new Set(orders.keys());
   for (const doc of requests.values()) {
-    const id = text$u(doc.data.convertedToOrderId) || text$u(doc.data.orderId);
+    const id = text$v(doc.data.convertedToOrderId) || text$v(doc.data.orderId);
     if (id) orderIds.add(id);
   }
   for (const doc of [...invoices.values(), ...appointments.values()]) {
-    const id = text$u(doc.data.orderId);
+    const id = text$v(doc.data.orderId);
     if (id) orderIds.add(id);
   }
   await readMissing("orders", orderIds, orders);
   const invoiceIds = new Set(invoices.keys());
   for (const doc of [...requests.values(), ...orders.values()]) {
-    const id = text$u(doc.data.invoiceId);
+    const id = text$v(doc.data.invoiceId);
     if (id) invoiceIds.add(id);
   }
   await readMissing("invoices", invoiceIds, invoices);
   const legacyIds = /* @__PURE__ */ new Set();
   for (const doc of requests.values()) {
-    for (const id of legacyInvoiceDocIds({ orderRequestId: doc.id, listingId: text$u(doc.data.listingId) })) {
+    for (const id of legacyInvoiceDocIds({ orderRequestId: doc.id, listingId: text$v(doc.data.listingId) })) {
       legacyIds.add(id);
     }
   }
   for (const doc of orders.values()) {
     for (const id of legacyInvoiceDocIds({
-      orderRequestId: text$u(doc.data.orderRequestId),
-      listingId: text$u(doc.data.listingId)
+      orderRequestId: text$v(doc.data.orderRequestId),
+      listingId: text$v(doc.data.listingId)
     })) {
       legacyIds.add(id);
     }
@@ -6318,7 +6318,7 @@ async function hydrateBundle(seed2) {
   mergeDocs(appointments, await queryIn("appointments", "orderId", [...orders.keys()]));
   const galleryIds = new Set(galleries.keys());
   for (const doc of [...requests.values(), ...orders.values()]) {
-    const id = text$u(doc.data.galleryId);
+    const id = text$v(doc.data.galleryId);
     if (id) galleryIds.add(id);
   }
   await readMissing("galleries", galleryIds, galleries);
@@ -6447,7 +6447,7 @@ function alreadyExists(err) {
 function isSentinel(value) {
   return Boolean(value && typeof value === "object" && "_methodName" in value);
 }
-function text$u(value) {
+function text$v(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function chunk$1(items, size) {
@@ -6464,14 +6464,14 @@ const BOOKING_PHOTOGRAPHER_STAFF_UIDS = {
   "david-gonzalez": "",
   "cadi-torres": ""
 };
-function text$t(value) {
+function text$u(value) {
   return typeof value === "string" ? value.trim().toLowerCase() : "";
 }
 function resolveBookingPhotographerStaff(input) {
   const publicId = input.publicId.trim();
   const configured = String(BOOKING_PHOTOGRAPHER_STAFF_UIDS[publicId] || "").trim();
-  const calendar = text$t(input.calendarId);
-  const match = calendar ? (input.staff || []).find((member) => text$t(member.email) === calendar || text$t(member.googleCalendarId) === calendar) : void 0;
+  const calendar = text$u(input.calendarId);
+  const match = calendar ? (input.staff || []).find((member) => text$u(member.email) === calendar || text$u(member.googleCalendarId) === calendar) : void 0;
   const candidate = String(match?.id || configured || "").trim();
   const uid = candidate && candidate !== publicId ? candidate : null;
   const matchedName = typeof match?.name === "string" ? match.name.trim() : "";
@@ -6698,7 +6698,7 @@ function nestedTotal(pricing) {
   return pricing.total;
 }
 function warnWhenStoredTotalDiffers(record2, lineItems) {
-  const stored = [money$6(record2.total), money$6(nestedTotal(record2.pricing))].filter((amount) => amount != null);
+  const stored = [money$7(record2.total), money$7(nestedTotal(record2.pricing))].filter((amount) => amount != null);
   if (stored.length === 0) return;
   const rebuilt = roundMoney$6(sumLineItemPrices(chargedServiceLines(lineItems)));
   const drifted = [...new Set(stored.filter((amount) => Math.abs(amount - rebuilt) > 9e-3))];
@@ -6707,7 +6707,7 @@ function warnWhenStoredTotalDiffers(record2, lineItems) {
     `[Bookings] Package repair kept stored total ${drifted.join(" / ")}; catalog lines total ${rebuilt}.`
   );
 }
-function money$6(value) {
+function money$7(value) {
   if (typeof value === "number" && Number.isFinite(value)) return roundMoney$6(value);
   if (typeof value === "string" && value.trim()) {
     const parsed = Number(value.replace(/[$,\s]/g, ""));
@@ -6768,7 +6768,7 @@ function synthesizePackageLine(record2) {
 }
 function packageLabel(record2) {
   for (const key of PACKAGE_LABEL_KEYS) {
-    const value = text$s(record2[key]);
+    const value = text$t(record2[key]);
     if (value) return value;
   }
   return "";
@@ -6805,7 +6805,7 @@ function moneyOrNull$1(value) {
 function nested$2(value) {
   return value && typeof value === "object" ? value : {};
 }
-function text$s(value) {
+function text$t(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function roundMoney$5(value) {
@@ -6837,8 +6837,8 @@ function buildAdminOrderTile(record2) {
   const packageName = skin2?.title || named || "Custom order";
   const charges = orderChargeSummary(record2, lines);
   return {
-    id: text$r(record2.id) || packageName,
-    orderCode: orderCode(kind, record2),
+    id: text$s(record2.id) || packageName,
+    orderCode: orderCode$1(kind, record2),
     kind,
     typeLabel: kind === "business" ? "Business" : "Listing",
     heroUrl,
@@ -6860,7 +6860,7 @@ function buildAdminOrderTile(record2) {
   };
 }
 function orderKind(record2, skin2) {
-  const raw = text$r(record2.projectType || record2.orderType || record2.type).toLowerCase();
+  const raw = text$s(record2.projectType || record2.orderType || record2.type).toLowerCase();
   if (raw === "business" || raw === "brand" || raw === "social") return "business";
   if (raw === "real_estate" || raw === "listing" || raw === "property") return "listing";
   if (skin2?.category === "listing") return "listing";
@@ -6873,37 +6873,37 @@ function channelFor(skin2, kind) {
   if (skin2?.category === "listing") return "Listings & Spaces";
   return kind === "business" ? "Human Brand" : "Listings & Spaces";
 }
-function orderCode(kind, record2) {
-  const explicit = text$r(record2.orderCode || record2.orderNumber || record2.displayId);
+function orderCode$1(kind, record2) {
+  const explicit = text$s(record2.orderCode || record2.orderNumber || record2.displayId);
   if (explicit) return explicit.toUpperCase();
-  const id = text$r(record2.id);
+  const id = text$s(record2.id);
   const prefix = kind === "listing" ? "L" : "B";
   return `ORD - ${prefix} - ${orderCodeTail(id)}`;
 }
 function heroFromRecord(record2) {
-  const explicit = text$r(record2.heroUrl) || text$r(record2.coverUrl) || text$r(record2.coverImage);
+  const explicit = text$s(record2.heroUrl) || text$s(record2.coverUrl) || text$s(record2.coverImage);
   if (explicit) return explicit;
   const images = record2.images;
   if (!Array.isArray(images)) return "";
   for (const image of images) {
     if (typeof image === "string" && image.trim()) return image.trim();
     if (image && typeof image === "object") {
-      const url = text$r(image.url) || text$r(image.thumbnailUrl);
+      const url = text$s(image.url) || text$s(image.thumbnailUrl);
       if (url) return url;
     }
   }
   return "";
 }
 function clientName(record2) {
-  const named = text$r(record2.clientName) || text$r(record2.customerName) || text$r(record2.agentName) || [text$r(record2.firstName), text$r(record2.lastName)].filter(Boolean).join(" ");
+  const named = text$s(record2.clientName) || text$s(record2.customerName) || text$s(record2.agentName) || [text$s(record2.firstName), text$s(record2.lastName)].filter(Boolean).join(" ");
   return named || "—";
 }
 function appointmentLabel(record2) {
   const raw = record2.appointmentDate ?? record2.apptDate ?? record2.scheduledDate ?? record2.requestedDate;
   const key = calendarDateKey(raw);
   const date = formatShootDateLabel(key, typeof raw === "string" ? raw : void 0);
-  const time = text$r(record2.scheduledTime || record2.appointmentTime || record2.requestedTime);
-  const photographer = text$r(record2.assignedPhotographerName || record2.photographerName || record2.photographerPreference);
+  const time = text$s(record2.scheduledTime || record2.appointmentTime || record2.requestedTime);
+  const photographer = text$s(record2.assignedPhotographerName || record2.photographerName || record2.photographerPreference);
   return [date, time, photographer].filter(Boolean).join(" · ") || "—";
 }
 function tilePrice(amount) {
@@ -6968,8 +6968,8 @@ function paidState(record2) {
   const invoice = nested$1(record2.invoice);
   const explicit = [record2.paymentStatus, record2.invoiceStatus, invoice.status].map((value) => normalize(value)).join(" ");
   if (/\bpartial\b/.test(explicit) || normalize(record2.status) === "partial") return "partial";
-  const total = money$5(invoice.total ?? record2.total ?? record2.amount);
-  const paid = money$5(invoice.amountPaid ?? record2.amountPaid);
+  const total = money$6(invoice.total ?? record2.total ?? record2.amount);
+  const paid = money$6(invoice.amountPaid ?? record2.amountPaid);
   if (paid > 0 && total > 0 && paid + 9e-3 < total) return "partial";
   if (/\bpaid\b/.test(explicit) || record2.paidAt || paid > 0 && (total === 0 || paid >= total)) return "paid";
   const status2 = normalize(record2.status);
@@ -6989,7 +6989,7 @@ function nested$1(value) {
 function normalize(value) {
   return String(value ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
 }
-function money$5(value) {
+function money$6(value) {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string" && value.trim()) {
     const parsed = Number(value.replace(/[$,\s]/g, ""));
@@ -6997,7 +6997,7 @@ function money$5(value) {
   }
   return 0;
 }
-function text$r(value) {
+function text$s(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 const NOT_PROVIDED = "Not provided";
@@ -7022,19 +7022,19 @@ function officeNewOrderEmail(saved, options) {
   const subtotal = subtotalBeforeProcessing(saved, subtotalLines, processingAmount);
   const fields = [
     ["Order number", orderNumber2],
-    ["Admin link", text$q(options?.adminUrl) || NOT_PROVIDED],
+    ["Admin link", text$r(options?.adminUrl) || NOT_PROVIDED],
     ["Client name", clientName2],
-    ["Client email", firstText$1(saved, ["clientEmail", "email"])],
-    ["Client phone", firstText$1(saved, ["clientPhone", "phone"])],
-    ["Agent", firstText$1(saved, ["agentName", "agent"])],
+    ["Client email", firstText$2(saved, ["clientEmail", "email"])],
+    ["Client phone", firstText$2(saved, ["clientPhone", "phone"])],
+    ["Agent", firstText$2(saved, ["agentName", "agent"])],
     ["Agent email/phone", agentContactOf(saved)],
-    ["Brokerage", firstText$1(saved, ["brokerage", "brokerageName"])],
+    ["Brokerage", firstText$2(saved, ["brokerage", "brokerageName"])],
     ["Property address", address],
-    ["Unit", firstText$1(saved, ["unit", "unitNumber"]) || addressPart(saved.address, ["unit", "unitNumber"])],
-    ["Gate code", firstText$1(saved, ["gateCode", "gate"])],
+    ["Unit", firstText$2(saved, ["unit", "unitNumber"]) || addressPart(saved.address, ["unit", "unitNumber"])],
+    ["Gate code", firstText$2(saved, ["gateCode", "gate"])],
     ["Lockbox", lockboxOf(saved)],
-    ["Access notes", firstText$1(saved, ["accessNotes", "accessInstructions", "accessMethod"])],
-    ["MLS #", firstText$1(saved, ["mlsNumber", "mls", "mlsId"])],
+    ["Access notes", firstText$2(saved, ["accessNotes", "accessInstructions", "accessMethod"])],
+    ["MLS #", firstText$2(saved, ["mlsNumber", "mls", "mlsId"])],
     ["Package", packageName],
     ["Photo count", deliverables.photoCount],
     ["Aerials", deliverables.aerials],
@@ -7051,18 +7051,18 @@ function officeNewOrderEmail(saved, options) {
     ["Total", moneyField(saved, "total", lines.length ? charges.total : null)],
     ["Payment", paymentOf(saved, lines.length ? charges.total : null)],
     ["Requested date", requestedDate],
-    ["Requested time", firstText$1(saved, ["scheduledTime", "requestedTime", "appointmentTime", "timeWindow"])],
-    ["Square footage", firstText$1(saved, ["squareFootage", "sqft", "homeSize"])],
+    ["Requested time", firstText$2(saved, ["scheduledTime", "requestedTime", "appointmentTime", "timeWindow"])],
+    ["Square footage", firstText$2(saved, ["squareFootage", "sqft", "homeSize"])],
     ["Occupancy", occupancyOf(saved)],
     ["Notes", notes],
     ["Booked via", bookedVia(saved)]
   ];
-  const officeNote = text$q(saved.officeNote);
+  const officeNote = text$r(saved.officeNote);
   if (officeNote) fields.unshift(["Office note", officeNote]);
   const subjectCore = `New order ${orderNumber2} — ${packageName} — ${address} — ${requestedDate}`;
   const subject = isTestOrder(clientName2, notes) ? `[TEST] ${subjectCore}` : subjectCore;
   const plain = fields.map(([label, value]) => `${label}: ${value}`).join("\n");
-  const html = `<div style="font-family:Arial,sans-serif;max-width:640px;color:#111"><h1 style="font-size:18px">${escapeHtml$a(subject)}</h1><table style="width:100%;border-collapse:collapse">${fields.map(([label, value]) => `<tr><td style="padding:6px 10px;border-bottom:1px solid #eee;font-weight:bold;vertical-align:top">${escapeHtml$a(label)}</td><td style="padding:6px 10px;border-bottom:1px solid #eee;white-space:pre-wrap">${escapeHtml$a(value)}</td></tr>`).join("")}</table></div>`;
+  const html = `<div style="font-family:Arial,sans-serif;max-width:640px;color:#111"><h1 style="font-size:18px">${escapeHtml$b(subject)}</h1><table style="width:100%;border-collapse:collapse">${fields.map(([label, value]) => `<tr><td style="padding:6px 10px;border-bottom:1px solid #eee;font-weight:bold;vertical-align:top">${escapeHtml$b(label)}</td><td style="padding:6px 10px;border-bottom:1px solid #eee;white-space:pre-wrap">${escapeHtml$b(value)}</td></tr>`).join("")}</table></div>`;
   return { subject, text: plain, html, orderNumber: orderNumber2, packageName };
 }
 function isTestOrder(clientName2, notes) {
@@ -7071,19 +7071,19 @@ ${notes}`.toUpperCase().includes("TEST ORDER");
 }
 function orderNumberOf(saved) {
   for (const key of ["orderNumber", "orderCode", "displayId"]) {
-    const value = text$q(saved[key]);
+    const value = text$r(saved[key]);
     if (value && value !== NOT_PROVIDED) return value;
   }
-  if (!text$q(saved.id)) return NOT_PROVIDED;
+  if (!text$r(saved.id)) return NOT_PROVIDED;
   return buildAdminOrderTile(saved).orderCode;
 }
 function explicitPackageName(saved) {
   for (const key of ["packageName", "serviceName"]) {
-    const value = text$q(saved[key]);
+    const value = text$r(saved[key]);
     if (value && value !== NOT_PROVIDED) return cleanPackageName(value) || value;
   }
-  const selected = text$q(saved.selectedService);
-  if (text$q(saved.id) || selected) {
+  const selected = text$r(saved.selectedService);
+  if (text$r(saved.id) || selected) {
     const tileName = buildAdminOrderTile(saved).packageName;
     if (tileName && tileName !== "Custom order") return tileName;
   }
@@ -7091,14 +7091,14 @@ function explicitPackageName(saved) {
   return NOT_PROVIDED;
 }
 function clientNameOf(saved) {
-  const named = firstText$1(saved, ["clientName", "customerName"]);
+  const named = firstText$2(saved, ["clientName", "customerName"]);
   if (named) return named;
-  const joined = [text$q(saved.firstName), text$q(saved.lastName)].filter(Boolean).join(" ");
+  const joined = [text$r(saved.firstName), text$r(saved.lastName)].filter(Boolean).join(" ");
   return joined || NOT_PROVIDED;
 }
 function agentContactOf(saved) {
-  const clientEmail2 = firstText$1(saved, ["clientEmail", "email"]).toLowerCase();
-  const clientPhone = digits$1(firstText$1(saved, ["clientPhone", "phone"]));
+  const clientEmail2 = firstText$2(saved, ["clientEmail", "email"]).toLowerCase();
+  const clientPhone = digits$1(firstText$2(saved, ["clientPhone", "phone"]));
   const email = agentField(saved, ["agentEmail", "realtorEmail", "listingAgentEmail", "brokerEmail"], "email");
   const phone = agentField(saved, ["agentPhone", "realtorPhone", "listingAgentPhone", "brokerPhone"], "phone");
   const parts = [];
@@ -7107,11 +7107,11 @@ function agentContactOf(saved) {
   return parts.length ? parts.join(" / ") : NOT_PROVIDED;
 }
 function agentField(saved, keys, nestedKey) {
-  const direct = firstText$1(saved, keys);
+  const direct = firstText$2(saved, keys);
   if (direct !== NOT_PROVIDED) return direct;
   for (const holder of [saved.agent, saved.listingAgent, saved.realtor]) {
     const record2 = nested(holder);
-    const value = text$q(record2[nestedKey]);
+    const value = text$r(record2[nestedKey]);
     if (value) return value;
   }
   return "";
@@ -7123,7 +7123,7 @@ function notesOf(saved) {
   const seen = /* @__PURE__ */ new Set();
   const lines = [];
   for (const key of ["vibeNote", "notes", "specialInstructions", "internalNotes"]) {
-    const chunk2 = text$q(saved[key]);
+    const chunk2 = text$r(saved[key]);
     if (!chunk2) continue;
     for (const line of chunk2.split(/\n+/)) {
       const trimmed = line.trim();
@@ -7170,16 +7170,16 @@ function roundCents(value) {
   return Math.round(value * 100) / 100;
 }
 function lockboxOf(saved) {
-  const code = firstText$1(saved, ["lockboxCode", "supraCode"]);
+  const code = firstText$2(saved, ["lockboxCode", "supraCode"]);
   return code || NOT_PROVIDED;
 }
 function occupancyOf(saved) {
-  const parts = ["occupancy", "propertyStatus", "furnishingStatus"].map((key) => text$q(saved[key])).filter(Boolean);
+  const parts = ["occupancy", "propertyStatus", "furnishingStatus"].map((key) => text$r(saved[key])).filter(Boolean);
   return parts.length ? parts.join(", ") : NOT_PROVIDED;
 }
 function bookedVia(saved) {
-  const lead = text$q(saved.leadSource);
-  const source = text$q(saved.source);
+  const lead = text$r(saved.leadSource);
+  const source = text$r(saved.source);
   const blob = `${lead} ${source}`.toLowerCase();
   if (!blob.trim()) return NOT_PROVIDED;
   if (/admin/.test(blob)) return "Admin";
@@ -7189,7 +7189,7 @@ function bookedVia(saved) {
 }
 function paymentOf(saved, total) {
   const invoice = nested(saved.invoice);
-  const explicit = [saved.paymentStatus, saved.invoiceStatus, invoice.status].map((value) => text$q(value).toLowerCase()).find(Boolean) || "";
+  const explicit = [saved.paymentStatus, saved.invoiceStatus, invoice.status].map((value) => text$r(value).toLowerCase()).find(Boolean) || "";
   if (/partial/.test(explicit)) return "Partial";
   if (/\bpaid\b/.test(explicit) && !/unpaid/.test(explicit)) return "Paid";
   if (/unpaid/.test(explicit)) return "Unpaid";
@@ -7234,7 +7234,7 @@ function isAddOn(line, catalog) {
   const match = catalog.find((item) => item.id === line.id || item.bookingId === line.id);
   return match?.bookingKind === "addon" || match?.bookingKind === "upgrade";
 }
-function firstText$1(record2, keys) {
+function firstText$2(record2, keys) {
   for (const key of keys) {
     const value = record2[key];
     if (Array.isArray(value)) {
@@ -7296,10 +7296,10 @@ function moneyOrNull(value) {
 function nested(value) {
   return value && typeof value === "object" ? value : {};
 }
-function text$q(value) {
+function text$r(value) {
   return typeof value === "string" ? value.trim() : "";
 }
-function escapeHtml$a(value) {
+function escapeHtml$b(value) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 const OFFICE_NEW_ORDER_EMAIL_TEMPLATE = "office_new_order";
@@ -7348,6 +7348,1368 @@ async function notifyOfficeOfOrder(input) {
     }
   });
   return { sent: result.sent };
+}
+const CLIENT_EMAIL_NOTIFY_FLAG = "CLIENT_EMAIL_NOTIFY_LIVE";
+const CLIENT_EMAIL_NOTIFY_TEST_SINK = "ops+deliveryqa@iconicimagestx.com";
+const ARYEO_EMAIL_FROM_NAME = "Iconic Images";
+const ARYEO_EMAIL_FROM_ADDRESS = "photos@iconicimagestx.com";
+const ARYEO_COMPANY_NAME = "Iconic Images Media & Marketing";
+const NOTIFY_TIME_ZONE = "America/Chicago";
+const DEFAULT_APPOINTMENT_REMINDER_HOURS = 24;
+const PAYMENT_OVERDUE_DAYS = 3;
+const INVOICE_LICENSE_NOTE = "Licenses are not active until payment has been made in full #BeIconic";
+const BRAND_YELLOW = "#FFE500";
+const BRAND_INK = "#111111";
+function clientEmailNotifyLive(env = process.env) {
+  return env[CLIENT_EMAIL_NOTIFY_FLAG] === "true";
+}
+function legacyClientOrderEmailEnabled(env = process.env) {
+  return !clientEmailNotifyLive(env);
+}
+function aryeoFromHeader() {
+  return `${ARYEO_EMAIL_FROM_NAME} <${ARYEO_EMAIL_FROM_ADDRESS}>`;
+}
+const MERGE_TAG_GAPS = [
+  {
+    tag: "customer_app_download_cta",
+    reason: "No Iconic customer app download link is stored. The block is omitted."
+  },
+  {
+    tag: "appointment_actions",
+    reason: "No client self-serve reschedule or cancel URL. The email offers the studio phone and email."
+  },
+  {
+    tag: "listing.first_interactive_content_unbranded_url",
+    reason: "A listing stores one tour URL (tourUrl, matterportUrl, or virtualTourUrl). There is no unbranded tour field, so that line is omitted."
+  },
+  {
+    tag: "property_website.unbranded_url",
+    reason: "There is no unbranded property-website field. A branded site is linked only when the listing already has a slug or propertyWebsiteUrl."
+  },
+  {
+    tag: "listing.showcase_media_url",
+    reason: "Showcase Select has no media URL unless the order already stores showcaseMediaUrl. The link line is omitted when that field is empty."
+  },
+  {
+    tag: "order.status_url",
+    reason: "There is no tokenized public order-status URL. The portal listing is used only when listingId is already on the record."
+  },
+  {
+    tag: "customer_new_lead",
+    reason: "Property-website lead mail is not wired. No lead object is created by order entry."
+  },
+  {
+    tag: "team notification preferences",
+    reason: "Aryeo per-user Email/SMS/Push preferences are not stored. Team mail goes to ADMIN_EMAIL, COORDINATOR_EMAIL, and the assigned photographer email when the order has one."
+  }
+];
+const BLOCKED_COMPACT = /* @__PURE__ */ new Set(["marcobrito", "deliagrimaldo"]);
+function compactPerson(value) {
+  return value.toLowerCase().replace(/[^a-z]/g, "");
+}
+function hardSuppressionReason(input) {
+  const name = compactPerson(input.name || "");
+  if (name && BLOCKED_COMPACT.has(name)) {
+    return name === "marcobrito" ? "Marco Brito" : "Delia Grimaldo";
+  }
+  const email = (input.email || "").trim().toLowerCase();
+  if (!email) return null;
+  const local = email.split("@")[0] || "";
+  const compactLocal = compactPerson(local);
+  if (BLOCKED_COMPACT.has(compactLocal) || compactLocal.includes("marcobrito") || compactLocal.includes("deliagrimaldo")) {
+    return compactLocal.includes("delia") ? "Delia Grimaldo" : "Marco Brito";
+  }
+  return null;
+}
+const NOTIFY_DEFINITIONS = [
+  { key: "customer_order_confirmation", label: "Order Confirmation", audience: "customer", trigger: "Order placed (online booking or admin confirm)", wired: true },
+  { key: "customer_appointment_scheduled", label: "Appointment Scheduled", audience: "customer", trigger: "Appointment scheduled. Subject is Appointment Confirmed.", wired: true },
+  { key: "customer_appointment_rescheduled", label: "Appointment Rescheduled", audience: "customer", trigger: "Appointment date or time changes", wired: true },
+  { key: "customer_appointment_reminder", label: "Appointment Reminder", audience: "customer", trigger: "Upcoming appointment. Default 24 hours before, America/Chicago.", wired: true },
+  { key: "customer_appointment_canceled", label: "Appointment Canceled", audience: "customer", trigger: "Appointment or order canceled", wired: true },
+  { key: "customer_appointment_postponed", label: "Appointment Postponed", audience: "customer", trigger: "Order status set to postponed", wired: true },
+  { key: "listing_delivery", label: "Listing Delivered", audience: "customer", trigger: "Listing media delivered", wired: true },
+  { key: "listing_delivery_showcase_select", label: "Listing Delivered — Showcase Select", audience: "customer", trigger: "Delivery marked showcase, or showcaseMediaUrl is set", wired: true },
+  { key: "customer_order_payment_required", label: "Order Payment Required", audience: "customer", trigger: "Order fulfilled and still unpaid", wired: true },
+  { key: "customer_order_payment_overdue", label: "Order Payment Overdue", audience: "customer", trigger: "3 days after fulfillment if still unpaid", wired: true },
+  { key: "creator_order_received", label: "Order Received", audience: "team", trigger: "New order placed", wired: true },
+  { key: "creator_appointment_assigned", label: "Appointment Assigned", audience: "team", trigger: "Photographer assigned", wired: true },
+  { key: "creator_appointment_unassigned", label: "Appointment Unassigned", audience: "team", trigger: "Photographer removed", wired: true },
+  { key: "creator_appointment_scheduled", label: "Appointment Scheduled", audience: "team", trigger: "Appointment scheduled", wired: true },
+  { key: "creator_appointment_rescheduled", label: "Appointment Rescheduled", audience: "team", trigger: "Appointment date or time changes", wired: true },
+  { key: "creator_appointment_canceled", label: "Appointment Canceled", audience: "team", trigger: "Appointment canceled", wired: true },
+  { key: "creator_appointment_postponed", label: "Appointment Postponed", audience: "team", trigger: "Appointment postponed", wired: true },
+  { key: "creator_appointment_reminder", label: "Appointment Reminder", audience: "team", trigger: "Same 24-hour reminder, to the assigned team", wired: true },
+  { key: "creator_upcoming_appointments_summary", label: "Appointment Summary", audience: "team", trigger: "Daily summary for that Chicago day", wired: true },
+  { key: "creator_order_payment_processed", label: "Order Payment Processed", audience: "team", trigger: "Payment recorded on the order", wired: true },
+  {
+    key: "customer_team_invitation",
+    label: "Customer Team Invitation",
+    audience: "account",
+    trigger: "Invited to a customer team",
+    wired: false,
+    wireNote: "The client hub already sends team_invite. This Aryeo copy is preview-only so the portal does not send a second invitation."
+  },
+  {
+    key: "customer_user_activation",
+    label: "User Activation",
+    audience: "account",
+    trigger: "New client user invited",
+    wired: false,
+    wireNote: "Booking already sends account_password_setup when a portal account is created. Not duplicated."
+  },
+  {
+    key: "customer_user_reset_password",
+    label: "User Reset Password",
+    audience: "account",
+    trigger: "Password reset requested",
+    wired: false,
+    wireNote: "Forgot password already uses Firebase sendPasswordResetEmail. Not duplicated."
+  },
+  {
+    key: "customer_user_verification",
+    label: "User Verification",
+    audience: "account",
+    trigger: "First login code",
+    wired: false,
+    wireNote: "The portal has no first-login verification code. This email is not sent."
+  }
+];
+function notifyDefinition(key) {
+  return NOTIFY_DEFINITIONS.find((item) => item.key === key) || null;
+}
+function isNotifyKey(key) {
+  return notifyDefinition(key) != null;
+}
+function defaultNotifySettings() {
+  const enabled = {};
+  for (const item of NOTIFY_DEFINITIONS) enabled[item.key] = item.wired;
+  return { enabled, reminderHoursBefore: DEFAULT_APPOINTMENT_REMINDER_HOURS };
+}
+function normalizeReminderHours(value) {
+  const hours = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(hours)) return DEFAULT_APPOINTMENT_REMINDER_HOURS;
+  const whole = Math.round(hours);
+  if (whole < 1 || whole > 168) return DEFAULT_APPOINTMENT_REMINDER_HOURS;
+  return whole;
+}
+function notificationEnabled(settings, key) {
+  const def = notifyDefinition(key);
+  if (!def?.wired) return false;
+  if (settings.enabled[key] === false) return false;
+  return true;
+}
+function text$q(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+function escapeHtml$a(value) {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+function money$5(value) {
+  if (typeof value === "string" && value.trim().startsWith("$")) return value.trim();
+  const amount = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(amount)) return "";
+  return `$${amount.toFixed(2)}`;
+}
+function firstText$1(record2, keys) {
+  for (const key of keys) {
+    const value = text$q(record2[key]);
+    if (value) return value;
+  }
+  return "";
+}
+function personName$2(record2) {
+  const first = firstText$1(record2, ["firstName", "clientFirstName"]);
+  const last = firstText$1(record2, ["lastName", "clientLastName"]);
+  const full = firstText$1(record2, ["clientName", "customerName", "fullName"]) || `${first} ${last}`.trim();
+  return { first: first || full.split(/\s+/)[0] || "", full };
+}
+function orderUnpaid(record2) {
+  const paymentStatus = firstText$1(record2, ["paymentStatus"]).toLowerCase();
+  if (paymentStatus === "paid" || paymentStatus === "comped") return false;
+  const invoiceStatus = text$q(record2.invoiceStatus).toLowerCase();
+  if (invoiceStatus === "paid" || invoiceStatus === "comped") return false;
+  const dueRaw = record2.balanceDue ?? record2.amountDue;
+  if (dueRaw != null && dueRaw !== "" && Number(dueRaw) <= 0) return false;
+  const total = Number(record2.total);
+  if (Number.isFinite(total) && total <= 0 && dueRaw == null) return false;
+  return true;
+}
+function mediaOutstandingOf(record2) {
+  if (record2.mediaOutstanding === false) return { outstanding: false, detail: "" };
+  const listed = Array.isArray(record2.outstandingMedia) ? record2.outstandingMedia.map((item) => text$q(item) || text$q(item?.name)).filter(Boolean) : [];
+  const note = listed.join(", ") || firstText$1(record2, ["outstandingMediaNote", "pendingMedia", "mediaPendingNote"]);
+  if (record2.mediaOutstanding === true || note) {
+    return {
+      outstanding: true,
+      detail: note || "Some media for this listing is still outstanding."
+    };
+  }
+  return { outstanding: false, detail: "" };
+}
+function isShowcaseDelivery(record2) {
+  if (record2.showcase === true || record2.showcaseSelect === true) return true;
+  const channel = firstText$1(record2, ["deliveryTarget", "deliveryChannel"]).toLowerCase();
+  if (channel === "showcase" || channel === "showcase_select") return true;
+  return Boolean(firstText$1(record2, ["showcaseMediaUrl"]));
+}
+function lineItemsOf(record2) {
+  const raw = Array.isArray(record2.lineItems) ? record2.lineItems : Array.isArray(record2.services) ? record2.services : [];
+  return raw.map((item) => {
+    if (typeof item === "string") return { name: item, price: "" };
+    if (!item || typeof item !== "object") return { name: "", price: "" };
+    const row = item;
+    return { name: text$q(row.name) || text$q(row.label) || text$q(row.service), price: money$5(row.price ?? row.amount ?? row.total) };
+  }).filter((item) => item.name);
+}
+function dateFromUnknown(value) {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
+  if (typeof value === "string" && value.trim()) {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value.trim())) return null;
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) return parsed;
+  }
+  if (value && typeof value === "object") {
+    const row = value;
+    if (typeof row.toDate === "function") {
+      const date = row.toDate();
+      if (date instanceof Date && !Number.isNaN(date.getTime())) return date;
+    }
+    const seconds = typeof row.seconds === "number" ? row.seconds : typeof row._seconds === "number" ? row._seconds : null;
+    if (seconds != null) return new Date(seconds * 1e3);
+  }
+  return null;
+}
+function clockFromLabel(value) {
+  const match = value.trim().match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/i);
+  if (!match) return null;
+  let hour = Number(match[1]);
+  const minute = Number(match[2] || "0");
+  const meridiem = (match[3] || "").toLowerCase();
+  if (meridiem === "pm" && hour < 12) hour += 12;
+  if (meridiem === "am" && hour === 12) hour = 0;
+  if (hour > 23 || minute > 59) return null;
+  return { hour, minute };
+}
+function chicagoDateParts(date) {
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    timeZone: NOTIFY_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23"
+  });
+  const bag = Object.fromEntries(fmt.formatToParts(date).map((part) => [part.type, part.value]));
+  return {
+    year: Number(bag.year),
+    month: Number(bag.month),
+    day: Number(bag.day),
+    hour: Number(bag.hour),
+    minute: Number(bag.minute)
+  };
+}
+function chicagoWallTime(year, month, day, hour, minute) {
+  const guess = new Date(Date.UTC(year, month - 1, day, hour, minute));
+  const seen = chicagoDateParts(guess);
+  const seenUtc = Date.UTC(seen.year, seen.month - 1, seen.day, seen.hour, seen.minute);
+  return new Date(guess.getTime() - (seenUtc - guess.getTime()));
+}
+function appointmentStart(record2) {
+  const timeLabel = firstText$1(record2, ["scheduledTime", "appointmentTime", "requestedTimeLabel"]);
+  const clock2 = clockFromLabel(timeLabel);
+  const rawDate = record2.scheduledDate ?? record2.appointmentDate ?? record2.shootDate;
+  if (typeof rawDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(rawDate.trim())) {
+    const [year, month, day] = rawDate.trim().split("-").map(Number);
+    if (!clock2) return chicagoWallTime(year, month, day, 12, 0);
+    return chicagoWallTime(year, month, day, clock2.hour, clock2.minute);
+  }
+  const instant = dateFromUnknown(rawDate);
+  if (!instant) return null;
+  if (!clock2) return instant;
+  const parts = chicagoDateParts(instant);
+  return chicagoWallTime(parts.year, parts.month, parts.day, clock2.hour, clock2.minute);
+}
+function formatChicagoWhen(date, timeLabel = "") {
+  if (!date) return timeLabel;
+  const when = new Intl.DateTimeFormat("en-US", {
+    timeZone: NOTIFY_TIME_ZONE,
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  }).format(date);
+  return `${when} CT`;
+}
+function googleCalendarLink(input) {
+  if (!input.start) return "";
+  const end = new Date(input.start.getTime() + 60 * 60 * 1e3);
+  const stamp2 = (date) => date.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+  const params = new URLSearchParams({
+    action: "TEMPLATE",
+    text: input.title,
+    dates: `${stamp2(input.start)}/${stamp2(end)}`,
+    location: input.address,
+    details: input.details
+  });
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+function contextFromRecord(record2, extras = {}) {
+  const person2 = personName$2(record2);
+  const id = extras.id || text$q(record2.id);
+  const requestId = extras.requestId || text$q(record2.orderRequestId) || (extras.collection === "orderRequests" ? id : "");
+  const orderId = text$q(record2.orderId) || (extras.collection === "orders" ? id : text$q(record2.id));
+  const listingId = firstText$1(record2, ["listingId"]);
+  const galleryId = firstText$1(record2, ["galleryId"]);
+  const address = firstText$1(record2, ["addressLabel", "address", "fullAddress", "propertyAddress"]);
+  const slug = firstText$1(record2, ["listingSlug", "slug", "propertyWebsiteSlug"]);
+  const statusUrl = firstText$1(record2, ["statusUrl"]) || (listingId ? publicClientUrl(`/portal/listings/${encodeURIComponent(listingId)}`, extras.env) : "");
+  const editPath = extras.collection === "orderRequests" || !orderId && requestId ? `/admin/order-request/${encodeURIComponent(requestId || id)}` : `/admin/order/${encodeURIComponent(orderId || id)}`;
+  const start = appointmentStart(record2);
+  const timeLabel = firstText$1(record2, ["scheduledTime", "appointmentTime", "requestedTimeLabel"]);
+  const outstanding = mediaOutstandingOf(record2);
+  const downloadUrl = firstText$1(record2, ["downloadCenterUrl", "galleryUrl", "deliveryUrl"]) || (galleryId ? galleryDeliveryUrl(galleryId, extras.env) : "");
+  const brandedWebsite = firstText$1(record2, ["propertyWebsiteUrl", "brandedPropertyWebsiteUrl"]) || (slug ? publicClientUrl(`/l/${encodeURIComponent(slug)}`, extras.env) : "");
+  return {
+    orderNumber: firstText$1(record2, ["orderNumber"]) || "",
+    address,
+    orderId: orderId || id,
+    requestId,
+    listingId,
+    galleryId,
+    statusUrl,
+    editUrl: id || requestId ? publicClientUrl(editPath, extras.env) : "",
+    firstName: person2.first,
+    fullName: person2.full,
+    email: firstText$1(record2, ["clientEmail", "email", "customerEmail"]),
+    phone: firstText$1(record2, ["clientPhone", "phone"]),
+    lineItems: lineItemsOf(record2),
+    total: money$5(record2.total),
+    balanceDue: money$5(record2.balanceDue ?? record2.amountDue),
+    appointmentWhen: formatChicagoWhen(start, timeLabel),
+    appointmentStartIso: start ? start.toISOString() : "",
+    photographerName: firstText$1(record2, ["assignedPhotographerName", "photographerName"]),
+    photographerEmail: firstText$1(record2, ["photographerEmail", "assignedPhotographerEmail"]),
+    calendarUrl: firstText$1(record2, ["googleCalendarUrl", "calendarHtmlLink"]),
+    downloadUrl,
+    brandedTourUrl: firstText$1(record2, ["brandedTourUrl", "tourUrl", "matterportUrl", "virtualTourUrl"]),
+    unbrandedTourUrl: firstText$1(record2, ["unbrandedTourUrl"]),
+    brandedWebsiteUrl: brandedWebsite,
+    unbrandedWebsiteUrl: firstText$1(record2, ["unbrandedPropertyWebsiteUrl"]),
+    showcaseMediaUrl: firstText$1(record2, ["showcaseMediaUrl"]),
+    showcase: isShowcaseDelivery(record2),
+    mediaOutstanding: outstanding.outstanding,
+    mediaOutstandingDetail: outstanding.detail,
+    unpaid: orderUnpaid(record2),
+    paymentAmount: money$5(record2.paymentAmount ?? record2.amount),
+    paymentMethod: firstText$1(record2, ["paymentMethod"]),
+    paymentWhen: firstText$1(record2, ["paidAt", "paymentWhen"]),
+    paymentId: firstText$1(record2, ["paymentId", "squarePaymentId", "stripePaymentIntentId"]),
+    teamMembers: [],
+    dailyAppointments: [],
+    activationUrl: firstText$1(record2, ["activationUrl", "passwordSetupLink"]),
+    invitingName: firstText$1(record2, ["invitingName"]),
+    invitingEmail: firstText$1(record2, ["invitingEmail"]),
+    teamName: firstText$1(record2, ["teamName"]),
+    teamRole: firstText$1(record2, ["teamRole"]) || "member",
+    verificationCode: firstText$1(record2, ["verificationCode"])
+  };
+}
+function orderCode(ctx) {
+  return ctx.orderNumber || "the order";
+}
+function subjectFor(key, ctx) {
+  const number = ctx.orderNumber || "";
+  const address = ctx.address || "";
+  switch (key) {
+    case "customer_order_confirmation":
+      return `New order confirmation ${number}${number ? " - " : ""}${address}`.replace(/\s+/g, " ").trim();
+    case "customer_appointment_scheduled":
+      return `Order ${number} Appointment Confirmed`.replace(/\s+/g, " ").trim();
+    case "customer_appointment_rescheduled":
+    case "creator_appointment_rescheduled":
+      return `Order ${number} Appointment Rescheduled`.replace(/\s+/g, " ").trim();
+    case "customer_appointment_reminder":
+    case "creator_appointment_reminder":
+      return `Order ${number} Appointment Reminder`.replace(/\s+/g, " ").trim();
+    case "customer_appointment_canceled":
+    case "creator_appointment_canceled":
+      return `Order ${number} Appointment Canceled`.replace(/\s+/g, " ").trim();
+    case "customer_appointment_postponed":
+    case "creator_appointment_postponed":
+      return `Order ${number} Appointment Postponed`.replace(/\s+/g, " ").trim();
+    case "listing_delivery":
+      return `Delivery notification for ${address || "your listing"}`;
+    case "listing_delivery_showcase_select":
+      return `Media delivery notification for ${address || "your listing"}`;
+    case "customer_order_payment_required":
+      return `Payment due for Order ${number}${number ? " - " : ""}${address}`.replace(/\s+/g, " ").trim();
+    case "customer_order_payment_overdue":
+      return `Payment overdue for Order ${number}${number ? " - " : ""}${address}`.replace(/\s+/g, " ").trim();
+    case "creator_order_received":
+      return `New order ${number} placed by ${ctx.fullName || "a client"}${address ? ` - ${address}` : ""}`.replace(/\s+/g, " ").trim();
+    case "creator_appointment_assigned":
+      return `Assigned to Appointment for Order ${number}`.trim();
+    case "creator_appointment_unassigned":
+      return `Unassigned from Appointment for Order ${number}`.trim();
+    case "creator_appointment_scheduled":
+      return `Order ${number} Appointment Scheduled`.replace(/\s+/g, " ").trim();
+    case "creator_upcoming_appointments_summary":
+      return "Upcoming Appointments Summary";
+    case "creator_order_payment_processed":
+      return `You have received a payment for Order ${number}`.trim();
+    case "customer_team_invitation":
+      return `You have been invited to join team ${ctx.teamName || "your team"}`;
+    case "customer_user_activation":
+      return `Important: Account Activation Link For ${ARYEO_COMPANY_NAME}`;
+    case "customer_user_reset_password":
+      return "Important: Account Password Reset Link";
+    case "customer_user_verification":
+      return "Important: Account Verification Code";
+    default:
+      return "Iconic Images";
+  }
+}
+function p(html) {
+  return `<div style="margin:0 0 12px;">${html}</div>`;
+}
+function orderDetailsHtml(ctx) {
+  const rows = ctx.lineItems.map((item) => `<tr><td style="padding:6px 0;color:#333;">${escapeHtml$a(item.name)}</td><td style="padding:6px 0;text-align:right;">${escapeHtml$a(item.price)}</td></tr>`).join("");
+  return `
+    <div style="margin:16px 0;padding:16px;border:1px solid #eee;border-radius:8px;">
+      <div style="font-weight:bold;margin-bottom:8px;">Order ${escapeHtml$a(orderCode(ctx))}</div>
+      <div>${escapeHtml$a(ctx.address || "Address not on the order")}</div>
+      ${rows ? `<table style="width:100%;border-collapse:collapse;margin-top:8px;">${rows}</table>` : ""}
+      ${ctx.total ? `<div style="margin-top:8px;"><strong>Total:</strong> ${escapeHtml$a(ctx.total)}</div>` : ""}
+      ${ctx.balanceDue ? `<div><strong>Balance due:</strong> ${escapeHtml$a(ctx.balanceDue)}</div>` : ""}
+      <div style="margin-top:12px;">Please remember: <strong>${escapeHtml$a(INVOICE_LICENSE_NOTE)}</strong></div>
+    </div>
+  `;
+}
+function appointmentsHtml(ctx) {
+  if (!ctx.appointmentWhen && !ctx.address) return "";
+  return `
+    <div style="margin:16px 0;">
+      <div style="font-weight:bold;">Appointment</div>
+      <div>${escapeHtml$a(ctx.appointmentWhen || "Time to be confirmed")}</div>
+      <div>${escapeHtml$a(ctx.address)}</div>
+      ${ctx.photographerName ? `<div>Photographer: ${escapeHtml$a(ctx.photographerName)}</div>` : ""}
+    </div>
+  `;
+}
+function calendarLinksHtml(ctx) {
+  const generated = googleCalendarLink({
+    title: `Iconic Images appointment ${ctx.orderNumber}`.trim(),
+    start: ctx.appointmentStartIso ? new Date(ctx.appointmentStartIso) : null,
+    address: ctx.address,
+    details: `Order ${ctx.orderNumber}`.trim()
+  });
+  const links = [
+    ctx.calendarUrl ? `<a href="${escapeHtml$a(ctx.calendarUrl)}">View the calendar event</a>` : "",
+    generated ? `<a href="${escapeHtml$a(generated)}">Add to Google Calendar</a>` : ""
+  ].filter(Boolean);
+  if (links.length === 0) return "";
+  return p(links.join("<br>"));
+}
+function actionsHtml() {
+  return p(`Questions or a new time? Call <a href="${BUSINESS_CONTACT.phoneHref}">${escapeHtml$a(BUSINESS_CONTACT.phoneDisplay)}</a> or email <a href="${BUSINESS_CONTACT.emailHref}">${escapeHtml$a(BUSINESS_CONTACT.email)}</a>.`);
+}
+function statusBlock(ctx) {
+  if (!ctx.statusUrl) return "";
+  return p(`You can view the most up to date status of your order here: <a href="${escapeHtml$a(ctx.statusUrl)}">${escapeHtml$a(ctx.statusUrl)}</a>`);
+}
+function pendingLine(ctx) {
+  if (!ctx.mediaOutstanding) return "";
+  return p(`<strong>Pending:</strong> ${escapeHtml$a(ctx.mediaOutstandingDetail)}`);
+}
+function contactBlock() {
+  return `
+    <div>Iconic Images Crew<br>
+    <a href="${BUSINESS_CONTACT.emailHref}">${escapeHtml$a(BUSINESS_CONTACT.email)}</a><br>
+    <a href="${BUSINESS_CONTACT.phoneHref}">${escapeHtml$a(BUSINESS_CONTACT.phoneDisplay)}</a></div>
+    <div>${escapeHtml$a(BUSINESS_CONTACT.address)}</div>
+  `;
+}
+function innerHtml(key, ctx) {
+  const number = escapeHtml$a(orderCode(ctx));
+  switch (key) {
+    case "customer_order_confirmation":
+      return [
+        p("This is an automated email confirming your order submission."),
+        statusBlock(ctx),
+        orderDetailsHtml(ctx),
+        appointmentsHtml(ctx)
+      ].join("");
+    case "customer_appointment_scheduled":
+      return [
+        p("This is an automated message letting you know your appointment has been confirmed and scheduled."),
+        appointmentsHtml(ctx),
+        calendarLinksHtml(ctx),
+        actionsHtml(),
+        orderDetailsHtml(ctx)
+      ].join("");
+    case "customer_appointment_rescheduled":
+      return [
+        p("This is an automated message letting you know your appointment has been <strong>rescheduled</strong>."),
+        appointmentsHtml(ctx),
+        calendarLinksHtml(ctx),
+        actionsHtml(),
+        orderDetailsHtml(ctx)
+      ].join("");
+    case "customer_appointment_reminder":
+      return [
+        p(`This is an automated message reminding you of your scheduled appointment for Order ${number}.`),
+        appointmentsHtml(ctx),
+        calendarLinksHtml(ctx),
+        actionsHtml(),
+        orderDetailsHtml(ctx)
+      ].join("");
+    case "customer_appointment_canceled":
+      return [
+        p("This is a confirmation message letting you know your appointment has been canceled. Please let us know if and when you are ready to reschedule."),
+        actionsHtml(),
+        orderDetailsHtml(ctx)
+      ].join("");
+    case "customer_appointment_postponed":
+      return [
+        p(`This is an automated message letting you know that an appointment for Order ${number} has been postponed.`),
+        appointmentsHtml(ctx),
+        orderDetailsHtml(ctx)
+      ].join("");
+    case "listing_delivery":
+      return [
+        p(`Hi ${escapeHtml$a(ctx.firstName || "there")}!`),
+        p(`Your media for ${escapeHtml$a(ctx.address || "your listing")} is ready for download! Check out the link below to access your content:`),
+        pendingLine(ctx),
+        ctx.downloadUrl ? p(`<strong>Iconic Media:</strong> <a href="${escapeHtml$a(ctx.downloadUrl)}">${escapeHtml$a(ctx.downloadUrl)}</a>`) : "",
+        ctx.brandedTourUrl ? p(`<strong>This listing also includes 3D Virtual content URL(s). Access with the links below:</strong><br><strong>3D Tour Branded:</strong> <a href="${escapeHtml$a(ctx.brandedTourUrl)}">${escapeHtml$a(ctx.brandedTourUrl)}</a>`) : "",
+        ctx.unbrandedTourUrl ? p(`<strong>3D Tour Unbranded:</strong> <a href="${escapeHtml$a(ctx.unbrandedTourUrl)}">${escapeHtml$a(ctx.unbrandedTourUrl)}</a>`) : "",
+        ctx.brandedWebsiteUrl || ctx.unbrandedWebsiteUrl ? p(`<strong>This listing also includes a property website. Login to your account if you'd like to customize it further.</strong><br>${ctx.brandedWebsiteUrl ? `<strong>Branded Property Website:</strong> <a href="${escapeHtml$a(ctx.brandedWebsiteUrl)}">${escapeHtml$a(ctx.brandedWebsiteUrl)}</a><br>` : ""}${ctx.unbrandedWebsiteUrl ? `<strong>Unbranded Property Website:</strong> <a href="${escapeHtml$a(ctx.unbrandedWebsiteUrl)}">${escapeHtml$a(ctx.unbrandedWebsiteUrl)}</a>` : ""}`) : "",
+        p("Happy Listing!"),
+        contactBlock(),
+        p("<strong>Book your Podcast Studio Rental, Photo Studio Rental, Headshots &amp; More @ Iconic Studios Ste 105</strong>"),
+        p("<em>Note: If you haven't logged into your account before, you will receive a secure account activation email with your access.</em>")
+      ].join("");
+    case "listing_delivery_showcase_select":
+      return [
+        p(`Hello ${escapeHtml$a(ctx.fullName || "there")},`),
+        p(`Your content for ${escapeHtml$a(ctx.address || "your listing")} is ready for download in your Showcase agent experience dashboard!`),
+        ctx.showcaseMediaUrl ? p(`Access your media with this link: <a href="${escapeHtml$a(ctx.showcaseMediaUrl)}">${escapeHtml$a(ctx.showcaseMediaUrl)}</a>`) : "",
+        p("Thank you for your business,"),
+        p(escapeHtml$a(ARYEO_COMPANY_NAME))
+      ].join("");
+    case "customer_order_payment_required":
+      return [
+        p(`This is an automated email letting you know that Order ${number} has been fulfilled and is now awaiting payment.`),
+        statusBlock(ctx),
+        orderDetailsHtml(ctx),
+        p("Thank you for your business,"),
+        p(escapeHtml$a(ARYEO_COMPANY_NAME))
+      ].join("");
+    case "customer_order_payment_overdue":
+      return [
+        p(`This is an automated email letting you know that Order ${number} requires payment and is overdue.`),
+        statusBlock(ctx),
+        orderDetailsHtml(ctx),
+        p("Thank you for your business,"),
+        p(escapeHtml$a(ARYEO_COMPANY_NAME))
+      ].join("");
+    case "creator_order_received":
+      return [
+        p("You have received a new order! This is an automated email notification. Please review the details below and take any further actions in your account."),
+        ctx.editUrl ? p(`You can manage your order here: <a href="${escapeHtml$a(ctx.editUrl)}">${escapeHtml$a(ctx.editUrl)}</a>`) : "",
+        orderDetailsHtml(ctx),
+        appointmentsHtml(ctx)
+      ].join("");
+    case "creator_appointment_assigned":
+      return [p("This is an automated message letting you know that you have been assigned to this appointment."), appointmentsHtml(ctx), orderDetailsHtml(ctx)].join("");
+    case "creator_appointment_unassigned":
+      return [p("This is an automated message letting you know that you have been unassigned from this appointment."), appointmentsHtml(ctx), orderDetailsHtml(ctx)].join("");
+    case "creator_appointment_scheduled":
+      return [
+        p("This is an automated message letting you know your appointment has been confirmed and scheduled."),
+        appointmentsHtml(ctx),
+        ctx.teamMembers.length ? p(`<strong>Team:</strong> ${escapeHtml$a(ctx.teamMembers.join(", "))}`) : ctx.photographerName ? p(`<strong>Team:</strong> ${escapeHtml$a(ctx.photographerName)}`) : "",
+        calendarLinksHtml(ctx),
+        actionsHtml(),
+        orderDetailsHtml(ctx)
+      ].join("");
+    case "creator_appointment_rescheduled":
+      return [p("This is an automated message letting you know your appointment has been <strong>rescheduled</strong>."), appointmentsHtml(ctx), calendarLinksHtml(ctx), actionsHtml(), orderDetailsHtml(ctx)].join("");
+    case "creator_appointment_canceled":
+      return [p("This is an automated message letting you know your appointment has been canceled."), actionsHtml(), orderDetailsHtml(ctx)].join("");
+    case "creator_appointment_postponed":
+      return [p(`This is an automated message letting you know that an appointment for Order ${number} has been postponed.`), appointmentsHtml(ctx), orderDetailsHtml(ctx)].join("");
+    case "creator_appointment_reminder":
+      return [p(`This is an automated message reminding you of your scheduled appointment for Order ${number}.`), appointmentsHtml(ctx), calendarLinksHtml(ctx), actionsHtml(), orderDetailsHtml(ctx)].join("");
+    case "creator_upcoming_appointments_summary": {
+      const rows = ctx.dailyAppointments.map((item) => `<li style="margin:0 0 8px;">${escapeHtml$a(item.when)} — ${escapeHtml$a(item.address)} — ${escapeHtml$a(item.orderNumber)} — ${escapeHtml$a(item.clientName)}</li>`).join("");
+      return [p("This is an automated email with your daily schedule of appointments. Here are your upcoming appointments:"), `<ul>${rows}</ul>`].join("");
+    }
+    case "creator_order_payment_processed":
+      return [
+        p("Hello,"),
+        p(`You have received a payment for Order ${number}.`),
+        p(`${escapeHtml$a(ctx.paymentAmount || "Payment")} ${ctx.paymentMethod ? `via ${escapeHtml$a(ctx.paymentMethod)}` : ""} ${ctx.paymentWhen ? `on ${escapeHtml$a(ctx.paymentWhen)}` : ""}`.trim()),
+        ctx.editUrl ? p(`You can manage your order here: <a href="${escapeHtml$a(ctx.editUrl)}">${escapeHtml$a(ctx.editUrl)}</a>`) : ""
+      ].join("");
+    case "customer_team_invitation":
+      return [
+        p(`Hi ${escapeHtml$a(ctx.firstName || "there")},`),
+        p(`You've been invited by ${escapeHtml$a(ctx.invitingName || "a teammate")} (${escapeHtml$a(ctx.invitingEmail)}) to activate your account as a ${escapeHtml$a(ctx.teamRole)} of team ${escapeHtml$a(ctx.teamName)}.`),
+        ctx.teamRole === "admin" ? "<ul><li>View and manage team members listings</li><li>Place orders on behalf of team members</li><li>Update the team roster</li><li>View and manage team settings.</li></ul>" : "<ul><li>Access your projects and files</li><li>Review upcoming appointments</li><li>Receive important account notifications and communication</li><li>Automatically share your listings with team admin</li></ul>",
+        ctx.activationUrl ? p(`Button not working? Copy and paste the link below into your browser: <a href="${escapeHtml$a(ctx.activationUrl)}">${escapeHtml$a(ctx.activationUrl)}</a>`) : ""
+      ].join("");
+    case "customer_user_activation":
+      return [
+        p(`Hi ${escapeHtml$a(ctx.firstName || "there")},`),
+        p(`You've been invited to activate your account with ${escapeHtml$a(ARYEO_COMPANY_NAME)}. This will allow you to:`),
+        "<ul><li>Access your projects and files</li><li>Review upcoming appointments</li><li>Receive important account notifications and communication</li></ul>",
+        ctx.activationUrl ? p(`Button not working? Copy and paste the link below into your browser: <a href="${escapeHtml$a(ctx.activationUrl)}">${escapeHtml$a(ctx.activationUrl)}</a>`) : ""
+      ].join("");
+    case "customer_user_reset_password":
+      return [
+        p(`Hi ${escapeHtml$a(ctx.firstName || "there")},`),
+        p(`You are receiving this email because we received a password reset request for your account with ${escapeHtml$a(ARYEO_COMPANY_NAME)}.`),
+        p("This password reset link will expire in 60 minutes."),
+        p("If you did not request a password reset, no further action is required."),
+        ctx.activationUrl ? p(`Button not working? Copy and paste the link below into your browser: <a href="${escapeHtml$a(ctx.activationUrl)}">${escapeHtml$a(ctx.activationUrl)}</a>`) : ""
+      ].join("");
+    case "customer_user_verification":
+      return [
+        p(`Hi ${escapeHtml$a(ctx.firstName || "there")},`),
+        p(`Your verification code for your account with ${escapeHtml$a(ARYEO_COMPANY_NAME)} is listed below. Please enter it along with a new password of your choosing and do not share this email.`),
+        ctx.verificationCode ? `<h1>${escapeHtml$a(ctx.verificationCode)}</h1>` : ""
+      ].join("");
+    default:
+      return "";
+  }
+}
+function gapsFor(key, ctx) {
+  const gaps = [];
+  const push = (tag) => {
+    const found = MERGE_TAG_GAPS.find((item) => item.tag === tag);
+    if (found && !gaps.some((item) => item.tag === tag)) gaps.push(found);
+  };
+  if (key.startsWith("customer_") || key.startsWith("creator_appointment") || key === "listing_delivery") {
+    push("customer_app_download_cta");
+  }
+  if (key.includes("appointment") && key !== "creator_upcoming_appointments_summary") push("appointment_actions");
+  if (key === "listing_delivery") {
+    if (!ctx.unbrandedTourUrl) push("listing.first_interactive_content_unbranded_url");
+    if (!ctx.unbrandedWebsiteUrl) push("property_website.unbranded_url");
+    if (!ctx.statusUrl) push("order.status_url");
+  }
+  if (key === "listing_delivery_showcase_select" && !ctx.showcaseMediaUrl) push("listing.showcase_media_url");
+  if ((key === "customer_order_confirmation" || key.includes("payment")) && !ctx.statusUrl) push("order.status_url");
+  if (key.startsWith("creator_")) push("team notification preferences");
+  if (key === "customer_user_verification") push("user_verification.verification_code");
+  if (!MERGE_TAG_GAPS.some((item) => item.tag === "user_verification.verification_code") && key === "customer_user_verification") {
+    gaps.push({ tag: "user_verification.verification_code", reason: "The portal has no first-login verification code. This email is not sent." });
+  }
+  return gaps;
+}
+function wrapEmailHtml(inner, env) {
+  const logo = receiptLogoUrl(env);
+  return `<!doctype html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f4f4f5;">
+  <div style="padding:24px 12px;">
+    <div style="max-width:600px;margin:0 auto;background:#ffffff;font-family:Arial,Helvetica,sans-serif;color:${BRAND_INK};">
+      <div style="background:#111111;padding:20px;text-align:center;">
+        <img src="${escapeHtml$a(logo)}" alt="Iconic Images" width="180" style="width:180px;max-width:70%;height:auto;border:0;">
+      </div>
+      <div style="height:6px;background:${BRAND_YELLOW};line-height:6px;font-size:0;">&nbsp;</div>
+      <div style="padding:28px 24px;font-size:15px;line-height:1.5;">
+        ${inner}
+      </div>
+      <div style="padding:8px 24px 28px;font-size:12px;line-height:1.5;color:#555555;text-align:center;">
+        <div>${escapeHtml$a(BUSINESS_CONTACT.line)}</div>
+        <div style="margin-top:6px;">${escapeHtml$a(ARYEO_EMAIL_FROM_NAME)}</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+}
+function renderNotification(key, ctx, env) {
+  const subject = subjectFor(key, ctx);
+  const html = wrapEmailHtml(innerHtml(key, ctx), env);
+  const text2 = html.replace(/<style[\s\S]*?<\/style>/gi, " ").replace(/<br\s*\/?>/gi, "\n").replace(/<\/(p|div|li|h1|tr)>/gi, "\n").replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").replace(/[ \t]{2,}/g, " ").trim();
+  return { key, subject, html, text: text2, gaps: gapsFor(key, ctx) };
+}
+function sampleNotifyContext() {
+  const start = chicagoWallTime(2026, 11, 28, 10, 30);
+  return {
+    orderNumber: "#1042",
+    address: "1200 Sample Oak Lane, Spring, TX 77380",
+    orderId: "order_sample",
+    requestId: "request_sample",
+    listingId: "listing_sample",
+    galleryId: "gallery_sample",
+    statusUrl: publicClientUrl("/portal/listings/listing_sample"),
+    editUrl: publicClientUrl("/admin/order/order_sample"),
+    firstName: "Jordan",
+    fullName: "Jordan Hale",
+    email: "jordan.hale.sample@example.com",
+    phone: "281-555-0100",
+    lineItems: [
+      { name: "Premium photos", price: "$249.00" },
+      { name: "Drone", price: "$149.00" }
+    ],
+    total: "$398.00",
+    balanceDue: "$398.00",
+    appointmentWhen: formatChicagoWhen(start, "10:30 AM"),
+    appointmentStartIso: start.toISOString(),
+    photographerName: "Alex Rivera",
+    photographerEmail: "alex.sample@iconicimagestx.com",
+    calendarUrl: "",
+    downloadUrl: publicClientUrl("/gallery/gallery_sample"),
+    brandedTourUrl: "https://my.matterport.com/show/?m=sample",
+    unbrandedTourUrl: "",
+    brandedWebsiteUrl: publicClientUrl("/l/1200-sample-oak"),
+    unbrandedWebsiteUrl: "",
+    showcaseMediaUrl: "",
+    showcase: false,
+    mediaOutstanding: false,
+    mediaOutstandingDetail: "",
+    unpaid: true,
+    paymentAmount: "$398.00",
+    paymentMethod: "card",
+    paymentWhen: "Nov 28, 2026",
+    paymentId: "pay_sample",
+    teamMembers: ["Alex Rivera"],
+    dailyAppointments: [
+      {
+        when: formatChicagoWhen(start, "10:30 AM"),
+        address: "1200 Sample Oak Lane, Spring, TX 77380",
+        orderNumber: "#1042",
+        clientName: "Jordan Hale"
+      }
+    ],
+    activationUrl: publicClientUrl("/portal"),
+    invitingName: "Casey Admin",
+    invitingEmail: "casey.sample@iconicimagestx.com",
+    teamName: "Hale Group",
+    teamRole: "member",
+    verificationCode: ""
+  };
+}
+function scopeId(input) {
+  return input.requestId || input.orderId || input.orderNumber || "unknown";
+}
+function idempotencyKey(key, scope, slot = "") {
+  return [key, scope, slot].filter(Boolean).join(":");
+}
+function slotOf(record2) {
+  const start = appointmentStart(record2);
+  return start ? start.toISOString() : firstText$1(record2, ["scheduledDate", "scheduledTime"]) || "unscheduled";
+}
+function changedSchedule(before, after) {
+  return slotOf(before) !== slotOf(after) && slotOf(after) !== "unscheduled";
+}
+function intentsForEvent(event) {
+  const after = event.after || {};
+  const before = event.before || {};
+  const slot = slotOf(after);
+  const intents = [];
+  const add = (key, audience, useSlot = "") => {
+    intents.push({ key, audience, slot: useSlot });
+  };
+  if (event.type === "order_placed") {
+    add("customer_order_confirmation", "customer");
+    add("creator_order_received", "team");
+  }
+  if (event.type === "appointment_scheduled" || event.type === "appointment_changed" && !appointmentStart(before) && appointmentStart(after)) {
+    add("customer_appointment_scheduled", "customer", slot);
+    add("creator_appointment_scheduled", "team", slot);
+  }
+  if (event.type === "appointment_changed" && appointmentStart(before) && changedSchedule(before, after)) {
+    add("customer_appointment_rescheduled", "customer", slot);
+    add("creator_appointment_rescheduled", "team", slot);
+  }
+  if (event.type === "appointment_changed") {
+    const prev = firstText$1(before, ["assignedPhotographerId", "photographerId"]);
+    const next = firstText$1(after, ["assignedPhotographerId", "photographerId"]);
+    if (next && next !== prev) add("creator_appointment_assigned", "team", `${next}:${slot}`);
+    if (prev && !next) add("creator_appointment_unassigned", "team", prev);
+  }
+  if (event.type === "appointment_canceled") {
+    add("customer_appointment_canceled", "customer", slot);
+    add("creator_appointment_canceled", "team", slot);
+  }
+  if (event.type === "appointment_postponed") {
+    add("customer_appointment_postponed", "customer", slot);
+    add("creator_appointment_postponed", "team", slot);
+  }
+  if (event.type === "listing_delivered") {
+    if (isShowcaseDelivery(after)) add("listing_delivery_showcase_select", "customer", "showcase");
+    else add("listing_delivery", "customer", "delivery");
+  }
+  if (event.type === "order_fulfilled" && orderUnpaid(after)) {
+    add("customer_order_payment_required", "customer", "due");
+  }
+  if (event.type === "payment_processed") {
+    add("creator_order_payment_processed", "team", firstText$1(after, ["paymentId", "squarePaymentId", "stripePaymentIntentId"]) || slot);
+  }
+  return intents;
+}
+function reminderDueAt(startIso, hoursBefore) {
+  const start = new Date(startIso);
+  if (Number.isNaN(start.getTime())) return null;
+  return new Date(start.getTime() - normalizeReminderHours(hoursBefore) * 60 * 60 * 1e3).toISOString();
+}
+function overdueDueAt(fulfilledAtIso) {
+  const start = new Date(fulfilledAtIso);
+  if (Number.isNaN(start.getTime())) return null;
+  return new Date(start.getTime() + PAYMENT_OVERDUE_DAYS * 24 * 60 * 60 * 1e3).toISOString();
+}
+function dailySummaryDueAt(startIso) {
+  const start = new Date(startIso);
+  if (Number.isNaN(start.getTime())) return null;
+  const parts = chicagoDateParts(start);
+  return chicagoWallTime(parts.year, parts.month, parts.day, 7, 0).toISOString();
+}
+function chicagoDayKey(startIso) {
+  const start = new Date(startIso);
+  if (Number.isNaN(start.getTime())) return "";
+  const parts = chicagoDateParts(start);
+  return `${parts.year}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`;
+}
+function createMemoryEmailNotifyStore() {
+  let settings = defaultNotifySettings();
+  const claims = /* @__PURE__ */ new Map();
+  const jobs = /* @__PURE__ */ new Map();
+  const orderLogs = [];
+  return {
+    async getSettings() {
+      return { enabled: { ...settings.enabled }, reminderHoursBefore: settings.reminderHoursBefore };
+    },
+    async saveSettings(next) {
+      settings = { enabled: { ...next.enabled }, reminderHoursBefore: normalizeReminderHours(next.reminderHoursBefore) };
+    },
+    async claim(key) {
+      if (claims.has(key)) return false;
+      claims.set(key, "sending");
+      return true;
+    },
+    async complete(claim) {
+      claims.set(claim.key, claim);
+      orderLogs.push(claim);
+    },
+    async release(key) {
+      if (claims.get(key) === "sending") claims.delete(key);
+    },
+    async hasClaim(key) {
+      const value = claims.get(key);
+      return Boolean(value && value !== "sending");
+    },
+    async upsertJob(job) {
+      const existing = jobs.get(job.id);
+      if (existing?.status === "sent" || existing?.status === "canceled") return;
+      jobs.set(job.id, { ...existing, ...job, payload: mergedJobPayload(existing?.payload, job.payload) });
+    },
+    async cancelJob(id) {
+      const existing = jobs.get(id);
+      if (existing && existing.status === "pending") jobs.set(id, { ...existing, status: "canceled" });
+    },
+    async dueJobs(now) {
+      return [...jobs.values()].filter((job) => job.status === "pending" && job.dueAt <= now.toISOString());
+    },
+    async markJob(id, status2) {
+      const existing = jobs.get(id);
+      if (existing) jobs.set(id, { ...existing, status: status2 });
+    },
+    async appendOrderLog(claim) {
+      if (!orderLogs.includes(claim)) orderLogs.push(claim);
+    },
+    logs() {
+      return [...orderLogs];
+    }
+  };
+}
+const memoryStore$3 = createMemoryEmailNotifyStore();
+function productionFirestoreEnabled() {
+  return process.env.NODE_ENV === "production" && admin.apps.length > 0;
+}
+function activeStore$1() {
+  if (productionFirestoreEnabled()) return firestoreStore$3();
+  return memoryStore$3;
+}
+const CLAIMS = "clientEmailNotifyClaims";
+const JOBS = "clientEmailNotifyJobs";
+const SETTINGS_DOC = "clientEmailNotify";
+function firestoreStore$3() {
+  const db2 = () => admin.firestore();
+  return {
+    async getSettings() {
+      const snap = await db2().collection("settings").doc(SETTINGS_DOC).get();
+      if (!snap.exists) return defaultNotifySettings();
+      const data = snap.data() || {};
+      const defaults = defaultNotifySettings();
+      const enabled = { ...defaults.enabled, ...data.enabled && typeof data.enabled === "object" ? data.enabled : {} };
+      return { enabled, reminderHoursBefore: normalizeReminderHours(data.reminderHoursBefore) };
+    },
+    async saveSettings(settings) {
+      await db2().collection("settings").doc(SETTINGS_DOC).set({
+        enabled: settings.enabled,
+        reminderHoursBefore: normalizeReminderHours(settings.reminderHoursBefore),
+        updatedAt: (/* @__PURE__ */ new Date()).toISOString()
+      }, { merge: true });
+    },
+    async claim(key) {
+      try {
+        await db2().collection(CLAIMS).doc(claimDocId(key)).create({
+          key,
+          status: "sending",
+          at: (/* @__PURE__ */ new Date()).toISOString()
+        });
+        return true;
+      } catch (err) {
+        const code = err && typeof err === "object" && "code" in err ? Number(err.code) : 0;
+        if (code === 6 || code === 409) return false;
+        const message = err instanceof Error ? err.message : "";
+        if (/already exists/i.test(message)) return false;
+        throw err;
+      }
+    },
+    async complete(claim) {
+      await db2().collection(CLAIMS).doc(claimDocId(claim.key)).set(claim, { merge: true });
+      await this.appendOrderLog(claim);
+    },
+    async release(key) {
+      await db2().collection(CLAIMS).doc(claimDocId(key)).delete().catch(() => void 0);
+    },
+    async hasClaim(key) {
+      const snap = await db2().collection(CLAIMS).doc(claimDocId(key)).get();
+      return snap.exists && snap.data()?.status === "sent";
+    },
+    async upsertJob(job) {
+      const ref = db2().collection(JOBS).doc(claimDocId(job.id));
+      const snap = await ref.get();
+      if (snap.exists && (snap.data()?.status === "sent" || snap.data()?.status === "canceled")) return;
+      const prev = snap.exists ? snap.data()?.payload : {};
+      await ref.set({
+        ...job,
+        payload: mergedJobPayload(prev && typeof prev === "object" ? prev : {}, job.payload)
+      }, { merge: true });
+    },
+    async cancelJob(id) {
+      const ref = db2().collection(JOBS).doc(claimDocId(id));
+      const snap = await ref.get();
+      if (snap.exists && snap.data()?.status === "pending") await ref.set({ status: "canceled" }, { merge: true });
+    },
+    async dueJobs(now) {
+      const snap = await db2().collection(JOBS).where("status", "==", "pending").limit(100).get();
+      return snap.docs.map((doc) => doc.data()).filter((job) => typeof job.dueAt === "string" && job.dueAt <= now.toISOString());
+    },
+    async markJob(id, status2) {
+      await db2().collection(JOBS).doc(claimDocId(id)).set({ status: status2 }, { merge: true });
+    },
+    async appendOrderLog(claim) {
+      if (!claim.orderId || !claim.collection) return;
+      await db2().collection(claim.collection).doc(claim.orderId).update({
+        clientEmailNotifyLog: admin.firestore.FieldValue.arrayUnion({
+          key: claim.key,
+          notification: claim.notification,
+          at: claim.at,
+          intendedTo: claim.intendedTo,
+          deliveredTo: claim.deliveredTo,
+          subject: claim.subject,
+          live: claim.live,
+          status: claim.status,
+          reason: claim.reason || ""
+        })
+      }).catch((err) => {
+        console.error("[Aryeo email] Order log was not saved.", err instanceof Error ? err.message : "error");
+      });
+    },
+    logs() {
+      return [];
+    }
+  };
+}
+function mergedJobPayload(previous, next) {
+  const prevAppointments = Array.isArray(previous?.appointments) ? previous.appointments : [];
+  const nextAppointments = Array.isArray(next.appointments) ? next.appointments : [];
+  const seen = /* @__PURE__ */ new Set();
+  const appointments = [...prevAppointments, ...nextAppointments].filter((item) => {
+    const stamp2 = JSON.stringify(item);
+    if (seen.has(stamp2)) return false;
+    seen.add(stamp2);
+    return true;
+  });
+  return {
+    ...previous || {},
+    ...next,
+    ...appointments.length ? { appointments } : {}
+  };
+}
+function claimDocId(key) {
+  return key.replace(/[^a-zA-Z0-9_-]+/g, "_").slice(0, 700);
+}
+function splitEmails(value) {
+  return value.split(/[,;]/).map((part) => part.trim()).filter((part) => part.includes("@"));
+}
+function recipientsFor(intent, ctx, env) {
+  const raw = intent.audience === "customer" ? splitEmails(ctx.email) : [
+    ...splitEmails(ctx.photographerEmail),
+    ...officeStaffRecipients(env)
+  ];
+  const intended = [];
+  const blocked = [];
+  const seen = /* @__PURE__ */ new Set();
+  const client = ctx.email.trim().toLowerCase();
+  for (const email of raw) {
+    const key = email.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    if (intent.audience === "team" && client && key === client) {
+      blocked.push(email);
+      continue;
+    }
+    const reason = hardSuppressionReason({ email, name: intent.audience === "customer" ? ctx.fullName : "" });
+    if (reason) {
+      blocked.push(email);
+      continue;
+    }
+    intended.push(email);
+  }
+  if (intent.audience === "customer" && hardSuppressionReason({ email: ctx.email, name: ctx.fullName })) {
+    return { intended: [], blocked: [ctx.email || ctx.fullName || "suppressed"] };
+  }
+  return { intended, blocked };
+}
+async function deliverMessage(to, subject, html, text2) {
+  if (to.length === 0) return "not_configured";
+  if (process.env.NODE_ENV === "test" || process.env.VITEST) return "not_configured";
+  const user = process.env.SMTP_USER || process.env.EMAIL_FROM;
+  const pass = process.env.SMTP_PASS;
+  if (!user || !pass) return "not_configured";
+  const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST || "smtp.gmail.com",
+    port: Number(process.env.SMTP_PORT) || 587,
+    secure: process.env.SMTP_SECURE === "true",
+    auth: { user, pass }
+  });
+  await transporter.sendMail({
+    from: aryeoFromHeader(),
+    to: to.join(", "),
+    replyTo: ARYEO_EMAIL_FROM_ADDRESS,
+    subject,
+    html,
+    text: text2
+  });
+  return "sent";
+}
+async function sendRenderedNotification(input) {
+  const env = input.env ?? process.env;
+  const settings = input.settings ?? await activeStore$1().getSettings();
+  const live = clientEmailNotifyLive(env);
+  if (!input.test && !notificationEnabled(settings, input.key)) {
+    return { status: "disabled", deliveredTo: [], intendedTo: input.intendedTo, live };
+  }
+  const def = notifyDefinition(input.key);
+  if (!def?.wired && !input.test) {
+    return { status: "disabled", deliveredTo: [], intendedTo: input.intendedTo, live, reason: def?.wireNote };
+  }
+  const store = activeStore$1();
+  const claimed = await store.claim(input.idempotency);
+  if (!claimed) return { status: "duplicate", deliveredTo: [], intendedTo: input.intendedTo, live };
+  const blockedName = hardSuppressionReason({ email: input.ctx.email, name: input.ctx.fullName });
+  const suppressed = input.intendedTo.filter((email) => hardSuppressionReason({ email, name: input.ctx.fullName }));
+  const allowed = input.intendedTo.filter((email) => !suppressed.includes(email));
+  if (allowed.length === 0 && !blockedName && suppressed.length === 0) {
+    await store.release(input.idempotency);
+    return { status: "no_recipient", deliveredTo: [], intendedTo: input.intendedTo, live };
+  }
+  if (allowed.length === 0) {
+    const claim = {
+      key: input.idempotency,
+      notification: input.key,
+      at: (/* @__PURE__ */ new Date()).toISOString(),
+      orderId: input.orderId || input.ctx.orderId,
+      collection: input.collection || "",
+      intendedTo: input.intendedTo,
+      deliveredTo: [],
+      subject: "",
+      live,
+      status: "suppressed",
+      reason: blockedName || "hard suppression"
+    };
+    await store.complete(claim);
+    return { status: "suppressed", deliveredTo: [], intendedTo: input.intendedTo, live, reason: claim.reason };
+  }
+  const deliveredTo = live ? allowed : [CLIENT_EMAIL_NOTIFY_TEST_SINK];
+  const rendered = renderNotification(input.key, input.ctx);
+  const subject = live ? rendered.subject : `[QA] ${rendered.subject}`;
+  try {
+    const delivery = await deliverMessage(deliveredTo, subject, rendered.html, rendered.text);
+    if (delivery === "not_configured") {
+      await store.release(input.idempotency);
+      return { status: "not_configured", deliveredTo: [], intendedTo: allowed, live, subject };
+    }
+    const claim = {
+      key: input.idempotency,
+      notification: input.key,
+      at: (/* @__PURE__ */ new Date()).toISOString(),
+      orderId: input.orderId || input.ctx.orderId,
+      collection: input.collection || "",
+      intendedTo: allowed,
+      deliveredTo,
+      subject,
+      live,
+      status: "sent"
+    };
+    await store.complete(claim);
+    return { status: "sent", deliveredTo, intendedTo: allowed, live, subject };
+  } catch (err) {
+    await store.release(input.idempotency);
+    console.error("[Aryeo email] Send failed.", err instanceof Error ? err.message : "error");
+    return { status: "not_configured", deliveredTo: [], intendedTo: allowed, live, subject, reason: "send failed" };
+  }
+}
+async function scheduleFollowUps(input) {
+  const store = activeStore$1();
+  const scope = scopeId({ orderId: input.orderId, requestId: input.ctx.requestId, orderNumber: input.ctx.orderNumber });
+  if (input.ctx.appointmentStartIso) {
+    const dueAt = reminderDueAt(input.ctx.appointmentStartIso, input.settings.reminderHoursBefore);
+    if (dueAt) {
+      const id = idempotencyKey("customer_appointment_reminder", scope, input.ctx.appointmentStartIso);
+      await store.upsertJob({
+        id,
+        kind: "reminder",
+        dueAt,
+        status: "pending",
+        orderId: input.orderId,
+        collection: input.collection,
+        idempotencyKey: id,
+        payload: { record: input.record, requestId: input.ctx.requestId }
+      });
+      const day = chicagoDayKey(input.ctx.appointmentStartIso);
+      const summaryId = `creator_upcoming_appointments_summary:${input.ctx.photographerEmail || "office"}:${day}`;
+      const summaryDue = dailySummaryDueAt(input.ctx.appointmentStartIso);
+      if (summaryDue) {
+        await store.upsertJob({
+          id: summaryId,
+          kind: "daily_summary",
+          dueAt: summaryDue,
+          status: "pending",
+          orderId: input.orderId,
+          collection: input.collection,
+          idempotencyKey: summaryId,
+          payload: {
+            appointments: [{
+              when: input.ctx.appointmentWhen,
+              address: input.ctx.address,
+              orderNumber: input.ctx.orderNumber,
+              clientName: input.ctx.fullName
+            }],
+            photographerEmail: input.ctx.photographerEmail
+          }
+        });
+      }
+    }
+  }
+  if (input.fulfilled && input.ctx.unpaid) {
+    const dueAt = overdueDueAt((/* @__PURE__ */ new Date()).toISOString());
+    if (dueAt) {
+      const id = idempotencyKey("customer_order_payment_overdue", scope, "overdue");
+      await store.upsertJob({
+        id,
+        kind: "overdue",
+        dueAt,
+        status: "pending",
+        orderId: input.orderId,
+        collection: input.collection,
+        idempotencyKey: id,
+        payload: { record: input.record, requestId: input.ctx.requestId }
+      });
+    }
+  }
+  if (input.fulfilled && !input.ctx.unpaid) {
+    await store.cancelJob(idempotencyKey("customer_order_payment_overdue", scope, "overdue"));
+  }
+}
+async function dispatchClientEmailNotifications(input) {
+  try {
+    const settings = await activeStore$1().getSettings();
+    const ctx = contextFromRecord(
+      { ...input.record, id: input.recordId },
+      { id: input.recordId, collection: input.collection, requestId: input.requestId, env: input.env }
+    );
+    const intents = intentsForEvent({ type: input.type, before: input.before, after: input.record });
+    const outcomes = [];
+    const scope = scopeId({
+      orderId: input.collection === "orders" ? input.recordId : ctx.orderId,
+      requestId: input.requestId || ctx.requestId || (input.collection === "orderRequests" ? input.recordId : ""),
+      orderNumber: ctx.orderNumber
+    });
+    for (const intent of intents) {
+      const people = recipientsFor(intent, ctx, input.env ?? process.env);
+      outcomes.push(await sendRenderedNotification({
+        key: intent.key,
+        ctx,
+        idempotency: idempotencyKey(intent.key, scope, intent.slot),
+        intendedTo: people.intended,
+        orderId: input.recordId,
+        collection: input.collection,
+        env: input.env,
+        settings
+      }));
+    }
+    if (input.type === "appointment_scheduled" || input.type === "appointment_changed") {
+      await scheduleFollowUps({
+        ctx,
+        record: input.record,
+        orderId: input.recordId,
+        collection: input.collection,
+        settings
+      });
+    }
+    if (input.type === "order_fulfilled" || input.type === "listing_delivered") {
+      await scheduleFollowUps({
+        ctx,
+        record: input.record,
+        orderId: input.recordId,
+        collection: input.collection,
+        settings,
+        fulfilled: true
+      });
+    }
+    if (input.type === "payment_processed" && !ctx.unpaid) {
+      await activeStore$1().cancelJob(idempotencyKey(
+        "customer_order_payment_overdue",
+        scope,
+        "overdue"
+      ));
+    }
+    if (input.type === "appointment_canceled" || input.type === "appointment_postponed") {
+      const start = ctx.appointmentStartIso;
+      if (start) {
+        await activeStore$1().cancelJob(idempotencyKey("customer_appointment_reminder", scope, start));
+      }
+    }
+    return outcomes;
+  } catch (err) {
+    console.error("[Aryeo email] Dispatch failed.", err instanceof Error ? err.message : "error");
+    return [];
+  }
+}
+async function sendTestNotification(input) {
+  const ctx = sampleNotifyContext();
+  const reason = hardSuppressionReason({ email: input.to });
+  if (reason) {
+    return { status: "suppressed", deliveredTo: [], intendedTo: [input.to], live: clientEmailNotifyLive(input.env), reason };
+  }
+  return sendRenderedNotification({
+    key: input.key,
+    ctx,
+    idempotency: `test:${input.key}:${input.to.toLowerCase()}:${Date.now()}`,
+    intendedTo: [input.to],
+    orderId: "",
+    collection: "",
+    env: input.env,
+    test: true
+  });
+}
+async function runDueClientEmailJobs(now = /* @__PURE__ */ new Date(), env = process.env) {
+  const store = activeStore$1();
+  const settings = await store.getSettings();
+  const jobs = await store.dueJobs(now);
+  let sent = 0;
+  for (const job of jobs) {
+    if (job.kind === "reminder") {
+      const record2 = job.payload.record || {};
+      const ctx = contextFromRecord(record2, { id: job.orderId, collection: job.collection || void 0, requestId: String(job.payload.requestId || "") });
+      const customer = recipientsFor({ audience: "customer" }, ctx, env);
+      const customerResult = await sendRenderedNotification({
+        key: "customer_appointment_reminder",
+        ctx,
+        idempotency: job.idempotencyKey,
+        intendedTo: customer.intended,
+        orderId: job.orderId,
+        collection: job.collection,
+        env,
+        settings
+      });
+      const team = recipientsFor({ audience: "team" }, ctx, env);
+      await sendRenderedNotification({
+        key: "creator_appointment_reminder",
+        ctx,
+        idempotency: job.idempotencyKey.replace("customer_appointment_reminder", "creator_appointment_reminder"),
+        intendedTo: team.intended,
+        orderId: job.orderId,
+        collection: job.collection,
+        env,
+        settings
+      });
+      if (customerResult.status === "sent" || customerResult.status === "duplicate" || customerResult.status === "suppressed" || customerResult.status === "disabled") {
+        await store.markJob(job.id, "sent");
+      }
+      if (customerResult.status === "sent") sent += 1;
+    } else if (job.kind === "overdue") {
+      const record2 = job.payload.record || {};
+      const ctx = contextFromRecord({ ...record2, balanceDue: record2.balanceDue ?? record2.amountDue ?? 1 }, {
+        id: job.orderId,
+        collection: job.collection || void 0
+      });
+      if (!ctx.unpaid) {
+        await store.markJob(job.id, "canceled");
+        continue;
+      }
+      const people = recipientsFor({ audience: "customer" }, ctx, env);
+      const result = await sendRenderedNotification({
+        key: "customer_order_payment_overdue",
+        ctx,
+        idempotency: job.idempotencyKey,
+        intendedTo: people.intended,
+        orderId: job.orderId,
+        collection: job.collection,
+        env,
+        settings
+      });
+      if (result.status !== "not_configured") await store.markJob(job.id, "sent");
+      if (result.status === "sent") sent += 1;
+    } else if (job.kind === "daily_summary") {
+      const appointments = Array.isArray(job.payload.appointments) ? job.payload.appointments : [];
+      const ctx = sampleNotifyContext();
+      ctx.email = "";
+      ctx.fullName = "";
+      ctx.photographerEmail = typeof job.payload.photographerEmail === "string" ? job.payload.photographerEmail : "";
+      ctx.dailyAppointments = appointments;
+      const people = recipientsFor({ audience: "team" }, ctx, env);
+      const result = await sendRenderedNotification({
+        key: "creator_upcoming_appointments_summary",
+        ctx,
+        idempotency: job.idempotencyKey,
+        intendedTo: people.intended,
+        orderId: job.orderId,
+        collection: job.collection,
+        env,
+        settings
+      });
+      if (result.status !== "not_configured") await store.markJob(job.id, "sent");
+      if (result.status === "sent") sent += 1;
+    }
+  }
+  return { ran: jobs.length, sent };
+}
+async function readNotifySettings() {
+  return activeStore$1().getSettings();
+}
+async function writeNotifySettings(patch) {
+  const current = await activeStore$1().getSettings();
+  if (patch.key && notifyDefinition(patch.key)?.wired && typeof patch.enabled === "boolean") {
+    current.enabled[patch.key] = patch.enabled;
+  }
+  if (patch.reminderHoursBefore != null) current.reminderHoursBefore = normalizeReminderHours(patch.reminderHoursBefore);
+  await activeStore$1().saveSettings(current);
+  return current;
 }
 const HOLIDAY_SOCIAL_SAVES_LEAD = "Thankful social saves";
 const HOLIDAY_SEASON_LEAD = "Tis the season client shoots";
@@ -9072,7 +10434,7 @@ async function createTitusCheckout(input, deps) {
   if (decision.ok === false) return { ok: false, error: decision.error };
   const apiKey = String(deps.env.PAY_AT_CLOSE_API_KEY || "").trim();
   if (!apiKey) return { ok: false, error: "Pay at Close is not configured." };
-  const idempotencyKey = payAtCloseIdempotencyKey(input.invoiceId, input.checkoutStatus);
+  const idempotencyKey2 = payAtCloseIdempotencyKey(input.invoiceId, input.checkoutStatus);
   const body = titusCheckoutBody({
     invoiceId: input.invoiceId,
     orderId: input.orderId,
@@ -9080,7 +10442,7 @@ async function createTitusCheckout(input, deps) {
     description: input.description,
     successUrl: input.successUrl,
     cancelUrl: input.cancelUrl,
-    idempotencyKey,
+    idempotencyKey: idempotencyKey2,
     externalCustomerId: input.externalCustomerId || input.email,
     businessId: deps.env.PAY_AT_CLOSE_BUSINESS_ID,
     project: titusProjectFromAddress(input)
@@ -9093,7 +10455,7 @@ async function createTitusCheckout(input, deps) {
       headers: {
         "Content-Type": "application/json",
         "x-api-key": apiKey,
-        "idempotency-key": idempotencyKey
+        "idempotency-key": idempotencyKey2
       },
       body: JSON.stringify(body)
     });
@@ -11973,7 +13335,7 @@ function createRateLimiter(options) {
     }
   };
 }
-const router$F = Router();
+const router$G = Router();
 const db$z = () => admin.firestore();
 async function portalOrderLink(header2, source) {
   if (source !== "portal" || !header2?.startsWith("Bearer ") || !admin.apps.length) return null;
@@ -12032,7 +13394,7 @@ async function loadBookingCatalog() {
     return packagesForStaffEditor([]);
   }
 }
-router$F.post("/", async (req, res) => {
+router$G.post("/", async (req, res) => {
   const limit = bookingSubmitLimiter.check(clientIp(req));
   if (!limit.allowed) {
     res.setHeader("Retry-After", String(limit.retryAfterSec));
@@ -12562,7 +13924,7 @@ router$F.post("/", async (req, res) => {
       console.info(
         `[Bookings] Studio 105 request ${docRef.id} was saved. booking_received was not sent.`
       );
-    } else {
+    } else if (legacyClientOrderEmailEnabled()) {
       clientEmailStatus = await sendEmail({
         to: email,
         template: "booking_received",
@@ -12590,6 +13952,13 @@ router$F.post("/", async (req, res) => {
         console.error("[Bookings] Confirmation email failed:", err);
         return "failed";
       });
+    } else {
+      clientEmailStatus = "gated";
+      console.info(
+        `[Bookings] booking_received was not sent for request ${docRef.id}. The Aryeo order confirmation replaces it.`
+      );
+    }
+    if (!studio105Request && !isThankfulRsvp) {
       if (phone) {
         const clientSmsAllowed = clientNotifyLive() || isNotifyTestAllowlisted(normalizedEmail);
         if (!clientSmsAllowed) {
@@ -12812,6 +14181,28 @@ router$F.post("/", async (req, res) => {
         console.error("[Pay at Close] Booking checkout failed:", err instanceof Error ? err.message : "error");
       }
     }
+    void dispatchClientEmailNotifications({
+      type: "order_placed",
+      record: {
+        orderNumber: orderNumber2,
+        clientName: clientName2,
+        firstName,
+        lastName,
+        clientEmail: email,
+        email,
+        phone,
+        address: displayAddress,
+        addressLabel: displayAddress,
+        scheduledDate: orderRequest.scheduledDate,
+        scheduledTime: orderRequest.scheduledTime,
+        lineItems,
+        total: Number(total) || 0,
+        balanceDue: Number(total) || 0
+      },
+      recordId: docRef.id,
+      collection: "orderRequests",
+      requestId: docRef.id
+    }).catch((err) => console.error("[Bookings] Client email notify failed:", err));
     return res.status(201).json({
       success: true,
       requestId: docRef.id,
@@ -12861,13 +14252,13 @@ async function socialRateCaller(req) {
     return { role: null, email: null };
   }
 }
-router$F.get("/social-rate", async (req, res) => {
+router$G.get("/social-rate", async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   const requested = typeof req.query.date === "string" ? req.query.date : "";
   const previewAllowed = requested ? socialRatePreviewAllowed(await socialRateCaller(req)) : false;
   return res.json(socialRateView(/* @__PURE__ */ new Date(), requested || null, previewAllowed));
 });
-router$F.post("/holiday-calendar-backfill", requireAdmin, async (_req, res) => {
+router$G.post("/holiday-calendar-backfill", requireAdmin, async (_req, res) => {
   try {
     return res.json(await backfillHolidayCalendarEvents());
   } catch (err) {
@@ -12875,7 +14266,7 @@ router$F.post("/holiday-calendar-backfill", requireAdmin, async (_req, res) => {
     return res.status(500).json({ error: "Holiday calendar backfill failed." });
   }
 });
-router$F.get("/holiday-slots", async (_req, res) => {
+router$G.get("/holiday-slots", async (_req, res) => {
   res.setHeader("Cache-Control", "no-store");
   try {
     return res.json(holidayTakenFromOrders(await loadHolidaySlotOrders()));
@@ -12884,13 +14275,13 @@ router$F.get("/holiday-slots", async (_req, res) => {
     return res.status(500).json({ error: "Holiday slots are unavailable." });
   }
 });
-router$F.get("/photographers", (_req, res) => {
+router$G.get("/photographers", (_req, res) => {
   return res.json({
     noPreference: { id: NO_PREFERENCE_ID, name: NO_PREFERENCE_NAME },
     photographers: publicBookingPhotographers()
   });
 });
-router$F.get("/realestate-75/slots", async (req, res) => {
+router$G.get("/realestate-75/slots", async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   const pkg = realEstate75Package(typeof req.query.package === "string" ? req.query.package : "");
   try {
@@ -12914,7 +14305,7 @@ function postedDurationMinutes(value) {
   if (!Number.isInteger(parsed) || parsed < 15 || parsed > 24 * 60) return void 0;
   return parsed;
 }
-router$F.get("/slots", async (req, res) => {
+router$G.get("/slots", async (req, res) => {
   const basics = typeof req.query.basics === "string" ? req.query.basics.split(",").map((id) => id.trim()).filter(Boolean) : [];
   const preferenceId = preferenceFromRequest(req.query.photographer, "");
   try {
@@ -12939,7 +14330,7 @@ router$F.get("/slots", async (req, res) => {
     return res.json({ live: false, durationMinutes: 90, slots: [], suggestions: [] });
   }
 });
-router$F.get("/catalog", async (_req, res) => {
+router$G.get("/catalog", async (_req, res) => {
   const catalog = await loadBookingCatalog();
   const adjustments = await loadPricingAdjustments();
   const rates = pricingRates(adjustments);
@@ -12956,7 +14347,7 @@ router$F.get("/catalog", async (_req, res) => {
     payAtClose: payAtClosePublicOffer(process.env, adjustments)
   });
 });
-router$F.get("/", requireCoordinator, async (_req, res) => {
+router$G.get("/", requireCoordinator, async (_req, res) => {
   try {
     const snapshot = await db$z().collection("orderRequests").orderBy("createdAt", "desc").limit(100).get();
     const requests = snapshot.docs.map((doc) => ({
@@ -12969,7 +14360,7 @@ router$F.get("/", requireCoordinator, async (_req, res) => {
     return res.status(500).json({ error: "Failed to fetch booking requests." });
   }
 });
-router$F.get("/:id", requireCoordinator, async (req, res) => {
+router$G.get("/:id", requireCoordinator, async (req, res) => {
   try {
     const doc = await db$z().collection("orderRequests").doc(req.params.id).get();
     if (!doc.exists) {
@@ -12981,7 +14372,7 @@ router$F.get("/:id", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch booking request." });
   }
 });
-router$F.post("/:id/assign-photographer", requireCoordinator, async (req, res) => {
+router$G.post("/:id/assign-photographer", requireCoordinator, async (req, res) => {
   try {
     const requestDoc = await db$z().collection("orderRequests").doc(req.params.id).get();
     if (!requestDoc.exists) return res.status(404).json({ error: "Booking request not found." });
@@ -12996,7 +14387,7 @@ router$F.post("/:id/assign-photographer", requireCoordinator, async (req, res) =
     return res.status(500).json({ error: "Could not assign the photographer." });
   }
 });
-router$F.patch("/:id/confirm", requireCoordinator, async (req, res) => {
+router$G.patch("/:id/confirm", requireCoordinator, async (req, res) => {
   try {
     const { assignedPhotographerId, assignedPhotographerName: postedPhotographerName, scheduledDate, scheduledTime, internalNotes } = req.body;
     const requestDoc = await db$z().collection("orderRequests").doc(req.params.id).get();
@@ -13396,21 +14787,57 @@ router$F.patch("/:id/confirm", requireCoordinator, async (req, res) => {
         console.error("[Bookings] Photographer assign failed:", err);
       }
     }
-    await sendEmail({
-      to: requestEmail,
-      template: "order_confirmed",
-      variables: {
-        clientName: requestClientName,
-        address: requestAddressLabel,
-        orderNumber: typeof request.orderNumber === "string" ? request.orderNumber : "",
-        scheduledDate: bookingDateLabel(confirmSource, "To be confirmed"),
-        scheduledTime: confirmTime || "To be confirmed",
-        photographerName: assignedPhotographerName || "Our team",
-        travelFee: travelSummaryText(travel),
-        orderId: orderRef.id,
-        portalUrl: publicClientUrl("/portal")
-      }
-    }).catch((err) => console.error("[Bookings] Confirmation email failed:", err));
+    if (legacyClientOrderEmailEnabled()) {
+      await sendEmail({
+        to: requestEmail,
+        template: "order_confirmed",
+        variables: {
+          clientName: requestClientName,
+          address: requestAddressLabel,
+          orderNumber: typeof request.orderNumber === "string" ? request.orderNumber : "",
+          scheduledDate: bookingDateLabel(confirmSource, "To be confirmed"),
+          scheduledTime: confirmTime || "To be confirmed",
+          photographerName: assignedPhotographerName || "Our team",
+          travelFee: travelSummaryText(travel),
+          orderId: orderRef.id,
+          portalUrl: publicClientUrl("/portal")
+        }
+      }).catch((err) => console.error("[Bookings] Confirmation email failed:", err));
+    }
+    const confirmedRecord = {
+      orderNumber: typeof request.orderNumber === "string" ? request.orderNumber : "",
+      clientName: requestClientName,
+      clientEmail: requestEmail,
+      email: requestEmail,
+      phone: requestPhone,
+      address: requestAddressLabel,
+      scheduledDate: confirmDate ? confirmDate.toISOString() : null,
+      scheduledTime: confirmTime,
+      assignedPhotographerId: assignedPhotographerId || "",
+      assignedPhotographerName: assignedPhotographerName || "",
+      photographerEmail: photographer?.email || "",
+      lineItems: requestLineItems,
+      total: requestTotal,
+      balanceDue: requestTotal,
+      listingId: listingId || listingIdForGallery || "",
+      galleryId: galleryRef.id
+    };
+    void dispatchClientEmailNotifications({
+      type: "order_placed",
+      record: confirmedRecord,
+      recordId: orderRef.id,
+      collection: "orders",
+      requestId: req.params.id
+    }).catch((err) => console.error("[Bookings] Client email notify failed:", err));
+    if (confirmDate || confirmTime) {
+      void dispatchClientEmailNotifications({
+        type: "appointment_scheduled",
+        record: confirmedRecord,
+        recordId: orderRef.id,
+        collection: "orders",
+        requestId: req.params.id
+      }).catch((err) => console.error("[Bookings] Appointment email notify failed:", err));
+    }
     return res.json({
       success: true,
       orderId: orderRef.id,
@@ -13435,7 +14862,7 @@ async function releaseOrderCalendar(data) {
     return calendarHoldFailureMessage(err);
   }
 }
-router$F.patch("/:id/cancel", requireCoordinator, async (req, res) => {
+router$G.patch("/:id/cancel", requireCoordinator, async (req, res) => {
   try {
     const doc = await db$z().collection("orderRequests").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Not found." });
@@ -13458,13 +14885,24 @@ router$F.patch("/:id/cancel", requireCoordinator, async (req, res) => {
       } : hadEvent ? { calendarHold: "none" } : {},
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
+    void dispatchClientEmailNotifications({
+      type: "appointment_canceled",
+      record: {
+        ...data,
+        clientEmail: typeof data.email === "string" ? data.email : data.clientEmail,
+        address: typeof data.addressLabel === "string" ? data.addressLabel : data.address
+      },
+      recordId: doc.id,
+      collection: "orderRequests",
+      requestId: doc.id
+    }).catch((err) => console.error("[Bookings] Cancel email notify failed:", err));
     return res.json({ success: true, calendarDeleted: !calendarError });
   } catch (err) {
     console.error("[Bookings] Cancel error:", err);
     return res.status(500).json({ error: "Failed to cancel booking." });
   }
 });
-router$F.patch("/:id/decline", requireCoordinator, async (req, res) => {
+router$G.patch("/:id/decline", requireCoordinator, async (req, res) => {
   try {
     const { reason } = req.body;
     const doc = await db$z().collection("orderRequests").doc(req.params.id).get();
@@ -14145,7 +15583,7 @@ async function resolveLateHeadshotPayment(orderId) {
   }
   return "flagged";
 }
-const router$E = Router();
+const router$F = Router();
 const limiter$4 = createRateLimiter({ windowMs: 15 * 60 * 1e3, max: 8 });
 const db$x = () => admin.firestore();
 async function nextInvoiceNumber$2() {
@@ -14158,7 +15596,7 @@ async function nextInvoiceNumber$2() {
     return `INV-${year}-${String(Date.now()).slice(-6)}`;
   }
 }
-router$E.get("/config", (_req, res) => {
+router$F.get("/config", (_req, res) => {
   const config = headshotConfig(process.env);
   res.json({
     ...config,
@@ -14169,7 +15607,7 @@ router$E.get("/config", (_req, res) => {
     holdMinutes: 60
   });
 });
-router$E.get("/slots", async (req, res) => {
+router$F.get("/slots", async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   const config = headshotConfig(process.env);
   const quantity = Number(req.query.quantity);
@@ -14195,7 +15633,7 @@ router$E.get("/slots", async (req, res) => {
     });
   }
 });
-router$E.post("/order", async (req, res) => {
+router$F.post("/order", async (req, res) => {
   const limit = limiter$4.check(clientIp(req));
   if (!limit.allowed) {
     res.setHeader("Retry-After", String(limit.retryAfterSec));
@@ -14607,7 +16045,7 @@ async function loadRevenueDocs(id) {
 function text$g(value) {
   return typeof value === "string" ? value.trim() : "";
 }
-const router$D = Router();
+const router$E = Router();
 const db$v = () => admin.firestore();
 const dotOptInLimiter = createRateLimiter({ windowMs: 10 * 60 * 1e3, max: 30 });
 function sendDotOptInPage(res, status2, ok) {
@@ -14620,7 +16058,7 @@ function sendDotOptInPage(res, status2, ok) {
   });
   res.send(dotOptInResultHtml(ok));
 }
-router$D.get("/dot-opt-in", async (req, res) => {
+router$E.get("/dot-opt-in", async (req, res) => {
   const limit = dotOptInLimiter.check(clientIp(req));
   if (!limit.allowed) {
     res.set("Retry-After", String(limit.retryAfterSec));
@@ -14636,7 +16074,7 @@ router$D.get("/dot-opt-in", async (req, res) => {
     sendDotOptInPage(res, 500, false);
   }
 });
-router$D.get("/", requireStaff, async (req, res) => {
+router$E.get("/", requireStaff, async (req, res) => {
   try {
     const { status: status2, photographerId, limit = "50", startAfter } = req.query;
     let query = db$v().collection("orders").orderBy("createdAt", "desc");
@@ -14664,7 +16102,7 @@ router$D.get("/", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch orders." });
   }
 });
-router$D.get("/dashboard", requireStaff, async (_req, res) => {
+router$E.get("/dashboard", requireStaff, async (_req, res) => {
   try {
     const now = /* @__PURE__ */ new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -14694,7 +16132,7 @@ router$D.get("/dashboard", requireStaff, async (_req, res) => {
     return res.status(500).json({ error: "Failed to fetch dashboard stats." });
   }
 });
-router$D.get("/:id", requireStaff, async (req, res) => {
+router$E.get("/:id", requireStaff, async (req, res) => {
   try {
     const orderDoc = await db$v().collection("orders").doc(req.params.id).get();
     if (!orderDoc.exists) return res.status(404).json({ error: "Order not found." });
@@ -14729,7 +16167,7 @@ router$D.get("/:id", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch order." });
   }
 });
-router$D.patch("/:id/revenue", requireCoordinator, async (req, res) => {
+router$E.patch("/:id/revenue", requireCoordinator, async (req, res) => {
   if (typeof req.body?.countsTowardRevenue !== "boolean") {
     return res.status(400).json({ error: "countsTowardRevenue must be true or false." });
   }
@@ -14758,7 +16196,7 @@ router$D.patch("/:id/revenue", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Could not update revenue acceptance." });
   }
 });
-router$D.patch("/:id", requireCoordinator, async (req, res) => {
+router$E.patch("/:id", requireCoordinator, async (req, res) => {
   try {
     const allowed = [
       "status",
@@ -14791,7 +16229,25 @@ router$D.patch("/:id", requireCoordinator, async (req, res) => {
         updates.scheduledDate = admin.firestore.Timestamp.fromDate(anchored);
       }
     }
+    const watchKeys = ["status", "assignedPhotographerId", "scheduledDate", "scheduledTime"];
+    let beforeRecord = null;
+    if (watchKeys.some((key) => key in req.body)) {
+      const existing = await db$v().collection("orders").doc(req.params.id).get();
+      if (existing.exists) beforeRecord = { id: existing.id, ...existing.data() || {} };
+    }
     await db$v().collection("orders").doc(req.params.id).update(updates);
+    if (beforeRecord) {
+      const postedStatus = typeof req.body.status === "string" ? req.body.status.toLowerCase() : "";
+      const type = postedStatus === "cancelled" || postedStatus === "canceled" ? "appointment_canceled" : postedStatus === "postponed" ? "appointment_postponed" : "appointment_changed";
+      void dispatchClientEmailNotifications({
+        type,
+        before: beforeRecord,
+        record: { ...beforeRecord, ...req.body },
+        recordId: req.params.id,
+        collection: "orders",
+        requestId: typeof beforeRecord.orderRequestId === "string" ? beforeRecord.orderRequestId : ""
+      }).catch((err) => console.error("[Orders] Client email notify failed:", err));
+    }
     return res.json({ success: true });
   } catch (err) {
     console.error("[Orders] Update error:", err);
@@ -14809,7 +16265,7 @@ const VALID_TRANSITIONS = {
   completed: [],
   cancelled: []
 };
-router$D.patch("/:id/status", requireCoordinator, async (req, res) => {
+router$E.patch("/:id/status", requireCoordinator, async (req, res) => {
   try {
     const { status: status2, note } = req.body;
     const orderDoc = await db$v().collection("orders").doc(req.params.id).get();
@@ -14849,13 +16305,40 @@ router$D.patch("/:id/status", requireCoordinator, async (req, res) => {
       details: note || "",
       createdAt: admin.firestore.FieldValue.serverTimestamp()
     });
+    const orderRecord = { ...orderDoc.data() || {}, status: status2 };
+    const requestId = typeof orderRecord.orderRequestId === "string" ? orderRecord.orderRequestId : "";
+    if (status2 === "cancelled") {
+      void dispatchClientEmailNotifications({
+        type: "appointment_canceled",
+        record: orderRecord,
+        recordId: req.params.id,
+        collection: "orders",
+        requestId
+      }).catch((err) => console.error("[Orders] Client email notify failed:", err));
+    }
+    if (status2 === "delivered" || status2 === "completed") {
+      void dispatchClientEmailNotifications({
+        type: "listing_delivered",
+        record: orderRecord,
+        recordId: req.params.id,
+        collection: "orders",
+        requestId
+      }).catch((err) => console.error("[Orders] Delivery email notify failed:", err));
+      void dispatchClientEmailNotifications({
+        type: "order_fulfilled",
+        record: orderRecord,
+        recordId: req.params.id,
+        collection: "orders",
+        requestId
+      }).catch((err) => console.error("[Orders] Payment email notify failed:", err));
+    }
     return res.json({ success: true, status: status2 });
   } catch (err) {
     console.error("[Orders] Status update error:", err);
     return res.status(500).json({ error: "Failed to update order status." });
   }
 });
-router$D.get("/:id/timeline", requireStaff, async (req, res) => {
+router$E.get("/:id/timeline", requireStaff, async (req, res) => {
   try {
     const [messages, editRequests, agentLogs] = await Promise.all([
       db$v().collection("messages").where("orderId", "==", req.params.id).orderBy("createdAt", "asc").get(),
@@ -19022,6 +20505,39 @@ async function deliverGalleryToClient(galleryId, options) {
     recipients,
     email: emailDelivery
   });
+  const orderId = typeof gallery.orderId === "string" ? gallery.orderId : "";
+  void dispatchClientEmailNotifications({
+    type: "listing_delivered",
+    record: {
+      ...gallery,
+      clientEmail: recipients[0] || gallery.clientEmail || client?.email || "",
+      clientName: gallery.clientName || client?.name || "",
+      address,
+      galleryId,
+      downloadCenterUrl: deliveryUrl,
+      balanceDue: invoice ? invoice.amountDue ?? invoice.balanceDue : void 0,
+      paymentStatus: invoice ? invoice.status : gallery.paymentStatus,
+      total: invoice ? invoice.total : gallery.total
+    },
+    recordId: orderId,
+    collection: "orders",
+    requestId: typeof gallery.orderRequestId === "string" ? gallery.orderRequestId : ""
+  }).catch((err) => console.error("[Galleries] Listing delivery email notify failed:", err));
+  if (orderId) {
+    void dispatchClientEmailNotifications({
+      type: "order_fulfilled",
+      record: {
+        ...gallery,
+        clientEmail: recipients[0] || client?.email || "",
+        address,
+        balanceDue: invoice ? invoice.amountDue ?? invoice.balanceDue : gallery.balanceDue,
+        paymentStatus: invoice ? invoice.paymentStatus ?? invoice.status : gallery.paymentStatus,
+        total: invoice ? invoice.total : gallery.total
+      },
+      recordId: orderId,
+      collection: "orders"
+    }).catch((err) => console.error("[Galleries] Payment required email notify failed:", err));
+  }
   if (client?.phone) {
     await sendSMS({
       to: client.phone,
@@ -19294,7 +20810,7 @@ const handlePublicGalleryLink = async (req, res) => {
     return res.status(500).json({ code: "lookup_failed", error: message, message });
   }
 };
-const router$C = Router();
+const router$D = Router();
 const db$p = () => admin.firestore();
 const storage = () => admin.storage().bucket();
 function cleanPosterUrl(value) {
@@ -19390,7 +20906,7 @@ function clientGalleryPayload(id, gallery, gate2) {
     mediaItems: showMedia ? lockedClientGalleryMedia(id, media, unlocked) : []
   };
 }
-router$C.get("/", requireStaff, async (req, res) => {
+router$D.get("/", requireStaff, async (req, res) => {
   try {
     const { status: status2, orderId } = req.query;
     let query = db$p().collection("galleries").orderBy("createdAt", "desc");
@@ -19436,7 +20952,7 @@ async function readGalleryPhotoBytes(item) {
     return null;
   }
 }
-router$C.get("/public/:id/photos.zip", async (req, res) => {
+router$D.get("/public/:id/photos.zip", async (req, res) => {
   const id = typeof req.params.id === "string" ? req.params.id : "";
   if (malformedPublicGalleryId(id)) return publicGalleryNotFound(res);
   if (!admin.apps.length) return publicGalleryNotFound(res);
@@ -19474,7 +20990,7 @@ router$C.get("/public/:id/photos.zip", async (req, res) => {
     return res.status(500).json({ error: "We couldn't build that download." });
   }
 });
-router$C.get("/public/:id", async (req, res) => {
+router$D.get("/public/:id", async (req, res) => {
   const id = typeof req.params.id === "string" ? req.params.id : "";
   if (malformedPublicGalleryId(id)) {
     console.warn("[Galleries] Public gallery id rejected.");
@@ -19502,8 +21018,8 @@ router$C.get("/public/:id", async (req, res) => {
     return res.status(500).json({ error: "We couldn't open this gallery." });
   }
 });
-router$C.get("/link/:id", handlePublicGalleryLink);
-router$C.get("/:id", requireAuth, async (req, res) => {
+router$D.get("/link/:id", handlePublicGalleryLink);
+router$D.get("/:id", requireAuth, async (req, res) => {
   try {
     const doc = await db$p().collection("galleries").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Gallery not found." });
@@ -19527,7 +21043,7 @@ router$C.get("/:id", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch gallery." });
   }
 });
-router$C.post("/:id/upload-url", requirePhotographer, async (req, res) => {
+router$D.post("/:id/upload-url", requirePhotographer, async (req, res) => {
   try {
     const { fileName: fileName2, fileType, isRaw: isRaw2 = false } = req.body;
     if (!fileName2 || !fileType) {
@@ -19552,7 +21068,7 @@ router$C.post("/:id/upload-url", requirePhotographer, async (req, res) => {
     return res.status(500).json({ error: "Failed to generate upload URL." });
   }
 });
-router$C.post("/:id/media", requirePhotographer, async (req, res) => {
+router$D.post("/:id/media", requirePhotographer, async (req, res) => {
   try {
     const {
       storagePath,
@@ -19606,7 +21122,7 @@ router$C.post("/:id/media", requirePhotographer, async (req, res) => {
     return res.status(500).json({ error: "Failed to register media." });
   }
 });
-router$C.post("/:id/media-link", requireCoordinator, async (req, res) => {
+router$D.post("/:id/media-link", requireCoordinator, async (req, res) => {
   try {
     const { url, title, type = "video", embedUrl, thumbnailUrl, downloadable = false, poster, posterUrl } = req.body;
     if (!url) return res.status(400).json({ error: "url required." });
@@ -19642,7 +21158,7 @@ router$C.post("/:id/media-link", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to register media link." });
   }
 });
-router$C.get("/:id/release", requireCoordinator, async (req, res) => {
+router$D.get("/:id/release", requireCoordinator, async (req, res) => {
   if (!adminReady$5(res)) return;
   try {
     const report = await loadGalleryReleaseForGallery(req.params.id);
@@ -19654,7 +21170,7 @@ router$C.get("/:id/release", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to check gallery release." });
   }
 });
-router$C.patch("/:id/status", requireCoordinator, async (req, res) => {
+router$D.patch("/:id/status", requireCoordinator, async (req, res) => {
   try {
     const { status: status2 } = req.body;
     const validStatuses = ["pending_upload", "raw_uploaded", "editing", "ready_for_review", "approved", "delivered"];
@@ -19676,7 +21192,7 @@ router$C.patch("/:id/status", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to update gallery status." });
   }
 });
-router$C.post("/:id/deliver", requireCoordinator, async (req, res) => {
+router$D.post("/:id/deliver", requireCoordinator, async (req, res) => {
   try {
     if (!adminReady$5(res)) return;
     const result = await deliverGalleryToClient(req.params.id, {
@@ -19705,7 +21221,7 @@ router$C.post("/:id/deliver", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to deliver gallery." });
   }
 });
-router$C.patch("/:id/downloads", requireCoordinator, async (req, res) => {
+router$D.patch("/:id/downloads", requireCoordinator, async (req, res) => {
   if (!adminReady$5(res)) return;
   try {
     if (typeof req.body?.released !== "boolean") {
@@ -19742,7 +21258,7 @@ router$C.patch("/:id/downloads", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to update gallery downloads." });
   }
 });
-router$C.delete("/:id/media/:mediaId", requireCoordinator, async (req, res) => {
+router$D.delete("/:id/media/:mediaId", requireCoordinator, async (req, res) => {
   try {
     const galleryDoc = await db$p().collection("galleries").doc(req.params.id).get();
     if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
@@ -20262,7 +21778,7 @@ async function fetchSquarePayment(paymentId, env = process.env, fetchImpl = fetc
   const payment = body?.payment;
   return payment && typeof payment === "object" ? payment : null;
 }
-const router$B = Router();
+const router$C = Router();
 const db$n = () => appFirestore();
 const payNowReconcileLimiter = createRateLimiter({ windowMs: 10 * 60 * 1e3, max: 30 });
 const stripe$1 = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
@@ -20646,6 +22162,29 @@ async function applySuccessfulPayment({
     unlocked,
     auditEntry
   });
+  if (resolvedOrderId) {
+    void dispatchClientEmailNotifications({
+      type: "payment_processed",
+      record: {
+        clientEmail: typeof invoice.clientEmail === "string" ? invoice.clientEmail : "",
+        clientName: clientName2 || invoice.clientName,
+        orderNumber: invoice.orderNumber,
+        address: invoice.address || invoice.addressLabel,
+        paymentAmount: amount,
+        amount,
+        paymentMethod: method,
+        paymentId: squarePaymentId || stripePaymentIntentId || titusCheckoutId || invoiceId,
+        squarePaymentId,
+        stripePaymentIntentId,
+        balanceDue: newAmountDue,
+        paymentStatus: newAmountDue <= 0 ? "paid" : "partial",
+        total
+      },
+      recordId: resolvedOrderId,
+      collection: "orders",
+      requestId: orderRequestId
+    }).catch((err) => console.error("[Payments] Payment email notify failed:", err));
+  }
   return { applied: true, unlocked, duplicate: false, email };
 }
 async function deliverPaymentReceipt(invoice, invoiceId, amountPaid, balance, unlocked) {
@@ -20869,7 +22408,7 @@ async function applyDepositPayment({
     }
   }
 }
-router$B.post("/create-intent", requireAuth, async (req, res) => {
+router$C.post("/create-intent", requireAuth, async (req, res) => {
   try {
     if (!stripeReady()) {
       return res.status(503).json({ error: "Studio Noir Stripe payments are not configured yet." });
@@ -20907,7 +22446,7 @@ router$B.post("/create-intent", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to create payment intent." });
   }
 });
-router$B.post("/send-invoice", requireCoordinator, async (req, res) => {
+router$C.post("/send-invoice", requireCoordinator, async (req, res) => {
   try {
     const { invoiceId } = req.body;
     if (!invoiceId) return res.status(400).json({ error: "invoiceId required." });
@@ -20950,7 +22489,7 @@ router$B.post("/send-invoice", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to send invoice." });
   }
 });
-router$B.post("/send-receipt", requireCoordinator, async (req, res) => {
+router$C.post("/send-receipt", requireCoordinator, async (req, res) => {
   try {
     const { invoiceId } = req.body;
     if (!invoiceId) return res.status(400).json({ error: "invoiceId required." });
@@ -20973,7 +22512,7 @@ router$B.post("/send-receipt", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to send receipt." });
   }
 });
-router$B.get("/pay-at-close", async (_req, res) => {
+router$C.get("/pay-at-close", async (_req, res) => {
   res.setHeader("Cache-Control", "no-store");
   const adjustments = await loadPricingAdjustments();
   const offer = payAtCloseOfferFromAdjustments(process.env, adjustments);
@@ -21069,7 +22608,7 @@ async function beginPayAtCloseCheckout(invoiceDoc) {
   }
   return { status: 200, body: { checkoutUrl: created.checkoutUrl, provider: PAY_AT_CLOSE_METHOD } };
 }
-router$B.post("/invoice/:id/pay-at-close", async (req, res) => {
+router$C.post("/invoice/:id/pay-at-close", async (req, res) => {
   try {
     const invoiceDoc = await loadInvoice(req.params.id);
     if (!invoiceDoc) return invoiceNotFound(res);
@@ -21090,7 +22629,7 @@ router$B.post("/invoice/:id/pay-at-close", async (req, res) => {
     return res.status(500).json({ error: "Pay at Close checkout could not be started." });
   }
 });
-router$B.post("/pay-at-close-webhook", async (req, res) => {
+router$C.post("/pay-at-close-webhook", async (req, res) => {
   try {
     const rawBody = await readSquareWebhookRawBody(req);
     if (rawBody === null) return res.status(400).json({ error: "Pay at Close webhook raw body is unavailable." });
@@ -21179,7 +22718,7 @@ router$B.post("/pay-at-close-webhook", async (req, res) => {
     return res.status(500).json({ error: "Pay at Close webhook handler failed." });
   }
 });
-router$B.get("/invoice/:id", async (req, res) => {
+router$C.get("/invoice/:id", async (req, res) => {
   try {
     const invoiceDoc = await loadInvoice(req.params.id);
     if (!invoiceDoc) return invoiceNotFound(res);
@@ -21255,7 +22794,7 @@ router$B.get("/invoice/:id", async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch invoice." });
   }
 });
-router$B.post("/invoice/:id/checkout", async (req, res) => {
+router$C.post("/invoice/:id/checkout", async (req, res) => {
   try {
     const invoiceDoc = await loadInvoice(req.params.id);
     if (!invoiceDoc) return invoiceNotFound(res);
@@ -21393,7 +22932,7 @@ router$B.post("/invoice/:id/checkout", async (req, res) => {
     return res.status(500).json({ error: "Failed to start checkout." });
   }
 });
-router$B.post("/invoice/:id/deposit-checkout", async (req, res) => {
+router$C.post("/invoice/:id/deposit-checkout", async (req, res) => {
   try {
     if (!seniorDepositCheckoutLive()) return invoiceNotFound(res);
     const invoiceDoc = await loadInvoice(req.params.id);
@@ -21474,7 +23013,7 @@ router$B.post("/invoice/:id/deposit-checkout", async (req, res) => {
     return res.status(500).json({ error: SQUARE_DEPOSIT_CHECKOUT_FAILURE });
   }
 });
-router$B.post("/webhook", async (req, res) => {
+router$C.post("/webhook", async (req, res) => {
   const sig = req.headers["stripe-signature"];
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || "";
   let event;
@@ -21742,7 +23281,7 @@ async function reconcilePayNowOrder(rawOrderNumber) {
   );
   return { paymentStatus: after === "unpaid" ? "pending" : after, orderNumber: orderNumber2 };
 }
-router$B.post("/pay-now/reconcile", async (req, res) => {
+router$C.post("/pay-now/reconcile", async (req, res) => {
   const limit = payNowReconcileLimiter.check(clientIp(req));
   if (!limit.allowed) {
     res.set("Retry-After", String(limit.retryAfterSec));
@@ -21756,7 +23295,7 @@ router$B.post("/pay-now/reconcile", async (req, res) => {
     return res.status(500).json({ error: "Payment could not be confirmed." });
   }
 });
-router$B.post("/square-webhook", async (req, res) => {
+router$C.post("/square-webhook", async (req, res) => {
   try {
     const signatureKey = process.env.SQUARE_WEBHOOK_SIGNATURE_KEY;
     if (!signatureKey) {
@@ -21793,7 +23332,7 @@ router$B.post("/square-webhook", async (req, res) => {
     return res.status(500).json({ error: "Square webhook handler failed." });
   }
 });
-router$B.get("/transactions", requireCoordinator, async (req, res) => {
+router$C.get("/transactions", requireCoordinator, async (req, res) => {
   try {
     const { startDate, endDate, limit = "50" } = req.query;
     let query = db$n().collection("transactions").orderBy("createdAt", "desc");
@@ -21879,7 +23418,7 @@ async function handleStripeRefund(charge) {
     createdAt: admin.firestore.FieldValue.serverTimestamp()
   });
 }
-const router$A = Router();
+const router$B = Router();
 const db$m = () => admin.firestore();
 const VSAI_API_BASE = "https://api.virtualstagingai.app/v1";
 const VSAI_API_KEY = process.env.VSAI_API_KEY || process.env.VIRTUAL_STAGING_AI_API_KEY || "";
@@ -21887,7 +23426,7 @@ const VSAI_PRICE_CENTS = parseInt(process.env.VSAI_PRICE_CENTS || "1500", 10);
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
   apiVersion: "2024-06-20"
 });
-router$A.post("/create", requireAuth, async (req, res) => {
+router$B.post("/create", requireAuth, async (req, res) => {
   try {
     if (!VSAI_API_KEY) {
       console.error("[VSAI] VSAI_API_KEY is not set");
@@ -21962,7 +23501,7 @@ router$A.post("/create", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$A.get("/result/:jobId", requireAuth, async (req, res) => {
+router$B.get("/result/:jobId", requireAuth, async (req, res) => {
   try {
     const jobDoc = await db$m().collection("vsaiJobs").doc(req.params.jobId).get();
     if (!jobDoc.exists) return res.status(404).json({ error: "Job not found." });
@@ -22037,7 +23576,7 @@ router$A.get("/result/:jobId", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$A.get("/result/:jobId/file", requireAuth, async (req, res) => {
+router$B.get("/result/:jobId/file", requireAuth, async (req, res) => {
   try {
     const jobDoc = await db$m().collection("vsaiJobs").doc(req.params.jobId).get();
     if (!jobDoc.exists) return res.status(404).json({ error: "Job not found." });
@@ -22059,7 +23598,7 @@ router$A.get("/result/:jobId/file", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$A.post("/variation", requireAuth, async (req, res) => {
+router$B.post("/variation", requireAuth, async (req, res) => {
   try {
     const { jobId, style: newStyle, roomType: newRoomType } = req.body;
     if (!jobId) {
@@ -22143,7 +23682,7 @@ router$A.post("/variation", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$A.post("/checkout", requireAuth, async (req, res) => {
+router$B.post("/checkout", requireAuth, async (req, res) => {
   try {
     const { jobIds, successUrl, cancelUrl } = req.body;
     if (!jobIds || !Array.isArray(jobIds) || jobIds.length === 0) {
@@ -22212,7 +23751,7 @@ router$A.post("/checkout", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$A.post(
+router$B.post(
   "/webhook/stripe",
   // Raw body needed — mount before express.json() parses it
   async (req, res) => {
@@ -22250,7 +23789,7 @@ router$A.post(
     res.json({ received: true });
   }
 );
-router$A.get("/options", (_req, res) => {
+router$B.get("/options", (_req, res) => {
   return res.json({
     roomTypes: [
       { value: "living", label: "Living Room" },
@@ -22280,9 +23819,9 @@ router$A.get("/options", (_req, res) => {
 function capitalize(s) {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : "";
 }
-const router$z = Router();
+const router$A = Router();
 const db$l = () => admin.firestore();
-router$z.post("/email", requireStaff, async (req, res) => {
+router$A.post("/email", requireStaff, async (req, res) => {
   try {
     const { to, subject, body, orderId, clientId: clientId2 } = req.body;
     if (!to || !body?.trim()) {
@@ -22322,7 +23861,7 @@ router$z.post("/email", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to send email." });
   }
 });
-router$z.get("/:orderId", requireAuth, async (req, res) => {
+router$A.get("/:orderId", requireAuth, async (req, res) => {
   try {
     const orderDoc = await db$l().collection("orders").doc(req.params.orderId).get();
     if (!orderDoc.exists) return res.status(404).json({ error: "Order not found." });
@@ -22351,7 +23890,7 @@ router$z.get("/:orderId", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch messages." });
   }
 });
-router$z.post("/:orderId", requireAuth, async (req, res) => {
+router$A.post("/:orderId", requireAuth, async (req, res) => {
   try {
     const { content, attachments } = req.body;
     if (!content?.trim()) {
@@ -22407,7 +23946,7 @@ router$z.post("/:orderId", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to send message." });
   }
 });
-router$z.get("/unread/count", requireStaff, async (_req, res) => {
+router$A.get("/unread/count", requireStaff, async (_req, res) => {
   try {
     const snapshot = await db$l().collection("messages").where("isRead", "==", false).where("senderType", "==", "client").get();
     return res.json({ unreadCount: snapshot.size });
@@ -24497,13 +26036,13 @@ const handlePatchPortalWebsite = async (req, res) => {
     return sendKnownError$3(res, err, "Could not save the listing site.");
   }
 };
-const router$y = Router();
+const router$z = Router();
 const db$i = () => admin.firestore();
 const HOME_LIMIT = 100;
 function asRecord$4(value) {
   return value && typeof value === "object" ? value : {};
 }
-router$y.get("/", requireStaff, async (req, res) => {
+router$z.get("/", requireStaff, async (req, res) => {
   try {
     const { status: status2, search, limit = "50" } = req.query;
     let query = db$i().collection("clients").orderBy("createdAt", "desc");
@@ -24530,7 +26069,7 @@ function adminReady$3(res) {
   });
   return false;
 }
-router$y.post("/register", async (req, res) => {
+router$z.post("/register", async (req, res) => {
   if (!clientPortalEnabled()) {
     return res.status(403).json({
       error: "Client portal signup is not available yet. Email photos@iconicimagestx.com for access to your media.",
@@ -24598,7 +26137,7 @@ router$y.post("/register", async (req, res) => {
     return res.status(500).json({ error: "Could not create the client account." });
   }
 });
-router$y.get("/me/home", requireAuth, async (req, res) => {
+router$z.get("/me/home", requireAuth, async (req, res) => {
   if (!adminReady$3(res)) return;
   try {
     const identity = await resolveClientIdentity(req.user.uid, req.user.email);
@@ -24805,14 +26344,14 @@ router$y.get("/me/home", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to load your portal." });
   }
 });
-router$y.get("/me/listings/:id", requireAuth, handleGetPortalListing);
-router$y.patch("/me/listings/:id/data", requireAuth, handlePatchPortalData);
-router$y.patch("/me/listings/:id/media", requireAuth, handlePatchPortalMedia);
-router$y.patch("/me/listings/:id/website", requireAuth, handlePatchPortalWebsite);
-router$y.post("/me/listings/:id/photo-edit-requests", requireAuth, handleCreatePhotoEditRequest);
-router$y.post("/me/listings/:id/uploads/url", requireAuth, handleCreatePortalUploadUrl);
-router$y.post("/me/listings/:id/uploads", requireAuth, handleRegisterPortalUpload);
-router$y.get("/me", requireAuth, async (req, res) => {
+router$z.get("/me/listings/:id", requireAuth, handleGetPortalListing);
+router$z.patch("/me/listings/:id/data", requireAuth, handlePatchPortalData);
+router$z.patch("/me/listings/:id/media", requireAuth, handlePatchPortalMedia);
+router$z.patch("/me/listings/:id/website", requireAuth, handlePatchPortalWebsite);
+router$z.post("/me/listings/:id/photo-edit-requests", requireAuth, handleCreatePhotoEditRequest);
+router$z.post("/me/listings/:id/uploads/url", requireAuth, handleCreatePortalUploadUrl);
+router$z.post("/me/listings/:id/uploads", requireAuth, handleRegisterPortalUpload);
+router$z.get("/me", requireAuth, async (req, res) => {
   try {
     const directDoc = await db$i().collection("clients").doc(req.user.uid).get();
     if (directDoc.exists) {
@@ -24828,7 +26367,7 @@ router$y.get("/me", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch profile." });
   }
 });
-router$y.get("/:id", requireStaff, async (req, res) => {
+router$z.get("/:id", requireStaff, async (req, res) => {
   try {
     const doc = await db$i().collection("clients").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Client not found." });
@@ -24845,7 +26384,7 @@ router$y.get("/:id", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch client." });
   }
 });
-router$y.post("/", requireCoordinator, async (req, res) => {
+router$z.post("/", requireCoordinator, async (req, res) => {
   try {
     const { firstName, lastName, email, phone, address, notes, tags } = req.body;
     if (!firstName || !lastName || !email) {
@@ -24875,7 +26414,7 @@ router$y.post("/", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to create client." });
   }
 });
-router$y.patch("/:id", requireCoordinator, async (req, res) => {
+router$z.patch("/:id", requireCoordinator, async (req, res) => {
   try {
     const allowed = ["firstName", "lastName", "phone", "address", "status", "notes", "tags", "company"];
     const updates = { updatedAt: admin.firestore.FieldValue.serverTimestamp() };
@@ -25845,7 +27384,7 @@ function publicFile(file) {
     createdAt: file.createdAt
   };
 }
-const router$x = Router();
+const router$y = Router();
 function guard(handler) {
   return async (req, res) => {
     try {
@@ -25863,7 +27402,7 @@ function testClient(req) {
 function testStaff(req) {
   return process.env.CLIENT_HUB_TEST_AUTH === "1" && typeof req.headers["x-staff-uid"] === "string";
 }
-router$x.use((req, res, next) => {
+router$y.use((req, res, next) => {
   const clientPath = req.path.startsWith("/me/hub") || req.path.startsWith("/me/files");
   if (clientPath && testClient(req)) {
     req.user = {
@@ -25885,60 +27424,60 @@ function coordinatorOrTest(req, res, next) {
   }
   return requireCoordinator(req, res, next);
 }
-router$x.get("/me/hub/profile", guard(async (req, res) => {
+router$y.get("/me/hub/profile", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   res.json(await getProfile(await loadActor(req.user.uid, req.user.email || "")));
 }));
-router$x.patch("/me/hub/profile", guard(async (req, res) => {
+router$y.patch("/me/hub/profile", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   res.json(await saveProfile(await loadActor(req.user.uid, req.user.email || ""), req.body));
 }));
-router$x.post("/me/hub/profile/asset", guard(async (req, res) => {
+router$y.post("/me/hub/profile/asset", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   const kind = typeof req.body?.kind === "string" ? req.body.kind : "";
   const dataUrl = typeof req.body?.dataUrl === "string" ? req.body.dataUrl : "";
   res.json(await saveProfileAsset(await loadActor(req.user.uid, req.user.email || ""), kind, dataUrl));
 }));
-router$x.get("/me/hub/team", guard(async (req, res) => {
+router$y.get("/me/hub/team", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   res.json(await getTeam(await loadActor(req.user.uid, req.user.email || "")));
 }));
-router$x.post("/me/hub/team", guard(async (req, res) => {
+router$y.post("/me/hub/team", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   res.json(await saveTeam(await loadActor(req.user.uid, req.user.email || ""), req.body));
 }));
-router$x.patch("/me/hub/team", guard(async (req, res) => {
+router$y.patch("/me/hub/team", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   res.json(await saveTeam(await loadActor(req.user.uid, req.user.email || ""), req.body));
 }));
-router$x.post("/me/hub/team/members", guard(async (req, res) => {
+router$y.post("/me/hub/team/members", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   res.status(201).json(await addTeamMember(await loadActor(req.user.uid, req.user.email || ""), req.body, req.body?.invite === true));
 }));
-router$x.patch("/me/hub/team/members/:id", guard(async (req, res) => {
+router$y.patch("/me/hub/team/members/:id", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   res.json(await updateTeamMember(await loadActor(req.user.uid, req.user.email || ""), req.params.id, req.body));
 }));
-router$x.delete("/me/hub/team/members/:id", guard(async (req, res) => {
+router$y.delete("/me/hub/team/members/:id", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   res.json(await removeTeamMember(await loadActor(req.user.uid, req.user.email || ""), req.params.id));
 }));
-router$x.post("/me/hub/team/members/:id/invite", guard(async (req, res) => {
+router$y.post("/me/hub/team/members/:id/invite", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   res.json(await sendTeamInvite(await loadActor(req.user.uid, req.user.email || ""), req.params.id));
 }));
-router$x.get("/me/hub/clients.csv", guard(async (req, res) => {
+router$y.get("/me/hub/clients.csv", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   const { contacts } = await listContacts(await loadActor(req.user.uid, req.user.email || ""));
   res.setHeader("Content-Type", "text/csv; charset=utf-8");
   res.setHeader("Content-Disposition", 'attachment; filename="example-clients.csv"');
   res.send(contactsToCsv(contacts));
 }));
-router$x.get("/me/hub/clients", guard(async (req, res) => {
+router$y.get("/me/hub/clients", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   res.json(await listContacts(await loadActor(req.user.uid, req.user.email || "")));
 }));
-router$x.post("/me/hub/clients/import", guard(async (req, res) => {
+router$y.post("/me/hub/clients/import", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   const csv = typeof req.body?.csv === "string" ? req.body.csv : "";
   const parsed = parseContactsCsv(csv);
@@ -25947,35 +27486,35 @@ router$x.post("/me/hub/clients/import", guard(async (req, res) => {
   const saved = await importContacts(actor2, parsed.contacts.map((contact2) => ({ ...contact2, ownerClientId: actor2.clientId, teamId: "" })));
   res.status(201).json({ ...saved, errors: parsed.errors });
 }));
-router$x.post("/me/hub/clients", guard(async (req, res) => {
+router$y.post("/me/hub/clients", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   res.status(201).json(await saveContact(await loadActor(req.user.uid, req.user.email || ""), null, req.body));
 }));
-router$x.patch("/me/hub/clients/:id", guard(async (req, res) => {
+router$y.patch("/me/hub/clients/:id", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   res.json(await saveContact(await loadActor(req.user.uid, req.user.email || ""), req.params.id, req.body));
 }));
-router$x.delete("/me/hub/clients/:id", guard(async (req, res) => {
+router$y.delete("/me/hub/clients/:id", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   res.json(await deleteContact(await loadActor(req.user.uid, req.user.email || ""), req.params.id));
 }));
-router$x.get("/me/hub/billing", guard(async (req, res) => {
+router$y.get("/me/hub/billing", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   const owner = typeof req.query.account === "string" ? req.query.account : "";
   res.json(await getBilling(await loadActor(req.user.uid, req.user.email || ""), owner));
 }));
-router$x.patch("/me/hub/billing", guard(async (req, res) => {
+router$y.patch("/me/hub/billing", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   const owner = typeof req.query.account === "string" ? req.query.account : "";
   res.json(await saveBilling(await loadActor(req.user.uid, req.user.email || ""), owner, req.body));
 }));
-router$x.get("/me/files", guard(async (req, res) => {
+router$y.get("/me/files", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open your files.");
   const actor2 = await loadActor(req.user.uid, req.user.email || "");
   const files = await listClientFiles({ firebaseUids: [actor2.uid, ...actor2.clientIds], clientIds: actor2.clientIds });
   res.json({ files });
 }));
-router$x.post("/me/files", guard(async (req, res) => {
+router$y.post("/me/files", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to upload a file.");
   const actor2 = await loadActor(req.user.uid, req.user.email || "");
   const file = await addClientFile({
@@ -25989,7 +27528,7 @@ router$x.post("/me/files", guard(async (req, res) => {
   });
   res.status(201).json({ file });
 }));
-router$x.get("/me/files/:fileId/raw", guard(async (req, res) => {
+router$y.get("/me/files/:fileId/raw", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open your files.");
   const actor2 = await loadActor(req.user.uid, req.user.email || "");
   const found = await readClientFile(req.params.fileId, { firebaseUids: [actor2.uid, ...actor2.clientIds], clientIds: actor2.clientIds });
@@ -25998,7 +27537,7 @@ router$x.get("/me/files/:fileId/raw", guard(async (req, res) => {
   res.setHeader("Content-Disposition", `inline; filename="${found.file.name.replace(/"/g, "")}"`);
   res.send(found.bytes);
 }));
-router$x.post("/me/hub/billing/card", guard(async (req, res) => {
+router$y.post("/me/hub/billing/card", guard(async (req, res) => {
   if (!req.user) throw new HubError(401, "Sign in to open settings.");
   if (containsRawCard(req.body)) throw new HubError(400, "Card numbers are not stored. Use the Square card form.");
   const sourceId = typeof req.body?.sourceId === "string" ? req.body.sourceId : "";
@@ -26022,16 +27561,16 @@ function clientIdParam(value) {
   if (!/^[A-Za-z0-9_-]{4,128}$/.test(id)) throw new HubError(400, "Client not found.");
   return id;
 }
-router$x.get("/:id/hub/profile", requireCoordinator, guard(async (req, res) => {
+router$y.get("/:id/hub/profile", requireCoordinator, guard(async (req, res) => {
   const billing = await getStaffBilling(clientIdParam(req.params.id));
   res.json({ profile: billing.profile });
 }));
-router$x.post("/:id/hub/profile/asset", requireCoordinator, guard(async (req, res) => {
+router$y.post("/:id/hub/profile/asset", requireCoordinator, guard(async (req, res) => {
   const kind = typeof req.body?.kind === "string" ? req.body.kind : "";
   const dataUrl = typeof req.body?.dataUrl === "string" ? req.body.dataUrl : "";
   res.json(await saveStaffProfileAsset(clientIdParam(req.params.id), kind, dataUrl));
 }));
-router$x.get("/:id/hub/billing", requireCoordinator, guard(async (req, res) => {
+router$y.get("/:id/hub/billing", requireCoordinator, guard(async (req, res) => {
   res.json(await getStaffBilling(clientIdParam(req.params.id)));
 }));
 async function staffFileScope(clientId2) {
@@ -26052,11 +27591,11 @@ async function staffFileScope(clientId2) {
     clientId: clientId2
   };
 }
-router$x.get("/:id/files", coordinatorOrTest, guard(async (req, res) => {
+router$y.get("/:id/files", coordinatorOrTest, guard(async (req, res) => {
   const scope = await staffFileScope(clientIdParam(req.params.id));
   res.json({ files: await listClientFiles(scope) });
 }));
-router$x.post("/:id/files", coordinatorOrTest, guard(async (req, res) => {
+router$y.post("/:id/files", coordinatorOrTest, guard(async (req, res) => {
   const scope = await staffFileScope(clientIdParam(req.params.id));
   const file = await addClientFile({
     firebaseUid: scope.firebaseUid,
@@ -26069,7 +27608,7 @@ router$x.post("/:id/files", coordinatorOrTest, guard(async (req, res) => {
   });
   res.status(201).json({ file });
 }));
-router$x.get("/:id/files/:fileId/raw", coordinatorOrTest, guard(async (req, res) => {
+router$y.get("/:id/files/:fileId/raw", coordinatorOrTest, guard(async (req, res) => {
   const scope = await staffFileScope(clientIdParam(req.params.id));
   const found = await readClientFile(req.params.fileId, scope);
   if (!found) throw new HubError(404, "That file is not on this client.");
@@ -26077,7 +27616,7 @@ router$x.get("/:id/files/:fileId/raw", coordinatorOrTest, guard(async (req, res)
   res.setHeader("Content-Disposition", `inline; filename="${found.file.name.replace(/"/g, "")}"`);
   res.send(found.bytes);
 }));
-router$x.post("/:id/hub/billing/card", requireCoordinator, guard(async (req, res) => {
+router$y.post("/:id/hub/billing/card", requireCoordinator, guard(async (req, res) => {
   if (containsRawCard(req.body)) throw new HubError(400, "Card numbers are not stored. Use the Square card form.");
   const clientId2 = clientIdParam(req.params.id);
   const sourceId = typeof req.body?.sourceId === "string" ? req.body.sourceId : "";
@@ -26093,7 +27632,7 @@ router$x.post("/:id/hub/billing/card", requireCoordinator, guard(async (req, res
   if ("error" in saved) throw new HubError(502, saved.error);
   res.json(await saveStaffCard(clientId2, saved.card));
 }));
-router$x.use((req, res, next) => {
+router$y.use((req, res, next) => {
   if (req.path.startsWith("/me/hub") || req.path.startsWith("/me/files")) {
     return res.status(404).json({ error: "Settings path not found." });
   }
@@ -26709,9 +28248,9 @@ async function setStaffPassword(staffId, password, actor2, replaceExisting) {
   await deleteManualDuplicates(email, uid);
   return { uid, mustChangePassword: true };
 }
-const router$w = Router();
+const router$x = Router();
 const db$f = () => admin.firestore();
-router$w.get("/", requireStaff, async (_req, res) => {
+router$x.get("/", requireStaff, async (_req, res) => {
   try {
     const snapshot = await db$f().collection("staff").where("isActive", "==", true).orderBy("firstName").get();
     return res.json(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
@@ -26729,7 +28268,7 @@ function staffLoginFailure(err, res, fallback) {
   console.error("[Staff] Login provision error.");
   return res.status(500).json({ error: fallback });
 }
-router$w.post("/", requireAdmin, async (req, res) => {
+router$x.post("/", requireAdmin, async (req, res) => {
   try {
     const result = await provisionStaffLogin(req.body || {}, actingAdmin(req));
     return res.status(result.created ? 201 : 200).json({
@@ -26743,7 +28282,7 @@ router$w.post("/", requireAdmin, async (req, res) => {
     return staffLoginFailure(err, res, "Failed to create staff member.");
   }
 });
-router$w.post("/:id/password", requireAdmin, async (req, res) => {
+router$x.post("/:id/password", requireAdmin, async (req, res) => {
   try {
     const result = await setStaffPassword(
       String(req.params.id || ""),
@@ -26756,7 +28295,7 @@ router$w.post("/:id/password", requireAdmin, async (req, res) => {
     return staffLoginFailure(err, res, "Failed to set the password.");
   }
 });
-router$w.patch("/:id", requireAdmin, async (req, res) => {
+router$x.patch("/:id", requireAdmin, async (req, res) => {
   try {
     const allowed = ["firstName", "lastName", "phone", "role", "isActive"];
     const updates = { updatedAt: admin.firestore.FieldValue.serverTimestamp() };
@@ -26796,7 +28335,7 @@ function requireSetupSecret(req, res) {
   }
   return true;
 }
-router$w.post("/playtest", async (req, res) => {
+router$x.post("/playtest", async (req, res) => {
   if (!requireSetupSecret(req, res)) return;
   if (!admin.apps.length) {
     return res.status(503).json({
@@ -26815,7 +28354,7 @@ router$w.post("/playtest", async (req, res) => {
     return res.status(500).json({ error: "Playtest setup failed." });
   }
 });
-router$w.post("/setup", async (req, res) => {
+router$x.post("/setup", async (req, res) => {
   try {
     if (isHostedDeployment(liveServerEnv())) {
       const secret2 = process.env.STAFF_SETUP_SECRET;
@@ -26858,7 +28397,7 @@ router$w.post("/setup", async (req, res) => {
     return res.status(500).json({ error: "Setup failed." });
   }
 });
-const router$v = Router();
+const router$w = Router();
 async function clearMustChangeFlag(uid) {
   const db2 = admin.firestore();
   const now = admin.firestore.FieldValue.serverTimestamp();
@@ -26874,7 +28413,7 @@ async function clearMustChangeFlag(uid) {
   await admin.auth().setCustomUserClaims(uid, claims);
   await admin.auth().revokeRefreshTokens(uid);
 }
-router$v.post("/password", requireAuth, async (req, res) => {
+router$w.post("/password", requireAuth, async (req, res) => {
   const password = String(req.body?.password || "");
   const problem = passwordPolicyError(password);
   if (problem) return res.status(400).json({ error: problem });
@@ -26916,7 +28455,7 @@ function kickStudioQueue(listingId, env = process.env) {
   });
   return { dispatched: true };
 }
-const router$u = Router();
+const router$v = Router();
 const db$e = () => admin.firestore();
 const DIRECT_UPLOAD_LIMIT = 3e6;
 function adminReady$2(res) {
@@ -26984,7 +28523,7 @@ function sendKnownError$2(res, err, fallback) {
   console.error("[Listings]", err);
   return res.status(500).json({ error: fallback });
 }
-router$u.get("/assigned", requirePhotographer, async (req, res) => {
+router$v.get("/assigned", requirePhotographer, async (req, res) => {
   if (!adminReady$2(res)) return;
   try {
     const uid = req.user.uid;
@@ -27013,7 +28552,7 @@ router$u.get("/assigned", requirePhotographer, async (req, res) => {
     return res.status(500).json({ error: "Failed to load assigned jobs." });
   }
 });
-router$u.get("/:id", requireAuth, async (req, res) => {
+router$v.get("/:id", requireAuth, async (req, res) => {
   if (!adminReady$2(res)) return;
   try {
     const listing = await assertListingAccess(req, req.params.id);
@@ -27028,7 +28567,7 @@ router$u.get("/:id", requireAuth, async (req, res) => {
     return sendKnownError$2(res, err, "Failed to load listing.");
   }
 });
-router$u.post("/:id/photos/upload-url", requirePhotographer, async (req, res) => {
+router$v.post("/:id/photos/upload-url", requirePhotographer, async (req, res) => {
   if (!adminReady$2(res)) return;
   try {
     const fileName2 = safeStorageFileName(req.body?.fileName);
@@ -27046,7 +28585,7 @@ router$u.post("/:id/photos/upload-url", requirePhotographer, async (req, res) =>
     return sendKnownError$2(res, err, "Failed to prepare the upload. Check FIREBASE_STORAGE_BUCKET.");
   }
 });
-router$u.post("/:id/photos", requirePhotographer, async (req, res) => {
+router$v.post("/:id/photos", requirePhotographer, async (req, res) => {
   if (!adminReady$2(res)) return;
   try {
     const listingId = req.params.id;
@@ -27094,7 +28633,7 @@ router$u.post("/:id/photos", requirePhotographer, async (req, res) => {
     return sendKnownError$2(res, err, "Failed to save the uploaded photo.");
   }
 });
-router$u.patch("/:id/photo-order", requirePhotographer, async (req, res) => {
+router$v.patch("/:id/photo-order", requirePhotographer, async (req, res) => {
   if (!adminReady$2(res)) return;
   try {
     await assertListingAccess(req, req.params.id);
@@ -27112,7 +28651,7 @@ router$u.patch("/:id/photo-order", requirePhotographer, async (req, res) => {
     return sendKnownError$2(res, err, "Failed to save the photo order.");
   }
 });
-router$u.patch("/:id/media-arrangement", requireStaff, async (req, res) => {
+router$v.patch("/:id/media-arrangement", requireStaff, async (req, res) => {
   if (!adminReady$2(res)) return;
   try {
     await assertListingAccess(req, req.params.id);
@@ -27122,7 +28661,7 @@ router$u.patch("/:id/media-arrangement", requireStaff, async (req, res) => {
     return sendKnownError$2(res, err, "Failed to save the media order.");
   }
 });
-router$u.post("/:id/gallery-sequence", requirePhotographer, async (req, res) => {
+router$v.post("/:id/gallery-sequence", requirePhotographer, async (req, res) => {
   if (!adminReady$2(res)) return;
   try {
     await assertListingAccess(req, req.params.id);
@@ -27133,7 +28672,7 @@ router$u.post("/:id/gallery-sequence", requirePhotographer, async (req, res) => 
     return sendKnownError$2(res, err, "Failed to upload the gallery in order.");
   }
 });
-const router$t = Router();
+const router$u = Router();
 const db$d = () => admin.firestore();
 function mailchimpConfig() {
   const apiKey = process.env.MAILCHIMP_API_KEY || "";
@@ -27161,7 +28700,7 @@ async function mailchimpRequest(path2, init = {}) {
   }
   return data;
 }
-router$t.get("/", requireCoordinator, async (_req, res) => {
+router$u.get("/", requireCoordinator, async (_req, res) => {
   try {
     const snapshot = await db$d().collection("campaigns").orderBy("createdAt", "desc").limit(50).get();
     return res.json(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
@@ -27169,7 +28708,7 @@ router$t.get("/", requireCoordinator, async (_req, res) => {
     return res.status(500).json({ error: "Failed to fetch campaigns." });
   }
 });
-router$t.get("/mailchimp/status", requireCoordinator, async (_req, res) => {
+router$u.get("/mailchimp/status", requireCoordinator, async (_req, res) => {
   try {
     const { apiKey, serverPrefix } = mailchimpConfig();
     if (!apiKey || !serverPrefix) {
@@ -27200,7 +28739,7 @@ router$t.get("/mailchimp/status", requireCoordinator, async (_req, res) => {
     });
   }
 });
-router$t.post("/mailchimp/sync", requireCoordinator, async (req, res) => {
+router$u.post("/mailchimp/sync", requireCoordinator, async (req, res) => {
   try {
     const { listId, audience = "all" } = req.body;
     if (!listId) return res.status(400).json({ error: "listId required." });
@@ -27263,7 +28802,7 @@ router$t.post("/mailchimp/sync", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: err instanceof Error ? err.message : "Failed to sync Mailchimp." });
   }
 });
-router$t.post("/", requireCoordinator, async (req, res) => {
+router$u.post("/", requireCoordinator, async (req, res) => {
   try {
     const { name, type, subject, body, audience, audienceIds, scheduledAt } = req.body;
     if (!name || !body || !audience) {
@@ -27288,7 +28827,7 @@ router$t.post("/", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to create campaign." });
   }
 });
-router$t.post("/:id/send", requireCoordinator, async (req, res) => {
+router$u.post("/:id/send", requireCoordinator, async (req, res) => {
   try {
     const campaignDoc = await db$d().collection("campaigns").doc(req.params.id).get();
     if (!campaignDoc.exists) return res.status(404).json({ error: "Campaign not found." });
@@ -29539,7 +31078,7 @@ function parseTabularUpload(input) {
   }
   return parseCsv(input.text || "");
 }
-const router$s = Router();
+const router$t = Router();
 const MAX_ROWS = 1e4;
 const unsubscribeLimit = createRateLimiter({ windowMs: 60 * 60 * 1e3, max: 20 });
 function requireMarketing$1(permission) {
@@ -29576,7 +31115,7 @@ function publicContact(contact2, suppression) {
     suppressed: blocked ? reasonLabel(blocked.reason, blocked.hold) : ""
   };
 }
-router$s.get("/overview", requireMarketing$1("view"), async (_req, res) => {
+router$t.get("/overview", requireMarketing$1("view"), async (_req, res) => {
   const store = getMarketingStore();
   await store.ensureSeed();
   const [contacts, suppression, segments] = await Promise.all([
@@ -29592,7 +31131,7 @@ router$s.get("/overview", requireMarketing$1("view"), async (_req, res) => {
     segments: segments.length
   });
 });
-router$s.get("/contacts", requireMarketing$1("view"), async (req, res) => {
+router$t.get("/contacts", requireMarketing$1("view"), async (req, res) => {
   const store = getMarketingStore();
   await store.ensureSeed();
   const [contacts, suppression] = await Promise.all([store.listContacts(), store.listSuppression()]);
@@ -29608,7 +31147,7 @@ router$s.get("/contacts", requireMarketing$1("view"), async (req, res) => {
   const tags = [...new Set(contacts.flatMap((contact2) => contact2.tags))].sort((a, b) => a.localeCompare(b));
   res.json({ contacts: filtered, tags, total: contacts.length });
 });
-router$s.get("/contacts/detail", requireMarketing$1("view"), async (req, res) => {
+router$t.get("/contacts/detail", requireMarketing$1("view"), async (req, res) => {
   const email = normalizeEmail(req.query.email);
   if (!isValidEmail(email)) return res.status(400).json({ error: "A valid email is required." });
   const store = getMarketingStore();
@@ -29625,7 +31164,7 @@ router$s.get("/contacts/detail", requireMarketing$1("view"), async (req, res) =>
     activity: events.sort((a, b) => b.at.localeCompare(a.at))
   });
 });
-router$s.post("/contacts", requireMarketing$1("manage"), async (req, res) => {
+router$t.post("/contacts", requireMarketing$1("manage"), async (req, res) => {
   const email = normalizeEmail(req.body?.email);
   if (!isValidEmail(email)) return res.status(400).json({ error: "A valid email is required." });
   const store = getMarketingStore();
@@ -29650,7 +31189,7 @@ router$s.post("/contacts", requireMarketing$1("manage"), async (req, res) => {
   await store.saveContacts([contact2]);
   res.json({ contact: contact2 });
 });
-router$s.post("/contacts/tags", requireMarketing$1("manage"), async (req, res) => {
+router$t.post("/contacts/tags", requireMarketing$1("manage"), async (req, res) => {
   const emails = Array.isArray(req.body?.emails) ? req.body.emails.map((email) => normalizeEmail(email)) : [];
   const add = Array.isArray(req.body?.add) ? req.body.add.map(String) : [];
   const remove = Array.isArray(req.body?.remove) ? req.body.remove.map(String) : [];
@@ -29663,11 +31202,11 @@ router$s.post("/contacts/tags", requireMarketing$1("manage"), async (req, res) =
   await store.saveContacts(next);
   res.json({ updated: next.length });
 });
-router$s.post("/contacts/sync", requireMarketing$1("manage"), async (_req, res) => {
+router$t.post("/contacts/sync", requireMarketing$1("manage"), async (_req, res) => {
   const result = await syncCustomerContacts();
   res.json(result);
 });
-router$s.post("/imports/parse", requireMarketing$1("manage"), async (req, res) => {
+router$t.post("/imports/parse", requireMarketing$1("manage"), async (req, res) => {
   try {
     const table = parseTabularUpload({
       text: typeof req.body?.text === "string" ? req.body.text : "",
@@ -29687,7 +31226,7 @@ router$s.post("/imports/parse", requireMarketing$1("manage"), async (req, res) =
     res.status(400).json({ error: err instanceof Error ? err.message : "Could not read that file." });
   }
 });
-router$s.post("/imports/commit", requireMarketing$1("manage"), async (req, res) => {
+router$t.post("/imports/commit", requireMarketing$1("manage"), async (req, res) => {
   const headers = Array.isArray(req.body?.headers) ? req.body.headers.map(String) : [];
   const rows = Array.isArray(req.body?.rows) ? req.body.rows.map((row) => Array.isArray(row) ? row.map(String) : []) : [];
   const mapping = req.body?.mapping && typeof req.body.mapping === "object" ? req.body.mapping : {};
@@ -29705,7 +31244,7 @@ router$s.post("/imports/commit", requireMarketing$1("manage"), async (req, res) 
   await store.saveContacts(plan.upserts);
   res.json({ summary: plan.summary });
 });
-router$s.get("/segments", requireMarketing$1("view"), async (_req, res) => {
+router$t.get("/segments", requireMarketing$1("view"), async (_req, res) => {
   const store = getMarketingStore();
   const [segments, contacts] = await Promise.all([store.listSegments(), store.listContacts()]);
   res.json({
@@ -29715,7 +31254,7 @@ router$s.get("/segments", requireMarketing$1("view"), async (_req, res) => {
     }))
   });
 });
-router$s.post("/segments", requireMarketing$1("manage"), async (req, res) => {
+router$t.post("/segments", requireMarketing$1("manage"), async (req, res) => {
   const name = String(req.body?.name || "").trim();
   if (!name) return res.status(400).json({ error: "Name the segment." });
   const store = getMarketingStore();
@@ -29732,11 +31271,11 @@ router$s.post("/segments", requireMarketing$1("manage"), async (req, res) => {
   await store.saveSegment(segment);
   res.json({ segment });
 });
-router$s.delete("/segments/:id", requireMarketing$1("manage"), async (req, res) => {
+router$t.delete("/segments/:id", requireMarketing$1("manage"), async (req, res) => {
   await getMarketingStore().deleteSegment(req.params.id);
   res.json({ ok: true });
 });
-router$s.get("/suppression", requireMarketing$1("view"), async (_req, res) => {
+router$t.get("/suppression", requireMarketing$1("view"), async (_req, res) => {
   const store = getMarketingStore();
   await store.ensureSeed();
   const entries = await store.listSuppression();
@@ -29744,7 +31283,7 @@ router$s.get("/suppression", requireMarketing$1("view"), async (_req, res) => {
     entries: entries.sort((a, b) => a.value.localeCompare(b.value))
   });
 });
-router$s.post("/suppression", requireMarketing$1("manage"), async (req, res) => {
+router$t.post("/suppression", requireMarketing$1("manage"), async (req, res) => {
   const now = (/* @__PURE__ */ new Date()).toISOString();
   const entry2 = buildSuppression(now, {
     kind: req.body?.kind === "domain" || req.body?.kind === "name" ? req.body.kind : "email",
@@ -29763,11 +31302,11 @@ router$s.post("/suppression", requireMarketing$1("manage"), async (req, res) => 
   await store.saveSuppression({ ...entry2, createdAt: existing?.createdAt || now, source: existing?.source || "manual" });
   res.json({ entry: entry2 });
 });
-router$s.delete("/suppression/:id", requireMarketing$1("manage"), async (req, res) => {
+router$t.delete("/suppression/:id", requireMarketing$1("manage"), async (req, res) => {
   await getMarketingStore().deleteSuppression(decodeURIComponent(req.params.id));
   res.json({ ok: true });
 });
-router$s.post("/unsubscribe", async (req, res) => {
+router$t.post("/unsubscribe", async (req, res) => {
   const limit = unsubscribeLimit.check(clientIp(req));
   if (!limit.allowed) return res.status(429).json({ error: "Too many attempts. Try again later." });
   const email = normalizeEmail(req.body?.email);
@@ -30109,7 +31648,7 @@ function createGmassClient(env = process.env, fetchImpl = fetch) {
 function getGmassClient() {
   return createGmassClient();
 }
-const router$r = Router();
+const router$s = Router();
 function requireMarketing(permission) {
   return async (req, res, next) => {
     await requireStaff(req, res, () => {
@@ -30255,7 +31794,7 @@ function sendBlocked(res, gmass) {
   }
   return false;
 }
-router$r.get("/dashboard", requireMarketing("view"), async (_req, res) => {
+router$s.get("/dashboard", requireMarketing("view"), async (_req, res) => {
   const store = getMarketingStore();
   await store.ensureSeed();
   const [contacts, suppression, segments, campaigns, reports] = await Promise.all([
@@ -30290,11 +31829,11 @@ router$r.get("/dashboard", requireMarketing("view"), async (_req, res) => {
     alerts: rows.filter((row) => row.stats?.pauseRecommended)
   });
 });
-router$r.get("/campaigns", requireMarketing("view"), async (_req, res) => {
+router$s.get("/campaigns", requireMarketing("view"), async (_req, res) => {
   const campaigns = await getMarketingStore().listCampaigns();
   res.json({ campaigns: campaigns.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)) });
 });
-router$r.post("/campaigns", requireMarketing("manage"), async (req, res) => {
+router$s.post("/campaigns", requireMarketing("manage"), async (req, res) => {
   const store = getMarketingStore();
   const now = (/* @__PURE__ */ new Date()).toISOString();
   const settings = await store.getSettings();
@@ -30307,12 +31846,12 @@ router$r.post("/campaigns", requireMarketing("manage"), async (req, res) => {
   await store.saveCampaign(campaign);
   res.status(201).json({ campaign });
 });
-router$r.get("/campaigns/:id", requireMarketing("view"), async (req, res) => {
+router$s.get("/campaigns/:id", requireMarketing("view"), async (req, res) => {
   const campaign = await getMarketingStore().getCampaign(req.params.id);
   if (!campaign) return res.status(404).json({ error: "Campaign not found." });
   res.json({ campaign });
 });
-router$r.post("/campaigns/:id", requireMarketing("manage"), async (req, res) => {
+router$s.post("/campaigns/:id", requireMarketing("manage"), async (req, res) => {
   const store = getMarketingStore();
   const current = await store.getCampaign(req.params.id);
   if (!current) return res.status(404).json({ error: "Campaign not found." });
@@ -30327,7 +31866,7 @@ router$r.post("/campaigns/:id", requireMarketing("manage"), async (req, res) => 
   await store.saveCampaign(campaign);
   res.json({ campaign });
 });
-router$r.post("/campaigns/:id/duplicate", requireMarketing("manage"), async (req, res) => {
+router$s.post("/campaigns/:id/duplicate", requireMarketing("manage"), async (req, res) => {
   const store = getMarketingStore();
   const current = await store.getCampaign(req.params.id);
   if (!current) return res.status(404).json({ error: "Campaign not found." });
@@ -30349,7 +31888,7 @@ router$r.post("/campaigns/:id/duplicate", requireMarketing("manage"), async (req
   await store.saveCampaign(copy);
   res.status(201).json({ campaign: copy });
 });
-router$r.post("/campaigns/:id/preview", requireMarketing("send"), async (req, res) => {
+router$s.post("/campaigns/:id/preview", requireMarketing("send"), async (req, res) => {
   const store = getMarketingStore();
   const current = await store.getCampaign(req.params.id);
   if (!current) return res.status(404).json({ error: "Campaign not found." });
@@ -30368,7 +31907,7 @@ router$r.post("/campaigns/:id/preview", requireMarketing("send"), async (req, re
   await store.saveCampaign(campaign);
   res.json({ confirmation });
 });
-router$r.post("/campaigns/:id/test", requireMarketing("send"), async (req, res) => {
+router$s.post("/campaigns/:id/test", requireMarketing("send"), async (req, res) => {
   const to = normalizeEmail(req.body?.to);
   if (!isValidEmail(to)) return res.status(400).json({ error: "Enter a test email address." });
   const gmass = getGmassClient();
@@ -30397,7 +31936,7 @@ router$r.post("/campaigns/:id/test", requireMarketing("send"), async (req, res) 
   }
   res.json({ ok: true, to });
 });
-router$r.post("/campaigns/:id/send", requireMarketing("send"), async (req, res) => {
+router$s.post("/campaigns/:id/send", requireMarketing("send"), async (req, res) => {
   const store = getMarketingStore();
   const current = await store.getCampaign(req.params.id);
   if (!current) return res.status(404).json({ error: "Campaign not found." });
@@ -30501,7 +32040,7 @@ router$r.post("/campaigns/:id/send", requireMarketing("send"), async (req, res) 
     return res.status(502).json({ error: message });
   }
 });
-router$r.get("/campaigns/:id/report", requireMarketing("view"), async (req, res) => {
+router$s.get("/campaigns/:id/report", requireMarketing("view"), async (req, res) => {
   const store = getMarketingStore();
   const [campaign, report] = await Promise.all([
     store.getCampaign(req.params.id),
@@ -30510,7 +32049,7 @@ router$r.get("/campaigns/:id/report", requireMarketing("view"), async (req, res)
   if (!campaign) return res.status(404).json({ error: "Campaign not found." });
   res.json({ campaign, report });
 });
-router$r.post("/campaigns/:id/report", requireMarketing("view"), async (req, res) => {
+router$s.post("/campaigns/:id/report", requireMarketing("view"), async (req, res) => {
   const store = getMarketingStore();
   const campaign = await store.getCampaign(req.params.id);
   if (!campaign) return res.status(404).json({ error: "Campaign not found." });
@@ -30585,11 +32124,11 @@ router$r.post("/campaigns/:id/report", requireMarketing("view"), async (req, res
     res.status(502).json({ error: err instanceof Error ? err.message : "Could not refresh the GMass report." });
   }
 });
-router$r.get("/templates", requireMarketing("view"), async (_req, res) => {
+router$s.get("/templates", requireMarketing("view"), async (_req, res) => {
   const templates = await getMarketingStore().listTemplates();
   res.json({ templates });
 });
-router$r.post("/templates", requireMarketing("manage"), async (req, res) => {
+router$s.post("/templates", requireMarketing("manage"), async (req, res) => {
   const name = String(req.body?.name || "").trim();
   const html = String(req.body?.html || "");
   if (!name || !html) return res.status(400).json({ error: "A template needs a name and HTML." });
@@ -30604,15 +32143,15 @@ router$r.post("/templates", requireMarketing("manage"), async (req, res) => {
   await getMarketingStore().saveTemplate(template);
   res.json({ template });
 });
-router$r.delete("/templates/:id", requireMarketing("manage"), async (req, res) => {
+router$s.delete("/templates/:id", requireMarketing("manage"), async (req, res) => {
   await getMarketingStore().deleteTemplate(req.params.id);
   res.json({ ok: true });
 });
-router$r.get("/settings", requireMarketing("view"), async (_req, res) => {
+router$s.get("/settings", requireMarketing("view"), async (_req, res) => {
   const settings = await getMarketingStore().getSettings();
   res.json({ settings });
 });
-router$r.get("/account", requireMarketing("view"), async (_req, res) => {
+router$s.get("/account", requireMarketing("view"), async (_req, res) => {
   const settings = await getMarketingStore().getSettings();
   const gmass = getGmassClient();
   const base = {
@@ -30634,7 +32173,7 @@ router$r.get("/account", requireMarketing("view"), async (_req, res) => {
   ]);
   res.json({ ...base, user, warmup, domains });
 });
-router$r.post("/settings", requireMarketing("send"), async (req, res) => {
+router$s.post("/settings", requireMarketing("send"), async (req, res) => {
   const store = getMarketingStore();
   const current = await store.getSettings();
   const next = {
@@ -30657,7 +32196,7 @@ router$r.post("/settings", requireMarketing("send"), async (req, res) => {
   await store.saveSettings(next);
   res.json({ settings: next });
 });
-router$r.post("/account/unsubscribes", requireMarketing("send"), async (req, res) => {
+router$s.post("/account/unsubscribes", requireMarketing("send"), async (req, res) => {
   const gmass = getGmassClient();
   if (!gmass.configured) return res.status(503).json({ error: "Set GMASS_API_KEY before syncing a suppression to GMass." });
   const email = normalizeEmail(req.body?.email);
@@ -30677,7 +32216,7 @@ router$r.post("/account/unsubscribes", requireMarketing("send"), async (req, res
   }
   res.json({ ok: true });
 });
-router$r.post("/demo/sample-report", requireMarketing("send"), async (req, res) => {
+router$s.post("/demo/sample-report", requireMarketing("send"), async (req, res) => {
   if (process.env.MARKETING_DEMO !== "true" || isHostedDeployment(liveServerEnv())) {
     return res.status(404).json({ error: "Not found." });
   }
@@ -32435,7 +33974,7 @@ function openPixel(origin, campaignId, email, secret2) {
   const src = `${origin}/api/channel-campaigns/t/open.gif?c=${encodeURIComponent(campaignId)}&e=${encodeURIComponent(email)}&t=${token}`;
   return `<img src="${src}" width="1" height="1" alt="" />`;
 }
-const router$q = Router();
+const router$r = Router();
 const sendLimit = createRateLimiter({ windowMs: 10 * 60 * 1e3, max: 8 });
 const trackLimit = createRateLimiter({ windowMs: 60 * 1e3, max: 120 });
 const PIXEL = Buffer.from("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", "base64");
@@ -32491,7 +34030,7 @@ async function runBatches(items, worker) {
     if (index < batches.length - 1) await wait(delayMs());
   }
 }
-router$q.get("/t/open.gif", async (req, res) => {
+router$r.get("/t/open.gif", async (req, res) => {
   const limit = trackLimit.check(clientIp(req));
   const campaignId = String(req.query.c || "").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 80);
   const email = normalizeEmail(req.query.e);
@@ -32506,7 +34045,7 @@ router$q.get("/t/open.gif", async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   res.send(PIXEL);
 });
-router$q.get("/t/click", async (req, res) => {
+router$r.get("/t/click", async (req, res) => {
   const limit = trackLimit.check(clientIp(req));
   if (!limit.allowed) return res.status(429).send("Too many requests.");
   const campaignId = String(req.query.c || "").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 80);
@@ -32522,14 +34061,14 @@ router$q.get("/t/click", async (req, res) => {
   if (fresh) await store.bump(campaignId, "clicked");
   return res.redirect(url);
 });
-router$q.get("/", staffGate, async (req, res) => {
+router$r.get("/", staffGate, async (req, res) => {
   await ensureCampaignSample();
   const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 25));
   const page2 = await getChannelCampaignStore().list(limit, String(req.query.cursor || ""));
   const emailCampaigns = await emailCampaignSummaries();
   res.json({ ...page2, emailCampaigns, live: campaignSendLive() });
 });
-router$q.get("/calendar", staffGate, async (req, res) => {
+router$r.get("/calendar", staffGate, async (req, res) => {
   await ensureCampaignSample();
   const month = String(req.query.month || "");
   const campaigns = await getChannelCampaignStore().listAll(200);
@@ -32557,11 +34096,11 @@ router$q.get("/calendar", staffGate, async (req, res) => {
     }))
   });
 });
-router$q.get("/social-queue", staffGate, async (_req, res) => {
+router$r.get("/social-queue", staffGate, async (_req, res) => {
   const queue = await getChannelCampaignStore().listQueue(50);
   res.json({ queue });
 });
-router$q.get("/audience", staffGate, async (req, res) => {
+router$r.get("/audience", staffGate, async (req, res) => {
   await ensureCampaignSample();
   const segmentId = String(req.query.segmentId || "");
   const [preview, segments] = await Promise.all([
@@ -32573,7 +34112,7 @@ router$q.get("/audience", staffGate, async (req, res) => {
     audience: publicAudience(preview)
   });
 });
-router$q.post("/", staffGate, async (req, res) => {
+router$r.post("/", staffGate, async (req, res) => {
   const name = String(req.body?.name || "").trim();
   if (!name) return res.status(400).json({ error: "Name the campaign." });
   const now = (/* @__PURE__ */ new Date()).toISOString();
@@ -32592,7 +34131,7 @@ router$q.post("/", staffGate, async (req, res) => {
   await getChannelCampaignStore().save(campaign);
   res.status(201).json({ campaign });
 });
-router$q.post("/media", staffGate, async (req, res) => {
+router$r.post("/media", staffGate, async (req, res) => {
   const match = String(req.body?.dataUrl || "").match(/^data:(image\/(?:png|jpeg|gif|webp));base64,([A-Za-z0-9+/=\s]+)$/);
   if (!match) return res.status(400).json({ error: "Upload a PNG, JPEG, GIF, or WebP image." });
   const buffer = Buffer.from(match[2].replace(/\s/g, ""), "base64");
@@ -32607,7 +34146,7 @@ router$q.post("/media", staffGate, async (req, res) => {
   await fs.writeFile(path.join(dir, filename), buffer);
   res.json({ url: `/marketing/${filename}`, name: filename });
 });
-router$q.get("/:id", staffGate, async (req, res) => {
+router$r.get("/:id", staffGate, async (req, res) => {
   await ensureCampaignSample();
   const campaign = await getChannelCampaignStore().get(req.params.id);
   if (!campaign) return res.status(404).json({ error: "Campaign not found." });
@@ -32617,7 +34156,7 @@ router$q.get("/:id", staffGate, async (req, res) => {
   ]);
   res.json({ campaign, logs: logs.logs, audience: publicAudience(preview), live: campaignSendLive() });
 });
-router$q.post("/:id", staffGate, async (req, res) => {
+router$r.post("/:id", staffGate, async (req, res) => {
   const store = getChannelCampaignStore();
   const current = await store.get(req.params.id);
   if (!current) return res.status(404).json({ error: "Campaign not found." });
@@ -32641,7 +34180,7 @@ router$q.post("/:id", staffGate, async (req, res) => {
   await store.save(next, current.status);
   res.json({ campaign: next, reopened });
 });
-router$q.post("/:id/status", staffGate, async (req, res) => {
+router$r.post("/:id/status", staffGate, async (req, res) => {
   const store = getChannelCampaignStore();
   const current = await store.get(req.params.id);
   if (!current) return res.status(404).json({ error: "Campaign not found." });
@@ -32657,7 +34196,7 @@ router$q.post("/:id/status", staffGate, async (req, res) => {
   await store.save(next, current.status);
   res.json({ campaign: next });
 });
-router$q.post("/:id/posts/:postId/queue", staffGate, async (req, res) => {
+router$r.post("/:id/posts/:postId/queue", staffGate, async (req, res) => {
   const store = getChannelCampaignStore();
   const campaign = await store.get(req.params.id);
   if (!campaign) return res.status(404).json({ error: "Campaign not found." });
@@ -32685,12 +34224,12 @@ router$q.post("/:id/posts/:postId/queue", staffGate, async (req, res) => {
   });
   res.json({ campaign: next, queued: true });
 });
-router$q.get("/:id/logs", staffGate, async (req, res) => {
+router$r.get("/:id/logs", staffGate, async (req, res) => {
   const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 20));
   const page2 = await getChannelCampaignStore().listLogs(req.params.id, limit, String(req.query.cursor || ""));
   res.json(page2);
 });
-router$q.post("/:id/test", staffGate, async (req, res) => {
+router$r.post("/:id/test", staffGate, async (req, res) => {
   const limit = sendLimit.check(req.user?.uid || clientIp(req));
   if (!limit.allowed) return res.status(429).json({ error: "Too many send attempts. Try again shortly." });
   const to = normalizeEmail(req.user?.email || "");
@@ -32728,7 +34267,7 @@ router$q.post("/:id/test", staffGate, async (req, res) => {
   await getChannelCampaignStore().addLog(log);
   res.json({ delivered, to, log });
 });
-router$q.post("/:id/send", staffGate, async (req, res) => {
+router$r.post("/:id/send", staffGate, async (req, res) => {
   const limit = sendLimit.check(`${req.user?.uid || clientIp(req)}:send`);
   if (!limit.allowed) return res.status(429).json({ error: "Too many send attempts. Try again shortly." });
   const store = getChannelCampaignStore();
@@ -32830,7 +34369,7 @@ router$q.post("/:id/send", staffGate, async (req, res) => {
   await store.addLog(log);
   res.json({ dryRun: false, live: true, sent, failed, log, campaign: next });
 });
-const router$p = Router();
+const router$q = Router();
 const db$a = () => admin.firestore();
 function isAgentAuthorized(req) {
   const serviceKey = req.headers["x-agent-key"];
@@ -32872,7 +34411,7 @@ async function loadOrderForAppointment(appointment) {
   const orderDoc = await db$a().collection("orders").doc(String(appointment.orderId)).get();
   return orderDoc.exists ? { id: orderDoc.id, ref: orderDoc.ref, data: orderDoc.data() || {} } : null;
 }
-router$p.get("/briefing", requireStaff, async (_req, res) => {
+router$q.get("/briefing", requireStaff, async (_req, res) => {
   try {
     const today = /* @__PURE__ */ new Date();
     today.setHours(0, 0, 0, 0);
@@ -33071,9 +34610,9 @@ async function runReminderSweep(req, res) {
     return res.status(500).json({ error: "Failed to run reminder sweep." });
   }
 }
-router$p.get("/run-reminders", runReminderSweep);
-router$p.post("/run-reminders", runReminderSweep);
-router$p.get("/logs", requireStaff, async (req, res) => {
+router$q.get("/run-reminders", runReminderSweep);
+router$q.post("/run-reminders", runReminderSweep);
+router$q.get("/logs", requireStaff, async (req, res) => {
   try {
     const { agent, status: status2, requiresReview, limit = "50" } = req.query;
     let query = db$a().collection("agentLogs").orderBy("createdAt", "desc");
@@ -33088,7 +34627,7 @@ router$p.get("/logs", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch agent logs." });
   }
 });
-router$p.patch("/logs/:id/resolve", requireCoordinator, async (req, res) => {
+router$q.patch("/logs/:id/resolve", requireCoordinator, async (req, res) => {
   try {
     const { notes } = req.body;
     await db$a().collection("agentLogs").doc(req.params.id).update({
@@ -33103,7 +34642,7 @@ router$p.patch("/logs/:id/resolve", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to resolve flag." });
   }
 });
-router$p.post("/log", async (req, res) => {
+router$q.post("/log", async (req, res) => {
   try {
     if (!isAgentAuthorized(req)) {
       return res.status(401).json({ error: "Invalid agent key." });
@@ -33975,7 +35514,7 @@ async function revokeBotRoomKey(id) {
 function requestSecrets(presented) {
   return secretsInPlay(presented);
 }
-const router$o = Router();
+const router$p = Router();
 function sendBotRoomError(res, err) {
   if (res.headersSent) return;
   if (err instanceof BotRoomError) {
@@ -34056,14 +35595,14 @@ function queryFlag(value) {
 function queryString(value) {
   return typeof value === "string" ? value.trim() : "";
 }
-router$o.get("/openapi.json", (req, res) => {
+router$p.get("/openapi.json", (req, res) => {
   const forwardedProto = req.get("x-forwarded-proto");
   const proto = forwardedProto ? forwardedProto.split(",")[0].trim() : req.protocol;
   const forwardedHost = req.get("x-forwarded-host");
   const host = forwardedHost ? forwardedHost.split(",")[0].trim() : req.get("host");
   res.json(botRoomOpenApi(`${proto}://${host}/api/botroom`));
 });
-router$o.get("/messages", requireBotOrOwner, limitActor, wrap(async (req, res) => {
+router$p.get("/messages", requireBotOrOwner, limitActor, wrap(async (req, res) => {
   const limit = queryString(req.query.limit);
   const parsedLimit = limit ? Number(limit) : void 0;
   if (limit && !Number.isInteger(parsedLimit)) throw new BotRoomError(400, "limit must be a whole number.");
@@ -34076,7 +35615,7 @@ router$o.get("/messages", requireBotOrOwner, limitActor, wrap(async (req, res) =
   });
   res.json(result);
 }));
-router$o.post("/messages", requireBotOrOwner, limitActor, wrap(async (req, res) => {
+router$p.post("/messages", requireBotOrOwner, limitActor, wrap(async (req, res) => {
   const body = req.body && typeof req.body === "object" ? req.body : {};
   const message = await postBotRoomMessage({
     actor: actor$3(req),
@@ -34085,18 +35624,18 @@ router$o.post("/messages", requireBotOrOwner, limitActor, wrap(async (req, res) 
   });
   res.status(201).json({ message });
 }));
-router$o.post("/messages/:id/ack", requireBotOrOwner, limitActor, wrap(async (req, res) => {
+router$p.post("/messages/:id/ack", requireBotOrOwner, limitActor, wrap(async (req, res) => {
   const body = req.body && typeof req.body === "object" ? req.body : {};
   const message = await ackBotRoomMessage(req.params.id, actor$3(req), body);
   res.json({ message });
 }));
-router$o.get("/keys", wrap(async (req, res, next) => {
+router$p.get("/keys", wrap(async (req, res, next) => {
   await requireOwnerOrAdmin$1(req, res, next);
 }), wrap(async (_req, res) => {
   const keys = await listBotRoomKeys();
   res.json({ keys: keys.map(publicBotRoomKey) });
 }));
-router$o.post("/keys", wrap(async (req, res, next) => {
+router$p.post("/keys", wrap(async (req, res, next) => {
   await requireOwnerOrAdmin$1(req, res, next);
 }), wrap(async (req, res) => {
   const body = req.body && typeof req.body === "object" ? req.body : {};
@@ -34107,15 +35646,15 @@ router$o.post("/keys", wrap(async (req, res, next) => {
   });
   res.status(201).json(created);
 }));
-router$o.post("/keys/:id/revoke", wrap(async (req, res, next) => {
+router$p.post("/keys/:id/revoke", wrap(async (req, res, next) => {
   await requireOwnerOrAdmin$1(req, res, next);
 }), wrap(async (req, res) => {
   const record2 = await revokeBotRoomKey(req.params.id);
   res.json({ record: publicBotRoomKey(record2) });
 }));
-const router$n = Router();
+const router$o = Router();
 const db$9 = () => admin.firestore();
-router$n.get("/", requireStaff, async (req, res) => {
+router$o.get("/", requireStaff, async (req, res) => {
   try {
     const { status: status2, listingId, orderId, limit = "100" } = req.query;
     let q = db$9().collection("mediaJobs").orderBy("createdAt", "desc");
@@ -34129,7 +35668,7 @@ router$n.get("/", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch media jobs." });
   }
 });
-router$n.post("/", requireStaff, async (req, res) => {
+router$o.post("/", requireStaff, async (req, res) => {
   try {
     const {
       listingId,
@@ -34188,7 +35727,7 @@ router$n.post("/", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to create media job." });
   }
 });
-router$n.patch("/:id/status", requireCoordinator, async (req, res) => {
+router$o.patch("/:id/status", requireCoordinator, async (req, res) => {
   try {
     const { status: status2, resultItems = [], error = "", requiresHumanReview } = req.body;
     const valid = ["queued", "processing", "ready_for_review", "completed", "failed", "cancelled"];
@@ -34322,7 +35861,7 @@ async function moveMediaDelivery(input) {
     label: MEDIA_DELIVERY_LABELS[input.status]
   };
 }
-const router$m = Router();
+const router$n = Router();
 function adminReady$1(res) {
   if (admin.apps.length) return true;
   res.status(503).json({
@@ -34330,12 +35869,12 @@ function adminReady$1(res) {
   });
   return false;
 }
-function cronAuthorized$2(req) {
+function cronAuthorized$3(req) {
   const secret2 = typeof process.env.CRON_SECRET === "string" ? process.env.CRON_SECRET.trim() : "";
   return Boolean(secret2) && req.headers.authorization === `Bearer ${secret2}`;
 }
 function requireStaffOrQueueCron(req, res, next) {
-  if (cronAuthorized$2(req)) {
+  if (cronAuthorized$3(req)) {
     req.user = { uid: "studio-queue" };
     req.staffRole = "admin";
     return next();
@@ -34350,7 +35889,7 @@ function sendKnownError$1(res, err, fallback) {
   console.error("[Studio]", err);
   return res.status(500).json({ error: fallback });
 }
-router$m.get("/workspace", requireStaff, async (req, res) => {
+router$n.get("/workspace", requireStaff, async (req, res) => {
   if (!adminReady$1(res)) return;
   try {
     const listingId = typeof req.query.listingId === "string" ? req.query.listingId : "";
@@ -34372,7 +35911,7 @@ router$m.get("/workspace", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to load Studio.");
   }
 });
-router$m.get("/delivery-queue", requireStaff, async (req, res) => {
+router$n.get("/delivery-queue", requireStaff, async (req, res) => {
   if (!adminReady$1(res)) return;
   try {
     const rows = await listMediaDeliveryQueue({
@@ -34384,7 +35923,7 @@ router$m.get("/delivery-queue", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to load the delivery queue.");
   }
 });
-router$m.post("/delivery-queue/move", requireCoordinator, async (req, res) => {
+router$n.post("/delivery-queue/move", requireCoordinator, async (req, res) => {
   const galleryId = String(req.body?.galleryId || "").trim();
   const status2 = String(req.body?.status || "").trim();
   if (!/^[A-Za-z0-9_-]{8,128}$/.test(galleryId)) {
@@ -34421,7 +35960,7 @@ router$m.post("/delivery-queue/move", requireCoordinator, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to update delivery.");
   }
 });
-router$m.post("/order-edits", requireStaff, async (req, res) => {
+router$n.post("/order-edits", requireStaff, async (req, res) => {
   const listingId = String(req.body?.listingId || "").trim();
   if (!/^[A-Za-z0-9_-]{8,128}$/.test(listingId)) {
     return res.status(400).json({ error: "A valid listing id is required." });
@@ -34435,7 +35974,7 @@ router$m.post("/order-edits", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to queue the order edits.");
   }
 });
-router$m.post("/order-queue/tick", requireStaffOrQueueCron, async (req, res) => {
+router$n.post("/order-queue/tick", requireStaffOrQueueCron, async (req, res) => {
   let listingId = String(req.body?.listingId || "").trim();
   if (listingId && !/^[A-Za-z0-9_-]{8,128}$/.test(listingId)) {
     return res.status(400).json({ error: "A valid listing id is required." });
@@ -34465,7 +36004,7 @@ router$m.post("/order-queue/tick", requireStaffOrQueueCron, async (req, res) => 
     return sendKnownError$1(res, err, "Failed to advance the order edit queue.");
   }
 });
-router$m.post("/iconic-polish", requireStaff, async (req, res) => {
+router$n.post("/iconic-polish", requireStaff, async (req, res) => {
   const listingId = String(req.body?.listingId || "").trim();
   if (!/^[A-Za-z0-9_-]{8,128}$/.test(listingId)) {
     return res.status(400).json({ error: "A valid listing id is required." });
@@ -34482,7 +36021,7 @@ router$m.post("/iconic-polish", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to save Iconic Polish.");
   }
 });
-router$m.post("/ai-edit", requireStaff, async (req, res) => {
+router$n.post("/ai-edit", requireStaff, async (req, res) => {
   const parsed = parseAiEditRequest(req.body);
   if (parsed.ok === false) return res.status(400).json({ error: parsed.error });
   if (!adminReady$1(res)) return;
@@ -34502,7 +36041,7 @@ router$m.post("/ai-edit", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to enqueue the AI edit.");
   }
 });
-router$m.post("/adjust", requireStaff, async (req, res) => {
+router$n.post("/adjust", requireStaff, async (req, res) => {
   if (!adminReady$1(res)) return;
   try {
     const listingId = String(req.body?.listingId || "");
@@ -34525,7 +36064,7 @@ router$m.post("/adjust", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to save the adjustment.");
   }
 });
-router$m.post("/reject", requireStaff, async (req, res) => {
+router$n.post("/reject", requireStaff, async (req, res) => {
   if (!adminReady$1(res)) return;
   try {
     const listingId = String(req.body?.listingId || "");
@@ -34542,7 +36081,7 @@ router$m.post("/reject", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to reject the edit.");
   }
 });
-router$m.post("/approve", requireStaff, async (req, res) => {
+router$n.post("/approve", requireStaff, async (req, res) => {
   if (!adminReady$1(res)) return;
   try {
     const listingId = String(req.body?.listingId || "");
@@ -34627,8 +36166,8 @@ async function loadPhotographerPreview(staffId) {
     studioJobs
   };
 }
-const router$l = Router();
-router$l.get("/photographer-preview", requireAdmin, async (req, res) => {
+const router$m = Router();
+router$m.get("/photographer-preview", requireAdmin, async (req, res) => {
   const staffId = String(req.query.staffId || "").trim();
   if (!/^[A-Za-z0-9_-]{1,128}$/.test(staffId) || staffId === "demo-photographer") {
     return res.status(400).json({ error: "Choose a photographer." });
@@ -34760,16 +36299,16 @@ async function editScratchPhoto(input) {
     downloadName: scratchDownloadName(input.fileName || "scratch.jpg")
   };
 }
-const router$k = Router();
+const router$l = Router();
 function headerValue(value) {
   if (Array.isArray(value)) return value[0] || "";
   return value || "";
 }
-router$k.get("/", requireCoordinator, async (_req, res) => {
+router$l.get("/", requireCoordinator, async (_req, res) => {
   const grass = await grassReferenceStatus();
   return res.json({ grass, twilightPrompt: orderExteriorTwilightPrompt() });
 });
-router$k.post(
+router$l.post(
   "/",
   requireCoordinator,
   express.raw({ type: "image/jpeg", limit: "4mb" }),
@@ -34795,20 +36334,20 @@ router$k.post(
     }
   }
 );
-router$k.use((err, _req, res, next) => {
+router$l.use((err, _req, res, next) => {
   if (err?.type === "entity.too.large" || err?.status === 413) {
     return res.status(413).json({ error: "That photo is too large for the scratch pad. Export a smaller JPEG." });
   }
   return next(err);
 });
-const router$j = Router();
+const router$k = Router();
 const GOOGLE_KEY = process.env.GOOGLE_MAPS_API_KEY || "";
-function fromGoogle(p) {
+function fromGoogle(p2) {
   return {
-    place_id: p.place_id,
-    description: p.description,
-    main_text: p.structured_formatting?.main_text || p.description,
-    secondary: p.structured_formatting?.secondary_text || ""
+    place_id: p2.place_id,
+    description: p2.description,
+    main_text: p2.structured_formatting?.main_text || p2.description,
+    secondary: p2.structured_formatting?.secondary_text || ""
   };
 }
 function fromNominatim(r, idx) {
@@ -34828,7 +36367,7 @@ function fromNominatim(r, idx) {
     secondary: parts.slice(1).join(", ")
   };
 }
-router$j.get("/autocomplete", async (req, res) => {
+router$k.get("/autocomplete", async (req, res) => {
   const input = (req.query.input || "").trim();
   if (!input || input.length < 2) {
     return res.json({ suggestions: [] });
@@ -34864,7 +36403,7 @@ router$j.get("/autocomplete", async (req, res) => {
     return res.json({ suggestions: [] });
   }
 });
-router$j.get("/distance", async (req, res) => {
+router$k.get("/distance", async (req, res) => {
   const destination = (req.query.destination || "").trim();
   const origin = (req.query.origin || process.env.STUDIO_ADDRESS || "The Woodlands, TX 77380").trim();
   if (!destination) {
@@ -34891,7 +36430,7 @@ router$j.get("/distance", async (req, res) => {
     return res.status(500).json({ error: "Failed to calculate distance." });
   }
 });
-const router$i = Router();
+const router$j = Router();
 const db$6 = () => admin.firestore();
 async function findOrderLikeDocument(id) {
   const orderRequestDoc = await db$6().collection("orderRequests").doc(id).get();
@@ -34900,7 +36439,7 @@ async function findOrderLikeDocument(id) {
   if (orderDoc.exists) return orderDoc;
   return null;
 }
-router$i.post("/send", requireStaff, async (req, res) => {
+router$j.post("/send", requireStaff, async (req, res) => {
   try {
     const { to, body, orderId } = req.body;
     if (!to || !body) return res.status(400).json({ error: "to and body required." });
@@ -34962,7 +36501,7 @@ router$i.post("/send", requireStaff, async (req, res) => {
     return res.status(500).json({ error: errorMessage });
   }
 });
-router$i.post("/remind/:orderId", requireStaff, async (req, res) => {
+router$j.post("/remind/:orderId", requireStaff, async (req, res) => {
   try {
     const { type = "24h" } = req.body;
     const orderDoc = await findOrderLikeDocument(req.params.orderId);
@@ -35004,7 +36543,7 @@ router$i.post("/remind/:orderId", requireStaff, async (req, res) => {
     return res.status(500).json({ error: errorMessage });
   }
 });
-router$i.post("/conversation", requireStaff, async (req, res) => {
+router$j.post("/conversation", requireStaff, async (req, res) => {
   try {
     const { orderId, photographerPhone, photographerName, clientPhone, clientName: clientName2 } = req.body;
     if (!orderId || !photographerPhone || !clientPhone) {
@@ -35056,7 +36595,7 @@ router$i.post("/conversation", requireStaff, async (req, res) => {
     return res.status(500).json({ error: errorMessage });
   }
 });
-router$i.get("/conversations", requireStaff, async (_req, res) => {
+router$j.get("/conversations", requireStaff, async (_req, res) => {
   try {
     const snapshot = await db$6().collection("conversations").orderBy("createdAt", "desc").limit(50).get();
     return res.json(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
@@ -35064,7 +36603,7 @@ router$i.get("/conversations", requireStaff, async (_req, res) => {
     return res.status(500).json({ error: "Failed to fetch conversations." });
   }
 });
-router$i.post("/conversation/:id/close", requireStaff, async (req, res) => {
+router$j.post("/conversation/:id/close", requireStaff, async (req, res) => {
   try {
     const convoDoc = await db$6().collection("conversations").doc(req.params.id).get();
     if (!convoDoc.exists) return res.status(404).json({ error: "Conversation not found." });
@@ -35076,7 +36615,7 @@ router$i.post("/conversation/:id/close", requireStaff, async (req, res) => {
     return res.status(500).json({ error: errorMessage });
   }
 });
-router$i.post("/webhook", express_raw_or_json, async (req, res) => {
+router$j.post("/webhook", express_raw_or_json, async (req, res) => {
   try {
     const authToken = process.env.TWILIO_AUTH_TOKEN;
     if (authToken && process.env.NODE_ENV === "production") {
@@ -35144,7 +36683,7 @@ router$i.post("/webhook", express_raw_or_json, async (req, res) => {
     return res.status(200).send("");
   }
 });
-router$i.post("/campaign/:id/send", requireCoordinator, async (req, res) => {
+router$j.post("/campaign/:id/send", requireCoordinator, async (req, res) => {
   try {
     const campaignDoc = await db$6().collection("campaigns").doc(req.params.id).get();
     if (!campaignDoc.exists) return res.status(404).json({ error: "Campaign not found." });
@@ -35187,7 +36726,7 @@ router$i.post("/campaign/:id/send", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: errorMessage });
   }
 });
-router$i.post("/opt-out", async (req, res) => {
+router$j.post("/opt-out", async (req, res) => {
   try {
     const { From, Body } = req.body;
     if (!From) return res.status(200).send("");
@@ -35210,7 +36749,7 @@ router$i.post("/opt-out", async (req, res) => {
 function express_raw_or_json(req, _res, next) {
   next();
 }
-const router$h = Router();
+const router$i = Router();
 const STAFF_INBOX_FALLBACK = "photos@iconicimagestx.com";
 const MAX_SUBJECT_LENGTH = 200;
 const MAX_MESSAGE_LENGTH = 4e3;
@@ -35238,7 +36777,7 @@ function contactFailureLog(error) {
   for (const secret2 of secrets) safe = safe.split(secret2).join("[redacted]");
   return safe.slice(0, 300);
 }
-router$h.post("/", async (req, res) => {
+router$i.post("/", async (req, res) => {
   try {
     const { name, email, subject, message, phone } = req.body ?? {};
     if (typeof name !== "string" || typeof email !== "string" || typeof subject !== "string" || typeof message !== "string" || !name.trim() || !email.trim() || !subject.trim() || !message.trim()) {
@@ -35299,7 +36838,7 @@ router$h.post("/", async (req, res) => {
     });
   }
 });
-const router$g = Router();
+const router$h = Router();
 const SENIOR_LIVING_RATE_WINDOW_MS = 15 * 60 * 1e3;
 const SENIOR_LIVING_RATE_MAX = 5;
 const limiter$3 = createRateLimiter({
@@ -35320,10 +36859,10 @@ async function nextInvoiceNumber$1() {
     return `INV-${year}-${String(Date.now()).slice(-6)}`;
   }
 }
-router$g.get("/config", (_req, res) => {
+router$h.get("/config", (_req, res) => {
   res.json({ depositCheckoutLive: seniorDepositCheckoutLive() });
 });
-router$g.post("/order", async (req, res) => {
+router$h.post("/order", async (req, res) => {
   const limit = limiter$3.check(clientIp(req));
   if (!limit.allowed) {
     res.setHeader("Retry-After", String(limit.retryAfterSec));
@@ -35601,7 +37140,7 @@ router$g.post("/order", async (req, res) => {
     });
   }
 });
-router$g.post("/", async (req, res) => {
+router$h.post("/", async (req, res) => {
   const limit = limiter$3.check(clientIp(req));
   if (!limit.allowed) {
     res.setHeader("Retry-After", String(limit.retryAfterSec));
@@ -35647,7 +37186,7 @@ router$g.post("/", async (req, res) => {
     });
   }
 });
-const router$f = Router();
+const router$g = Router();
 const limiter$2 = createRateLimiter({
   windowMs: 15 * 60 * 1e3,
   max: 5
@@ -35684,15 +37223,15 @@ function publicAvailability(result, packageId) {
     fallback: result.available ? null : APPRENTICESHIP_CALENDAR_FALLBACK
   };
 }
-router$f.get("/config", (_req, res) => {
+router$g.get("/config", (_req, res) => {
   res.json({ depositCheckoutLive: seniorDepositCheckoutLive() });
 });
-function cronAuthorized$1(req) {
+function cronAuthorized$2(req) {
   const secret2 = typeof process.env.CRON_SECRET === "string" ? process.env.CRON_SECRET.trim() : "";
   return Boolean(secret2) && req.headers.authorization === `Bearer ${secret2}`;
 }
 async function releaseHolds(req, res) {
-  if (!cronAuthorized$1(req)) return res.status(401).json({ error: "Unauthorized" });
+  if (!cronAuthorized$2(req)) return res.status(401).json({ error: "Unauthorized" });
   try {
     const result = await releaseExpiredApprenticeshipHolds();
     const headshots = await releaseExpiredHeadshotHolds();
@@ -35702,9 +37241,9 @@ async function releaseHolds(req, res) {
     return res.status(500).json({ error: "Hold release failed." });
   }
 }
-router$f.get("/release-holds", releaseHolds);
-router$f.post("/release-holds", releaseHolds);
-router$f.get("/slots", async (req, res) => {
+router$g.get("/release-holds", releaseHolds);
+router$g.post("/release-holds", releaseHolds);
+router$g.get("/slots", async (req, res) => {
   const packageId = typeof req.query.package === "string" ? req.query.package : "apprentice-25";
   if (!findApprenticeshipPackage(packageId)) {
     return res.status(400).json({ error: "Choose an apprenticeship package." });
@@ -35713,7 +37252,7 @@ router$f.get("/slots", async (req, res) => {
   const result = await readApprenticeshipAvailability({ packageId });
   return res.json(publicAvailability(result, packageId));
 });
-router$f.get("/setup", requireStaff, async (_req, res) => {
+router$g.get("/setup", requireStaff, async (_req, res) => {
   const hours = apprenticeshipHoursFromEnv();
   const result = await readApprenticeshipAvailability({ packageId: "apprentice-25" });
   return res.json({
@@ -35729,7 +37268,7 @@ router$f.get("/setup", requireStaff, async (_req, res) => {
     }
   });
 });
-router$f.post("/order", async (req, res) => {
+router$g.post("/order", async (req, res) => {
   const limit = limiter$2.check(clientIp(req));
   if (!limit.allowed) {
     res.setHeader("Retry-After", String(limit.retryAfterSec));
@@ -36169,12 +37708,12 @@ async function deliverLiveChat(input, options = {}) {
     notConfigured ? "not_configured" : "failed"
   );
 }
-const router$e = Router();
+const router$f = Router();
 const liveChatLimiter = createRateLimiter({
   windowMs: LIVE_CHAT_WINDOW_MS,
   max: LIVE_CHAT_MAX_PER_WINDOW
 });
-router$e.post("/live-chat", async (req, res) => {
+router$f.post("/live-chat", async (req, res) => {
   const parsed = parseLiveChatBody(req.body);
   if (parsed.ok === false) {
     return res.status(400).json({ error: parsed.error });
@@ -36482,7 +38021,7 @@ async function alertStaffOfVisitorThread(threadId, input) {
     console.error("[ContactThread] Staff alert failed.", error);
   }
 }
-const router$d = Router();
+const router$e = Router();
 const THREAD_ID_RE = /^[a-f0-9]{32}$/;
 const postLimiter = createRateLimiter({
   windowMs: LIVE_CHAT_WINDOW_MS,
@@ -36496,7 +38035,7 @@ function threadToken(req) {
   const header2 = req.header("x-contact-thread-token");
   return typeof header2 === "string" ? header2.trim() : "";
 }
-router$d.get("/staff/threads", requireCoordinator, async (_req, res) => {
+router$e.get("/staff/threads", requireCoordinator, async (_req, res) => {
   try {
     const threads = await listContactThreads();
     return res.json({ threads });
@@ -36505,7 +38044,7 @@ router$d.get("/staff/threads", requireCoordinator, async (_req, res) => {
     return res.status(500).json({ error: "Couldn't load contact chats." });
   }
 });
-router$d.post("/staff/threads/:id/reply", requireCoordinator, async (req, res) => {
+router$e.post("/staff/threads/:id/reply", requireCoordinator, async (req, res) => {
   const id = routeParam(req.params.id);
   if (!THREAD_ID_RE.test(id)) {
     return res.status(404).json({ error: "Conversation not found." });
@@ -36526,7 +38065,7 @@ router$d.post("/staff/threads/:id/reply", requireCoordinator, async (req, res) =
     return res.status(500).json({ error: "Couldn't save the reply." });
   }
 });
-router$d.get("/threads/:id", async (req, res) => {
+router$e.get("/threads/:id", async (req, res) => {
   const id = routeParam(req.params.id);
   const token = threadToken(req);
   if (!THREAD_ID_RE.test(id) || !token) {
@@ -36541,7 +38080,7 @@ router$d.get("/threads/:id", async (req, res) => {
     return res.status(500).json({ error: "Couldn't load this chat." });
   }
 });
-router$d.post("/threads", async (req, res) => {
+router$e.post("/threads", async (req, res) => {
   const parsed = parseLiveChatBody(req.body);
   if (parsed.ok === false) {
     return res.status(400).json({ error: parsed.error });
@@ -37678,7 +39217,7 @@ function actorFromClient(uid, email) {
     permissions: null
   };
 }
-const router$c = Router();
+const router$d = Router();
 const AUDIENCES = /* @__PURE__ */ new Set(["clients", "leads", "photographers", "socials"]);
 function ownerEmails() {
   return ownerAllowlist(process.env.OWNER_EMAILS);
@@ -37733,7 +39272,7 @@ async function portalScope(req) {
     return { kind: "client", uid, email, phone: "" };
   }
 }
-router$c.get("/threads", requireCoordinator, async (req, res) => {
+router$d.get("/threads", requireCoordinator, async (req, res) => {
   const audience = typeof req.query.audience === "string" ? req.query.audience : "";
   const q = typeof req.query.q === "string" ? req.query.q : "";
   try {
@@ -37745,7 +39284,7 @@ router$c.get("/threads", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Couldn't load conversations." });
   }
 });
-router$c.get("/mine", requireAuth, async (req, res) => {
+router$d.get("/mine", requireAuth, async (req, res) => {
   try {
     const scope = await portalScope(req);
     const threads = threadsForPortal(await listUnifiedThreads(), scope);
@@ -37755,7 +39294,7 @@ router$c.get("/mine", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Couldn't load your messages." });
   }
 });
-router$c.post("/mine/reply", requireAuth, async (req, res) => {
+router$d.post("/mine/reply", requireAuth, async (req, res) => {
   const threadId = typeof req.body?.threadId === "string" ? req.body.threadId.trim() : "";
   const content = typeof req.body?.body === "string" ? req.body.body.trim() : "";
   if (!threadId || !content) return res.status(400).json({ error: "Choose a thread and enter a reply." });
@@ -37790,7 +39329,7 @@ router$c.post("/mine/reply", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Couldn't save the reply." });
   }
 });
-router$c.get("/mine/flags", requireAuth, async (req, res) => {
+router$d.get("/mine/flags", requireAuth, async (req, res) => {
   try {
     const who = await resolveDeskActor(req.user?.uid || "", req.user?.email || "");
     if (!who) return res.status(403).json({ error: "Sign in to see messages." });
@@ -37801,7 +39340,7 @@ router$c.get("/mine/flags", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Couldn't load your message folders." });
   }
 });
-router$c.post("/mine/flags", requireAuth, async (req, res) => {
+router$d.post("/mine/flags", requireAuth, async (req, res) => {
   const patches = patchesFromBody(req.body);
   if (!patches) return res.status(400).json({ error: "Choose a conversation to update." });
   try {
@@ -37843,7 +39382,7 @@ async function conversationVisible(scope, id) {
   const thread = await findUnifiedThread(id);
   return Boolean(thread && threadVisibleTo(thread, scope));
 }
-router$c.post("/reply", requireCoordinator, async (req, res) => {
+router$d.post("/reply", requireCoordinator, async (req, res) => {
   const threadId = typeof req.body?.threadId === "string" ? req.body.threadId.trim() : "";
   const channel = req.body?.channel === "sms" ? "sms" : req.body?.channel === "email" ? "email" : "";
   const content = typeof req.body?.body === "string" ? req.body.body.trim() : "";
@@ -37913,7 +39452,7 @@ router$c.post("/reply", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Couldn't send the reply." });
   }
 });
-router$c.get("/assist/status", requireOwnerOrAdmin, (_req, res) => {
+router$d.get("/assist/status", requireOwnerOrAdmin, (_req, res) => {
   const status2 = assistantStatus();
   return res.json({
     openai: status2.openai,
@@ -37922,7 +39461,7 @@ router$c.get("/assist/status", requireOwnerOrAdmin, (_req, res) => {
     openaiNotice: status2.openaiNotice
   });
 });
-router$c.post("/assist", requireOwnerOrAdmin, async (req, res) => {
+router$d.post("/assist", requireOwnerOrAdmin, async (req, res) => {
   const provider = req.body?.provider === "grok" ? "grok" : req.body?.provider === "openai" ? "openai" : "";
   if (!provider) return res.status(400).json({ error: "Choose Grok or OpenAI." });
   const messages = parseAssistantTurns(req.body);
@@ -37931,7 +39470,7 @@ router$c.post("/assist", requireOwnerOrAdmin, async (req, res) => {
   if (result.ok === false) return res.status(result.status).json({ error: result.message, enabled: false });
   return res.json({ reply: result.reply });
 });
-const router$b = Router();
+const router$c = Router();
 function kindOf(value) {
   return PERSON_KINDS.includes(value) ? value : null;
 }
@@ -37942,77 +39481,77 @@ function folderOf(value) {
 async function actor$2(req) {
   return resolveDeskActor(req.user?.uid || "", req.user?.email || "");
 }
-router$b.get("/directory", requireAuth, async (req, res) => {
+router$c.get("/directory", requireAuth, async (req, res) => {
   const who = await actor$2(req);
   if (!who) return res.status(403).json({ error: "Sign in to see people." });
   const result = await directory(who, String(req.query.q || ""), String(req.query.role || ""));
   if ("error" in result && result.error) return res.status(result.status).json({ error: result.error });
   return res.json(result);
 });
-router$b.get("/permissions", requireAuth, async (req, res) => {
+router$c.get("/permissions", requireAuth, async (req, res) => {
   const who = await actor$2(req);
   if (!who) return res.status(403).json({ error: "Sign in to see permissions." });
   const result = await permissionRoster(who);
   if ("error" in result && result.error) return res.status(result.status).json({ error: result.error });
   return res.json(result);
 });
-router$b.put("/permissions/:staffId", requireAuth, async (req, res) => {
+router$c.put("/permissions/:staffId", requireAuth, async (req, res) => {
   const who = await actor$2(req);
   if (!who) return res.status(403).json({ error: "Sign in to change permissions." });
   const result = await savePermission(who, req.params.staffId, String(req.body?.role || ""), req.body?.permissions);
   if ("error" in result && result.error) return res.status(result.status).json({ error: result.error });
   return res.json(result);
 });
-router$b.get("/groups", requireAuth, async (req, res) => {
+router$c.get("/groups", requireAuth, async (req, res) => {
   const who = await actor$2(req);
   if (!who) return res.status(403).json({ error: "Sign in to see groups." });
   const result = await groupsFor(who);
   if ("error" in result && result.error) return res.status(result.status).json({ error: result.error });
   return res.json(result);
 });
-router$b.post("/groups", requireAuth, async (req, res) => {
+router$c.post("/groups", requireAuth, async (req, res) => {
   const who = await actor$2(req);
   if (!who) return res.status(403).json({ error: "Sign in to add a group." });
   const result = await saveGroup(who, null, req.body);
   if ("error" in result && result.error) return res.status(result.status).json({ error: result.error });
   return res.status(201).json(result);
 });
-router$b.get("/groups/:id", requireAuth, async (req, res) => {
+router$c.get("/groups/:id", requireAuth, async (req, res) => {
   const who = await actor$2(req);
   if (!who) return res.status(403).json({ error: "Sign in to see this group." });
   const result = await groupFor(who, req.params.id);
   if ("error" in result && result.error) return res.status(result.status).json({ error: result.error });
   return res.json(result);
 });
-router$b.patch("/groups/:id", requireAuth, async (req, res) => {
+router$c.patch("/groups/:id", requireAuth, async (req, res) => {
   const who = await actor$2(req);
   if (!who) return res.status(403).json({ error: "Sign in to edit this group." });
   const result = await saveGroup(who, req.params.id, req.body);
   if ("error" in result && result.error) return res.status(result.status).json({ error: result.error });
   return res.json(result);
 });
-router$b.get("/inbox", requireAuth, async (req, res) => {
+router$c.get("/inbox", requireAuth, async (req, res) => {
   const who = await actor$2(req);
   if (!who) return res.status(403).json({ error: "Sign in to see messages." });
   const result = await inboxFor(who, folderOf(req.query.folder));
   if ("error" in result && result.error) return res.status(result.status).json({ error: result.error });
   return res.json(result);
 });
-router$b.post("/inbox/draft", requireAuth, async (req, res) => {
+router$c.post("/inbox/draft", requireAuth, async (req, res) => {
   const who = await actor$2(req);
   if (!who) return res.status(403).json({ error: "Sign in to save a draft." });
   const result = await saveInboxDraft(who, req.body || {});
   if ("error" in result && result.error) return res.status(result.status).json({ error: result.error });
   return res.status(201).json(result);
 });
-router$b.post("/inbox/send", requireAuth, async (req, res) => {
+router$c.post("/inbox/send", requireAuth, async (req, res) => {
   const who = await actor$2(req);
   if (!who) return res.status(403).json({ error: "Sign in to send a message." });
   const result = await sendInbox(who, req.body || {});
   if ("error" in result && result.error) return res.status(result.status).json({ error: result.error });
   return res.status(201).json(result);
 });
-router$b.post("/inbox/:id/reply", requireAuth, async (req, res) => {
+router$c.post("/inbox/:id/reply", requireAuth, async (req, res) => {
   const who = await actor$2(req);
   if (!who) return res.status(403).json({ error: "Sign in to reply." });
   const body = typeof req.body?.body === "string" ? req.body.body : "";
@@ -38020,7 +39559,7 @@ router$b.post("/inbox/:id/reply", requireAuth, async (req, res) => {
   if ("error" in result && result.error) return res.status(result.status).json({ error: result.error });
   return res.status(201).json(result);
 });
-router$b.post("/inbox/:id/folder", requireAuth, async (req, res) => {
+router$c.post("/inbox/:id/folder", requireAuth, async (req, res) => {
   const who = await actor$2(req);
   if (!who) return res.status(403).json({ error: "Sign in to file this message." });
   const folder = req.body?.folder;
@@ -38031,7 +39570,7 @@ router$b.post("/inbox/:id/folder", requireAuth, async (req, res) => {
   if ("error" in result && result.error) return res.status(result.status).json({ error: result.error });
   return res.json(result);
 });
-router$b.get("/:kind/:id", requireAuth, async (req, res) => {
+router$c.get("/:kind/:id", requireAuth, async (req, res) => {
   const kind = kindOf(req.params.kind);
   if (!kind) return res.status(404).json({ error: "Profile not found." });
   const who = await actor$2(req);
@@ -38041,7 +39580,7 @@ router$b.get("/:kind/:id", requireAuth, async (req, res) => {
   if ("error" in result && result.error) return res.status(result.status).json({ error: result.error });
   return res.json(result);
 });
-router$b.patch("/:kind/:id/settings", requireAuth, async (req, res) => {
+router$c.patch("/:kind/:id/settings", requireAuth, async (req, res) => {
   const kind = kindOf(req.params.kind);
   if (!kind) return res.status(404).json({ error: "Profile not found." });
   const who = await actor$2(req);
@@ -38651,7 +40190,7 @@ ${next}`;
 function escapeHtml$2(value) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
-const router$a = Router();
+const router$b = Router();
 const db$2 = () => admin.firestore();
 function originOf(req) {
   const configured = process.env.APP_URL;
@@ -38695,7 +40234,7 @@ async function loadPresentation(token, origin) {
   const galleries = await galleriesForListing(listing.id, listing);
   return buildPresentation({ token, listing, galleries, origin });
 }
-router$a.get("/presentations/:token", async (req, res) => {
+router$b.get("/presentations/:token", async (req, res) => {
   const token = String(req.params.token || "");
   if (!isPresentationToken(token)) {
     return res.status(400).json({ error: "That presentation link is not valid." });
@@ -38732,8 +40271,8 @@ const handlePresentationShell = async (req, res) => {
   const rendered = await renderPresentationShell(String(req.params.token || ""), originOf(req));
   res.status(rendered.status).type("html").send(rendered.html);
 };
-router$a.get("/presentations/shell/:token", handlePresentationShell);
-router$a.post("/listings/:id/presentation", requireStaff, async (req, res) => {
+router$b.get("/presentations/shell/:token", handlePresentationShell);
+router$b.post("/listings/:id/presentation", requireStaff, async (req, res) => {
   const listingId = String(req.params.id || "");
   if (!/^[A-Za-z0-9_-]{8,128}$/.test(listingId)) {
     return res.status(400).json({ error: "A valid listing id is required." });
@@ -38980,7 +40519,7 @@ function readSpaShell$2() {
 function escapeHtml(value) {
   return value.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch] || ch);
 }
-const router$9 = Router();
+const router$a = Router();
 function adminReady(res) {
   if (admin.apps.length) return true;
   res.status(503).json({ error: "Firebase Admin is not configured. Set FIREBASE_SERVICE_ACCOUNT." });
@@ -39012,13 +40551,13 @@ async function advance(req, res, to) {
     return sendKnownError(res, err, "Could not update that edit request.");
   }
 }
-router$9.post("/listings/:id/photo-edit-requests/:requestId/sent", requireStaff, async (req, res) => {
+router$a.post("/listings/:id/photo-edit-requests/:requestId/sent", requireStaff, async (req, res) => {
   return advance(req, res, "sent_out");
 });
-router$9.post("/listings/:id/photo-edit-requests/:requestId/received", requireStaff, async (req, res) => {
+router$a.post("/listings/:id/photo-edit-requests/:requestId/received", requireStaff, async (req, res) => {
   return advance(req, res, "received_back");
 });
-router$9.post("/listings/:id/photo-edit-requests/:requestId/replacement", requireStaff, async (req, res) => {
+router$a.post("/listings/:id/photo-edit-requests/:requestId/replacement", requireStaff, async (req, res) => {
   if (!adminReady(res)) return;
   const listingId = portalListingId(req.params.id);
   const requestId = typeof req.params.requestId === "string" ? req.params.requestId.trim() : "";
@@ -39206,8 +40745,8 @@ function decode(data) {
     return "";
   }
 }
-const router$8 = Router();
-router$8.get("/inbox", requireAdmin, async (_req, res) => {
+const router$9 = Router();
+router$9.get("/inbox", requireAdmin, async (_req, res) => {
   const snapshot = await readPhotosInbox(process.env);
   return res.json(snapshot);
 });
@@ -40463,7 +42002,7 @@ async function importDropboxFile(rawUrl) {
   }
   throw new Error("Dropbox redirected too many times.");
 }
-const router$7 = Router();
+const router$8 = Router();
 function actor$1(req) {
   const email = req.user?.email || "";
   const name = email === "temp-admin@iconicimagestx.com" ? "Temporary Admin" : email || req.user?.uid || "Staff";
@@ -40530,18 +42069,18 @@ async function workspacePage(id) {
   const draft = await readDraft(id);
   return mergeContent(draft || (published ? stripPage(published) : base));
 }
-router$7.get("/", async (_req, res) => {
+router$8.get("/", async (_req, res) => {
   const pages = (await listPublished()).map((page2) => mergeContent(page2)).filter((page2) => Boolean(page2));
   return res.json({ pages });
 });
-router$7.get("/blob/:id", (req, res) => {
+router$8.get("/blob/:id", (req, res) => {
   const blob = siteMediaBlob(req.params.id);
   if (!blob) return res.status(404).json({ error: "File not found." });
   res.setHeader("Content-Type", blob.type);
   res.setHeader("Cache-Control", "public, max-age=3600");
   return res.send(blob.body);
 });
-router$7.get("/workspace", gate("view"), async (req, res) => {
+router$8.get("/workspace", gate("view"), async (req, res) => {
   const editorReq = req;
   const ids = knownPageIds();
   const pages = [];
@@ -40563,7 +42102,7 @@ router$7.get("/workspace", gate("view"), async (req, res) => {
     draftIds
   });
 });
-router$7.put("/:id", gate("edit"), async (req, res) => {
+router$8.put("/:id", gate("edit"), async (req, res) => {
   const id = req.params.id;
   if (!defaultPage(id)) return res.status(404).json({ error: "Unknown page." });
   const merged = mergeContent({ ...req.body, id });
@@ -40572,14 +42111,14 @@ router$7.put("/:id", gate("edit"), async (req, res) => {
   await writeDraft(merged, { at: (/* @__PURE__ */ new Date()).toISOString(), byUid: who.uid, byName: who.name });
   return res.json({ page: merged });
 });
-router$7.post("/:id/discard", gate("edit"), async (req, res) => {
+router$8.post("/:id/discard", gate("edit"), async (req, res) => {
   const id = req.params.id;
   if (!defaultPage(id)) return res.status(404).json({ error: "Unknown page." });
   await deleteDraft(id);
   const page2 = await workspacePage(id);
   return res.json({ page: page2 });
 });
-router$7.post("/:id/release", gate("publish"), async (req, res) => {
+router$8.post("/:id/release", gate("publish"), async (req, res) => {
   const id = req.params.id;
   if (!defaultPage(id)) return res.status(404).json({ error: "Unknown page." });
   const draft = await readDraft(id);
@@ -40600,7 +42139,7 @@ router$7.post("/:id/release", gate("publish"), async (req, res) => {
   await deleteDraft(id);
   return res.json({ page: stripPage(source), publishedAt: now, publishedByName: who.name });
 });
-router$7.post("/release-all", gate("publish"), async (req, res) => {
+router$8.post("/release-all", gate("publish"), async (req, res) => {
   const who = actor$1(req);
   const publishedIds = [];
   for (const id of await listDraftIds()) {
@@ -40621,7 +42160,7 @@ router$7.post("/release-all", gate("publish"), async (req, res) => {
   }
   return res.json({ publishedIds });
 });
-router$7.post("/:id/revert", gate("publish"), async (req, res) => {
+router$8.post("/:id/revert", gate("publish"), async (req, res) => {
   const id = req.params.id;
   if (!defaultPage(id)) return res.status(404).json({ error: "Unknown page." });
   const current = await readPublished(id);
@@ -40646,7 +42185,7 @@ function mediaFolder(pageIdRaw) {
   if (defaultPage(pageId)) return pageId;
   return null;
 }
-router$7.post("/media", gate("edit"), async (req, res) => {
+router$8.post("/media", gate("edit"), async (req, res) => {
   try {
     const folder = mediaFolder(req.body?.pageId);
     if (!folder) return res.status(404).json({ error: "Unknown page." });
@@ -40660,7 +42199,7 @@ router$7.post("/media", gate("edit"), async (req, res) => {
     return res.status(status2).json({ error: err instanceof Error ? err.message : "Upload failed." });
   }
 });
-router$7.post("/dropbox", gate("edit"), async (req, res) => {
+router$8.post("/dropbox", gate("edit"), async (req, res) => {
   try {
     const folder = mediaFolder(req.body?.pageId);
     if (!folder) return res.status(404).json({ error: "Unknown page." });
@@ -41086,7 +42625,7 @@ async function deleteInsight(id) {
   }
   await admin.firestore().collection(INSIGHT_COLLECTION).doc(id).delete();
 }
-const router$6 = Router();
+const router$7 = Router();
 const BLOB_URL = /^\/api\/site-content\/blob\/([A-Za-z0-9-]+)$/;
 const ALLOWED_ASSET_HOSTS = /* @__PURE__ */ new Set(["firebasestorage.googleapis.com", "storage.googleapis.com"]);
 function writerAllowed(req) {
@@ -41121,28 +42660,28 @@ async function withSlug(post) {
   const posts = await listInsights();
   return { ...post, slug: claimSlug(post.slug, post.id, posts) };
 }
-router$6.get("/", async (_req, res) => {
+router$7.get("/", async (_req, res) => {
   const posts = await listPublishedInsights();
   res.setHeader("Cache-Control", "no-store");
   return res.json({ posts: posts.map(toPublicInsight) });
 });
-router$6.get("/admin/posts", requireInsightsWriter, async (_req, res) => {
+router$7.get("/admin/posts", requireInsightsWriter, async (_req, res) => {
   const posts = await listInsights();
   return res.json({ posts });
 });
-router$6.post("/admin/posts", requireInsightsWriter, async (req, res) => {
+router$7.post("/admin/posts", requireInsightsWriter, async (req, res) => {
   const created = await withSlug(createInsightPost(req.body, actor(req)));
   await saveInsight(created);
   return res.status(201).json({ post: created });
 });
-router$6.put("/admin/posts/:id", requireInsightsWriter, async (req, res) => {
+router$7.put("/admin/posts/:id", requireInsightsWriter, async (req, res) => {
   const current = await getInsight(String(req.params.id || ""));
   if (!current) return res.status(404).json({ error: "That insight was not found." });
   const next = await withSlug(updateInsightPost(current, req.body));
   await saveInsight(next);
   return res.json({ post: next });
 });
-router$6.post("/admin/posts/:id/publish", requireInsightsWriter, async (req, res) => {
+router$7.post("/admin/posts/:id/publish", requireInsightsWriter, async (req, res) => {
   const current = await getInsight(String(req.params.id || ""));
   if (!current) return res.status(404).json({ error: "That insight was not found." });
   const edited = req.body && Object.keys(req.body).length ? updateInsightPost(current, req.body) : current;
@@ -41153,7 +42692,7 @@ router$6.post("/admin/posts/:id/publish", requireInsightsWriter, async (req, res
   await saveInsight(next);
   return res.json({ post: next });
 });
-router$6.post("/admin/posts/:id/unpublish", requireInsightsWriter, async (req, res) => {
+router$7.post("/admin/posts/:id/unpublish", requireInsightsWriter, async (req, res) => {
   const current = await getInsight(String(req.params.id || ""));
   if (!current) return res.status(404).json({ error: "That insight was not found." });
   const now = (/* @__PURE__ */ new Date()).toISOString();
@@ -41161,13 +42700,13 @@ router$6.post("/admin/posts/:id/unpublish", requireInsightsWriter, async (req, r
   await saveInsight(next);
   return res.json({ post: next });
 });
-router$6.delete("/admin/posts/:id", requireInsightsWriter, async (req, res) => {
+router$7.delete("/admin/posts/:id", requireInsightsWriter, async (req, res) => {
   const current = await getInsight(String(req.params.id || ""));
   if (!current) return res.status(404).json({ error: "That insight was not found." });
   await deleteInsight(current.id);
   return res.json({ ok: true });
 });
-router$6.get("/admin/posts/:id/social.zip", requireInsightsWriter, async (req, res) => {
+router$7.get("/admin/posts/:id/social.zip", requireInsightsWriter, async (req, res) => {
   const current = await getInsight(String(req.params.id || ""));
   if (!current) return res.status(404).json({ error: "That insight was not found." });
   if (!current.socialPack.assets.length) {
@@ -41191,7 +42730,7 @@ router$6.get("/admin/posts/:id/social.zip", requireInsightsWriter, async (req, r
   res.setHeader("Cache-Control", "no-store");
   return res.send(Buffer.from(zipStored(entries)));
 });
-router$6.get("/:slug", async (req, res) => {
+router$7.get("/:slug", async (req, res) => {
   const slug = String(req.params.slug || "");
   if (!isInsightSlug(slug)) return res.status(404).json({ error: "This insight is not published." });
   const post = await getPublishedInsightBySlug(slug);
@@ -41424,12 +42963,12 @@ async function findSentCampaignIssue(category, slug) {
   }
   return null;
 }
-const router$5 = Router();
+const router$6 = Router();
 function categoryOf(value) {
   if (value === "newsletter" || value === "promo") return value;
   return null;
 }
-router$5.get("/issues/:category/:slug", async (req, res) => {
+router$6.get("/issues/:category/:slug", async (req, res) => {
   res.setHeader("X-Robots-Tag", "noindex, nofollow");
   const category = categoryOf(String(req.params.category || ""));
   const slug = String(req.params.slug || "");
@@ -41438,7 +42977,7 @@ router$5.get("/issues/:category/:slug", async (req, res) => {
   if (!issue) return res.status(404).json({ error: "That news issue is not published." });
   return res.json({ issue });
 });
-router$5.get("/", requireStaff, async (_req, res) => {
+router$6.get("/", requireStaff, async (_req, res) => {
   const folders = newsCards();
   const campaigns = await sentCampaignCards();
   res.json({ issues: mergeNewsCards(folders, campaigns) });
@@ -41622,7 +43161,7 @@ async function saveFlashSaleOrder(order) {
   await db2.collection(ORDERS).doc(ref.id).set(linked);
   return ref.id;
 }
-const router$4 = Router();
+const router$5 = Router();
 const limiter$1 = createRateLimiter({ windowMs: 15 * 60 * 1e3, max: 12 });
 function clean(value, max) {
   return String(value || "").trim().slice(0, max);
@@ -41630,7 +43169,7 @@ function clean(value, max) {
 function orderNumber$1() {
   return `FS-${randomBytes$1(3).toString("hex").toUpperCase()}`;
 }
-router$4.post("/checkout", async (req, res) => {
+router$5.post("/checkout", async (req, res) => {
   const limit = limiter$1.check(clientIp(req));
   if (!limit.allowed) {
     res.setHeader("Retry-After", String(limit.retryAfterSec));
@@ -42285,8 +43824,8 @@ function firestoreHooks() {
     }
   };
 }
-const router$3 = Router();
-router$3.post("/dry-run", requireAdmin, async (_req, res) => {
+const router$4 = Router();
+router$4.post("/dry-run", requireAdmin, async (_req, res) => {
   try {
     return res.json(await dryRunTestData());
   } catch (err) {
@@ -42294,7 +43833,7 @@ router$3.post("/dry-run", requireAdmin, async (_req, res) => {
     return res.status(500).json({ error: err instanceof Error ? err.message : "Dry run failed." });
   }
 });
-router$3.post("/apply", requireAdmin, async (req, res) => {
+router$4.post("/apply", requireAdmin, async (req, res) => {
   if (req.body?.confirm !== "APPLY") {
     return res.status(400).json({ error: "Apply requires confirm: APPLY. Dry run is the default." });
   }
@@ -42317,7 +43856,7 @@ router$3.post("/apply", requireAdmin, async (req, res) => {
     });
   }
 });
-router$3.post("/unarchive", requireAdmin, async (req, res) => {
+router$4.post("/unarchive", requireAdmin, async (req, res) => {
   const runId = typeof req.body?.runId === "string" ? req.body.runId.trim() : "";
   if (req.body?.confirm !== "UNARCHIVE" || !runId) {
     return res.status(400).json({ error: "Unarchive requires confirm: UNARCHIVE and a runId." });
@@ -42331,7 +43870,7 @@ router$3.post("/unarchive", requireAdmin, async (req, res) => {
     return res.status(500).json({ error: err instanceof Error ? err.message : "Unarchive failed." });
   }
 });
-router$3.get("/backups/:runId", requireAdmin, async (req, res) => {
+router$4.get("/backups/:runId", requireAdmin, async (req, res) => {
   try {
     const backup = await readCleanupBackup(String(req.params.runId || ""));
     if (!backup) return res.status(404).json({ error: "That backup was not found." });
@@ -42931,8 +44470,8 @@ async function applyExternalLeads(leads) {
     message: "HAR leads were planned with the same dedupe as the website feed."
   });
 }
-const router$2 = Router();
-function cronAuthorized(req) {
+const router$3 = Router();
+function cronAuthorized$1(req) {
   const secret2 = typeof process.env.CRON_SECRET === "string" ? process.env.CRON_SECRET.trim() : "";
   return Boolean(secret2) && req.headers.authorization === `Bearer ${secret2}`;
 }
@@ -42942,7 +44481,7 @@ function parseSince(value) {
   return Number.isFinite(ms) ? ms : "invalid";
 }
 async function handleSync(req, res) {
-  if (!cronAuthorized(req)) return res.status(401).json({ error: "Unauthorized" });
+  if (!cronAuthorized$1(req)) return res.status(401).json({ error: "Unauthorized" });
   try {
     const result = await runHolyGrailSync({ dryRun: false });
     return res.status(200).json(result);
@@ -42956,7 +44495,7 @@ async function handleSync(req, res) {
   }
 }
 async function handleHar(req, res) {
-  if (!cronAuthorized(req)) return res.status(401).json({ error: "Unauthorized" });
+  if (!cronAuthorized$1(req)) return res.status(401).json({ error: "Unauthorized" });
   try {
     const result = await runHolyGrailHar();
     return res.status(200).json(result);
@@ -42967,14 +44506,14 @@ async function handleHar(req, res) {
   }
 }
 async function adminOrCron(req, res, next) {
-  if (cronAuthorized(req)) return next();
+  if (cronAuthorized$1(req)) return next();
   return requireAdmin(req, res, next);
 }
-router$2.get("/sync", handleSync);
-router$2.post("/sync", handleSync);
-router$2.get("/har", handleHar);
-router$2.post("/har", handleHar);
-router$2.get("/dry-run", adminOrCron, async (req, res) => {
+router$3.get("/sync", handleSync);
+router$3.post("/sync", handleSync);
+router$3.get("/har", handleHar);
+router$3.post("/har", handleHar);
+router$3.get("/dry-run", adminOrCron, async (req, res) => {
   const since = parseSince(req.query.since);
   if (since === "invalid") return res.status(400).json({ error: "since must be an ISO timestamp." });
   try {
@@ -42988,6 +44527,73 @@ router$2.get("/dry-run", adminOrCron, async (req, res) => {
     }
     return res.status(500).json({ ok: false, error: "Holy Grail dry run failed." });
   }
+});
+const router$2 = Router();
+function cronAuthorized(req) {
+  const secret2 = typeof process.env.CRON_SECRET === "string" ? process.env.CRON_SECRET.trim() : "";
+  const header2 = req.headers.authorization;
+  const value = Array.isArray(header2) ? header2[0] : header2;
+  return Boolean(secret2) && value === `Bearer ${secret2}`;
+}
+router$2.get("/", requireAdmin, async (_req, res) => {
+  const settings = await readNotifySettings();
+  const sample = sampleNotifyContext();
+  res.json({
+    live: clientEmailNotifyLive(),
+    testSink: CLIENT_EMAIL_NOTIFY_TEST_SINK,
+    timeZone: NOTIFY_TIME_ZONE,
+    reminderHoursBefore: settings.reminderHoursBefore,
+    reminderAssumption: `Aryeo does not show the appointment reminder offset. The default is ${DEFAULT_APPOINTMENT_REMINDER_HOURS} hours before the appointment in ${NOTIFY_TIME_ZONE}.`,
+    overdueDays: PAYMENT_OVERDUE_DAYS,
+    notifications: NOTIFY_DEFINITIONS.map((item) => {
+      const rendered = renderNotification(item.key, sample);
+      return {
+        key: item.key,
+        label: item.label,
+        audience: item.audience,
+        trigger: item.trigger,
+        wired: item.wired,
+        wireNote: item.wireNote || "",
+        enabled: item.wired && settings.enabled[item.key] !== false,
+        subject: rendered.subject,
+        gaps: rendered.gaps
+      };
+    })
+  });
+});
+router$2.patch("/", requireAdmin, async (req, res) => {
+  const key = typeof req.body?.key === "string" ? req.body.key : "";
+  if (key && !isNotifyKey(key)) return res.status(400).json({ error: "Unknown notification." });
+  const settings = await writeNotifySettings({
+    key: key ? key : void 0,
+    enabled: typeof req.body?.enabled === "boolean" ? req.body.enabled : void 0,
+    reminderHoursBefore: req.body?.reminderHoursBefore
+  });
+  res.json({ ok: true, reminderHoursBefore: settings.reminderHoursBefore, enabled: settings.enabled[key] });
+});
+router$2.post("/preview", requireAdmin, async (req, res) => {
+  const key = typeof req.body?.key === "string" ? req.body.key : "";
+  if (!isNotifyKey(key)) return res.status(400).json({ error: "Unknown notification." });
+  const rendered = renderNotification(key, sampleNotifyContext());
+  res.json({ subject: rendered.subject, html: rendered.html, text: rendered.text, gaps: rendered.gaps });
+});
+router$2.post("/test", requireAdmin, async (req, res) => {
+  const key = typeof req.body?.key === "string" ? req.body.key : "";
+  if (!isNotifyKey(key)) return res.status(400).json({ error: "Unknown notification." });
+  const definition = NOTIFY_DEFINITIONS.find((item) => item.key === key);
+  if (!definition?.wired) return res.status(400).json({ error: definition?.wireNote || "That email is not sent from this page." });
+  const to = req.user?.email || "";
+  if (!to) return res.status(400).json({ error: "Your account has no email address." });
+  const result = await sendTestNotification({ key, to });
+  res.json({
+    ...result,
+    note: result.live ? "Sent to your address." : `CLIENT_EMAIL_NOTIFY_LIVE is off. The test went only to ${CLIENT_EMAIL_NOTIFY_TEST_SINK}.`
+  });
+});
+router$2.post("/run", async (req, res) => {
+  if (!cronAuthorized(req)) return res.status(401).json({ error: "Unauthorized" });
+  const result = await runDueClientEmailJobs(/* @__PURE__ */ new Date());
+  res.json({ ok: true, ...result });
 });
 const router$1 = Router();
 const limiter = createRateLimiter({ windowMs: 15 * 60 * 1e3, max: 12 });
@@ -43661,27 +45267,27 @@ function createServer() {
     res.json({ live: clientNotifyLive() });
   });
   mountOwners(app);
-  app.use("/api/bookings", router$F);
-  app.use("/api/headshots-10", router$E);
-  app.use("/api/orders", router$D);
+  app.use("/api/bookings", router$G);
+  app.use("/api/headshots-10", router$F);
+  app.use("/api/orders", router$E);
   app.patch("/api/admin/orders/:id/approval", handleOrderApproval);
-  app.use("/api/galleries", router$C);
-  app.use("/api/payments", router$B);
-  app.use("/api/vsai", router$A);
-  app.use("/api/messages", router$z);
-  app.use("/api/communications", router$c);
-  app.use("/api/people", router$b);
-  app.use("/api/clients", router$x);
+  app.use("/api/galleries", router$D);
+  app.use("/api/payments", router$C);
+  app.use("/api/vsai", router$B);
+  app.use("/api/messages", router$A);
+  app.use("/api/communications", router$d);
+  app.use("/api/people", router$c);
   app.use("/api/clients", router$y);
+  app.use("/api/clients", router$z);
   app.get("/api/portal/listings/:id", handleGetPublicPortalListing);
   app.get("/api/listing-sites/:slug", handleGetListingSite);
   app.post("/api/listing-sites/:slug/inquiry", handleListingSiteInquiry);
-  app.use("/api/staff", router$w);
-  app.use("/api/account", router$v);
-  app.use("/api/site-content", router$7);
-  app.use("/api/insights", router$6);
-  app.use("/api/news", router$5);
-  app.use("/api/flash-sale", router$4);
+  app.use("/api/staff", router$x);
+  app.use("/api/account", router$w);
+  app.use("/api/site-content", router$8);
+  app.use("/api/insights", router$7);
+  app.use("/api/news", router$6);
+  app.use("/api/flash-sale", router$5);
   app.get("/present/:token", (req, res, next) => {
     if (process.env.ICONIC_VITE_DEV === "1") return next();
     return handlePresentationShell(req, res);
@@ -43695,31 +45301,32 @@ function createServer() {
     if (req.params.slug === "prep" || req.params.slug === "news") return next();
     return handleInsightShell(req, res);
   });
+  app.use("/api", router$b);
+  app.use("/api/listings", router$v);
   app.use("/api", router$a);
-  app.use("/api/listings", router$u);
-  app.use("/api", router$9);
-  app.use("/api/task-board", router$8);
-  app.use("/api/campaigns", router$t);
+  app.use("/api/task-board", router$9);
+  app.use("/api/campaigns", router$u);
+  app.use("/api/marketing", router$t);
   app.use("/api/marketing", router$s);
-  app.use("/api/marketing", router$r);
-  app.use("/api/channel-campaigns", router$q);
-  app.use("/api/agents", router$p);
-  app.use("/api/botroom", router$o);
-  app.use("/api/media-jobs", router$n);
-  app.use("/api/studio", router$m);
-  app.use("/api/ops", router$l);
-  app.use("/api/studio/scratch", router$k);
-  app.use("/api/places", router$j);
-  app.use("/api/sms", router$i);
-  app.use("/api/contact", router$d);
+  app.use("/api/channel-campaigns", router$r);
+  app.use("/api/agents", router$q);
+  app.use("/api/botroom", router$p);
+  app.use("/api/media-jobs", router$o);
+  app.use("/api/studio", router$n);
+  app.use("/api/ops", router$m);
+  app.use("/api/studio/scratch", router$l);
+  app.use("/api/places", router$k);
+  app.use("/api/sms", router$j);
   app.use("/api/contact", router$e);
-  app.use("/api/contact", router$h);
-  app.use("/api/senior-living", router$g);
+  app.use("/api/contact", router$f);
+  app.use("/api/contact", router$i);
+  app.use("/api/senior-living", router$h);
   app.use("/api/virtual-staging-pro", router);
   app.use("/api/stock-footage", router$1);
-  app.use("/api/apprenticeship", router$f);
-  app.use("/api/admin/test-data", router$3);
-  app.use("/api/holy-grail", router$2);
+  app.use("/api/apprenticeship", router$g);
+  app.use("/api/admin/test-data", router$4);
+  app.use("/api/holy-grail", router$3);
+  app.use("/api/client-email-notify", router$2);
   app.use(
     (err, _req, res, _next) => {
       console.error("[Server] Unhandled error:", err);
