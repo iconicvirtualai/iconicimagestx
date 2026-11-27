@@ -137,22 +137,43 @@ describe("orders desk sections", () => {
     expect(idsIn("open")).toEqual(["fixture-birch"]);
   });
 
-  it("shows order, payment, and gallery as plain text with one neutral dot", async () => {
+  it("shows a status pill, payment, gallery, and package add-ons", async () => {
     await renderAt("adminOrdersView:status");
     const maple = section("open").querySelector("[data-order-id='fixture-maple']");
-    expect(maple?.textContent).toContain("Order");
-    expect(maple?.textContent).toContain("Scheduled");
+    expect(maple?.querySelector(".status-pill")?.textContent).toContain("Scheduled");
     expect(maple?.textContent).toContain("Payment");
     expect(maple?.textContent).toContain("Paid");
     expect(maple?.textContent).toContain("Gallery");
     expect(maple?.textContent).toContain("Editing");
-    expect(maple?.querySelectorAll("i.ndot").length).toBe(1);
-    expect(maple?.innerHTML).not.toMatch(/bg-red-|bg-green-|bg-blue-|rounded-full px-/);
+    expect(maple?.querySelector(".oid")?.textContent).toBe("#012");
     expect(maple?.textContent).toContain(adminOrderTotalLabel(orders.find((order) => order.id === "fixture-maple")!));
     const link = maple?.querySelector("a[data-order-link='fixture-maple']") as HTMLAnchorElement | null;
     expect(link?.getAttribute("href")).toBe("/admin/order-request/fixture-maple");
     expect(section("open").textContent).toContain("The Showcase");
     expect(section("open").textContent).toContain("+1");
+    expect(section("open").textContent).toContain("Incoming Order Requests");
+  });
+
+  it("sorts from the column headers and keeps search beside the filters", async () => {
+    await renderAt("adminOrdersView:columns");
+    const agent = container?.querySelector("[data-testid='orders-sort-col-agent']") as HTMLButtonElement;
+    expect(agent?.getAttribute("aria-label")).toBe("Sort by Agent name");
+    await act(async () => {
+      agent.click();
+    });
+    expect(container?.querySelector("[data-line-sort]")?.getAttribute("data-line-sort")).toBe("agent");
+    expect(container?.querySelector("[data-line-order]")?.getAttribute("data-line-order")).toBe("asc");
+    expect(idsIn("open")).toEqual(["fixture-maple", "fixture-oak", "fixture-pine", "fixture-cedar", "fixture-birch"]);
+    const header = agent.closest("th");
+    expect(header?.getAttribute("aria-sort")).toBe("ascending");
+    await act(async () => {
+      agent.click();
+    });
+    expect(container?.querySelector("[data-line-order]")?.getAttribute("data-line-order")).toBe("desc");
+    expect(idsIn("open")[0]).toBe("fixture-birch");
+    await clickButton(container!, "Oldest");
+    expect(container?.querySelector("[data-line-sort]")?.getAttribute("data-line-sort")).toBe("");
+    expect(idsIn("open")).toEqual(["fixture-birch", "fixture-pine", "fixture-oak", "fixture-maple", "fixture-cedar"]);
   });
 
   it("remembers list or board per user", async () => {

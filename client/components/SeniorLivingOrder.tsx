@@ -274,7 +274,7 @@ export function SeniorLivingOrder({
         <h2 className="text-3xl font-semibold leading-tight">{SENIOR_LIVING_DEPOSIT_RECEIVED}</h2>
         <p className="text-lg leading-relaxed text-neutral-950">
           Order number{" "}
-          <span data-testid="senior-order-number" className="font-semibold">
+          <span data-testid="senior-order-number" className="text-base font-bold tabular-nums">
             {returnedOrder}
           </span>
         </p>
@@ -292,7 +292,7 @@ export function SeniorLivingOrder({
         {confirmation.orderNumber ? (
           <p className="text-lg leading-relaxed text-neutral-950">
             Order number{" "}
-            <span data-testid="senior-order-number" className="font-semibold">
+            <span data-testid="senior-order-number" className="text-base font-bold tabular-nums">
               {confirmation.orderNumber}
             </span>
           </p>

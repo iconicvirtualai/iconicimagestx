@@ -36,7 +36,7 @@ export function BookingConfirmation({
             <p className="text-[10px] font-black uppercase tracking-[0.18em] text-neutral-500">Order number</p>
             <p
               data-order-number=""
-              className="mt-1 break-all text-2xl font-black leading-tight tracking-tight text-black sm:text-3xl"
+              className="mt-1 break-all text-base font-bold tabular-nums leading-snug tracking-normal text-black"
             >
               {orderNumber}
             </p>

@@ -90,7 +90,7 @@ export function BrandedInvoiceShell({
             </span>
             <div className="mt-6">
               <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl" style={{ color: INK }}>Invoice</h1>
-              <p className="mt-2 font-medium" style={{ ...type.meta, color: TEAL }}>INVOICE NO : {invoiceNumber}</p>
+              <p className="mt-2 font-bold tabular-nums" style={{ ...type.meta, color: TEAL }}>INVOICE NO : {invoiceNumber}</p>
             </div>
             <div className="mt-4">
               {date ? <p className="font-medium text-neutral-500" style={type.meta}>{date}</p> : null}

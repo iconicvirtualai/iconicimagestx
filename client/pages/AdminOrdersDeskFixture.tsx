@@ -84,6 +84,8 @@ export function ordersDeskFixtureOrders(): Record<string, unknown>[] {
       createdAt: "2026-11-20T18:00:00.000Z",
       selectedService: "The Essentials",
       total: 199,
+      brokerage: "Creek & Co.",
+      aryeoOrderNumber: "ARY-10482",
     },
     {
       id: "play-row",

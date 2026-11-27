@@ -12,7 +12,7 @@ import { buildAdminOrderTile } from "./adminOrderTile.ts";
 import { invoiceChargeTotal, invoiceFaceFromStored } from "./invoiceFace.ts";
 import { computeInvoiceTotals } from "./invoiceProcessing.ts";
 import { formatAdminMoney, LISTING_PRICE_MISSING, resolveListingPriceLabel } from "./listingPrice.ts";
-import { compactOrderLabel, formatOrderNumber } from "./orderNumber.ts";
+import { aryeoOrderNumber, compactOrderLabel, formatOrderNumber } from "./orderNumber.ts";
 import { cleanPackageName, orderServiceLines } from "./orderPackageLines.ts";
 import { PAY_NOW_METHOD } from "./payNow.ts";
 import { paymentFaceLabel, type PaymentFaceLabel } from "./paymentSettlement.ts";
@@ -441,7 +441,25 @@ export function adminOrderSearchText(order: Record<string, unknown>): string {
     || text(order.name)
     || [text(order.firstName), text(order.lastName)].filter(Boolean).join(" ");
   const id = order.id == null ? "" : String(order.id);
-  return [name || "—", recordAddressText(order) || "—", id, tile.packageName, tile.skinLabel, tile.orderCode, adminOrderNumberLabel(order), compactOrderLabel(order), tile.clientName, tile.channel]
+  return [
+    name || "—",
+    text(order.brokerage),
+    text(order.brokerageName),
+    text(order.company),
+    recordAddressText(order) || "—",
+    id,
+    tile.packageName,
+    adminOrderPackageSummary(order),
+    tile.skinLabel,
+    tile.orderCode,
+    adminOrderNumberLabel(order),
+    compactOrderLabel(order),
+    aryeoOrderNumber(order),
+    adminOrderStatusLabel(order),
+    adminOrderPaymentLabel(order),
+    tile.clientName,
+    tile.channel,
+  ]
     .join(" ")
     .toLowerCase();
 }

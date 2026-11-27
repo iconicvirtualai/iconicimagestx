@@ -263,6 +263,17 @@ describe("admin order list filters", () => {
     expect(matched.map((order) => order.id)).toEqual(["fixture-maple"]);
     expect(filterAdminOrderRecords(records, "SHOWCASE").map((order) => order.id)).toEqual(["fixture-maple"]);
     expect(filterAdminOrderRecords(records, "blair").map((order) => order.id)).toEqual(["fixture-oak"]);
+    expect(filterAdminOrderRecords(records, "unscheduled").map((order) => order.id)).toEqual(["fixture-birch"]);
+    expect(filterAdminOrderRecords([{
+      id: "aryeo-row",
+      clientName: "Sample Agent",
+      brokerage: "Sample Brokerage",
+      address: "1 Sample St",
+      status: "request",
+      aryeoOrderNumber: "ARY-42",
+      selectedService: "The Essentials",
+    }], "ary-42").map((order) => order.id)).toEqual(["aryeo-row"]);
+    expect(filterAdminOrderRecords(records, "sample brokerage")).toEqual([]);
   });
 });
 

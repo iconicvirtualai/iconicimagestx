@@ -10,15 +10,20 @@ import {
   type AdminOrderListRow,
   type AdminOrderListStaff,
 } from "@shared/adminOrderList";
-import { compactOrderLabel } from "@shared/orderNumber";
+import { aryeoOrderNumber, compactOrderLabel } from "@shared/orderNumber";
 import { formatAdminMoney } from "@shared/listingPrice";
+import { formatChicagoDate } from "@shared/clientHome";
 import {
   ADMIN_ORDER_BOARD_COLUMNS,
   deliveryProgress,
   orderDeskTriage,
   orderIsUnhandled,
+  cycleOrderLineSort,
   shootWhen,
   shownKpiValue,
+  sortOrderLineItems,
+  type OrderLineSort,
+  type OrderLineSortField,
   type OrderDeskFilter,
   type OrderDeskKpis,
   type OrderDeskPrefs,
@@ -45,6 +50,15 @@ const FILTERS: { id: OrderDeskFilter; label: string }[] = [
 ];
 
 const TONES = ["ch", "cb", "jm", "aq", "je", "rb", "mb", "cn", "sp", "tb"];
+
+const LINE_COLUMNS: { id: OrderLineSortField; label: string }[] = [
+  { id: "order", label: "Order #" },
+  { id: "agent", label: "Agent name" },
+  { id: "address", label: "Address" },
+  { id: "package", label: "Package" },
+  { id: "status", label: "Status" },
+  { id: "date", label: "Date" },
+];
 
 type KpiKey = "today" | "unscheduled" | "progress" | "revenue";
 
@@ -129,6 +143,15 @@ export function OrdersDeskFace({
   onRowDragStart: (event: React.PointerEvent<HTMLButtonElement>, id: string) => void;
   onToggleCollapsed: (section: OrderDeskSectionId) => void;
 }) {
+  const [lineSort, setLineSort] = React.useState<OrderLineSort | null>(null);
+  React.useEffect(() => {
+    setLineSort(null);
+  }, [sortMode]);
+  const chooseLineSort = (field: OrderLineSortField) => {
+    setLineSort((current) => cycleOrderLineSort(current, field));
+  };
+  const openShown = lineSort ? sortOrderLineItems(openOrders, lineSort, staff) : openOrders;
+  const archivedShown = lineSort ? sortOrderLineItems(archivedOrders, lineSort, staff) : archivedOrders;
   const cards: { key: KpiKey; filterId: OrderDeskFilter; label: string; value: string; hint: string; icon: React.ReactNode; tone: string }[] = [
     { key: "today", filterId: "today", label: "Today's shoots", value: shownKpiValue(String(kpis.todayCount), deskPrefs.kpi.today), hint: kpis.todayHint, icon: <CalendarIcon />, tone: "teal" },
     { key: "unscheduled", filterId: "unscheduled", label: "Unscheduled", value: shownKpiValue(String(kpis.unscheduledCount), deskPrefs.kpi.unscheduled), hint: "No shoot date on file", icon: <TruckIcon />, tone: "amber" },
@@ -137,7 +160,7 @@ export function OrdersDeskFace({
   ];
 
   return (
-    <div className="orders-desk main" data-orders-view={view} data-orders-filter={filter} data-orders-sort={sortMode}>
+    <div className="orders-desk main" data-orders-view={view} data-orders-filter={filter} data-orders-sort={sortMode} data-line-sort={lineSort?.field || ""} data-line-order={lineSort?.order || ""}>
       <DragGhost ghost={ghost} />
       <div className="page-head">
         <div>
@@ -206,12 +229,12 @@ export function OrdersDeskFace({
         </nav>
         <div className="sorts" role="group" aria-label="Sort orders" data-testid="orders-sort">
           {SORTS.map((item) => (
-            <button key={item.id} type="button" className={sortMode === item.id ? "active" : ""} aria-pressed={sortMode === item.id} data-testid={`orders-sort-${item.id}`} onClick={() => onSort(item.id)}>
+            <button key={item.id} type="button" className={sortMode === item.id && !lineSort ? "active" : ""} aria-pressed={sortMode === item.id && !lineSort} data-testid={`orders-sort-${item.id}`} onClick={() => { setLineSort(null); onSort(item.id); }}>
               {item.label}
             </button>
           ))}
           {sortMode === "custom" ? (
-            <button type="button" className="active" data-testid="orders-sort-reset" onClick={() => onSort("newest")}>Reset order</button>
+            <button type="button" className="active" data-testid="orders-sort-reset" onClick={() => { setLineSort(null); onSort("newest"); }}>Reset order</button>
           ) : null}
         </div>
         <label className="select-all">
@@ -225,7 +248,7 @@ export function OrdersDeskFace({
         </label>
         <div className="search">
           <SearchIcon />
-          <input aria-label="Search orders or clients" data-testid="orders-search" placeholder="Search orders or clients…" value={query} onChange={(event) => onQuery(event.target.value)} />
+          <input aria-label="Search orders by number, agent, address, package, or status" data-testid="orders-search" placeholder="Search orders" value={query} onChange={(event) => onQuery(event.target.value)} />
         </div>
       </div>
 
@@ -233,16 +256,20 @@ export function OrdersDeskFace({
         <Board orders={boardOrders} staff={staff} now={clock} selection={selection} onToggleSelect={onToggleSelect} />
       ) : (
         <div className="stack">
+          <LineSortChips sort={lineSort} onSort={chooseLineSort} />
           <section data-section="open" className="block" data-testid="orders-open">
             <div className="block-head">
-              <h2>Orders</h2>
+              <h2>Incoming Order Requests</h2>
               <span className="count-calm" data-testid="orders-new-count" title="New requests waiting for a first response. Handled, delivered, and duplicate copies are not included.">{visibleNewCount}</span>
-              <span className="subdued">{sortHint(sortMode)}</span>
+              <span className="subdued">new</span>
+              <span className="subdued">{lineSort ? columnHint(lineSort) : sortHint(sortMode)}</span>
             </div>
             <div className="block-body">
-              {openOrders.length === 0 ? <div className="empty-note">No orders in this list</div> : (
-                <ScanList
-                  orders={openOrders}
+              {openShown.length === 0 ? <div className="empty-note">No orders in this list</div> : (
+                <OrderLineTable
+                  orders={openShown}
+                  lineSort={lineSort}
+                  onLineSort={chooseLineSort}
                   staff={staff}
                   now={clock}
                   editRequests={editRequests}
@@ -275,9 +302,11 @@ export function OrdersDeskFace({
             </div>
             {!deskPrefs.collapsed.archived && (
               <div className="block-body">
-                {archivedOrders.length === 0 ? <div className="empty-note">No orders in this list</div> : (
-                  <ScanList
-                    orders={archivedOrders}
+                {archivedShown.length === 0 ? <div className="empty-note">No orders in this list</div> : (
+                  <OrderLineTable
+                    orders={archivedShown}
+                    lineSort={lineSort}
+                    onLineSort={chooseLineSort}
                     staff={staff}
                     now={clock}
                     editRequests={editRequests}
@@ -297,8 +326,45 @@ export function OrdersDeskFace({
   );
 }
 
-function ScanList({
-  orders, staff, now, editRequests, selection, rowDropBefore, onToggleSelect, onStudioChange, onRowDragStart,
+function LineSortChips({ sort, onSort }: { sort: OrderLineSort | null; onSort: (field: OrderLineSortField) => void }) {
+  return (
+    <div className="line-sort-chips" role="group" aria-label="Sort columns">
+      {LINE_COLUMNS.map((column) => (
+        <SortHeader key={column.id} column={column} sort={sort} onSort={onSort} chip />
+      ))}
+    </div>
+  );
+}
+
+function SortHeader({
+  column,
+  sort,
+  onSort,
+  chip = false,
+}: {
+  column: { id: OrderLineSortField; label: string };
+  sort: OrderLineSort | null;
+  onSort: (field: OrderLineSortField) => void;
+  chip?: boolean;
+}) {
+  const active = sort?.field === column.id;
+  const mark = active ? (sort?.order === "asc" ? "↑" : "↓") : "↕";
+  return (
+    <button
+      type="button"
+      className={cn(chip ? "sort-chip" : "sort-head", active && "is-active")}
+      data-testid={chip ? undefined : `orders-sort-col-${column.id}`}
+      aria-label={`Sort by ${column.label}`}
+      onClick={() => onSort(column.id)}
+    >
+      <span>{column.label}</span>
+      <span className="sort-mark" aria-hidden="true">{mark}</span>
+    </button>
+  );
+}
+
+function OrderLineTable({
+  orders, staff, now, editRequests, selection, rowDropBefore, lineSort, onLineSort, onToggleSelect, onStudioChange, onRowDragStart,
 }: {
   orders: Record<string, unknown>[];
   staff: AdminOrderListStaff[];
@@ -306,97 +372,145 @@ function ScanList({
   editRequests: Record<string, unknown>[];
   selection: Set<string>;
   rowDropBefore: string | "end" | null;
+  lineSort: OrderLineSort | null;
+  onLineSort: (field: OrderLineSortField) => void;
   onToggleSelect: (id: string) => void;
   onStudioChange: (orderId: string, studio: AdminStudioId) => void;
   onRowDragStart: ((event: React.PointerEvent<HTMLButtonElement>, id: string) => void) | null;
 }) {
   return (
-    <div className="scan-list" data-order-list>
-      {orders.map((order) => {
-        const id = String(order.id || "");
-        const row = buildAdminOrderListRow(order, staff);
-        const number = compactOrderLabel(order) || row.orderCode;
-        const triage = orderDeskTriage(order, staff, editRequests);
-        const when = shootWhen(order, now);
-        const parts = packageParts(row);
-        const progress = deliveryProgress(order);
-        const tile = buildAdminOrderTile(order);
-        const address = splitAddress(row.address);
-        const fresh = orderIsUnhandled(order);
-        return (
-          <div key={id} className="scan-wrap" data-order-id={id} data-order-drop={id}>
-          {rowDropBefore === id ? <div className="row-slot" data-testid="order-drop-slot" /> : null}
-          <article
-            className={cn("scan", fresh && "is-new", rowDropBefore === id && "is-drop")}
-          >
-            {onRowDragStart ? (
-              <button type="button" className="drag-handle" aria-label={`Drag to reorder ${number}`} title="Drag to reorder" onPointerDown={(event) => onRowDragStart(event, id)}>
-                <GripIcon />
-              </button>
-            ) : <span className="drag-spacer" />}
-            <input className="pick" type="checkbox" aria-label={`Select ${number}`} checked={selection.has(id)} onChange={() => onToggleSelect(id)} />
-            <div className="scan-id">
-              <Link className="oid" to={adminOrderDetailHref(id)} data-order-link={id} title={row.orderCode === number ? id : `${row.orderCode} · ${id}`}>{number}</Link>
-              {fresh ? <span className="pill">New</span> : null}
-              {row.calendarHoldFailed ? <span data-slot="calendar-hold" className="subdued">Calendar hold failed</span> : null}
-            </div>
-            <div className="scan-main">
-              <div className="client">
-                <div className={`av ${toneClass(row.clientName)}`}>{initials(row.clientName)}</div>
-                <div>
-                  <div className="nm">{row.clientName}</div>
-                  {orderEmail(order, row) ? <div className="em">{orderEmail(order, row)}</div> : null}
-                </div>
-              </div>
-              <div className="addr"><div className="st">{address.street}</div>{address.city ? <div className="ct">{address.city}</div> : null}</div>
-              <div className="pkg">
-                <span className="name">{parts[0]}</span>
-                {parts.length > 1 ? <span className="plus" tabIndex={0}>+{parts.length - 1}</span> : null}
-                {parts.length > 1 ? (
-                  <div className="pkg-tip">
-                    <strong>Package & services</strong>
-                    <ul>{parts.map((part) => <li key={part}>{part}</li>)}</ul>
-                  </div>
+    <div className="table-wrap" data-order-list>
+      <table className="orders line-items">
+        <colgroup>
+          <col className="col-pick" />
+          <col className="col-order" />
+          <col className="col-agent" />
+          <col className="col-address" />
+          <col className="col-package" />
+          <col className="col-status" />
+          <col className="col-date" />
+          <col className="col-total" />
+          <col className="col-actions" />
+        </colgroup>
+        <thead>
+          <tr>
+            <th scope="col"><span className="sr">Select</span></th>
+            {LINE_COLUMNS.map((column) => {
+              const active = lineSort?.field === column.id;
+              return (
+                <th key={column.id} scope="col" aria-sort={active ? (lineSort?.order === "asc" ? "ascending" : "descending") : "none"}>
+                  <SortHeader column={column} sort={lineSort} onSort={onLineSort} />
+                </th>
+              );
+            })}
+            <th scope="col">Total</th>
+            <th scope="col">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {orders.map((order) => {
+            const id = String(order.id || "");
+            const row = buildAdminOrderListRow(order, staff);
+            const number = compactOrderLabel(order) || row.orderCode;
+            const aryeo = aryeoOrderNumber(order);
+            const triage = orderDeskTriage(order, staff, editRequests);
+            const when = dateFace(order, row, now);
+            const parts = packageParts(row);
+            const progress = deliveryProgress(order);
+            const tile = buildAdminOrderTile(order);
+            const address = splitAddress(row.address);
+            const fresh = orderIsUnhandled(order);
+            const secondary = brokerageOf(order) || orderEmail(order, row);
+            const payment = adminOrderPaymentLabel(order);
+            return (
+              <React.Fragment key={id}>
+                {rowDropBefore === id ? (
+                  <tr className="row-slot-row">
+                    <td colSpan={9}><div className="row-slot" data-testid="order-drop-slot" /></td>
+                  </tr>
                 ) : null}
-              </div>
-              {tile.studio ? (
-                <select className="studio-pick" aria-label={`Studio for ${number}`} value={tile.studio} onChange={(event) => onStudioChange(id, event.target.value as AdminStudioId)}>
-                  {ADMIN_STUDIOS.map((studio) => <option key={studio.id} value={studio.id}>{studio.label}</option>)}
-                </select>
-              ) : null}
-            </div>
-            <div className="scan-status statii">
-              <div className="st-line"><span className="st-k">Order</span><span className="st-v"><i className="ndot" />{row.statusLabel}</span></div>
-              <div className="st-line"><span className="st-k">Payment</span><span className="st-v">{adminOrderPaymentLabel(order)}</span></div>
-              <div className="st-line"><span className="st-k">Gallery</span><span className="st-v">{adminOrderGalleryLabel(order)}</span></div>
-              <div className="meta-row">
-                <Photographer name={row.photographer} />
-                {progress ? (
-                  <div className="prog">
-                    <div className="lab">{progress.delivered}/{progress.total} delivered</div>
-                    <div className="track"><i style={{ width: `${Math.round((progress.delivered / progress.total) * 100)}%` }} /></div>
-                  </div>
-                ) : null}
-                <Note notes={row.notes} />
-              </div>
-              {triage ? <span className="reason">{triage.label}</span> : null}
-            </div>
-            <div className="scan-side">
-              <div className="when">
-                <div className="d">Received {row.placedLabel}</div>
-                <div className="t">{when.day}{when.time ? ` · ${when.time}` : ""}</div>
-              </div>
-              <div className="total" data-slot="money">{row.totalLabel}</div>
-              {triage ? (
-                <Link className={cn("btn", triage.action === "Assign" && "btn-teal", triage.action === "Open gallery" && "btn-dark")} to={triageHref(id, order, triage.action)}>
-                  {triage.action}
-                </Link>
-              ) : null}
-            </div>
-          </article>
-          </div>
-        );
-      })}
+                <tr data-order-id={id} data-order-drop={id} className={cn(fresh && "is-new", rowDropBefore === id && "is-drop")}>
+                  <td data-label="">
+                    <div className="pick-cell">
+                      {onRowDragStart ? (
+                        <button type="button" className="drag-handle" aria-label={`Drag to reorder ${number}`} title="Drag to reorder" onPointerDown={(event) => onRowDragStart(event, id)}>
+                          <GripIcon />
+                        </button>
+                      ) : null}
+                      <input className="pick" type="checkbox" aria-label={`Select ${number}`} checked={selection.has(id)} onChange={() => onToggleSelect(id)} />
+                    </div>
+                  </td>
+                  <td data-label="Order #">
+                    <div className="oid-line">
+                      <Link className="oid" to={adminOrderDetailHref(id)} data-order-link={id} title={row.orderCode === number ? id : `${row.orderCode} · ${id}`}>{number}</Link>
+                      {fresh ? <span className="pill">New</span> : null}
+                    </div>
+                    {aryeo && aryeo !== number ? <div className="aryeo">Aryeo {aryeo}</div> : null}
+                    {row.calendarHoldFailed ? <div data-slot="calendar-hold" className="subdued">Calendar hold failed</div> : null}
+                  </td>
+                  <td data-label="Agent name">
+                    <div className="client">
+                      <div className={`av ${toneClass(row.clientName)}`}>{initials(row.clientName)}</div>
+                      <div className="min-w-0">
+                        <div className="nm">{row.clientName}</div>
+                        {secondary ? <div className="em" title={secondary}>{secondary}</div> : null}
+                      </div>
+                    </div>
+                  </td>
+                  <td data-label="Address">
+                    <div className="addr"><div className="st">{address.street}</div>{address.city ? <div className="ct">{address.city}</div> : null}</div>
+                  </td>
+                  <td data-label="Package">
+                    <div className="pkg">
+                      <span className="name">{parts[0]}</span>
+                      {parts.length > 1 ? <span className="plus" tabIndex={0}>+{parts.length - 1}</span> : null}
+                      {parts.length > 1 ? (
+                        <div className="pkg-tip">
+                          <strong>Package & services</strong>
+                          <ul>{parts.map((part) => <li key={part}>{part}</li>)}</ul>
+                        </div>
+                      ) : null}
+                    </div>
+                    {tile.studio ? (
+                      <select className="studio-pick" aria-label={`Studio for ${number}`} value={tile.studio} onChange={(event) => onStudioChange(id, event.target.value as AdminStudioId)}>
+                        {ADMIN_STUDIOS.map((studio) => <option key={studio.id} value={studio.id}>{studio.label}</option>)}
+                      </select>
+                    ) : null}
+                  </td>
+                  <td data-label="Status">
+                    <span className={cn("status-pill", statusTone(row.statusLabel))}>{row.statusLabel}</span>
+                    <div className="gallery-line">Gallery {adminOrderGalleryLabel(order)}</div>
+                    {progress ? <div className="gallery-line">{progress.delivered}/{progress.total} delivered</div> : null}
+                    {triage && triage.label !== row.statusLabel ? <span className="reason">{triage.label}</span> : null}
+                  </td>
+                  <td data-label="Date">
+                    <div className="when">
+                      <div className="d">{when.kind}</div>
+                      <div className="t">{when.when}</div>
+                      <div className="t">Received {row.placedLabel}</div>
+                    </div>
+                  </td>
+                  <td data-label="Total">
+                    <div className="total" data-slot="money">{row.totalLabel}</div>
+                    <div className="pay-line"><span className="pay-k">Payment</span><span>{payment}</span></div>
+                  </td>
+                  <td data-label="Actions">
+                    <div className="row-actions">
+                      <Link className="btn" to={adminOrderDetailHref(id)}>Open</Link>
+                      {triage ? (
+                        <Link className={cn("btn", triage.action === "Assign" && "btn-teal", triage.action === "Open gallery" && "btn-dark")} to={triageHref(id, order, triage.action)}>
+                          {triage.action}
+                        </Link>
+                      ) : null}
+                      <Note notes={row.notes} />
+                    </div>
+                  </td>
+                </tr>
+              </React.Fragment>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -487,6 +601,41 @@ function sortHint(mode: OrderDeskSort): string {
   if (mode === "status") return "Grouped by status";
   if (mode === "custom") return "Your order";
   return "Newest first";
+}
+
+function columnHint(sort: OrderLineSort): string {
+  const label = LINE_COLUMNS.find((column) => column.id === sort.field)?.label || "Column";
+  return `${label} ${sort.order === "asc" ? "A–Z" : "Z–A"}`;
+}
+
+function dateFace(order: Record<string, unknown>, row: AdminOrderListRow, now: Date): { kind: string; when: string } {
+  const booked = shootWhen(order, now);
+  if (booked.day !== "Date TBD") {
+    return { kind: "Scheduled", when: `${booked.day}${booked.time ? ` · ${booked.time}` : ""}` };
+  }
+  const requested = typeof order.requestedDate === "string" ? order.requestedDate.trim() : "";
+  if (requested) {
+    return { kind: "Requested", when: formatChicagoDate(requested, "compact") || requested };
+  }
+  return { kind: "Requested", when: "Date TBD" };
+}
+
+function brokerageOf(order: Record<string, unknown>): string {
+  for (const key of ["brokerage", "brokerageName", "company"]) {
+    const value = order[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return "";
+}
+
+function statusTone(label: string): string {
+  const key = label.toLowerCase();
+  if (key.includes("cancel") || key.includes("archiv")) return "is-muted";
+  if (key.includes("deliver")) return "is-delivered";
+  if (key.includes("unschedul") || key === "new") return "is-new";
+  if (key.includes("schedul") || key.includes("confirm")) return "is-scheduled";
+  if (key.includes("review") || key.includes("pending") || key.includes("progress")) return "is-progress";
+  return "is-new";
 }
 
 function triageHref(id: string, order: Record<string, unknown>, action: string): string {

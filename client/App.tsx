@@ -32,6 +32,9 @@ const AdminUnreadFixture = import.meta.env.DEV
 const AdminOrdersDeskFixture = import.meta.env.DEV
   ? lazy(() => import("./pages/AdminOrdersDeskFixture"))
   : null;
+const OrderNumberFaces = import.meta.env.DEV
+  ? lazy(() => import("./pages/OrderNumberFaces"))
+  : null;
 
 // Public pages
 import Index from "./pages/Index";
@@ -317,6 +320,9 @@ const App = () => (
             ) : null}
             {AdminOrdersDeskFixture ? (
               <Route path="/admin/orders-desk-fixture" element={<Suspense fallback={null}><AdminOrdersDeskFixture /></Suspense>} />
+            ) : null}
+            {OrderNumberFaces ? (
+              <Route path="/dev/order-number-faces" element={<Suspense fallback={null}><OrderNumberFaces /></Suspense>} />
             ) : null}
             <Route path="/admin/botroom" element={<ProtectedRoute requiredRole="admin"><AdminMessages /></ProtectedRoute>} />
             <Route path="/admin/botroom/connect" element={<ProtectedRoute requiredRole="admin"><AdminBotRoomConnect /></ProtectedRoute>} />

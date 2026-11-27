@@ -1006,3 +1006,226 @@
   font-size: 12.5px;
   font-weight: 550;
 }
+
+.orders-desk .sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.orders-desk .line-sort-chips { display: none; }
+.orders-desk .table-wrap { max-width: 100%; overflow-x: auto; }
+.orders-desk .table-wrap:has(table.line-items) { overflow-x: hidden; max-width: 100%; }
+.orders-desk table.line-items { width: 100%; max-width: 100%; min-width: 0; table-layout: fixed; }
+.orders-desk table.line-items col.col-pick { width: 6%; }
+.orders-desk table.line-items col.col-order { width: 11%; }
+.orders-desk table.line-items col.col-agent { width: 15%; }
+.orders-desk table.line-items col.col-address { width: 15%; }
+.orders-desk table.line-items col.col-package { width: 11%; }
+.orders-desk table.line-items col.col-status { width: 12%; }
+.orders-desk table.line-items col.col-date { width: 11%; }
+.orders-desk table.line-items col.col-total { width: 8%; }
+.orders-desk table.line-items col.col-actions { width: 11%; }
+.orders-desk table.line-items .btn { height: 28px; padding: 0 8px; font-size: 11.5px; }
+.orders-desk table.line-items .plus,
+.orders-desk table.line-items .pill { white-space: nowrap; }
+.orders-desk table.line-items .pkg { max-width: 100%; flex-wrap: wrap; }
+.orders-desk table.line-items .oid-line { max-width: 100%; flex-wrap: wrap; }
+.orders-desk table.line-items .reason {
+  display: inline-block;
+  max-width: 100%;
+  white-space: normal;
+  box-sizing: border-box;
+}
+.orders-desk table.line-items .drag-handle { width: 22px; height: 22px; }
+.orders-desk table.line-items .av { width: 28px; height: 28px; font-size: 10px; }
+.orders-desk table.line-items th,
+.orders-desk table.line-items td {
+  text-align: left;
+  vertical-align: top;
+  word-break: normal;
+  overflow-wrap: normal;
+  padding: 10px 8px;
+}
+.orders-desk table.line-items th:has(.sort-head) { padding: 0; }
+.orders-desk table.line-items th:first-child,
+.orders-desk table.line-items td:first-child { padding-left: 10px; }
+.orders-desk table.line-items .nm,
+.orders-desk table.line-items .addr .st,
+.orders-desk table.line-items .name,
+.orders-desk table.line-items .status-pill,
+.orders-desk table.line-items .when .d,
+.orders-desk table.line-items .when .t,
+.orders-desk table.line-items .pill,
+.orders-desk table.line-items .oid,
+.orders-desk table.line-items .sort-head,
+.orders-desk table.line-items .em,
+.orders-desk table.line-items .gallery-line {
+  overflow-wrap: normal;
+  word-break: normal;
+}
+.orders-desk table.line-items .name,
+.orders-desk table.line-items .status-pill,
+.orders-desk table.line-items .when .d,
+.orders-desk table.line-items .pill,
+.orders-desk table.line-items .oid,
+.orders-desk table.line-items .sort-head {
+  white-space: nowrap;
+}
+.orders-desk table.line-items .em {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.orders-desk table.line-items th:last-child,
+.orders-desk table.line-items td:last-child { text-align: left; padding-right: 14px; }
+.orders-desk table.line-items .client { min-width: 0; }
+.orders-desk table.line-items .sort-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  min-height: 36px;
+  border: 0;
+  background: transparent;
+  padding: 10px 8px;
+  margin: 0;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  text-align: left;
+}
+.orders-desk table.line-items .sort-head.is-active { color: var(--ink); }
+.orders-desk .sort-mark { font-size: 11px; letter-spacing: 0; line-height: 1; }
+.orders-desk table.line-items tr.is-new td { background: #fffdfd; }
+.orders-desk table.line-items tr.is-drop td { box-shadow: inset 0 2px 0 var(--teal); }
+.orders-desk .pick-cell { display: flex; align-items: center; gap: 6px; }
+.orders-desk .aryeo {
+  margin-top: 4px;
+  font-size: 11.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-2);
+}
+.orders-desk .status-pill {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.3;
+  background: var(--rose-soft);
+  color: var(--rose);
+}
+.orders-desk .status-pill.is-scheduled { background: var(--teal-soft); color: var(--teal-mid); }
+.orders-desk .status-pill.is-progress { background: var(--amber-soft); color: #8a5a10; }
+.orders-desk .status-pill.is-delivered { background: var(--blue-soft); color: #3147b5; }
+.orders-desk .status-pill.is-muted { background: #eef1ef; color: var(--muted); }
+.orders-desk .gallery-line {
+  margin-top: 4px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.orders-desk .pay-line {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.orders-desk .pay-k {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.orders-desk .row-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+.orders-desk .oid { font-weight: 700; }
+
+@media (max-width: 760px) {
+  .orders-desk .line-sort-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 0 0 10px;
+  }
+  .orders-desk .sort-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border: 1px solid var(--line);
+    background: #fff;
+    border-radius: 999px;
+    padding: 6px 10px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink-2);
+    cursor: pointer;
+  }
+  .orders-desk .sort-chip.is-active {
+    background: var(--teal-soft);
+    border-color: transparent;
+    color: var(--teal-mid);
+  }
+  .orders-desk .table-wrap { overflow: visible; }
+  .orders-desk table.line-items { width: 100%; min-width: 0; }
+  .orders-desk table.line-items td { min-width: 0; }
+  .orders-desk table.line-items,
+  .orders-desk table.line-items tbody,
+  .orders-desk table.line-items tr,
+  .orders-desk table.line-items td {
+    display: block;
+    width: 100%;
+  }
+  .orders-desk table.line-items thead { display: none; }
+  .orders-desk table.line-items tr {
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    margin: 0 0 10px;
+    padding: 10px 12px;
+    background: #fff;
+  }
+  .orders-desk table.line-items td {
+    border: 0;
+    padding: 4px 0;
+    text-align: left;
+  }
+  .orders-desk table.line-items td[data-label]:not([data-label=""])::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 2px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .orders-desk .addr .st,
+  .orders-desk .pkg .name,
+  .orders-desk .client .nm,
+  .orders-desk .client .em {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+  }
+}
