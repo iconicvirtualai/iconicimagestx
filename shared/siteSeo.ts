@@ -8,6 +8,7 @@
  * custom domains.
  */
 
+import { BLACK_FRIDAY_BUSINESS_SEO_DESCRIPTION, BLACK_FRIDAY_BUSINESS_SEO_TITLE } from "./blackFridayBusiness.ts";
 import { LEGAL_BUSINESS_NAME } from "./businessContact.ts";
 import { HEADSHOTS_SEO_DESCRIPTION, HEADSHOTS_SEO_TITLE } from "./headshots10.ts";
 import { STUDIO105_SEO_DESCRIPTION } from "./studio105.ts";
@@ -250,7 +251,7 @@ export function isNoIndexPath(pathname: string): boolean {
   if (path === "/invoice" || path.startsWith("/invoice/")) return true;
   if (path === "/news" || path.startsWith("/news/")) return true;
   if (path === "/insights/news" || path.startsWith("/insights/news/")) return true;
-  if (path === "/black-friday") return false;
+  if (path === "/black-friday" || path === "/black-friday-business") return false;
   return false;
 }
 
@@ -286,6 +287,15 @@ export function metaPlan(pathname: string, origin = SITE_ORIGIN): MetaPlan {
       kind: "public",
       title: "Black Friday Sale | Iconic Images",
       description: "Prepaid listing shoot bundles from Iconic Images in Spring, The Woodlands, and Houston.",
+      canonical: canonicalUrl(path, origin),
+      image: ogImageUrl(origin),
+    };
+  }
+  if (path === "/black-friday-business") {
+    return {
+      kind: "public",
+      title: BLACK_FRIDAY_BUSINESS_SEO_TITLE,
+      description: BLACK_FRIDAY_BUSINESS_SEO_DESCRIPTION,
       canonical: canonicalUrl(path, origin),
       image: ogImageUrl(origin),
     };

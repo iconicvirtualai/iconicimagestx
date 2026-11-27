@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { ArrowRight, Zap } from "lucide-react";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { useSiteHref } from "@/content/siteContent";
@@ -15,6 +15,7 @@ const barLayout =
  */
 export default function PromoBar() {
   const settings = useSiteSettings();
+  const { pathname } = useLocation();
   const fallbackHref = useSiteHref("chrome", "promo", "link", "/book");
   const [now, setNow] = useState(() => Date.now());
 
@@ -29,6 +30,8 @@ export default function PromoBar() {
   }, []);
 
   if (!settings.global.showPromoBar) return null;
+
+  if (!flashSaleOpen(now) && pathname === "/black-friday-business") return null;
 
   if (flashSaleOpen(now)) {
     return (
