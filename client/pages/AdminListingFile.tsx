@@ -35,6 +35,8 @@ import { StaffMediaBoard } from "@/components/listing/StaffMediaBoard";
 import { GalleryUploadBoard } from "@/components/gallery-delivery/GalleryUploadBoard";
 import { saveListingMediaArrangement, uploadListingFile } from "@/lib/listingUpload";
 import { collectArrangementMedia, readMediaArrangement } from "@shared/mediaArrangement";
+import { clientDeliveryDraft, clientDeliveryNotifyMode, deliveryInvoiceFromStored, type ClientDeliveryDraft } from "@shared/clientDelivery";
+import { SendToClientButton, SendToClientModal } from "@/components/delivery/SendToClientModal";
 
 // ─── Status systems ───────────────────────────────────────────────────────────
 const RE_STATUSES = ["unscheduled", "scheduled", "in_progress", "delivered", "paid", "archived", "cancelled"];
@@ -298,6 +300,8 @@ export default function AdminListingFile({
   const [loadedSurface, setLoadedSurface] = React.useState<ProjectSurface | null>(null);
   const [billingPhase, setBillingPhase] = React.useState<"loading" | "ready" | "error">("loading");
   const [invoiceBusy, setInvoiceBusy] = React.useState(false);
+  const [sendOpen, setSendOpen] = React.useState(false);
+  const [sendDraft, setSendDraft] = React.useState<ClientDeliveryDraft | null>(null);
 
   // Live listener
   React.useEffect(() => {
@@ -463,6 +467,54 @@ export default function AdminListingFile({
     toast.success("Photo removed.");
   };
 
+  const openSend = async () => {
+    if (!project) return;
+    const storedInvoice = project.invoice && typeof project.invoice === "object"
+      ? project.invoice as Record<string, unknown>
+      : {
+          id: project.invoiceId,
+          invoiceNumber: project.invoiceNumber,
+          total: project.total,
+          subtotal: project.subtotal,
+          processing: project.processing,
+          amountDue: project.amountDue,
+          amountPaid: project.amountPaid,
+          status: project.paymentStatus || (project.status === "paid" ? "paid" : "sent"),
+          lineItems: project.lineItems,
+        };
+    const local = clientDeliveryDraft({
+      listingId: id || "",
+      galleryId: typeof project.galleryId === "string" ? project.galleryId : "",
+      clientName: typeof project.clientName === "string" ? project.clientName : "",
+      clientEmail: typeof project.clientEmail === "string" ? project.clientEmail : "",
+      address: recordAddressText(project),
+      invoice: deliveryInvoiceFromStored(storedInvoice),
+      notify: clientDeliveryNotifyMode({}),
+    });
+    setSendDraft(local);
+    setSendOpen(true);
+    try {
+      const token = user ? await user.getIdToken() : "";
+      const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+      const params = new URLSearchParams();
+      if (id) params.set("listingId", id);
+      if (typeof project.galleryId === "string" && project.galleryId) params.set("galleryId", project.galleryId);
+      const [draftRes, modeRes] = await Promise.all([
+        fetch(`/api/deliver/draft?${params}`, { headers }),
+        fetch("/api/deliver/notify-mode"),
+      ]);
+      const mode = modeRes.ok ? await modeRes.json() : null;
+      if (draftRes.ok) {
+        const next = await draftRes.json();
+        setSendDraft(mode ? { ...next, notify: mode } : next);
+      } else if (mode) {
+        setSendDraft({ ...local, notify: mode });
+      }
+    } catch {
+      // The form stays on the project fields already on screen.
+    }
+  };
+
   if (loading) return (
     <AdminLayout title="Project">
       <div className="flex items-center justify-center py-32">
@@ -472,6 +524,7 @@ export default function AdminListingFile({
   );
 
   if (!project) return null;
+  const mediaReady = collectArrangementMedia(project).length > 0;
 
   const savedType = projectKind(project.projectType);
   const formType = projectKind(infoForm.projectType);
@@ -584,6 +637,16 @@ export default function AdminListingFile({
           </div>
         </div>
       </div>
+
+      {mediaReady && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-gray-100 bg-white px-5 py-4 shadow-sm" data-testid="send-to-client-bar">
+          <div>
+            <p className="text-sm font-bold text-black">Ready to deliver</p>
+            <p className="text-xs text-gray-500">Photos are organized. Send the client presentation and invoice.</p>
+          </div>
+          <SendToClientButton onClick={() => void openSend()} />
+        </div>
+      )}
 
       {/* Main + sidebar */}
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-6">
@@ -1028,6 +1091,28 @@ export default function AdminListingFile({
           </div>
         </div>
       </div>
+      {sendOpen && sendDraft && (
+        <SendToClientModal
+          open={sendOpen}
+          draft={sendDraft}
+          onClose={() => setSendOpen(false)}
+          onSend={async (body) => {
+            const token = user ? await user.getIdToken() : "";
+            const target = sendDraft.galleryId || sendDraft.listingId;
+            const res = await fetch(`/api/deliver/${encodeURIComponent(target)}/send`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+              },
+              body: JSON.stringify(body),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok && !data.note) throw new Error(typeof data.error === "string" ? data.error : "Could not send this delivery.");
+            return { note: typeof data.note === "string" ? data.note : "No email was sent." };
+          }}
+        />
+      )}
     </AdminLayout>
   );
 }
