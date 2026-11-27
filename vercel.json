@@ -1639,22 +1639,6 @@
       "destination": "/api/index"
     },
     {
-      "source": "/admin/owners",
-      "destination": "/api/index"
-    },
-    {
-      "source": "/admin/owners/",
-      "destination": "/api/index"
-    },
-    {
-      "source": "/owners",
-      "destination": "/api/index"
-    },
-    {
-      "source": "/owners/",
-      "destination": "/api/index"
-    },
-    {
       "source": "/sitemap.xml",
       "destination": "/api/index"
     },

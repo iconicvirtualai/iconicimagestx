@@ -63,8 +63,6 @@ const RESERVED: Rewrite[] = [
   // function on its original path, and that rule stays ahead of the SEO shells.
   { source: "/present/:token", destination: "/api/index" },
   { source: "/l/:slug", destination: "/api/index" },
-  { source: "/admin/owners", destination: "/api/index" },
-  { source: "/owners", destination: "/api/index" },
   { source: "/sitemap.xml", destination: "/api/index" },
   { source: "/robots.txt", destination: "/api/index" },
   { source: "/podcast-guest-prep", destination: "/podcast-guest-prep.html" },

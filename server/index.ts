@@ -270,7 +270,7 @@ export function createServer() {
     res.json({ live: clientNotifyLive() });
   });
 
-  // Owners Suite is mounted before other APIs. Staff roles do not open it.
+  // Owners API is mounted before other APIs. The browser portal is not served.
   mountOwners(app);
 
   // ─── API Routes ────────────────────────────────────────────────────

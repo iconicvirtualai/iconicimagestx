@@ -101,15 +101,12 @@ describe("spa rewrite coverage", () => {
     expect(htmlFileForRequestPath("/not-real")).toBeNull();
   });
 
-  it("sends owner pages to the API before the admin shell", () => {
-    const owners = vercel.rewrites.findIndex((rule) => rule.source === "/admin/owners");
-    const adminPrefix = vercel.rewrites.findIndex((rule) => rule.source === "/admin/(.*)");
-    expect(owners).toBeGreaterThanOrEqual(0);
-    expect(adminPrefix).toBeGreaterThan(owners);
-    expect(firstMatchingRewrite("/admin/owners", vercel.rewrites)?.destination).toBe("/api/index");
-    expect(firstMatchingRewrite("/owners", vercel.rewrites)?.destination).toBe("/api/index");
-    expect(firstMatchingRewrite("/owners/", vercel.rewrites)?.destination).toBe("/api/index");
-    expect(htmlFileForRequestPath("/admin/owners")).toBeNull();
+  it("does not give the owners portal its own rewrite", () => {
+    expect(vercel.rewrites.some((rule) => rule.source === "/admin/owners" || rule.source === "/owners")).toBe(false);
+    expect(firstMatchingRewrite("/admin/owners", vercel.rewrites)?.destination).toBe("/seo/private.html");
+    expect(firstMatchingRewrite("/owners", vercel.rewrites)).toBeUndefined();
+    expect(firstMatchingRewrite("/owners/", vercel.rewrites)).toBeUndefined();
+    expect(htmlFileForRequestPath("/admin/owners")).toBe("seo/private.html");
     expect(htmlFileForRequestPath("/owners")).toBeNull();
   });
 
@@ -130,7 +127,7 @@ describe("spa rewrite coverage", () => {
     expect(firstMatchingRewrite("/gallery/share-9", vercel.rewrites)?.destination).toBe("/seo/private.html");
     expect(firstMatchingRewrite("/portal/listings/listing-9", vercel.rewrites)?.destination).toBe("/seo/private.html");
     expect(firstMatchingRewrite("/admin/schedule", vercel.rewrites)?.destination).toBe("/seo/private.html");
-    expect(firstMatchingRewrite("/owners", vercel.rewrites)?.destination).toBe("/api/index");
+    expect(firstMatchingRewrite("/owners", vercel.rewrites)).toBeUndefined();
     expect(firstMatchingRewrite("/present/preview", vercel.rewrites)?.destination).toBe("/api/index");
     expect(firstMatchingRewrite("/podcast-guest-prep", vercel.rewrites)?.destination).toBe("/podcast-guest-prep.html");
     expect(firstMatchingRewrite("/book", vercel.rewrites)?.destination).toBe("/seo/book.html");

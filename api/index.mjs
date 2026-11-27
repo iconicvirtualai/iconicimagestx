@@ -33961,7 +33961,6 @@ function planBoardFixture() {
     ]
   };
 }
-const OWNER_SHEET_ID = "1vHkdHRhAWKcnsv8-d1ZZSWRr-OZyy0xCaqK1Bi3VB3Q";
 const SHEETS_READONLY_SCOPE = "https://www.googleapis.com/auth/spreadsheets.readonly";
 const CACHE_MS = 6e4;
 const ERROR_CACHE_MS = 15e3;
@@ -34019,42 +34018,15 @@ async function loadOwnerSuite(options = {}) {
     };
   }
   if (!options.fresh && cache && cache.expires > Date.now()) return cache.payload;
-  const credentials = resolveSheetsCredentials(env);
-  if (!credentials) {
-    const payload = {
-      data: unknownData(now),
-      source: "empty",
-      configured: false,
-      notice: "Scorecard is not connected.",
-      readerEmail: null
-    };
-    cache = { expires: Date.now() + ERROR_CACHE_MS, payload };
-    return payload;
-  }
-  try {
-    const grids = await fetchScorecard(credentials);
-    const payload = {
-      data: parseOwnerSuite(grids, now),
-      source: "sheet",
-      configured: true,
-      notice: null,
-      readerEmail: credentials.client_email
-    };
-    cache = { expires: Date.now() + CACHE_MS, payload };
-    return payload;
-  } catch (error) {
-    const status2 = error && typeof error === "object" && "code" in error ? String(error.code) : "error";
-    console.error(`[Owners] Scorecard read failed (${status2})`);
-    const payload = {
-      data: unknownData(now),
-      source: "empty",
-      configured: true,
-      notice: "The scorecard could not be read.",
-      readerEmail: credentials.client_email
-    };
-    cache = { expires: Date.now() + ERROR_CACHE_MS, payload };
-    return payload;
-  }
+  const payload = {
+    data: unknownData(now),
+    source: "empty",
+    configured: false,
+    notice: "Scorecard is not connected.",
+    readerEmail: null
+  };
+  cache = { expires: Date.now() + ERROR_CACHE_MS, payload };
+  return payload;
 }
 function unknownData(now) {
   const data = emptyOwnerSuiteData(now);
@@ -34082,17 +34054,20 @@ function createReadonlySheetsClient(credentials) {
   });
   return google.sheets({ version: "v4", auth });
 }
-async function fetchScorecard(credentials) {
+async function fetchScorecard(_credentials) {
+  return [];
+}
+async function fetchScorecardUnused(credentials) {
   const sheets = createReadonlySheetsClient(credentials);
   const meta = await sheets.spreadsheets.get({
-    spreadsheetId: OWNER_SHEET_ID,
+    spreadsheetId: undefined,
     fields: "sheets.properties.title"
   });
   const titles = (meta.data.sheets || []).map((sheet) => sheet.properties?.title || "").filter(Boolean);
   const matched = selectOwnerTabs(titles);
   if (!matched.length) return [];
   const values = await sheets.spreadsheets.values.batchGet({
-    spreadsheetId: OWNER_SHEET_ID,
+    spreadsheetId: undefined,
     ranges: matched.map((title) => `'${title.replace(/'/g, "''")}'`),
     valueRenderOption: "FORMATTED_VALUE"
   });
@@ -41550,31 +41525,12 @@ function releaseOwnerOrderRateLimit(email, now) {
   if (index >= 0) recent.splice(index, 1);
 }
 async function listOwnerOrders() {
-  const credentials = resolveSheetsCredentials();
-  if (!credentials) {
-    return { orders: [], configured: false, notice: NOT_CONNECTED, readerEmail: null };
-  }
-  const sheets = createReadonlySheetsClient(credentials);
-  const orders = await readOrders(sheets);
-  return { orders, configured: true, notice: null, readerEmail: credentials.client_email };
+  return { orders: [], configured: false, notice: NOT_CONNECTED, readerEmail: null };
 }
 async function submitOwnerOrder(input) {
   const prepared = prepareOwnerOrderText(input.raw);
   if ("error" in prepared) return { ok: false, status: 400, error: prepared.error };
-  const credentials = resolveSheetsCredentials();
-  if (!credentials) return { ok: false, status: 503, error: NOT_CONNECTED };
-  const now = input.now ?? /* @__PURE__ */ new Date();
-  const nowMs = now.getTime();
-  const limit = consumeOwnerOrderRateLimit(input.ownerEmail, nowMs);
-  if ("error" in limit) return { ok: false, status: 429, error: limit.error };
-  try {
-    const sheets = createOrdersWriteClient(credentials);
-    const order = await appendOrder(sheets, prepared.text, now);
-    return { ok: true, order };
-  } catch (error) {
-    releaseOwnerOrderRateLimit(input.ownerEmail, nowMs);
-    throw error;
-  }
+  return { ok: false, status: 503, error: NOT_CONNECTED };
 }
 function createOrdersWriteClient(credentials) {
   const auth = new google.auth.JWT({
@@ -41586,7 +41542,7 @@ function createOrdersWriteClient(credentials) {
 }
 async function readTitles(sheets) {
   const meta = await sheets.spreadsheets.get({
-    spreadsheetId: OWNER_SHEET_ID,
+    spreadsheetId: undefined,
     fields: "sheets.properties.title"
   });
   return (meta.data.sheets || []).map((sheet) => sheet.properties?.title || "").filter(Boolean);
@@ -41595,7 +41551,7 @@ async function readOrders(sheets) {
   const titles = await readTitles(sheets);
   if (!titles.includes(OWNER_ORDERS_TAB)) return [];
   const response = await sheets.spreadsheets.values.get({
-    spreadsheetId: OWNER_SHEET_ID,
+    spreadsheetId: undefined,
     range: sheetRange("A:E"),
     valueRenderOption: "FORMATTED_VALUE"
   });
@@ -41605,7 +41561,7 @@ async function appendOrder(sheets, text2, now) {
   const titles = await readTitles(sheets);
   if (!titles.includes(OWNER_ORDERS_TAB)) {
     await sheets.spreadsheets.batchUpdate({
-      spreadsheetId: OWNER_SHEET_ID,
+      spreadsheetId: undefined,
       requestBody: {
         requests: [
           {
@@ -41620,7 +41576,7 @@ async function appendOrder(sheets, text2, now) {
       }
     });
     await sheets.spreadsheets.values.update({
-      spreadsheetId: OWNER_SHEET_ID,
+      spreadsheetId: undefined,
       range: sheetRange("A1:E1"),
       valueInputOption: "RAW",
       requestBody: { values: [Array.from(OWNER_ORDERS_HEADERS)] }
@@ -41634,7 +41590,7 @@ async function appendOrder(sheets, text2, now) {
     reply: ""
   };
   await sheets.spreadsheets.values.append({
-    spreadsheetId: OWNER_SHEET_ID,
+    spreadsheetId: undefined,
     range: sheetRange("A:E"),
     valueInputOption: "RAW",
     insertDataOption: "INSERT_ROWS",
@@ -41682,10 +41638,6 @@ const NOT_FOUND = { error: "Not found" };
 const OWNER_LOGIN_REDIRECT = "/admin/login?next=/admin/owners";
 const OWNER_PAGE_PATHS = /* @__PURE__ */ new Set(["/admin/owners", "/admin/owners/", "/owners", "/owners/"]);
 function mountOwners(app) {
-  const page2 = ["/admin/owners", "/admin/owners/", "/owners", "/owners/", "/api/owners/page"];
-  app.get(page2, (req, res) => {
-    void handleOwnersPage(req, res);
-  });
   app.get("/api/owners/suite", (req, res) => {
     void handleSuite(req, res);
   });

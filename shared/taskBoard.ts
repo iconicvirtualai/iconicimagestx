@@ -1,6 +1,7 @@
 /**
  * Admin task board.
- * Derives checklist rows from orders, deliveries, edits, and client questions.
+ * Derives checklist rows from deliveries, production, edits, and client questions.
+ * Unscheduled "assign order" cards are not generated. Deliveries stay.
  * Does not email, text, or write orders, galleries, or deliveries.
  * Manual order, assignee, priority, due date, stage, and dismissals are overlays.
  */
@@ -503,15 +504,20 @@ export function displayTasks(
   return copy;
 }
 
+/** Schedule-order cards that existed so someone could assign an unscheduled order. */
+export function isAssignOrderTask(task: { origin: string; service: string; pipelineKey: string }): boolean {
+  return task.origin === "schedule" || task.service === "schedule" || task.pipelineKey.endsWith(":schedule");
+}
+
 export function buildTaskBoard(input: TaskBoardInput): TaskBoardModel {
   const staff = input.staff || [];
   const emails = input.emails || [];
-  const candidates = deriveCandidates(input, staff);
-  const overlays = input.overlays || [];
+  const candidates = deriveCandidates(input, staff).filter((task) => !isAssignOrderTask(task));
+  const overlays = (input.overlays || []).filter((task) => !isAssignOrderTask(task));
   const merged = mergeCandidates(candidates, overlays);
   return {
-    tasks: merged.tasks,
-    cleared: merged.cleared,
+    tasks: merged.tasks.filter((task) => !isAssignOrderTask(task)),
+    cleared: merged.cleared.filter((task) => !isAssignOrderTask(task)),
     emailConnected: input.emailConnected === true,
     emailNotice: photosInboxNotice(input.emailConnected === true),
   };
@@ -1119,20 +1125,7 @@ function deriveCandidates(input: TaskBoardInput, staff: TaskAssignee[]): TaskBoa
   const deliver = deliverCandidates(galleries, listings, requests, orders, byId);
   const deliverOrderIds = new Set(deliver.map((task) => orderIdFromKey(task.pipelineKey)).filter(Boolean));
   const tasks: TaskBoardTask[] = [...deliver];
-
-  for (const row of requests) {
-    if (!needsSchedule(row) || deliverOrderIds.has(text(row.id))) continue;
-    tasks.push(scheduleTask(row, "orderRequest", staff));
-  }
   const requestIds = new Set(requests.map((row) => text(row.id)));
-  for (const row of orders) {
-    const id = text(row.id);
-    const linkedRequest = text(row.orderRequestId);
-    if (!needsSchedule(row) || deliverOrderIds.has(id)) continue;
-    if (requestIds.has(id) || (linkedRequest && requestIds.has(linkedRequest))) continue;
-    if (requests.some((request) => text(request.convertedToOrderId) === id || text(request.orderId) === id)) continue;
-    tasks.push(scheduleTask(row, "order", staff));
-  }
 
   for (const row of requests) {
     if (needsSchedule(row) || adminOrderQueue(row) === "archived") continue;
@@ -1324,35 +1317,6 @@ function deliverCandidates(
     }));
   }
   return tasks;
-}
-
-function scheduleTask(row: Record<string, unknown>, kind: "orderRequest" | "order", staff: TaskAssignee[]): TaskBoardTask {
-  const id = text(row.id);
-  const label = orderLabel(row) || id;
-  const work = workText(row);
-  return baseTask({
-    pipelineKey: `order:${id}:schedule`,
-    origin: "schedule",
-    service: "schedule",
-    stage: "queued",
-    title: `Schedule order ${label}`,
-    sourceLine: "Order · Unscheduled",
-    primaryHref: kind === "orderRequest" ? adminOrderDetailHref(id) : `/admin/order/${encodeURIComponent(id)}`,
-    primaryHrefLabel: "Open order",
-    orderHref: kind === "orderRequest" ? adminOrderDetailHref(id) : `/admin/order/${encodeURIComponent(id)}`,
-    orderLabel: label,
-    galleryHref: text(row.listingId) ? `/admin/listing/${encodeURIComponent(text(row.listingId))}` : null,
-    galleryLabel: text(row.listingId) ? "Project" : null,
-    deliveryHref: text(row.listingId) ? deliveryHref(text(row.listingId)) : null,
-    deliveryLabel: text(row.listingId) ? "Deliveries" : null,
-    clientRequest: null,
-    clientRequestFrom: null,
-    clientRequestAt: null,
-    assignee: suggestedAssignee(work, staff),
-    dueOn: firstDate(row, ["dueDate", "requestedDate", "deliverBy"]),
-    fingerprint: `schedule|${id}|${text(row.status)}|${label}`,
-    sample: row.sample === true,
-  });
 }
 
 function productionTasks(
