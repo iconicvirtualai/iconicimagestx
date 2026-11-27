@@ -2973,6 +2973,10 @@ async function sendSMSCampaign(recipients, bodyTemplate, messagingServiceSid) {
   const results = [];
   for (const recipient of recipients) {
     if (!recipient.phone) continue;
+    if (recipient.marketingOptIn !== true) {
+      results.push({ phone: recipient.phone, error: "no_marketing_opt_in" });
+      continue;
+    }
     const body = bodyTemplate.replace(/\{\{name\}\}/gi, recipient.name || "there");
     try {
       const msg = await client.messages.create({
@@ -2990,7 +2994,10 @@ async function sendSMSCampaign(recipients, bodyTemplate, messagingServiceSid) {
   }
   return results;
 }
-async function deliverCampaignSms(to, body) {
+async function deliverCampaignSms(to, body, marketingOptIn = false) {
+  if (marketingOptIn !== true) {
+    throw new Error("Marketing SMS requires an explicit opt-in.");
+  }
   const client = getClient();
   const sid = process.env.TWILIO_MESSAGING_SERVICE_SID;
   const fromNumber = process.env.TWILIO_PHONE_NUMBER;
@@ -3089,9 +3096,2208 @@ Questions or edits? Just reply here. — Iconic Images`,
 
 Check dashboard for details.`
 };
+const TRANSACTIONAL_SMS_CONSENT_VERSION = "2026-10-01-transactional-v1";
+const TRANSACTIONAL_SMS_CONSENT_TEXT = "I agree to receive transactional booking and appointment text messages from Iconic Images, including order-received notices, appointment reminders, and photo delivery updates. Message frequency varies. Message and data rates may apply. Reply STOP to opt out. Reply HELP for help, or contact 281.356.0965 or photos@iconicimagestx.com. Consent is not a condition of purchase. Privacy Policy · Terms and Conditions.";
+const MARKETING_SMS_CONSENT_VERSION = "2026-10-01-marketing-v1";
+const MARKETING_SMS_CONSENT_TEXT = "I agree to receive promotional and marketing text messages from Iconic Images Photography, LLC about photography services, offers, and events. Message frequency varies. Message and data rates may apply. Reply STOP to opt out. Reply HELP for help, or contact 281.356.0965 or photos@iconicimagestx.com. Consent is not a condition of purchase. View our Privacy Policy and Terms.";
+const MARKETING_OPT_IN_CONFIRMATION = "Iconic Images Photography, LLC: You're signed up for promotional texts about photography services, offers, and events. Message frequency varies. Msg & data rates may apply. Reply HELP for help. Reply STOP to opt out.";
+const SMS_HELP_REPLY = "Iconic Images Photography, LLC. Help: photos@iconicimagestx.com or 281.356.0965. Msg & data rates may apply. Reply STOP to opt out.";
+const HELP_WORDS = ["HELP", "INFO"];
+function isHelpKeyword(body) {
+  return HELP_WORDS.includes(String(body || "").trim().toUpperCase());
+}
+function phoneDigits10(value) {
+  let digits2 = String(value || "").replace(/\D/g, "");
+  if (digits2.length === 11 && digits2.startsWith("1")) digits2 = digits2.slice(1);
+  return digits2.length >= 10 ? digits2.slice(-10) : "";
+}
+function phoneLookupValues(value) {
+  const digits2 = phoneDigits10(value);
+  if (!digits2) return [];
+  const area = digits2.slice(0, 3);
+  const prefix = digits2.slice(3, 6);
+  const line = digits2.slice(6);
+  return [.../* @__PURE__ */ new Set([
+    value.trim(),
+    digits2,
+    `1${digits2}`,
+    `+1${digits2}`,
+    `+${digits2}`,
+    `${area}-${prefix}-${line}`,
+    `${area}.${prefix}.${line}`,
+    `(${area}) ${prefix}-${line}`,
+    `${area} ${prefix} ${line}`
+  ])].slice(0, 10);
+}
+function transactionalSmsBlockReason(input) {
+  if (input.smsConsent !== true) return "no_sms_consent";
+  if (input.stopped) return "sms_stopped";
+  return null;
+}
+function explicitMarketingSmsOptIn(record2) {
+  if (!record2) return false;
+  if (record2.smsStopped === true || record2.doNotContact === true) return false;
+  return record2.marketingSmsOptIn === true || record2.smsOptIn === true;
+}
+function escapeXml(value) {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+}
+function twimlMessage(text2) {
+  return `<?xml version="1.0" encoding="UTF-8"?><Response><Message>${escapeXml(text2)}</Message></Response>`;
+}
+function twimlEmpty() {
+  return `<?xml version="1.0" encoding="UTF-8"?><Response/>`;
+}
+const EMAIL_RE$5 = /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i;
+function normalizeEmail$1(value) {
+  return String(value || "").trim().toLowerCase().replace(/\s+/g, "");
+}
+function isValidEmail(value) {
+  return EMAIL_RE$5.test(normalizeEmail$1(value));
+}
+function normalizePersonName$1(value) {
+  return String(value || "").toLowerCase().replace(/[^a-z\s]/g, " ").replace(/\s+/g, " ").trim();
+}
+function contactName(contact2) {
+  const name = `${contact2.firstName} ${contact2.lastName}`.trim();
+  return name || contact2.email;
+}
+function normalizeTag(value) {
+  return String(value || "").trim().replace(/\s+/g, " ").slice(0, 40);
+}
+function uniqueTags(tags) {
+  const seen = /* @__PURE__ */ new Set();
+  const out = [];
+  for (const tag of tags) {
+    const clean2 = normalizeTag(tag);
+    if (!clean2) continue;
+    const key = clean2.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(clean2);
+  }
+  return out;
+}
+function splitTags(value) {
+  return uniqueTags(String(value || "").split(/[,;|]/));
+}
+function applyTagChange(contact2, add, remove, now) {
+  const removeKeys = new Set(remove.map((tag) => normalizeTag(tag).toLowerCase()).filter(Boolean));
+  const next = contact2.tags.filter((tag) => !removeKeys.has(tag.toLowerCase()));
+  return { ...contact2, tags: uniqueTags([...next, ...add]), updatedAt: now };
+}
+function contactMatchesFilter(contact2, filter) {
+  const query = filter.query.trim().toLowerCase();
+  if (query) {
+    const haystack = [
+      contact2.email,
+      contact2.firstName,
+      contact2.lastName,
+      contact2.company,
+      contact2.phone,
+      contact2.tags.join(" "),
+      ...Object.values(contact2.custom)
+    ].join(" ").toLowerCase();
+    if (!haystack.includes(query)) return false;
+  }
+  const have = new Set(contact2.tags.map((tag) => tag.toLowerCase()));
+  if (filter.tagsAll.some((tag) => !have.has(tag.toLowerCase()))) return false;
+  if (filter.tagsAny.length && !filter.tagsAny.some((tag) => have.has(tag.toLowerCase()))) return false;
+  if (filter.tagsNone.some((tag) => have.has(tag.toLowerCase()))) return false;
+  if (filter.source && contact2.source !== filter.source) return false;
+  if (filter.verified === "yes" && !contact2.emailVerified) return false;
+  if (filter.verified === "no" && contact2.emailVerified) return false;
+  for (const field of filter.fields) {
+    const key = field.key.trim().toLowerCase();
+    if (!key) continue;
+    const actual = Object.entries(contact2.custom).find(([name]) => name.toLowerCase() === key)?.[1] || "";
+    if (actual.trim().toLowerCase() !== field.value.trim().toLowerCase()) return false;
+  }
+  return true;
+}
+function blankContact(email, source, now) {
+  return {
+    email: normalizeEmail$1(email),
+    firstName: "",
+    lastName: "",
+    company: "",
+    phone: "",
+    tags: [],
+    custom: {},
+    source,
+    clientId: "",
+    emailVerified: source === "client",
+    createdAt: now,
+    updatedAt: now
+  };
+}
+function prefer(current, incoming) {
+  return incoming.trim() || current;
+}
+function syncClientsIntoContacts(contacts, clients, now) {
+  const byEmail = new Map(contacts.map((contact2) => [contact2.email, { ...contact2, tags: [...contact2.tags], custom: { ...contact2.custom } }]));
+  let created = 0;
+  let relinked = 0;
+  let refreshed = 0;
+  for (const client of clients) {
+    const email = normalizeEmail$1(client.email);
+    if (!isValidEmail(email)) continue;
+    const previous = [...byEmail.values()].find((contact2) => contact2.clientId === client.id);
+    let target = byEmail.get(email);
+    if (previous && previous.email !== email) {
+      relinked += 1;
+      if (!target) {
+        target = { ...previous, email, updatedAt: now };
+        byEmail.set(email, target);
+      } else {
+        target = {
+          ...target,
+          tags: uniqueTags([...target.tags, ...previous.tags]),
+          custom: { ...previous.custom, ...target.custom },
+          updatedAt: now
+        };
+        byEmail.set(email, target);
+      }
+      if (previous.email !== email) byEmail.delete(previous.email);
+    }
+    if (!target) {
+      target = blankContact(email, "client", now);
+      created += 1;
+      byEmail.set(email, target);
+    } else {
+      refreshed += 1;
+    }
+    target.clientId = client.id;
+    target.firstName = prefer(target.firstName, client.firstName);
+    target.lastName = prefer(target.lastName, client.lastName);
+    target.phone = prefer(target.phone, client.phone);
+    target.company = prefer(target.company, client.company);
+    target.emailVerified = true;
+    target.updatedAt = now;
+    if (!target.source) target.source = "client";
+  }
+  return {
+    contacts: [...byEmail.values()].sort((a, b) => a.email.localeCompare(b.email)),
+    created,
+    relinked,
+    refreshed
+  };
+}
+function entry(now, draft) {
+  const names = draft.names || [];
+  const aliases = (draft.aliases || names).map((name) => normalizePersonName$1(name)).filter(Boolean);
+  return {
+    id: draft.kind === "email" ? `email:${normalizeEmail$1(draft.value)}` : draft.kind === "domain" ? `domain:${draft.value.replace(/^@/, "").toLowerCase()}` : `name:${normalizePersonName$1(draft.value)}`,
+    kind: draft.kind,
+    value: draft.kind === "email" ? normalizeEmail$1(draft.value) : draft.kind === "domain" ? draft.value.replace(/^@/, "").trim().toLowerCase() : normalizePersonName$1(draft.value),
+    reason: draft.reason,
+    hold: draft.hold || "",
+    note: draft.note,
+    aliases,
+    email: normalizeEmail$1(draft.email || (draft.kind === "email" ? draft.value : "")),
+    source: draft.source || "manual",
+    createdAt: now,
+    updatedAt: now
+  };
+}
+function seedSuppression(now) {
+  const manual = "Standing blacklist. Add the email here when you have it. A matching customer name is already blocked.";
+  return [
+    entry(now, {
+      kind: "domain",
+      value: "thekinkteam.com",
+      reason: "manual",
+      note: "Standing blacklist: every @thekinkteam.com address.",
+      source: "seed"
+    }),
+    entry(now, { kind: "name", value: "Bruce Kink", reason: "manual", note: manual, source: "seed", names: ["Bruce Kink"] }),
+    entry(now, { kind: "name", value: "Lisa Cagle", reason: "manual", note: manual, source: "seed", names: ["Lisa Cagle"] }),
+    entry(now, { kind: "name", value: "Haley Garcia", reason: "manual", note: manual, source: "seed", names: ["Haley Garcia"] }),
+    entry(now, { kind: "name", value: "Shannon Cox", reason: "manual", note: manual, source: "seed", names: ["Shannon Cox"] }),
+    entry(now, { kind: "name", value: "Melissa Franklin", reason: "manual", note: manual, source: "seed", names: ["Melissa Franklin"] }),
+    entry(now, { kind: "name", value: "Justin McClung", reason: "manual", note: manual, source: "seed", names: ["Justin McClung"] }),
+    entry(now, {
+      kind: "name",
+      value: "Rebecca Nye",
+      reason: "manual",
+      hold: "personal",
+      note: "Personal hold. Cadi emails Rebecca herself.",
+      source: "seed",
+      names: ["Rebecca Nye"]
+    }),
+    entry(now, {
+      kind: "name",
+      value: "Jacalyn Henthorne",
+      reason: "manual",
+      hold: "personal",
+      note: "Personal hold. Cadi emails Jacki (Jacalyn) Henthorne herself.",
+      source: "seed",
+      names: ["Jacki Henthorne", "Jacalyn Henthorne", "Jacki Jacalyn Henthorne"]
+    })
+  ];
+}
+function buildSuppression(now, draft) {
+  if (draft.kind === "email" && !isValidEmail(draft.value)) return null;
+  if (draft.kind === "domain" && !draft.value.replace(/^@/, "").includes(".")) return null;
+  if (draft.kind === "name" && !normalizePersonName$1(draft.value)) return null;
+  return entry(now, draft);
+}
+function matchSuppression(contact2, list2) {
+  const email = normalizeEmail$1(contact2.email);
+  const domain = email.split("@")[1] || "";
+  const name = normalizePersonName$1(`${contact2.firstName} ${contact2.lastName}`);
+  for (const item of list2) {
+    if (item.kind === "email" && item.value === email) return item;
+    if (item.email && item.email === email) return item;
+    if (item.kind === "domain" && domain === item.value) return item;
+    if (item.kind === "name" && name && (name === item.value || item.aliases.includes(name))) return item;
+  }
+  return null;
+}
+function reasonLabel(reason, hold) {
+  if (hold === "personal") return "Personal hold";
+  if (reason === "bounced") return "Bounced";
+  if (reason === "blocked") return "Blocked";
+  if (reason === "unsubscribed") return "Unsubscribed";
+  if (reason === "complained") return "Complained";
+  return "Do not email";
+}
+const HELLO_SENDING_ACCOUNT = "hello@iconicimagestx.com";
+const PHOTOS_SENDING_ACCOUNT = "photos@iconicimagestx.com";
+function normalizeSendingAccounts(raw) {
+  const list2 = [];
+  const seen = /* @__PURE__ */ new Set();
+  const add = (email, label) => {
+    const normalized = normalizeEmail$1(String(email || ""));
+    if (!isValidEmail(normalized) || seen.has(normalized)) return;
+    seen.add(normalized);
+    const name = String(label || "").trim();
+    list2.push({ email: normalized, label: name || normalized });
+  };
+  if (Array.isArray(raw)) {
+    for (const item of raw) {
+      if (!item || typeof item !== "object") continue;
+      const row = item;
+      add(row.email, row.label);
+    }
+  }
+  if (!list2.length) {
+    add(HELLO_SENDING_ACCOUNT, "Hello");
+    add(PHOTOS_SENDING_ACCOUNT, "Photos");
+  }
+  if (!seen.has(HELLO_SENDING_ACCOUNT)) {
+    list2.unshift({ email: HELLO_SENDING_ACCOUNT, label: "Hello" });
+  }
+  return list2;
+}
+function matchSendingAccount(email, accounts) {
+  const normalized = normalizeEmail$1(email);
+  return accounts.some((account) => account.email === normalized) ? normalized : "";
+}
+const EMPTY_SEGMENT_FILTER = {
+  query: "",
+  tagsAll: [],
+  tagsAny: [],
+  tagsNone: [],
+  source: "",
+  verified: "",
+  fields: []
+};
+const DEFAULT_MARKETING_SETTINGS = {
+  frequencyMax: 2,
+  frequencyDays: 7,
+  overlapHours: 24,
+  gmailDailyLimit: 2e3,
+  bounceWarnRate: 0.05,
+  bouncePauseRate: 0.08,
+  fromName: "Iconic Images",
+  fromEmail: "hello@iconicimagestx.com",
+  replyTo: "hello@iconicimagestx.com",
+  sendingAccounts: [
+    { email: "hello@iconicimagestx.com", label: "Hello" },
+    { email: "photos@iconicimagestx.com", label: "Photos" }
+  ],
+  suppressionSeededAt: ""
+};
+function settingsFrom(raw) {
+  const merged = { ...DEFAULT_MARKETING_SETTINGS, ...raw || {} };
+  const sendingAccounts = normalizeSendingAccounts(
+    raw && Array.isArray(raw.sendingAccounts) ? raw.sendingAccounts : DEFAULT_MARKETING_SETTINGS.sendingAccounts
+  );
+  let fromEmail = matchSendingAccount(merged.fromEmail, sendingAccounts) || HELLO_SENDING_ACCOUNT;
+  let replyTo = normalizeEmail$1(merged.replyTo) || fromEmail;
+  const stored = raw && Array.isArray(raw.sendingAccounts) ? raw.sendingAccounts : null;
+  const legacyPhotosOnly = !stored || stored.length === 1 && normalizeEmail$1(stored[0]?.email) === PHOTOS_SENDING_ACCOUNT;
+  if (legacyPhotosOnly && fromEmail === PHOTOS_SENDING_ACCOUNT) fromEmail = HELLO_SENDING_ACCOUNT;
+  if (legacyPhotosOnly && replyTo === PHOTOS_SENDING_ACCOUNT) replyTo = HELLO_SENDING_ACCOUNT;
+  if (!matchSendingAccount(replyTo, sendingAccounts)) replyTo = fromEmail;
+  return { ...merged, sendingAccounts, fromEmail, replyTo };
+}
+function createMemoryMarketingStore() {
+  const contacts = /* @__PURE__ */ new Map();
+  const segments = /* @__PURE__ */ new Map();
+  const suppression = /* @__PURE__ */ new Map();
+  const events = [];
+  const campaigns = /* @__PURE__ */ new Map();
+  const templates = /* @__PURE__ */ new Map();
+  const sends = [];
+  const reports = /* @__PURE__ */ new Map();
+  let settings = { ...DEFAULT_MARKETING_SETTINGS };
+  let clients = [];
+  return {
+    async ensureSeed() {
+      if (settings.suppressionSeededAt) return;
+      const now = (/* @__PURE__ */ new Date()).toISOString();
+      for (const item of seedSuppression(now)) suppression.set(item.id, item);
+      settings = { ...settings, suppressionSeededAt: now };
+    },
+    async listContacts() {
+      return [...contacts.values()];
+    },
+    async saveContacts(next) {
+      for (const contact2 of next) contacts.set(contact2.email, contact2);
+    },
+    async deleteContacts(emails) {
+      for (const email of emails) contacts.delete(email);
+    },
+    async listSegments() {
+      return [...segments.values()];
+    },
+    async saveSegment(segment) {
+      segments.set(segment.id, segment);
+    },
+    async deleteSegment(id) {
+      segments.delete(id);
+    },
+    async listSuppression() {
+      return [...suppression.values()];
+    },
+    async saveSuppression(entry2) {
+      suppression.set(entry2.id, entry2);
+    },
+    async deleteSuppression(id) {
+      suppression.delete(id);
+    },
+    async listEvents(email) {
+      return events.filter((event) => !email || event.email === email);
+    },
+    async addEvents(next) {
+      events.push(...next);
+    },
+    async getSettings() {
+      settings = settingsFrom(settings);
+      return settings;
+    },
+    async saveSettings(next) {
+      settings = next;
+    },
+    async listClients() {
+      return clients;
+    },
+    replaceClients(next) {
+      clients = next;
+    },
+    async listCampaigns() {
+      return [...campaigns.values()];
+    },
+    async getCampaign(id) {
+      return campaigns.get(id) || null;
+    },
+    async saveCampaign(campaign) {
+      campaigns.set(campaign.id, campaign);
+    },
+    async deleteCampaign(id) {
+      campaigns.delete(id);
+    },
+    async listTemplates() {
+      return [...templates.values()];
+    },
+    async saveTemplate(template) {
+      templates.set(template.id, template);
+    },
+    async deleteTemplate(id) {
+      templates.delete(id);
+    },
+    async listSends() {
+      return sends;
+    },
+    async addSends(next) {
+      sends.push(...next);
+    },
+    async getReport(campaignId) {
+      return reports.get(campaignId) || null;
+    },
+    async saveReport(report) {
+      reports.set(report.campaignId, report);
+    },
+    async listReports() {
+      return [...reports.values()];
+    }
+  };
+}
+const memoryStore$3 = createMemoryMarketingStore();
+function getMarketingStore() {
+  if (process.env.MARKETING_STORE === "memory" || !admin.apps.length) return memoryStore$3;
+  return firestoreStore$3;
+}
+function db$F() {
+  return admin.firestore();
+}
+async function writeAll(collection, docs) {
+  for (let index = 0; index < docs.length; index += 400) {
+    const batch = db$F().batch();
+    for (const doc of docs.slice(index, index + 400)) {
+      batch.set(db$F().collection(collection).doc(doc.id), doc.data);
+    }
+    await batch.commit();
+  }
+}
+const firestoreStore$3 = {
+  async ensureSeed() {
+    const settings = await this.getSettings();
+    if (settings.suppressionSeededAt) return;
+    const now = (/* @__PURE__ */ new Date()).toISOString();
+    await writeAll("marketingSuppression", seedSuppression(now).map((item) => ({ id: item.id, data: item })));
+    await this.saveSettings({ ...settings, suppressionSeededAt: now });
+  },
+  async listContacts() {
+    const snap = await db$F().collection("marketingContacts").get();
+    return snap.docs.map((doc) => doc.data());
+  },
+  async saveContacts(contacts) {
+    await writeAll("marketingContacts", contacts.map((contact2) => ({ id: contact2.email, data: contact2 })));
+  },
+  async deleteContacts(emails) {
+    for (let index = 0; index < emails.length; index += 400) {
+      const batch = db$F().batch();
+      for (const email of emails.slice(index, index + 400)) {
+        batch.delete(db$F().collection("marketingContacts").doc(email));
+      }
+      await batch.commit();
+    }
+  },
+  async listSegments() {
+    const snap = await db$F().collection("marketingSegments").get();
+    return snap.docs.map((doc) => doc.data());
+  },
+  async saveSegment(segment) {
+    await db$F().collection("marketingSegments").doc(segment.id).set(segment);
+  },
+  async deleteSegment(id) {
+    await db$F().collection("marketingSegments").doc(id).delete();
+  },
+  async listSuppression() {
+    const snap = await db$F().collection("marketingSuppression").get();
+    return snap.docs.map((doc) => doc.data());
+  },
+  async saveSuppression(entry2) {
+    await db$F().collection("marketingSuppression").doc(entry2.id).set(entry2);
+  },
+  async deleteSuppression(id) {
+    await db$F().collection("marketingSuppression").doc(id).delete();
+  },
+  async listEvents(email) {
+    const query = email ? db$F().collection("marketingEvents").where("email", "==", email) : db$F().collection("marketingEvents");
+    const snap = await query.get();
+    return snap.docs.map((doc) => doc.data());
+  },
+  async addEvents(events) {
+    await writeAll("marketingEvents", events.map((event) => ({ id: event.id, data: event })));
+  },
+  async getSettings() {
+    const doc = await db$F().collection("marketingSettings").doc("default").get();
+    return settingsFrom(doc.exists ? doc.data() : void 0);
+  },
+  async saveSettings(settings) {
+    await db$F().collection("marketingSettings").doc("default").set(settings);
+  },
+  async listClients() {
+    const snap = await db$F().collection("clients").get();
+    return snap.docs.map((doc) => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        email: String(data.email || ""),
+        firstName: String(data.firstName || ""),
+        lastName: String(data.lastName || ""),
+        phone: String(data.phone || ""),
+        company: String(data.company || "")
+      };
+    });
+  },
+  async listCampaigns() {
+    const snap = await db$F().collection("marketingCampaigns").get();
+    return snap.docs.map((doc) => doc.data());
+  },
+  async getCampaign(id) {
+    const doc = await db$F().collection("marketingCampaigns").doc(id).get();
+    return doc.exists ? doc.data() : null;
+  },
+  async saveCampaign(campaign) {
+    await db$F().collection("marketingCampaigns").doc(campaign.id).set(campaign);
+  },
+  async deleteCampaign(id) {
+    await db$F().collection("marketingCampaigns").doc(id).delete();
+  },
+  async listTemplates() {
+    const snap = await db$F().collection("marketingTemplates").get();
+    return snap.docs.map((doc) => doc.data());
+  },
+  async saveTemplate(template) {
+    await db$F().collection("marketingTemplates").doc(template.id).set(template);
+  },
+  async deleteTemplate(id) {
+    await db$F().collection("marketingTemplates").doc(id).delete();
+  },
+  async listSends() {
+    const snap = await db$F().collection("marketingSends").get();
+    return snap.docs.map((doc) => doc.data());
+  },
+  async addSends(sends) {
+    await writeAll("marketingSends", sends.map((send) => ({
+      id: `${send.campaignId}_${send.email}`.replace(/[^\w@.-]+/g, "_"),
+      data: send
+    })));
+  },
+  async getReport(campaignId) {
+    const doc = await db$F().collection("marketingReports").doc(campaignId).get();
+    return doc.exists ? doc.data() : null;
+  },
+  async saveReport(report) {
+    await db$F().collection("marketingReports").doc(report.campaignId).set(report);
+  },
+  async listReports() {
+    const snap = await db$F().collection("marketingReports").get();
+    return snap.docs.map((doc) => doc.data());
+  }
+};
+async function syncCustomerContacts(store = getMarketingStore()) {
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  const [contacts, clients] = await Promise.all([store.listContacts(), store.listClients()]);
+  const result = syncClientsIntoContacts(contacts, clients, now);
+  const nextEmails = new Set(result.contacts.map((contact2) => contact2.email));
+  const removed = contacts.map((contact2) => contact2.email).filter((email) => !nextEmails.has(email));
+  await store.saveContacts(result.contacts);
+  if (removed.length) await store.deleteContacts(removed);
+  return {
+    created: result.created,
+    relinked: result.relinked,
+    refreshed: result.refreshed,
+    total: result.contacts.length
+  };
+}
+const MERGE = /\{([A-Za-z]+)(?:\|([^}]*))?\}/g;
+function escapeHtml$b(value) {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+function applyMerge(template, values) {
+  return template.replace(MERGE, (full, key, fallback) => {
+    const value = values[key];
+    if (value) return key === "UnsubscribeUrl" ? value : escapeHtml$b(value);
+    if (fallback !== void 0) return escapeHtml$b(fallback);
+    return full;
+  });
+}
+function mergeValues(contact2, unsubscribeUrl) {
+  return {
+    FirstName: contact2.firstName || "",
+    LastName: contact2.lastName || "",
+    Email: contact2.email || "",
+    Company: contact2.company || "",
+    UnsubscribeUrl: unsubscribeUrl
+  };
+}
+const MARKETING_POSTAL_ADDRESS = "Iconic Images, 26410 Oakridge Dr. Ste 105 - 108, Spring, TX 77380";
+function withUnsubscribeFooter(html, url) {
+  const link = `<p style="margin-top:24px;font-size:12px;color:#667085;">${MARKETING_POSTAL_ADDRESS}. <a href="{UnsubscribeUrl}" clicktracking="off">Unsubscribe</a>.</p>`;
+  let merged = html.includes("{UnsubscribeUrl}") ? html : `${html}
+${link}`;
+  if (!merged.includes("26410 Oakridge Dr")) merged = `${merged}
+${link}`;
+  return applyMerge(merged, { UnsubscribeUrl: url });
+}
+function hoursBetween(laterIso, earlierIso) {
+  const later = Date.parse(laterIso);
+  const earlier = Date.parse(earlierIso);
+  if (Number.isNaN(later) || Number.isNaN(earlier)) return Number.POSITIVE_INFINITY;
+  return (later - earlier) / 36e5;
+}
+function resolveAudience(input) {
+  const removed = [];
+  const seen = /* @__PURE__ */ new Set();
+  const recipients = [];
+  let duplicatesRemoved = 0;
+  const pool = input.filter ? input.contacts.filter((contact2) => contactMatchesFilter(contact2, input.filter)) : input.contacts;
+  for (const contact2 of pool) {
+    const email = normalizeEmail$1(contact2.email);
+    const name = `${contact2.firstName} ${contact2.lastName}`.trim() || email;
+    if (!isValidEmail(email)) {
+      removed.push({ email, name, reason: "invalid", detail: "Invalid email" });
+      continue;
+    }
+    if (seen.has(email)) {
+      duplicatesRemoved += 1;
+      removed.push({ email, name, reason: "duplicate", detail: "Duplicate in this send" });
+      continue;
+    }
+    seen.add(email);
+    const suppressed = matchSuppression(contact2, input.suppression);
+    if (suppressed) {
+      const detail = suppressed.hold === "personal" ? "Personal hold" : suppressed.reason;
+      removed.push({ email, name, reason: "suppressed", detail });
+      continue;
+    }
+    const windowStart = Date.parse(input.sendAt) - input.settings.frequencyDays * 864e5;
+    const recent = input.sends.filter((send) => {
+      return normalizeEmail$1(send.email) === email && Date.parse(send.sentAt) >= windowStart;
+    });
+    if (input.settings.frequencyMax > 0 && recent.length >= input.settings.frequencyMax) {
+      removed.push({
+        email,
+        name,
+        reason: "frequency",
+        detail: `${recent.length} marketing emails in ${input.settings.frequencyDays} days`
+      });
+      continue;
+    }
+    if (!input.overlapOverride) {
+      const clash = input.campaigns.find((campaign) => {
+        if (campaign.id === input.excludeCampaignId) return false;
+        if (!campaign.recipientEmails.map(normalizeEmail$1).includes(email)) return false;
+        if (campaign.status === "sending") return true;
+        if (campaign.status === "scheduled" && campaign.scheduledAt) {
+          return Math.abs(hoursBetween(campaign.scheduledAt, input.sendAt)) <= input.settings.overlapHours;
+        }
+        if (campaign.status === "sent" && campaign.sentAt) {
+          return hoursBetween(input.sendAt, campaign.sentAt) <= input.settings.overlapHours && hoursBetween(input.sendAt, campaign.sentAt) >= 0;
+        }
+        return false;
+      });
+      if (clash) {
+        removed.push({ email, name, reason: "overlap", detail: clash.name });
+        continue;
+      }
+    }
+    recipients.push({ ...contact2, email });
+  }
+  return {
+    recipients,
+    removed,
+    duplicatesRemoved,
+    suppressed: removed.filter((item) => item.reason === "suppressed").length,
+    frequencyCapped: removed.filter((item) => item.reason === "frequency").length,
+    overlapHeld: removed.filter((item) => item.reason === "overlap").length,
+    unverified: recipients.filter((contact2) => !contact2.emailVerified).length
+  };
+}
+const HOLY_GRAIL_SHEET_ID = "1kZWkEHWdH_2nsLHokPaTs4pRxpkgLcOWqIaXu9wGsX8";
+const HOLY_GRAIL_PAGE_LIMIT = 40;
+const HOLY_GRAIL_TABS = {
+  dashboard: "🏠 Dashboard",
+  howTo: "📖 How To",
+  touchLog: "📞 Touch Log",
+  startHere: "Start Here",
+  inbox: "🆕 New Leads Inbox",
+  topClients: "⭐ Top Clients",
+  recurring: "🔁 Recurring",
+  strays: "🌱 Strays & One-time",
+  winBack: "💤 Win-Back",
+  agentProspects: "🏡 Agent Prospects",
+  seniorCommunities: "🏥 Senior Communities",
+  apartmentComplexes: "🏢 Apartment Complexes",
+  hospitality: "🏨 Hospitality",
+  otherBusinesses: "🏪 Other Businesses",
+  doNotContact: "⛔ Do Not Contact",
+  contacts: "📇 Contacts",
+  suppression: "⛔ Suppression",
+  prospectsHospitality: "Prospects - Hospitality",
+  campaignCalendar: "Campaign Calendar",
+  ads: "Ads",
+  ideasBank: "Ideas Bank",
+  lists: "Lists & Segments",
+  socialCalendar: "Social Calendar"
+};
+const INBOX_VALUE_COLUMNS = ["A", "B", "C", "D", "E", "F", "G", "H"];
+const CONTACTS_FORMULA_HEADERS = [
+  "Client ID",
+  "Touch Count",
+  "Last Touch",
+  "Live Status",
+  "Section",
+  "Priority",
+  "Call OK"
+];
+const ACTION_POSSIBLE_DUPE = "possible dupe";
+const ACTION_SUPPRESSED = "suppressed";
+const ICONIC_CLIENT_ID = /^(IC-\d+|C\d+)$/i;
+const FORMULA_LEAD$1 = /^[=+\-@\t\r]/;
+const TEST_WORD = /\b(test|playtest|localhost|sandbox|fixture|testdata|test-data)\b/i;
+const STAGING_FIXTURE = /staging/i;
+function holyGrailLive(env = process.env) {
+  return env.HOLY_GRAIL_SYNC_LIVE === "true";
+}
+function columnLetter(index) {
+  let n = index + 1;
+  let out = "";
+  while (n > 0) {
+    const rem = (n - 1) % 26;
+    out = String.fromCharCode(65 + rem) + out;
+    n = Math.floor((n - 1) / 26);
+  }
+  return out;
+}
+function columnIndex$1(letter) {
+  let n = 0;
+  for (const char of letter.toUpperCase()) {
+    if (char < "A" || char > "Z") return -1;
+    n = n * 26 + (char.charCodeAt(0) - 64);
+  }
+  return n - 1;
+}
+function quoteTab(tab, a1) {
+  return `'${tab.replace(/'/g, "''")}'!${a1}`;
+}
+function compactUtc(ms) {
+  return new Date(ms).toISOString().slice(0, 16) + "Z";
+}
+function normalizeSyncEmail(value) {
+  return String(value ?? "").trim().toLowerCase().replace(/\s+/g, "");
+}
+function normalizeSyncPhone(value) {
+  let digits2 = String(value ?? "").replace(/\D/g, "");
+  if (digits2.length === 11 && digits2.startsWith("1")) digits2 = digits2.slice(1);
+  return digits2.length >= 7 ? digits2 : "";
+}
+function sheetText(value, max = 400) {
+  const text2 = String(value ?? "").replace(/[\r\n\t]+/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
+  return FORMULA_LEAD$1.test(text2) ? `'${text2}` : text2;
+}
+function mapOrderStatus(raw) {
+  const value = String(raw ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+  if (!value) return "";
+  if (["cancelled", "canceled", "declined", "void", "voided", "expired_unpaid", "no_show"].includes(value)) return "Canceled";
+  if (["delivered", "paid", "delivered_paid", "complete", "completed"].includes(value)) return "Delivered";
+  if (["confirmed", "booked", "scheduled", "in_progress", "shooting", "editing"].includes(value)) return "Booked";
+  if (["new", "pending", "awaiting", "draft", "quoted"].includes(value)) return "Pending";
+  if (value === "archived") return "Archived";
+  return "";
+}
+function lastOrderLabel(orderNumber2, day) {
+  const ref = sheetText(orderNumber2, 80);
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : "";
+  if (ref && date) return `${ref} · ${date}`;
+  return ref || date;
+}
+function sourceSyncedValue(source, nowMs, harListingId = "") {
+  if (source === "HAR" && harListingId.trim()) return sheetText(`har:listing:${harListingId.trim()}`, 120);
+  if (source === "HAR") return `har:${compactUtc(nowMs)}`;
+  return `website:${compactUtc(nowMs)}`;
+}
+function cityFromAddressText(label) {
+  const parts = label.split(",").map((part) => part.trim()).filter(Boolean);
+  if (parts.length < 2) return "";
+  const tail = parts[parts.length - 1];
+  if (/^[A-Z]{2}(?:\s+\d{5}(?:-\d{4})?)?$/.test(tail)) return parts[parts.length - 2];
+  const embedded = tail.match(/^([A-Za-z .'-]+?)\s+[A-Z]{2}(?:\s+\d{5}(?:-\d{4})?)?$/);
+  if (embedded) return embedded[1].trim();
+  return "";
+}
+function isDncStatus(value) {
+  return /\bDNC\b/i.test(value) || value.includes("⛔ DNC");
+}
+function isEmailOkNo(value) {
+  return value.trim().toUpperCase() === "NO";
+}
+function asText$1(value) {
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return "";
+}
+function sourceBlob(data, id) {
+  const tags = Array.isArray(data.tags) ? data.tags.map((tag) => asText$1(tag)).join(" ") : asText$1(data.tags);
+  return [
+    id,
+    asText$1(data.source),
+    asText$1(data.leadSource),
+    asText$1(data.origin),
+    asText$1(data.environment),
+    asText$1(data.archivedFrom),
+    asText$1(data.createdFrom),
+    asText$1(data.fixtureName),
+    tags
+  ].join(" ");
+}
+function emailHostIsTest(email) {
+  const host = normalizeSyncEmail(email).split("@")[1] || "";
+  return host === "localhost" || host.endsWith(".localhost") || host.endsWith(".test");
+}
+function isTestRecord(id, data) {
+  if (data.playtest === true || data.sandbox === true || data.test === true || data.testData === true || data.fixture === true) {
+    return true;
+  }
+  const email = asText$1(data.email) || asText$1(data.clientEmail);
+  if (emailHostIsTest(email)) return true;
+  if (id.toLowerCase().includes("playtest")) return true;
+  const blob = sourceBlob(data, id);
+  if (TEST_WORD.test(blob) || STAGING_FIXTURE.test(blob)) return true;
+  if (/\/admin\/test-data/i.test(blob)) return true;
+  const status2 = asText$1(data.status).toLowerCase();
+  const archived = status2 === "archived" || data.archived === true;
+  if (archived && /test-data|testdata|\/admin\/test-data/i.test(blob)) return true;
+  return false;
+}
+function leadFromHar(input) {
+  const email = normalizeSyncEmail(input.email);
+  const phone = normalizeSyncPhone(input.phone);
+  const record2 = {
+    source: "HAR",
+    leadSource: "HAR",
+    email,
+    playtest: false
+  };
+  if (isTestRecord(input.listingId || "har", record2)) return null;
+  if (!email && !phone) return null;
+  const received = Number.isFinite(input.receivedAtMs) ? input.receivedAtMs : Date.now();
+  return {
+    key: email ? `email:${email}` : `phone:${phone}`,
+    siteClientId: input.listingId ? `har:${input.listingId}` : "",
+    iconicClientId: "",
+    name: sheetText(input.name, 120),
+    email,
+    phone,
+    phoneRaw: sheetText(input.phone, 40),
+    company: sheetText(input.company, 120),
+    city: sheetText(input.city, 80),
+    notes: sheetText(input.notes, 400),
+    source: "HAR",
+    receivedAt: compactUtc(received),
+    lastOrder: "",
+    orderStatus: "",
+    harListingId: sheetText(input.listingId, 80)
+  };
+}
+function timestampMillis$1(value) {
+  if (value && typeof value === "object" && "toMillis" in value && typeof value.toMillis === "function") {
+    const ms = value.toMillis();
+    return Number.isFinite(ms) ? ms : null;
+  }
+  if (value && typeof value === "object" && "seconds" in value) {
+    const seconds = Number(value.seconds);
+    return Number.isFinite(seconds) ? seconds * 1e3 : null;
+  }
+  if (typeof value === "string" || typeof value === "number") {
+    const parsed = new Date(value).getTime();
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+function dayFrom(value) {
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value.trim())) return value.trim().slice(0, 10);
+  const ms = timestampMillis$1(value);
+  return ms == null ? "" : new Date(ms).toISOString().slice(0, 10);
+}
+function cityFromData(data) {
+  const direct = asText$1(data.city);
+  if (direct) return direct;
+  const address = data.address;
+  if (address && typeof address === "object" && !Array.isArray(address)) {
+    const city = asText$1(address.city);
+    if (city) return city;
+  }
+  const label = asText$1(data.addressLabel) || (typeof address === "string" ? address.trim() : "");
+  return cityFromAddressText(label);
+}
+function personName$2(data) {
+  const combined = `${asText$1(data.firstName)} ${asText$1(data.lastName)}`.trim();
+  return combined || asText$1(data.clientName) || asText$1(data.name);
+}
+function iconicClientId(data) {
+  for (const key of ["iconicClientId", "crmClientId", "sheetClientId"]) {
+    const value = asText$1(data[key]);
+    if (ICONIC_CLIENT_ID.test(value)) return value.toUpperCase();
+  }
+  return "";
+}
+function nodeFromChange(doc) {
+  const data = doc.data;
+  const email = normalizeSyncEmail(asText$1(data.email) || asText$1(data.clientEmail));
+  const phoneRaw = asText$1(data.phone) || asText$1(data.clientPhone);
+  const phone = normalizeSyncPhone(phoneRaw);
+  const clientId2 = asText$1(data.clientId);
+  const clientIds = doc.collection === "clients" ? [doc.id] : clientId2 ? [clientId2] : [];
+  if (!email && !phone && clientIds.length === 0 && !iconicClientId(data)) return null;
+  const orderNumber2 = asText$1(data.orderNumber) || asText$1(data.orderCode);
+  const orderStatus = mapOrderStatus(data.status);
+  const orderRank = doc.collection === "orders" ? 2 : doc.collection === "orderRequests" ? 1 : 0;
+  const received = timestampMillis$1(data.createdAt) ?? timestampMillis$1(data.submittedAt) ?? doc.ms;
+  const orderDay = dayFrom(data.scheduledDate) || dayFrom(data.createdAt) || (orderRank > 0 ? dayFrom(doc.ms) : "");
+  return {
+    collection: doc.collection,
+    id: doc.id,
+    ms: doc.ms,
+    clientIds,
+    email,
+    phone,
+    phoneRaw,
+    iconicClientId: iconicClientId(data),
+    name: personName$2(data),
+    company: asText$1(data.company) || asText$1(data.brokerage) || asText$1(data.companyName),
+    city: cityFromData(data),
+    leadSource: asText$1(data.leadSource),
+    orderNumber: orderNumber2,
+    orderStatus,
+    orderRank,
+    orderMs: orderRank > 0 ? doc.ms : 0,
+    orderDay,
+    receivedMs: received
+  };
+}
+function preferText(current, next) {
+  return current || next;
+}
+function leadsFromChanges(docs) {
+  const nodes = [];
+  for (const doc of docs) {
+    if (isTestRecord(doc.id, doc.data)) continue;
+    const node = nodeFromChange(doc);
+    if (node) nodes.push(node);
+  }
+  const parent = nodes.map((_, index) => index);
+  const find = (index) => {
+    let cursor = index;
+    while (parent[cursor] !== cursor) {
+      parent[cursor] = parent[parent[cursor]];
+      cursor = parent[cursor];
+    }
+    return cursor;
+  };
+  const union = (left, right) => {
+    const a = find(left);
+    const b = find(right);
+    if (a !== b) parent[b] = a;
+  };
+  const emailAt = /* @__PURE__ */ new Map();
+  const clientAt = /* @__PURE__ */ new Map();
+  nodes.forEach((node, index) => {
+    if (node.email) {
+      const prev = emailAt.get(node.email);
+      if (prev != null) union(prev, index);
+      emailAt.set(node.email, index);
+    }
+    for (const id of node.clientIds) {
+      const prev = clientAt.get(id);
+      if (prev != null) union(prev, index);
+      clientAt.set(id, index);
+    }
+  });
+  const phoneRoots = /* @__PURE__ */ new Map();
+  nodes.forEach((node, index) => {
+    if (!node.phone) return;
+    const root = find(index);
+    const list2 = phoneRoots.get(node.phone) || [];
+    if (!list2.includes(root)) list2.push(root);
+    phoneRoots.set(node.phone, list2);
+  });
+  for (const roots of phoneRoots.values()) {
+    const emails = new Set(roots.map((root) => nodes.filter((_, index) => find(index) === root).map((node) => node.email).find(Boolean) || ""));
+    if ([...emails].filter(Boolean).length > 1) continue;
+    for (let index = 1; index < roots.length; index += 1) union(roots[0], roots[index]);
+  }
+  const groups = /* @__PURE__ */ new Map();
+  nodes.forEach((node, index) => {
+    const root = find(index);
+    const list2 = groups.get(root) || [];
+    list2.push(node);
+    groups.set(root, list2);
+  });
+  const leads = [];
+  for (const group of groups.values()) {
+    leads.push(mergeGroup(group));
+  }
+  return leads;
+}
+function mergeGroup(group) {
+  const clientNode = group.find((node) => node.collection === "clients");
+  const siteClientId = clientNode?.id || group.flatMap((node) => node.clientIds)[0] || `${group[0].collection}/${group[0].id}`;
+  const iconicIds = [...new Set(group.map((node) => node.iconicClientId).filter(Boolean))];
+  let email = "";
+  let phone = "";
+  let phoneRaw = "";
+  let name = "";
+  let company = "";
+  let city = "";
+  let leadSource = "";
+  let receivedMs = group[0].receivedMs;
+  let orderNumber2 = "";
+  let orderStatus = "";
+  let orderRank = 0;
+  let orderMs = 0;
+  let orderDay = "";
+  for (const node of group) {
+    email = preferText(email, node.email);
+    phone = preferText(phone, node.phone);
+    phoneRaw = preferText(phoneRaw, node.phoneRaw);
+    name = preferText(name, node.name);
+    company = preferText(company, node.company);
+    city = preferText(city, node.city);
+    leadSource = preferText(leadSource, node.leadSource);
+    receivedMs = Math.min(receivedMs, node.receivedMs);
+    if (node.orderRank > 0 && (node.orderRank > orderRank || node.orderRank === orderRank && node.orderMs >= orderMs)) {
+      orderRank = node.orderRank;
+      orderMs = node.orderMs;
+      orderNumber2 = node.orderNumber || orderNumber2;
+      orderStatus = node.orderStatus || orderStatus;
+      orderDay = node.orderDay || orderDay;
+    }
+  }
+  const notes = [
+    orderNumber2 ? `Order ${orderNumber2}` : "",
+    orderStatus,
+    leadSource && !isTestRecord("note", { leadSource }) ? leadSource : ""
+  ].filter(Boolean).join(" · ");
+  return {
+    key: email ? `email:${email}` : phone ? `phone:${phone}` : `site:${siteClientId}`,
+    siteClientId,
+    iconicClientId: iconicIds.length === 1 ? iconicIds[0] : "",
+    name: sheetText(name, 120),
+    email,
+    phone,
+    phoneRaw: sheetText(phoneRaw, 40),
+    company: sheetText(company, 120),
+    city: sheetText(city, 80),
+    notes: sheetText(notes, 400),
+    source: "Website",
+    receivedAt: compactUtc(receivedMs || group[0].ms),
+    lastOrder: lastOrderLabel(orderNumber2, orderDay || (orderMs ? new Date(orderMs).toISOString().slice(0, 10) : "")),
+    orderStatus: sheetText(orderStatus, 40),
+    harListingId: ""
+  };
+}
+function normalizeHeader(value) {
+  return value.trim().toLowerCase().replace(/\s+/g, " ");
+}
+const CONTACTS_HEADER_FIELDS = [
+  ["clientId", "Client ID"],
+  ["email", "Email"],
+  ["phone", "Phone"],
+  ["liveStatus", "Live Status"],
+  ["emailOk", "Email OK"],
+  ["sourceSynced", "Source / Synced"],
+  ["lastOrder", "Last Order"],
+  ["orderStatus", "Order Status"],
+  ["siteClientId", "Site Client ID"]
+];
+function resolveContactsColumns(header2) {
+  const found = /* @__PURE__ */ new Map();
+  header2.forEach((cell2, index) => {
+    const name = normalizeHeader(String(cell2 ?? ""));
+    if (!name) return;
+    const letters = found.get(name) || [];
+    letters.push(columnLetter(index));
+    found.set(name, letters);
+  });
+  const missing = [];
+  const columns = {};
+  for (const [key, label] of CONTACTS_HEADER_FIELDS) {
+    const letters = found.get(normalizeHeader(label)) || [];
+    if (letters.length === 1) columns[key] = letters[0];
+    else if (letters.length === 0) missing.push(label);
+    else missing.push(`${label} (duplicate)`);
+  }
+  if (missing.length) return { ok: false, missing };
+  const writeLetters = [columns.sourceSynced, columns.lastOrder, columns.orderStatus, columns.siteClientId];
+  for (const label of CONTACTS_FORMULA_HEADERS) {
+    const letters = found.get(normalizeHeader(label)) || [];
+    if (letters.some((letter) => writeLetters.includes(letter))) missing.push(`${label} (overlaps a write column)`);
+  }
+  if (missing.length) return { ok: false, missing };
+  return { ok: true, columns };
+}
+function contactsWriteLetters(columns) {
+  return [columns.sourceSynced, columns.lastOrder, columns.orderStatus, columns.siteClientId];
+}
+function buildContactIndex(input) {
+  const length = Math.max(input.clientIds.length, input.liveStatus.length, input.emails.length, input.phones.length, input.emailOk?.length || 0);
+  const rows = [];
+  for (let index = 1; index < length; index += 1) {
+    const clientId2 = (input.clientIds[index] || "").trim();
+    const email = normalizeSyncEmail(input.emails[index] || "");
+    const phone = normalizeSyncPhone(input.phones[index] || "");
+    if (!clientId2 && !email && !phone) continue;
+    rows.push({
+      row: index + 1,
+      clientId: clientId2.toUpperCase(),
+      email,
+      phone,
+      liveStatus: (input.liveStatus[index] || "").trim(),
+      emailOk: (input.emailOk?.[index] || "").trim()
+    });
+  }
+  return rows;
+}
+function headerIndexes(header2, names) {
+  const wanted = new Set(names);
+  const indexes = [];
+  header2.forEach((cell2, index) => {
+    if (wanted.has(cell2.trim().toLowerCase())) indexes.push(index);
+  });
+  return indexes;
+}
+function suppressionFromGrid(rows) {
+  const grid = rows.map((row) => row.map((cell2) => String(cell2 ?? "").trim()));
+  const header2 = (grid[0] || []).map((cell2) => cell2.toLowerCase());
+  const emailCols = headerIndexes(header2, ["email", "emails", "e-mail"]);
+  const phoneCols = headerIndexes(header2, ["phone", "phones", "mobile", "cell"]);
+  const nameCols = headerIndexes(header2, ["name", "names", "full name"]);
+  const hasHeader = emailCols.length + phoneCols.length + nameCols.length > 0;
+  const body = hasHeader ? grid.slice(1) : grid;
+  const emails = /* @__PURE__ */ new Set();
+  const phones = /* @__PURE__ */ new Set();
+  const names = /* @__PURE__ */ new Set();
+  const takeEmail = (cell2) => {
+    const email = normalizeSyncEmail(cell2);
+    if (email.includes("@")) emails.add(email);
+  };
+  const takePhone = (cell2) => {
+    const phone = normalizeSyncPhone(cell2);
+    if (phone) phones.add(phone);
+  };
+  for (const row of body) {
+    if (hasHeader) {
+      emailCols.forEach((index) => takeEmail(row[index] || ""));
+      phoneCols.forEach((index) => takePhone(row[index] || ""));
+      nameCols.forEach((index) => {
+        const name = normalizePersonName$1(row[index] || "");
+        if (name.includes(" ")) names.add(name);
+      });
+      row.forEach(takeEmail);
+    } else {
+      row.forEach((cell2) => {
+        takeEmail(cell2);
+        if (normalizeSyncPhone(cell2).length >= 10) takePhone(cell2);
+      });
+    }
+  }
+  return { emails: [...emails], phones: [...phones], names: [...names] };
+}
+function inboxFromLead(lead, notes) {
+  return {
+    A: lead.receivedAt,
+    B: lead.source,
+    C: lead.name,
+    D: lead.email,
+    E: lead.phoneRaw || lead.phone,
+    F: lead.company,
+    G: lead.city,
+    H: sheetText(notes || lead.notes, 400)
+  };
+}
+function contactCells(lead, nowMs) {
+  const cells = {
+    sourceSynced: sourceSyncedValue(lead.source, nowMs, lead.harListingId),
+    siteClientId: sheetText(lead.siteClientId, 160)
+  };
+  if (lead.lastOrder) cells.lastOrder = lead.lastOrder;
+  if (lead.orderStatus) cells.orderStatus = lead.orderStatus;
+  return cells;
+}
+function fingerprintFor(plan) {
+  return JSON.stringify({
+    disposition: plan.disposition,
+    inbox: plan.inbox,
+    action: plan.action,
+    contactRow: plan.contactRow,
+    contactCells: plan.contactCells
+  });
+}
+function marketingBlocked(lead, list2) {
+  if (!list2.length) return false;
+  const parts = lead.name.trim().split(/\s+/).filter(Boolean);
+  const firstName = parts[0] || "";
+  const lastName = parts.slice(1).join(" ");
+  return Boolean(matchSuppression({ email: lead.email, firstName, lastName }, list2));
+}
+function sheetBlocked(lead, index) {
+  if (lead.email && index.suppressionEmails.includes(lead.email)) return "suppression list email";
+  if (lead.phone && index.suppressionPhones.includes(lead.phone)) return "suppression list phone";
+  const name = normalizePersonName$1(lead.name);
+  if (name && index.suppressionNames.includes(name)) return "suppression list name";
+  if (marketingBlocked(lead, index.marketingSuppression)) return "Firestore marketingSuppression";
+  return "";
+}
+function rowBlocked(row) {
+  if (isDncStatus(row.liveStatus)) return "Live Status DNC";
+  if (isEmailOkNo(row.emailOk)) return "Email OK = NO";
+  return "";
+}
+function classify(lead, index, nowMs) {
+  const base = {
+    key: lead.key,
+    siteClientId: lead.siteClientId,
+    inboxAppended: false
+  };
+  if (!lead.email && !lead.phone && !lead.iconicClientId) {
+    const plan2 = { ...base, disposition: "no-identity", flag: "", reason: "No email, phone, or Client ID.", inbox: null, action: "", contactRow: null, contactCells: null };
+    return { ...plan2, fingerprint: fingerprintFor(plan2) };
+  }
+  const emailHits = lead.email ? index.contacts.filter((row) => row.email === lead.email) : [];
+  const phoneHits = lead.phone ? index.contacts.filter((row) => row.phone === lead.phone) : [];
+  const idHits = lead.iconicClientId ? index.contacts.filter((row) => row.clientId === lead.iconicClientId) : [];
+  const blockedOn = (rows) => rows.map(rowBlocked).find(Boolean) || "";
+  const listBlock = sheetBlocked(lead, index);
+  const suppressed = (reason, rows) => {
+    const plan2 = {
+      ...base,
+      disposition: "suppressed",
+      flag: ACTION_SUPPRESSED,
+      reason,
+      inbox: null,
+      action: "",
+      contactRow: rows[0]?.row ?? null,
+      contactCells: null
+    };
+    return { ...plan2, fingerprint: fingerprintFor(plan2) };
+  };
+  const possible = (reason) => {
+    const note = sheetText(`Possible duplicate. ${reason}`, 400);
+    const plan2 = {
+      ...base,
+      disposition: "possible-dupe",
+      flag: ACTION_POSSIBLE_DUPE,
+      reason,
+      inbox: inboxFromLead(lead, note),
+      action: ACTION_POSSIBLE_DUPE,
+      contactRow: null,
+      contactCells: null
+    };
+    return { ...plan2, fingerprint: fingerprintFor(plan2) };
+  };
+  const known = (row, reason, flag2) => {
+    const plan2 = {
+      ...base,
+      disposition: "known",
+      flag: flag2,
+      reason,
+      inbox: null,
+      action: "",
+      contactRow: row.row,
+      contactCells: contactCells(lead, nowMs)
+    };
+    return { ...plan2, fingerprint: fingerprintFor(plan2) };
+  };
+  if (idHits.length > 1) {
+    const reason = "Client ID matches more than one Contacts row.";
+    return listBlock || blockedOn(idHits) ? suppressed(`${reason} ${listBlock || blockedOn(idHits)}`, idHits) : possible(reason);
+  }
+  if (idHits.length === 1) {
+    const row = idHits[0];
+    const emailConflict = emailHits.some((hit) => hit.row !== row.row);
+    const phoneConflict = phoneHits.some((hit) => hit.row !== row.row);
+    const sameRowPhoneConflict = Boolean(lead.phone && row.phone && lead.phone !== row.phone);
+    if (emailConflict || phoneConflict || sameRowPhoneConflict) {
+      const reason = "Client ID row does not agree with email or phone.";
+      return listBlock || blockedOn([row, ...emailHits, ...phoneHits]) ? suppressed(`${reason} ${listBlock || blockedOn([row, ...emailHits, ...phoneHits])}`, [row]) : possible(reason);
+    }
+    const block2 = listBlock || rowBlocked(row);
+    return known(row, block2 ? `Client ID match. ${block2}` : "Client ID match.", block2 ? ACTION_SUPPRESSED : "");
+  }
+  const emailRows = [...new Set(emailHits.map((row) => row.row))];
+  const phoneRows = [...new Set(phoneHits.map((row) => row.row))];
+  if (emailRows.length > 1) {
+    const reason = "Email matches more than one Contacts row.";
+    return listBlock || blockedOn(emailHits) ? suppressed(`${reason} ${listBlock || blockedOn(emailHits)}`, emailHits) : possible(reason);
+  }
+  if (emailRows.length === 1) {
+    const row = emailHits[0];
+    const phoneOnOther = phoneHits.some((hit) => hit.row !== row.row);
+    const phoneDisagrees = Boolean(lead.phone && row.phone && lead.phone !== row.phone);
+    if (phoneOnOther || phoneDisagrees) {
+      const reason = phoneOnOther ? "Email matches one contact and phone matches another." : "Email matches a contact with a different phone.";
+      return listBlock || blockedOn([row, ...phoneHits]) ? suppressed(`${reason} ${listBlock || blockedOn([row, ...phoneHits])}`, [row]) : possible(reason);
+    }
+    const block2 = listBlock || rowBlocked(row);
+    return known(row, block2 ? `Email match. ${block2}` : "Email match.", block2 ? ACTION_SUPPRESSED : "");
+  }
+  if (phoneRows.length > 0) {
+    const reason = phoneRows.length > 1 ? "Phone matches more than one Contacts row and email does not." : "Phone matches a contact with a different or missing email.";
+    return listBlock || blockedOn(phoneHits) ? suppressed(`${reason} ${listBlock || blockedOn(phoneHits)}`, phoneHits) : possible(reason);
+  }
+  if (listBlock) return suppressed(listBlock, []);
+  const plan = {
+    ...base,
+    disposition: "append",
+    flag: "",
+    reason: "No Contacts match.",
+    inbox: inboxFromLead(lead, lead.notes),
+    action: "",
+    contactRow: null,
+    contactCells: null
+  };
+  return { ...plan, fingerprint: fingerprintFor(plan) };
+}
+function planHolyGrailLead(lead, index, nowMs, memory2) {
+  const next = classify(lead, index, nowMs);
+  if (!memory2) return next;
+  const alreadyAppended = memory2.inboxAppended && (next.disposition === "append" || next.disposition === "possible-dupe");
+  const sameWrite = memory2.fingerprint === next.fingerprint && (next.disposition === "known" || next.disposition === "suppressed" || next.disposition === "no-identity");
+  if (!alreadyAppended && !sameWrite) return next;
+  const unchanged = {
+    ...next,
+    disposition: "unchanged",
+    inbox: null,
+    action: "",
+    contactCells: null,
+    inboxAppended: memory2.inboxAppended,
+    contactRow: memory2.contactRow ?? next.contactRow,
+    reason: alreadyAppended ? "Inbox row already appended." : "Already synced."
+  };
+  return { ...unchanged, fingerprint: memory2.fingerprint };
+}
+function planHolyGrailBatch(leads, index, nowMs, memory2 = {}) {
+  return leads.map((lead) => planHolyGrailLead(lead, index, nowMs, memory2[lead.key]));
+}
+function inboxAppendRange() {
+  return quoteTab(HOLY_GRAIL_TABS.inbox, "A:H");
+}
+function inboxActionRange(row) {
+  return quoteTab(HOLY_GRAIL_TABS.inbox, `J${row}`);
+}
+function contactCellRange(column2, row) {
+  return quoteTab(HOLY_GRAIL_TABS.contacts, `${column2}${row}`);
+}
+function contactWrites(plan, columns) {
+  if (plan.disposition !== "known" || plan.contactRow == null || !plan.contactCells) return [];
+  const cells = plan.contactCells;
+  const writes = [
+    { range: contactCellRange(columns.sourceSynced, plan.contactRow), value: cells.sourceSynced },
+    { range: contactCellRange(columns.siteClientId, plan.contactRow), value: cells.siteClientId }
+  ];
+  if (cells.lastOrder) writes.push({ range: contactCellRange(columns.lastOrder, plan.contactRow), value: cells.lastOrder });
+  if (cells.orderStatus) writes.push({ range: contactCellRange(columns.orderStatus, plan.contactRow), value: cells.orderStatus });
+  return writes;
+}
+function inboxRowValues(cells) {
+  return INBOX_VALUE_COLUMNS.map((column2) => cells[column2]);
+}
+function parseSheetRange(range) {
+  const bang = range.lastIndexOf("!");
+  if (bang < 0) throw new Error("Sheet range is missing a tab name.");
+  let tab = range.slice(0, bang);
+  if (tab.startsWith("'") && tab.endsWith("'")) tab = tab.slice(1, -1).replace(/''/g, "'");
+  const a1 = range.slice(bang + 1).toUpperCase();
+  const match = a1.match(/^([A-Z]+)(\d+)?(?::([A-Z]+)(\d+)?)?$/);
+  if (!match) throw new Error(`Sheet range ${a1} is not a cell or column range.`);
+  const startCol = columnIndex$1(match[1]);
+  const endCol = match[3] ? columnIndex$1(match[3]) : startCol;
+  if (startCol < 0 || endCol < startCol) throw new Error(`Sheet range ${a1} is not ordered.`);
+  return { tab, startCol, endCol };
+}
+function assertAllowedSheetRange(range, columns) {
+  const parsed = parseSheetRange(range);
+  if (parsed.tab === HOLY_GRAIL_TABS.inbox) {
+    for (let col = parsed.startCol; col <= parsed.endCol; col += 1) {
+      if (col !== 9 && (col < 0 || col > 7)) {
+        throw new Error(`Refusing to write ${HOLY_GRAIL_TABS.inbox} column ${columnLetter(col)}.`);
+      }
+    }
+    return;
+  }
+  if (parsed.tab === HOLY_GRAIL_TABS.contacts) {
+    if (!columns) throw new Error(`Refusing to write ${HOLY_GRAIL_TABS.contacts} without a header map.`);
+    const allowed = new Set(contactsWriteLetters(columns));
+    for (let col = parsed.startCol; col <= parsed.endCol; col += 1) {
+      const letter = columnLetter(col);
+      if (!allowed.has(letter)) {
+        throw new Error(`Refusing to write ${HOLY_GRAIL_TABS.contacts} column ${letter}.`);
+      }
+    }
+    return;
+  }
+  throw new Error(`Refusing to write tab ${parsed.tab}.`);
+}
+function emptyCursor(ms) {
+  return { ms, seenIds: [] };
+}
+function selectFresh(previous, page2, limit) {
+  const seen = new Set(previous.seenIds);
+  const fresh = page2.filter((doc) => doc.ms > previous.ms || !seen.has(doc.id));
+  if (fresh.length === 0) {
+    if (page2.length < limit) return { fresh, next: previous, stalled: false };
+    return { fresh, next: { ms: previous.ms + 1, seenIds: [] }, stalled: true };
+  }
+  const max = fresh.reduce((top, doc) => Math.max(top, doc.ms), previous.ms);
+  const seenIds = /* @__PURE__ */ new Set();
+  for (const doc of page2) if (doc.ms === max) seenIds.add(doc.id);
+  for (const doc of fresh) if (doc.ms === max) seenIds.add(doc.id);
+  return { fresh, next: { ms: max, seenIds: [...seenIds] }, stalled: false };
+}
+const CAMPAIGN_STATUSES = ["idea", "draft", "ready", "approved", "scheduled", "sent", "archived"];
+const STATUS_LABEL = {
+  idea: "Idea",
+  draft: "Draft",
+  ready: "Ready for review",
+  approved: "Approved",
+  scheduled: "Scheduled",
+  sent: "Sent",
+  archived: "Archived"
+};
+const POST_PLATFORMS = [
+  { id: "facebook", label: "Facebook" },
+  { id: "instagram", label: "Instagram" },
+  { id: "tiktok", label: "TikTok" },
+  { id: "x", label: "X" },
+  { id: "pinterest", label: "Pinterest" },
+  { id: "youtube", label: "YouTube" },
+  { id: "linkedin", label: "LinkedIn" }
+];
+const CAMPAIGN_SHEET_NEVER_WRITE = ["H", "I", "J", "K", "L", "M", "N", "P"];
+const SEND_BATCH_SIZE = 25;
+const AUDIENCE_PAGE_SIZE = 200;
+const AUDIENCE_MAX_PAGES = 10;
+function campaignSendLive(env = process.env) {
+  return env.CAMPAIGN_SEND_LIVE === "true";
+}
+function campaignSheetAccess(method, range) {
+  const verb = method.toLowerCase();
+  if (verb === "get" || verb === "values.get") return;
+  let letters = [];
+  try {
+    const parsed = parseSheetRange(range);
+    for (let col = parsed.startCol; col <= parsed.endCol; col += 1) letters.push(columnLetter(col));
+  } catch {
+    letters = [];
+  }
+  const blocked = letters.filter((letter) => CAMPAIGN_SHEET_NEVER_WRITE.includes(letter));
+  if (blocked.length) {
+    throw new Error(`Refusing to write Marketing Holy Grail columns ${blocked.join(", ")}.`);
+  }
+  throw new Error("Campaign audience is read-only. Refusing to write the Marketing Holy Grail sheet.");
+}
+function emptyStats() {
+  return { sent: 0, delivered: 0, opened: 0, clicked: 0, unsubscribed: 0, replies: 0, failed: 0 };
+}
+function emptyEmail() {
+  return { enabled: true, mode: "builder", subject: "", preheader: "", html: "", blocks: [], scheduledAt: "" };
+}
+function emptySms() {
+  return { enabled: false, body: "", scheduledAt: "" };
+}
+function personName$1(person2) {
+  const name = `${person2.firstName} ${person2.lastName}`.trim();
+  return name || person2.email || person2.phone || "Contact";
+}
+function phoneDigits(value) {
+  let digits2 = String(value || "").replace(/\D/g, "");
+  if (digits2.length === 11 && digits2.startsWith("1")) digits2 = digits2.slice(1);
+  return digits2.length >= 10 ? digits2.slice(-10) : "";
+}
+function hasChannelSchedule(campaign) {
+  if (campaign.email.scheduledAt) return true;
+  if (campaign.sms.scheduledAt) return true;
+  return campaign.posts.some((post) => post.scheduledAt);
+}
+function statusChangeError(input) {
+  if (!CAMPAIGN_STATUSES.includes(input.to)) return "Unknown status.";
+  if (input.from === input.to) return null;
+  if (input.to === "approved") {
+    if (input.from === "scheduled") return null;
+    if (!input.isAdmin) return "Only an admin can approve a campaign.";
+    if (input.from !== "ready") return "Move the campaign to Ready for review before approving it.";
+    return null;
+  }
+  if (input.to === "scheduled") {
+    if (input.from !== "approved") return "Approve the campaign before scheduling it.";
+    if (!input.hasSchedule) return "Add a date on the email, text, or a post before scheduling.";
+    return null;
+  }
+  if (input.to === "sent") return "Sent is set by a live send.";
+  const allowed = {
+    idea: ["draft", "archived"],
+    draft: ["idea", "ready", "archived"],
+    ready: ["draft", "archived"],
+    approved: ["ready", "archived"],
+    scheduled: ["approved", "archived"],
+    sent: ["archived"],
+    archived: ["draft"]
+  };
+  if (!allowed[input.from].includes(input.to)) {
+    return `Cannot move from ${STATUS_LABEL[input.from]} to ${STATUS_LABEL[input.to]}.`;
+  }
+  if ((input.from === "approved" || input.from === "scheduled") && input.to === "ready" && !input.isAdmin) {
+    return "Only an admin can move an approved campaign back to review.";
+  }
+  return null;
+}
+new Set(`@£$¥èéùìòÇ
+Øø\rÅåΔ_ΦΓΛΩΠΨΣΘΞ\x1BÆæßÉ !"#¤%&'()*+,-./0123456789:;<=>?¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§¿abcdefghijklmnopqrstuvwxyzäöñüà`);
+new Set("^{}\\[~]|€");
+const STOP_WORDS = ["STOP", "STOPALL", "UNSUBSCRIBE", "CANCEL", "END", "QUIT"];
+function isStopKeyword(body) {
+  return STOP_WORDS.includes(body.trim().toUpperCase());
+}
+function campaignSmsBody(template, firstName) {
+  const name = firstName.trim() || "there";
+  let body = template.replace(/\{FirstName\}/g, name).trim();
+  if (!/\bSTOP\b/i.test(body)) body = `${body}
+Reply STOP to opt out.`.trim();
+  return body.slice(0, 1600);
+}
+function escapeHtml$a(value) {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+function compileBlocks(blocks, preheader) {
+  const hidden = preheader ? `<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">${escapeHtml$a(preheader)}</div>` : "";
+  const rows = blocks.map((block2) => {
+    if (block2.type === "heading") {
+      return `<h1 style="margin:0 0 12px;font-family:Inter,Arial,sans-serif;font-size:28px;line-height:1.2;color:#111827;">${escapeHtml$a(block2.text)}</h1>`;
+    }
+    if (block2.type === "image" && block2.url) {
+      return `<p style="margin:0 0 16px;"><img src="${escapeHtml$a(block2.url)}" alt="${escapeHtml$a(block2.text)}" style="max-width:100%;border-radius:12px;display:block;" /></p>`;
+    }
+    if (block2.type === "button" && block2.href) {
+      return `<p style="margin:0 0 16px;"><a href="${escapeHtml$a(block2.href)}" style="display:inline-block;background:#0d9488;color:#ffffff;font-family:Inter,Arial,sans-serif;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;text-decoration:none;padding:12px 18px;border-radius:12px;">${escapeHtml$a(block2.text || "Open")}</a></p>`;
+    }
+    return `<p style="margin:0 0 14px;font-family:Inter,Arial,sans-serif;font-size:16px;line-height:1.55;color:#1f2937;">${escapeHtml$a(block2.text)}</p>`;
+  }).join("");
+  return `<!DOCTYPE html><html><body style="margin:0;background:#f5f2ea;">${hidden}<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f5f2ea;"><tr><td align="center" style="padding:24px;"><table role="presentation" width="100%" style="max-width:560px;background:#ffffff;border-radius:16px;"><tr><td style="padding:28px;">${rows || `<p style="font-family:Inter,Arial,sans-serif;color:#1f2937;">Hello {FirstName},</p>`}</td></tr></table></td></tr></table></body></html>`;
+}
+function campaignHtml(email) {
+  if (email.mode === "html") {
+    const html = email.html || "";
+    if (email.preheader && !html.includes(email.preheader)) {
+      return `<div style="display:none;max-height:0;overflow:hidden;">${escapeHtml$a(email.preheader)}</div>${html}`;
+    }
+    return html;
+  }
+  return compileBlocks(email.blocks, email.preheader);
+}
+function renderCampaignEmail(email, person2, unsubscribeUrl) {
+  const values = mergeValues(person2, unsubscribeUrl);
+  const subject = applyMerge(email.subject || "Iconic Images", values);
+  const html = withUnsubscribeFooter(applyMerge(campaignHtml(email), values), unsubscribeUrl);
+  const text2 = [
+    applyMerge(email.preheader || email.subject || "", values),
+    `Hello ${person2.firstName || "there"},`,
+    "Iconic Images, 26410 Oakridge Dr. Ste 105 - 108, Spring, TX 77380",
+    `Unsubscribe: ${unsubscribeUrl}`
+  ].filter(Boolean).join("\n");
+  return { subject, html, text: text2 };
+}
+function toMarketingContact(person2, now) {
+  return {
+    email: normalizeEmail$1(person2.email),
+    firstName: person2.firstName,
+    lastName: person2.lastName,
+    company: person2.company,
+    phone: person2.phone,
+    tags: person2.tags,
+    custom: {},
+    source: person2.source === "sheet" ? "import" : person2.source,
+    clientId: "",
+    emailVerified: person2.emailVerified,
+    createdAt: now,
+    updatedAt: now
+  };
+}
+function suppressionBucket(entry2, doNotContact) {
+  if (doNotContact) return "doNotContact";
+  if (!entry2) return "ok";
+  if (entry2.reason === "unsubscribed") return "unsubscribe";
+  if (entry2.reason === "bounced") return "bounce";
+  return "doNotContact";
+}
+function buildChannelAudience(input) {
+  const now = input.sendAt || (/* @__PURE__ */ new Date()).toISOString();
+  const settings = input.settings || DEFAULT_MARKETING_SETTINGS;
+  const pool = input.segment ? input.people.filter((person2) => contactMatchesFilter(toMarketingContact(person2, now), input.segment.filter)) : input.people;
+  const counts2 = { emailCount: 0, smsCount: 0, smsOptedIn: 0, unsubscribe: 0, bounce: 0, doNotContact: 0, held: 0 };
+  const removed = [];
+  const emailCandidates = [];
+  const smsPeople = [];
+  const stops = new Set(input.phoneStops.map(phoneDigits).filter(Boolean));
+  for (const person2 of pool) {
+    const bucket2 = suppressionBucket(matchSuppression(toMarketingContact(person2, now), input.suppression), person2.doNotContact);
+    if (bucket2 === "unsubscribe") counts2.unsubscribe += 1;
+    if (bucket2 === "bounce") counts2.bounce += 1;
+    if (bucket2 === "doNotContact") counts2.doNotContact += 1;
+    if (bucket2 !== "ok") {
+      removed.push({ name: personName$1(person2), email: person2.email, reason: bucket2 === "doNotContact" ? "Do not contact" : bucket2 === "bounce" ? "Bounced" : "Unsubscribed" });
+    }
+    if (bucket2 === "ok" && isValidEmail(person2.email)) emailCandidates.push({ ...person2, email: normalizeEmail$1(person2.email) });
+    const phone = phoneDigits(person2.phone);
+    if (phone && person2.marketingSmsOptIn) counts2.smsOptedIn += 1;
+    const smsBlocked = !person2.marketingSmsOptIn || bucket2 === "doNotContact" || phone && stops.has(phone);
+    if (phone && !smsBlocked) smsPeople.push(person2);
+  }
+  const resolved = resolveAudience({
+    contacts: emailCandidates.map((person2) => toMarketingContact(person2, now)),
+    suppression: input.suppression,
+    sends: input.sends || [],
+    campaigns: input.overlap || [],
+    settings,
+    filter: null,
+    sendAt: now,
+    excludeCampaignId: input.excludeCampaignId
+  });
+  const emailAllowedSet = new Set(resolved.recipients.map((contact2) => contact2.email));
+  const emailPeople = emailCandidates.filter((person2) => emailAllowedSet.has(person2.email));
+  counts2.held = resolved.removed.filter((item) => item.reason === "frequency" || item.reason === "overlap" || item.reason === "duplicate" || item.reason === "invalid").length;
+  for (const item of resolved.removed) {
+    if (item.reason === "suppressed") continue;
+    removed.push({ name: item.name, email: item.email, reason: item.detail || item.reason });
+  }
+  counts2.emailCount = emailPeople.length;
+  counts2.smsCount = smsPeople.length;
+  const byEmail = /* @__PURE__ */ new Map();
+  for (const person2 of emailPeople) {
+    byEmail.set(person2.email, { name: personName$1(person2), email: person2.email, phone: phoneDigits(person2.phone), channels: ["email"] });
+  }
+  for (const person2 of smsPeople) {
+    const key = person2.email || phoneDigits(person2.phone);
+    const existing = byEmail.get(key);
+    if (existing) existing.channels.push("sms");
+    else byEmail.set(key, { name: personName$1(person2), email: person2.email, phone: phoneDigits(person2.phone), channels: ["sms"] });
+  }
+  return {
+    ...counts2,
+    recipients: [...byEmail.values()],
+    removed,
+    source: input.source || "contacts",
+    sheetConfigured: Boolean(input.sheetConfigured),
+    sheetNote: input.sheetNote || "",
+    truncated: Boolean(input.truncated),
+    emailPeople,
+    smsPeople
+  };
+}
+function planDelivery(campaign, audience, unsubscribeUrlFor) {
+  const lines = [];
+  if (campaign.email.enabled) {
+    for (const person2 of audience.emailPeople) {
+      const rendered = renderCampaignEmail(campaign.email, person2, unsubscribeUrlFor(person2.email));
+      lines.push({
+        channel: "email",
+        to: person2.email,
+        name: personName$1(person2),
+        detail: `${rendered.subject} — ${campaign.email.preheader || "no preheader"}`
+      });
+    }
+  }
+  if (campaign.sms.enabled) {
+    for (const person2 of audience.smsPeople) {
+      lines.push({
+        channel: "sms",
+        to: phoneDigits(person2.phone),
+        name: personName$1(person2),
+        detail: campaignSmsBody(campaign.sms.body, person2.firstName)
+      });
+    }
+  }
+  for (const post of campaign.posts) {
+    lines.push({
+      channel: "post",
+      to: post.platform,
+      name: campaign.name,
+      detail: post.copy
+    });
+  }
+  return lines;
+}
+function chicagoDay(isoOrDay) {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(isoOrDay)) return isoOrDay;
+  const ms = Date.parse(isoOrDay);
+  if (Number.isNaN(ms)) return "";
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago", year: "numeric", month: "2-digit", day: "2-digit" }).format(ms);
+}
+function calendarItems(campaigns) {
+  const items = [];
+  for (const campaign of campaigns) {
+    if (campaign.status === "archived") continue;
+    if (campaign.startsOn) {
+      items.push({ date: campaign.startsOn, campaignId: campaign.id, campaignName: campaign.name, channel: "window", label: "Starts" });
+    }
+    if (campaign.email.enabled && campaign.email.scheduledAt) {
+      const date = chicagoDay(campaign.email.scheduledAt);
+      if (date) items.push({ date, campaignId: campaign.id, campaignName: campaign.name, channel: "email", label: "Email" });
+    }
+    if (campaign.sms.enabled && campaign.sms.scheduledAt) {
+      const date = chicagoDay(campaign.sms.scheduledAt);
+      if (date) items.push({ date, campaignId: campaign.id, campaignName: campaign.name, channel: "sms", label: "Text" });
+    }
+    for (const post of campaign.posts) {
+      if (!post.scheduledAt) continue;
+      const date = chicagoDay(post.scheduledAt);
+      if (date) items.push({ date, campaignId: campaign.id, campaignName: campaign.name, channel: "post", label: post.platform });
+    }
+  }
+  return items.sort((a, b) => a.date.localeCompare(b.date) || a.campaignName.localeCompare(b.campaignName));
+}
+function batchItems(items, size = SEND_BATCH_SIZE) {
+  const batches = [];
+  for (let index = 0; index < items.length; index += size) batches.push(items.slice(index, index + size));
+  return batches;
+}
+const PLATFORM_SET$1 = new Set(POST_PLATFORMS.map((item) => item.id));
+function normalizeCampaign(raw, now, id) {
+  const status2 = CAMPAIGN_STATUSES.includes(raw.status) ? raw.status : "draft";
+  const email = { ...emptyEmail(), ...raw.email || {} };
+  email.mode = email.mode === "html" ? "html" : "builder";
+  email.blocks = Array.isArray(email.blocks) ? email.blocks.slice(0, 40).map((block2, index) => ({
+    id: String(block2?.id || `block-${index}`),
+    type: block2?.type === "heading" || block2?.type === "image" || block2?.type === "button" || block2?.type === "text" ? block2.type : "text",
+    text: String(block2?.text || "").slice(0, 5e3),
+    url: String(block2?.url || "").slice(0, 2e3),
+    href: String(block2?.href || "").slice(0, 2e3)
+  })) : [];
+  const sms = { ...emptySms(), ...raw.sms || {} };
+  const posts = Array.isArray(raw.posts) ? raw.posts.slice(0, 20).flatMap((post, index) => {
+    const platform = String(post?.platform || "");
+    if (!PLATFORM_SET$1.has(platform)) return [];
+    return [{
+      id: String(post?.id || `post-${index}`),
+      platform,
+      copy: String(post?.copy || "").slice(0, 5e3),
+      mediaUrl: String(post?.mediaUrl || "").slice(0, 2e3),
+      mediaName: String(post?.mediaName || "").slice(0, 180),
+      scheduledAt: String(post?.scheduledAt || ""),
+      queuedAt: String(post?.queuedAt || "")
+    }];
+  }) : [];
+  return {
+    id,
+    name: String(raw.name || "Untitled campaign").slice(0, 120),
+    purpose: String(raw.purpose || "").slice(0, 2e3),
+    status: status2,
+    ownerUid: String(raw.ownerUid || ""),
+    ownerName: String(raw.ownerName || "").slice(0, 120),
+    ownerEmail: normalizeEmail$1(raw.ownerEmail || ""),
+    startsOn: /^\d{4}-\d{2}-\d{2}$/.test(String(raw.startsOn || "")) ? String(raw.startsOn) : "",
+    endsOn: /^\d{4}-\d{2}-\d{2}$/.test(String(raw.endsOn || "")) ? String(raw.endsOn) : "",
+    segmentId: String(raw.segmentId || "").slice(0, 80),
+    email: {
+      ...email,
+      subject: String(email.subject || "").slice(0, 200),
+      preheader: String(email.preheader || "").slice(0, 200),
+      html: String(email.html || "").slice(0, 1e5),
+      scheduledAt: String(email.scheduledAt || ""),
+      enabled: email.enabled !== false
+    },
+    sms: {
+      enabled: Boolean(sms.enabled),
+      body: String(sms.body || "").slice(0, 1600),
+      scheduledAt: String(sms.scheduledAt || "")
+    },
+    posts,
+    stats: { ...emptyStats(), ...raw.stats || {} },
+    sentAt: String(raw.sentAt || ""),
+    createdAt: String(raw.createdAt || now),
+    updatedAt: now
+  };
+}
+function publicAudience(preview) {
+  return {
+    emailCount: preview.emailCount,
+    smsCount: preview.smsCount,
+    smsOptedIn: preview.smsOptedIn,
+    unsubscribe: preview.unsubscribe,
+    bounce: preview.bounce,
+    doNotContact: preview.doNotContact,
+    held: preview.held,
+    recipients: preview.recipients.slice(0, 50),
+    recipientTotal: preview.recipients.length,
+    removed: preview.removed.slice(0, 50),
+    source: preview.source,
+    sheetConfigured: preview.sheetConfigured,
+    sheetNote: preview.sheetNote,
+    truncated: preview.truncated
+  };
+}
+function emptyCounter() {
+  return { total: 0, byStatus: {} };
+}
+function applyCounter(counter, from, to, created) {
+  const byStatus = { ...counter.byStatus };
+  if (created && to) {
+    byStatus[to] = (byStatus[to] || 0) + 1;
+    return { total: counter.total + 1, byStatus };
+  }
+  if (from && to && from !== to) {
+    byStatus[from] = Math.max(0, (byStatus[from] || 0) - 1);
+    byStatus[to] = (byStatus[to] || 0) + 1;
+  }
+  return { total: counter.total, byStatus };
+}
+function createMemoryChannelCampaignStore() {
+  const campaigns = /* @__PURE__ */ new Map();
+  const logs = [];
+  const phones = /* @__PURE__ */ new Map();
+  const stops = /* @__PURE__ */ new Set();
+  const events = /* @__PURE__ */ new Set();
+  const queue = [];
+  let counter = emptyCounter();
+  return {
+    async list(limit, cursor) {
+      const sorted = [...campaigns.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+      const start = cursor ? sorted.findIndex((item) => item.id === cursor) + 1 : 0;
+      const page2 = sorted.slice(Math.max(0, start), Math.max(0, start) + limit);
+      const next = sorted[Math.max(0, start) + limit];
+      return { campaigns: page2, nextCursor: next?.id || "", counter };
+    },
+    async listAll(limit) {
+      return [...campaigns.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, limit);
+    },
+    async get(id) {
+      return campaigns.get(id) || null;
+    },
+    async save(campaign, previousStatus) {
+      const created = !campaigns.has(campaign.id);
+      campaigns.set(campaign.id, campaign);
+      counter = applyCounter(counter, created ? void 0 : previousStatus, campaign.status, created);
+    },
+    async addLog(log) {
+      logs.unshift(log);
+    },
+    async listLogs(campaignId, limit, cursor) {
+      const rows = logs.filter((log) => log.campaignId === campaignId);
+      const start = cursor ? rows.findIndex((log) => log.id === cursor) + 1 : 0;
+      const page2 = rows.slice(Math.max(0, start), Math.max(0, start) + limit);
+      const next = rows[Math.max(0, start) + limit];
+      return { logs: page2, nextCursor: next?.id || "" };
+    },
+    async bump(id, field, amount = 1) {
+      const campaign = campaigns.get(id);
+      if (!campaign) return;
+      campaign.stats = { ...campaign.stats, [field]: (campaign.stats[field] || 0) + amount };
+      campaigns.set(id, campaign);
+    },
+    async rememberPhone(phone, campaignId, at) {
+      const key = phoneDigits(phone);
+      if (!key) return;
+      phones.set(key, { phone: key, campaignId, updatedAt: at });
+    },
+    async phoneIndex(phone) {
+      return phones.get(phoneDigits(phone)) || null;
+    },
+    async suppressPhone(phone, at) {
+      const key = phoneDigits(phone);
+      if (!key) return;
+      stops.add(key);
+    },
+    async clearPhoneStop(phone) {
+      const key = phoneDigits(phone);
+      if (key) stops.delete(key);
+    },
+    async phoneStops() {
+      return [...stops];
+    },
+    async markEvent(id) {
+      if (events.has(id)) return false;
+      events.add(id);
+      return true;
+    },
+    async queuePost(item) {
+      const existing = queue.findIndex((row) => row.id === item.id);
+      if (existing >= 0) queue[existing] = item;
+      else queue.unshift(item);
+    },
+    async listQueue(limit) {
+      return queue.slice(0, limit);
+    }
+  };
+}
+const memoryStore$2 = createMemoryChannelCampaignStore();
+function getChannelCampaignStore() {
+  if (process.env.CHANNEL_CAMPAIGN_STORE === "memory" || !admin.apps.length) return memoryStore$2;
+  return firestoreStore$2;
+}
+function db$E() {
+  return admin.firestore();
+}
+const COL = "channelCampaigns";
+const firestoreStore$2 = {
+  async list(limit, cursor) {
+    let query = db$E().collection(COL).orderBy("updatedAt", "desc").limit(limit);
+    if (cursor) {
+      const cursorDoc = await db$E().collection(COL).doc(cursor).get();
+      if (cursorDoc.exists) query = query.startAfter(cursorDoc);
+    }
+    const [snap, counterDoc] = await Promise.all([
+      query.get(),
+      db$E().collection("channelCampaignCounters").doc("summary").get()
+    ]);
+    const campaigns = snap.docs.map((doc) => doc.data());
+    const counter = counterDoc.exists ? counterDoc.data() : emptyCounter();
+    const nextCursor = snap.size === limit ? snap.docs[snap.docs.length - 1]?.id || "" : "";
+    return { campaigns, nextCursor, counter };
+  },
+  async listAll(limit) {
+    const snap = await db$E().collection(COL).orderBy("updatedAt", "desc").limit(limit).get();
+    return snap.docs.map((doc) => doc.data());
+  },
+  async get(id) {
+    const doc = await db$E().collection(COL).doc(id).get();
+    return doc.exists ? doc.data() : null;
+  },
+  async save(campaign, previousStatus) {
+    const ref = db$E().collection(COL).doc(campaign.id);
+    const counterRef = db$E().collection("channelCampaignCounters").doc("summary");
+    await db$E().runTransaction(async (tx) => {
+      const existing = await tx.get(ref);
+      const counterSnap = await tx.get(counterRef);
+      const counter = counterSnap.exists ? counterSnap.data() : emptyCounter();
+      const created = !existing.exists;
+      const from = created ? void 0 : previousStatus || existing.data()?.status;
+      tx.set(ref, campaign);
+      tx.set(counterRef, applyCounter(counter, from, campaign.status, created));
+    });
+  },
+  async addLog(log) {
+    await db$E().collection(COL).doc(log.campaignId).collection("logs").doc(log.id).set(log);
+  },
+  async listLogs(campaignId, limit, cursor) {
+    let query = db$E().collection(COL).doc(campaignId).collection("logs").orderBy(admin.firestore.FieldPath.documentId(), "desc").limit(limit);
+    if (cursor) {
+      const cursorDoc = await db$E().collection(COL).doc(campaignId).collection("logs").doc(cursor).get();
+      if (cursorDoc.exists) query = query.startAfter(cursorDoc);
+    }
+    const snap = await query.get();
+    return {
+      logs: snap.docs.map((doc) => doc.data()),
+      nextCursor: snap.size === limit ? snap.docs[snap.docs.length - 1]?.id || "" : ""
+    };
+  },
+  async bump(id, field, amount = 1) {
+    await db$E().collection(COL).doc(id).update({ [`stats.${field}`]: admin.firestore.FieldValue.increment(amount) });
+  },
+  async rememberPhone(phone, campaignId, at) {
+    const key = phoneDigits(phone);
+    if (!key) return;
+    await db$E().collection("channelSmsIndex").doc(key).set({ phone: key, campaignId, updatedAt: at });
+  },
+  async phoneIndex(phone) {
+    const key = phoneDigits(phone);
+    if (!key) return null;
+    const doc = await db$E().collection("channelSmsIndex").doc(key).get();
+    return doc.exists ? doc.data() : null;
+  },
+  async suppressPhone(phone, at) {
+    const key = phoneDigits(phone);
+    if (!key) return;
+    await db$E().collection("channelSmsStops").doc(key).set({ phone: key, at, reason: "stop" });
+  },
+  async clearPhoneStop(phone) {
+    const key = phoneDigits(phone);
+    if (!key) return;
+    await db$E().collection("channelSmsStops").doc(key).delete();
+  },
+  async phoneStops() {
+    const stops = [];
+    let cursor = null;
+    for (let page2 = 0; page2 < 10; page2 += 1) {
+      let query = db$E().collection("channelSmsStops").orderBy(admin.firestore.FieldPath.documentId()).limit(200);
+      if (cursor) query = query.startAfter(cursor);
+      const snap = await query.get();
+      stops.push(...snap.docs.map((doc) => doc.id));
+      if (snap.size < 200) break;
+      cursor = snap.docs[snap.docs.length - 1];
+    }
+    return stops;
+  },
+  async markEvent(id) {
+    const ref = db$E().collection("channelCampaignEvents").doc(id);
+    return db$E().runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      if (snap.exists) return false;
+      tx.set(ref, { id, at: (/* @__PURE__ */ new Date()).toISOString() });
+      return true;
+    });
+  },
+  async queuePost(item) {
+    await db$E().collection("socialHandoff").doc(item.id).set(item);
+  },
+  async listQueue(limit) {
+    const snap = await db$E().collection("socialHandoff").orderBy("createdAt", "desc").limit(limit).get();
+    return snap.docs.map((doc) => doc.data());
+  }
+};
+async function noteCampaignSmsInbound(from, body) {
+  const store = getChannelCampaignStore();
+  const at = (/* @__PURE__ */ new Date()).toISOString();
+  const phone = phoneDigits(from);
+  if (!phone) return;
+  if (isStopKeyword(body)) await store.suppressPhone(from, at);
+  const index = await store.phoneIndex(from);
+  if (!index) return;
+  if (isStopKeyword(body)) await store.bump(index.campaignId, "unsubscribed");
+  else if (!["HELP", "INFO"].includes(body.trim().toUpperCase())) await store.bump(index.campaignId, "replies");
+}
+async function recordCampaignUnsubscribe(campaignId, email) {
+  const store = getChannelCampaignStore();
+  const campaign = await store.get(campaignId);
+  if (!campaign) return;
+  const fresh = await store.markEvent(`${campaignId}_${email}_unsubscribe`);
+  if (fresh) await store.bump(campaignId, "unsubscribed");
+}
+const memoryOptIns = /* @__PURE__ */ new Map();
+const memoryStops = /* @__PURE__ */ new Set();
+function useMemory$3() {
+  return !admin.apps?.length;
+}
+function splitName(name) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  return { firstName: parts[0] || "", lastName: parts.slice(1).join(" ") };
+}
+function stamp$2(existing) {
+  return existing || (/* @__PURE__ */ new Date()).toISOString();
+}
+async function isSmsStopped(phone) {
+  const digits2 = phoneDigits10(phone);
+  if (!digits2) return false;
+  if (memoryStops.has(digits2)) return true;
+  if (useMemory$3()) return false;
+  try {
+    const snap = await admin.firestore().collection("smsStops").doc(digits2).get();
+    return snap.exists && snap.data()?.stopped !== false;
+  } catch (error) {
+    console.error("[SMS] Stop lookup failed:", error);
+    return false;
+  }
+}
+async function rememberStop(digits2, at) {
+  memoryStops.add(digits2);
+  const existing = memoryOptIns.get(digits2);
+  if (existing) {
+    memoryOptIns.set(digits2, {
+      ...existing,
+      marketingSmsOptIn: false,
+      smsOptIn: false,
+      smsStopped: true,
+      stoppedAt: at,
+      updatedAt: at
+    });
+  }
+  if (useMemory$3()) return;
+  const db2 = admin.firestore();
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  await db2.collection("smsStops").doc(digits2).set({
+    phone: digits2,
+    stopped: true,
+    stoppedAt: now,
+    source: "inbound",
+    updatedAt: now
+  }, { merge: true });
+  await db2.collection("marketingSmsOptIns").doc(digits2).set({
+    phone: digits2,
+    marketingSmsOptIn: false,
+    smsOptIn: false,
+    smsStopped: true,
+    stoppedAt: now,
+    updatedAt: now
+  }, { merge: true });
+}
+async function patchPeople(digits2, patch) {
+  const values = phoneLookupValues(digits2);
+  if (!useMemory$3() && values.length) {
+    const db2 = admin.firestore();
+    const now = admin.firestore.FieldValue.serverTimestamp();
+    const firestorePatch = { ...patch, updatedAt: now };
+    for (const collection of ["clients", "marketingContacts"]) {
+      const snap = await db2.collection(collection).where("phone", "in", values).limit(20).get();
+      await Promise.all(snap.docs.map((doc) => doc.ref.set(firestorePatch, { merge: true })));
+    }
+  }
+  try {
+    const store = getMarketingStore();
+    const contacts = await store.listContacts();
+    let changed = false;
+    for (const contact2 of contacts) {
+      if (phoneDigits10(contact2.phone) !== digits2) continue;
+      Object.assign(contact2, {
+        marketingSmsOptIn: patch.marketingSmsOptIn === true,
+        smsStopped: patch.smsStopped === true,
+        updatedAt: (/* @__PURE__ */ new Date()).toISOString()
+      });
+      changed = true;
+    }
+    if (changed) await store.saveContacts(contacts);
+  } catch (error) {
+    console.error("[SMS] Contact opt-in update failed:", error);
+  }
+}
+async function saveMarketingOptIn(input) {
+  const phone = phoneDigits10(input.phone);
+  const name = input.name.trim().slice(0, 120);
+  const { firstName, lastName } = splitName(name);
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  const prior = memoryOptIns.get(phone);
+  const record2 = {
+    phone,
+    name,
+    firstName,
+    lastName,
+    marketingSmsOptIn: true,
+    smsOptIn: true,
+    smsStopped: false,
+    consentText: MARKETING_SMS_CONSENT_TEXT,
+    consentTextVersion: MARKETING_SMS_CONSENT_VERSION,
+    source: "/sms",
+    ip: input.ip.slice(0, 80),
+    userAgent: input.userAgent.slice(0, 400),
+    createdAt: stamp$2(prior?.createdAt),
+    updatedAt: now
+  };
+  memoryOptIns.set(phone, record2);
+  memoryStops.delete(phone);
+  if (!useMemory$3()) {
+    const db2 = admin.firestore();
+    const serverNow = admin.firestore.FieldValue.serverTimestamp();
+    await db2.collection("marketingSmsOptIns").doc(phone).set({
+      ...record2,
+      createdAt: prior ? record2.createdAt : serverNow,
+      updatedAt: serverNow
+    }, { merge: true });
+    await db2.collection("smsStops").doc(phone).set({
+      phone,
+      stopped: false,
+      clearedAt: serverNow
+    }, { merge: true });
+  }
+  await patchPeople(phone, {
+    smsOptIn: true,
+    marketingSmsOptIn: true,
+    smsStopped: false,
+    marketingSmsConsentVersion: MARKETING_SMS_CONSENT_VERSION,
+    marketingSmsConsentSource: "/sms"
+  });
+  try {
+    await getChannelCampaignStore().clearPhoneStop(phone);
+  } catch (error) {
+    console.error("[SMS] Clearing a prior STOP failed:", error);
+  }
+  return record2;
+}
+async function optOutEverywhere(from) {
+  const digits2 = phoneDigits10(from);
+  if (!digits2) return;
+  const at = (/* @__PURE__ */ new Date()).toISOString();
+  await rememberStop(digits2, at);
+  await patchPeople(digits2, {
+    smsOptIn: false,
+    marketingSmsOptIn: false,
+    smsStopped: true
+  });
+  try {
+    await getChannelCampaignStore().suppressPhone(from, at);
+  } catch (error) {
+    console.error("[SMS] Campaign stop index failed:", error);
+  }
+}
+function marketingRecipientAllowed(record2) {
+  return Boolean(record2.phone) && explicitMarketingSmsOptIn(record2);
+}
 const PLAYTEST_ADDRESS = "100 Playtest Lane, Austin, TX 78701";
 const STAFF_ROLES$1 = ["admin", "coordinator", "photographer", "editor"];
-function normalizeEmail$1(value) {
+function normalizeEmail(value) {
   return String(value || "").trim().toLowerCase();
 }
 function cleanPersonName(value) {
@@ -3145,8 +5351,8 @@ function clientCanViewListing(listing, identity) {
   if (!listing || !identity?.uid) return false;
   const ids = /* @__PURE__ */ new Set([identity.uid, ...identity.ids || []]);
   if (listing.clientId && ids.has(String(listing.clientId))) return true;
-  const email = normalizeEmail$1(identity.email);
-  const listingEmail = normalizeEmail$1(listing.clientEmail);
+  const email = normalizeEmail(identity.email);
+  const listingEmail = normalizeEmail(listing.clientEmail);
   return Boolean(email && listingEmail && email === listingEmail);
 }
 function buildBookingInvoiceDraft(input) {
@@ -3174,7 +5380,7 @@ function buildBookingInvoiceDraft(input) {
       orderRequestId: input.orderRequestId || null,
       orderId: null,
       clientId: input.clientId || null,
-      clientEmail: normalizeEmail$1(input.clientEmail),
+      clientEmail: normalizeEmail(input.clientEmail),
       clientName: input.clientName,
       lineItems,
       subtotal: priced.subtotal,
@@ -3197,7 +5403,7 @@ function buildBookingInvoiceDraft(input) {
     orderRequestId: input.orderRequestId || null,
     orderId: null,
     clientId: input.clientId || null,
-    clientEmail: normalizeEmail$1(input.clientEmail),
+    clientEmail: normalizeEmail(input.clientEmail),
     clientName: input.clientName,
     lineItems: copiedLines,
     subtotal: input.travel ? total : Number(input.pricing?.subtotal ?? total) || 0,
@@ -4585,17 +6791,17 @@ async function listCalendarScheduleEvents({
   const readFailures = results.filter((result) => result.status === "rejected").length;
   return { configured: true, events, readFailures };
 }
-const db$F = () => admin.firestore();
+const db$D = () => admin.firestore();
 async function upsertPortalClient(input) {
-  const email = normalizeEmail$1(input.email);
+  const email = normalizeEmail(input.email);
   const firstName = cleanPersonName(input.firstName);
   const lastName = cleanPersonName(input.lastName);
   const phone = String(input.phone || "").trim().slice(0, 40);
   const now = admin.firestore.FieldValue.serverTimestamp();
-  const existing = email ? await db$F().collection("clients").where("email", "==", email).limit(5).get() : null;
+  const existing = email ? await db$D().collection("clients").where("email", "==", email).limit(5).get() : null;
   const linked = existing?.docs.find((doc) => doc.id !== input.uid);
   const linkedData = linked?.data() || {};
-  const uidRef = db$F().collection("clients").doc(input.uid);
+  const uidRef = db$D().collection("clients").doc(input.uid);
   const uidSnap = await uidRef.get();
   const previous = uidSnap.exists ? uidSnap.data() || {} : {};
   await uidRef.set({
@@ -4627,27 +6833,27 @@ async function upsertPortalClient(input) {
 }
 async function resolveClientIdentity(uid, email) {
   const ids = /* @__PURE__ */ new Set([uid]);
-  const direct = await db$F().collection("clients").doc(uid).get();
+  const direct = await db$D().collection("clients").doc(uid).get();
   let profile = direct.exists ? { id: direct.id, ...direct.data() } : null;
   const redirectId = typeof profile?._redirect === "string" ? profile._redirect : "";
   if (redirectId) ids.add(redirectId);
   const linkedId = typeof profile?.linkedClientId === "string" ? profile.linkedClientId : "";
   if (linkedId) ids.add(linkedId);
-  const byUid = await db$F().collection("clients").where("firebaseUid", "==", uid).limit(10).get();
+  const byUid = await db$D().collection("clients").where("firebaseUid", "==", uid).limit(10).get();
   for (const doc of byUid.docs) {
     ids.add(doc.id);
     if (!profile) profile = { id: doc.id, ...doc.data() };
   }
-  const normalized = normalizeEmail$1(email || profile?.email);
+  const normalized = normalizeEmail(email || profile?.email);
   if (normalized) {
-    const matches = await db$F().collection("clients").where("email", "==", normalized).limit(10).get();
+    const matches = await db$D().collection("clients").where("email", "==", normalized).limit(10).get();
     for (const doc of matches.docs) {
       ids.add(doc.id);
       if (!profile) profile = { id: doc.id, ...doc.data() };
     }
   }
   if (redirectId && profile && !profile.email) {
-    const real = await db$F().collection("clients").doc(redirectId).get();
+    const real = await db$D().collection("clients").doc(redirectId).get();
     if (real.exists) profile = { id: real.id, ...real.data(), portalDocId: uid };
   }
   return { ids: [...ids], profile, email: normalized };
@@ -4676,16 +6882,16 @@ function planBookingAccount(input) {
     skipReason: null
   };
 }
-const db$E = () => admin.firestore();
+const db$C = () => admin.firestore();
 async function attachBookingClient(input) {
-  const email = normalizeEmail$1(input.email);
+  const email = normalizeEmail(input.email);
   if (!email || !email.includes("@")) {
     return { clientId: null, createdAccount: false, passwordSetupLink: null, skipReason: "invalid_email" };
   }
   const firstName = cleanPersonName(input.firstName) || "Client";
   const lastName = cleanPersonName(input.lastName);
   const phone = String(input.phone || "").trim().slice(0, 40);
-  const staffHit = await db$E().collection("staff").where("email", "==", email).limit(1).get();
+  const staffHit = await db$C().collection("staff").where("email", "==", email).limit(1).get();
   let authUid = null;
   if (staffHit.empty) {
     try {
@@ -4767,7 +6973,7 @@ async function sendFirebasePasswordEmail(email) {
 }
 async function createRequestedAppointment(input) {
   const now = admin.firestore.FieldValue.serverTimestamp();
-  await db$E().collection("appointments").add({
+  await db$C().collection("appointments").add({
     orderRequestId: input.orderRequestId,
     clientId: input.clientId,
     clientName: input.clientName,
@@ -4783,6 +6989,8 @@ async function createRequestedAppointment(input) {
     status: "requested",
     source: "booking_form",
     notes: input.notes,
+    smsConsent: input.smsConsent === true,
+    smsConsentTextVersion: input.smsConsent === true ? input.smsConsentTextVersion || null : null,
     createdAt: now,
     updatedAt: now
   });
@@ -5094,17 +7302,17 @@ function cardSummaryFrom(data) {
     expYear: Number(card.expYear) || 0
   };
 }
-function normalizePersonName$1(value) {
+function normalizePersonName(value) {
   return value.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
 }
 function directoryNeedles(query) {
-  return query.split(",").map((part) => normalizePersonName$1(part)).filter(Boolean);
+  return query.split(",").map((part) => normalizePersonName(part)).filter(Boolean);
 }
 function directoryHit(profile, query, role) {
   if (role && role !== "all" && profile.role !== role) return false;
   const needles = directoryNeedles(query);
   if (needles.length === 0) return true;
-  const hay = normalizePersonName$1(`${profile.displayName} ${profile.legalName} ${profile.email} ${ROLE_LABEL[profile.role]}`);
+  const hay = normalizePersonName(`${profile.displayName} ${profile.legalName} ${profile.email} ${ROLE_LABEL[profile.role]}`);
   return needles.some((needle) => hay.includes(needle));
 }
 function groupDelivery(group, senderUid) {
@@ -5624,7 +7832,7 @@ function fillEmptyListingFields(existing, desired) {
 }
 function clientOwnsListing(listing, clients) {
   const clientId2 = text$x(listing.clientId);
-  const email = normalizeEmail$1(listing.clientEmail || listing.email);
+  const email = normalizeEmail(listing.clientEmail || listing.email);
   if (!clientId2 && !email) return true;
   if (clientId2 && clients.ids.includes(clientId2)) return true;
   return Boolean(email && clients.emails.includes(email));
@@ -5729,7 +7937,7 @@ function clientsFor(group, identity) {
     if (id) ids.add(id);
   };
   const addEmail = (value) => {
-    const email = normalizeEmail$1(value);
+    const email = normalizeEmail(value);
     if (email) emails.add(email);
   };
   for (const id of identity?.ids || []) addId(id);
@@ -5870,10 +8078,10 @@ function clientId(group, identity) {
   return bookingIds.find((id) => identityIds2.includes(id)) || bookingIds[0] || identityIds2[0] || "";
 }
 function clientEmail(group, identity) {
-  const identityEmail = normalizeEmail$1(identity?.email);
+  const identityEmail = normalizeEmail(identity?.email);
   if (identityEmail) return identityEmail;
   for (const doc of propertyDocs(group)) {
-    const email = normalizeEmail$1(doc.data.clientEmail || doc.data.email);
+    const email = normalizeEmail(doc.data.clientEmail || doc.data.email);
     if (email) return email;
   }
   return "";
@@ -6088,7 +8296,7 @@ function visibleToPortalClient(record2, identity) {
   return recordVisibleToIdentity(record2, {
     ids: identity.ids,
     firebaseUid: identity.ids[0] || null,
-    email: normalizeEmail$1(identity.email),
+    email: normalizeEmail(identity.email),
     ...Array.isArray(identity.otherClientIds) ? { otherClientIds: identity.otherClientIds } : {}
   });
 }
@@ -6107,7 +8315,7 @@ async function otherKnownClientIds(db2, records, identityIds2) {
   }));
   return knownClientIds(docs, identityIds2);
 }
-const db$D = () => admin.firestore();
+const db$B = () => admin.firestore();
 const LINK_COLLECTIONS = /* @__PURE__ */ new Set([
   "orderRequests",
   "orders",
@@ -6128,7 +8336,7 @@ const LOCK_FIELDS = /* @__PURE__ */ new Set(["lockDownloads", "requirePayment", 
 async function ensureBookingListingForRequest(orderRequestId) {
   const id = orderRequestId.trim();
   if (!id) return null;
-  const snap = await db$D().collection("orderRequests").doc(id).get();
+  const snap = await db$B().collection("orderRequests").doc(id).get();
   if (!snap.exists) return null;
   const request = asDoc(snap.id, snap.data());
   const bundle = await hydrateBundle({
@@ -6140,7 +8348,7 @@ async function ensureBookingListingForRequest(orderRequestId) {
   });
   const identity = {
     ids: text$v(request.data.clientId) ? [text$v(request.data.clientId)] : [],
-    email: normalizeEmail$1(request.data.clientEmail || request.data.email)
+    email: normalizeEmail(request.data.clientEmail || request.data.email)
   };
   const plans = await plansFor(bundle, identity);
   const primary = plans.find((plan) => plan.createFields.orderRequestId === id) || plans[0];
@@ -6158,7 +8366,7 @@ async function ensureBookingListingForRequest(orderRequestId) {
 }
 async function ensurePortalListingsForClient(identity) {
   const ids = [...new Set(identity.ids.map((id) => id.trim()).filter(Boolean))];
-  const email = normalizeEmail$1(identity.email);
+  const email = normalizeEmail(identity.email);
   if (ids.length === 0 && !email) return { created: 0 };
   const portal = { ids, email };
   const seeds = await loadVisibleSeeds(portal);
@@ -6182,7 +8390,7 @@ async function plansFor(bundle, identity) {
 }
 async function applyBookingListingPlan(plan) {
   if (!isPortalListingId(plan.listingId)) throw new Error("Listing id is not valid.");
-  const ref = db$D().collection("listings").doc(plan.listingId);
+  const ref = db$B().collection("listings").doc(plan.listingId);
   let created = false;
   if (plan.create) {
     try {
@@ -6218,7 +8426,7 @@ async function fillListing(ref, desired) {
 }
 async function linkRecord(collectionName2, id, listingId) {
   if (!LINK_COLLECTIONS.has(collectionName2) || !id) return;
-  const ref = db$D().collection(collectionName2).doc(id);
+  const ref = db$B().collection(collectionName2).doc(id);
   const snap = await ref.get();
   if (!snap.exists) return;
   if (text$v(snap.data()?.listingId) === listingId) return;
@@ -6257,7 +8465,7 @@ async function loadVisibleSeeds(identity) {
   await Promise.all(jobs);
   let otherClientIds;
   try {
-    otherClientIds = await otherKnownClientIds(db$D(), [
+    otherClientIds = await otherKnownClientIds(db$B(), [
       ...requests.values(),
       ...orders.values(),
       ...invoices.values(),
@@ -6356,7 +8564,7 @@ async function hydrateBundle(seed2) {
 }
 async function loadListingsForGroups(identity, groups) {
   const found = /* @__PURE__ */ new Map();
-  const email = normalizeEmail$1(identity.email);
+  const email = normalizeEmail(identity.email);
   if (identity.ids.length) mergeDocs(found, await queryIn("listings", "clientId", identity.ids));
   if (email) mergeDocs(found, await queryEqual$1("listings", "clientEmail", email));
   const directIds = /* @__PURE__ */ new Set();
@@ -6392,7 +8600,7 @@ async function followInvoiceRedirects(invoices) {
 async function readMissing(collectionName2, ids, into) {
   const missing = [...ids].filter((id) => id && !into.has(id)).slice(0, 100);
   if (missing.length === 0) return;
-  const snaps = await db$D().getAll(...missing.map((id) => db$D().collection(collectionName2).doc(id)));
+  const snaps = await db$B().getAll(...missing.map((id) => db$B().collection(collectionName2).doc(id)));
   snaps.forEach((snap) => {
     if (!snap.exists || into.has(snap.id)) return;
     into.set(snap.id, asDoc(snap.id, snap.data()));
@@ -6402,14 +8610,14 @@ async function queryIn(collectionName2, field, values) {
   const unique2 = [...new Set(values.map((value) => value.trim()).filter(Boolean))];
   const docs = [];
   for (const part of chunk$1(unique2, 30)) {
-    const snap = await db$D().collection(collectionName2).where(field, "in", part).limit(100).get();
+    const snap = await db$B().collection(collectionName2).where(field, "in", part).limit(100).get();
     snap.docs.forEach((doc) => docs.push(asDoc(doc.id, doc.data())));
   }
   return docs;
 }
 async function queryEqual$1(collectionName2, field, value) {
   if (!value) return [];
-  const snap = await db$D().collection(collectionName2).where(field, "==", value).limit(100).get();
+  const snap = await db$B().collection(collectionName2).where(field, "==", value).limit(100).get();
   return snap.docs.map((doc) => asDoc(doc.id, doc.data()));
 }
 function mergeDocs(into, docs) {
@@ -6543,13 +8751,13 @@ function preferenceName(id) {
   if (id === NO_PREFERENCE_ID) return NO_PREFERENCE_NAME;
   return bookingPhotographerById(id)?.name || NO_PREFERENCE_NAME;
 }
-const db$C = () => admin.firestore();
+const db$A = () => admin.firestore();
 async function assignBookingPhotographerToListing(listingId, request) {
   const id = listingId.trim();
   const publicId = typeof request.bookingPhotographerId === "string" ? request.bookingPhotographerId.trim() : "";
   if (!id || !publicId) return { uid: null, publicId };
   const person2 = bookingPhotographerById(publicId);
-  const staffSnap = await db$C().collection("staff").limit(200).get();
+  const staffSnap = await db$A().collection("staff").limit(200).get();
   const staff = staffSnap.docs.map((doc) => {
     const data = doc.data() || {};
     return {
@@ -6567,7 +8775,7 @@ async function assignBookingPhotographerToListing(listingId, request) {
   });
   const patch = listingPhotographerAssignment(resolved);
   if (!patch) return { uid: null, publicId };
-  await db$C().collection("listings").doc(id).set({
+  await db$A().collection("listings").doc(id).set({
     ...patch,
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
   }, { merge: true });
@@ -7084,7 +9292,7 @@ function officeNewOrderEmail(saved, options) {
   const subjectCore = `New order ${orderNumber2} — ${packageName} — ${address} — ${requestedDate}`;
   const subject = isTestOrder(clientName2, notes) ? `[TEST] ${subjectCore}` : subjectCore;
   const plain = fields.map(([label, value]) => `${label}: ${value}`).join("\n");
-  const html = `<div style="font-family:Arial,sans-serif;max-width:640px;color:#111"><h1 style="font-size:18px">${escapeHtml$b(subject)}</h1><table style="width:100%;border-collapse:collapse">${fields.map(([label, value]) => `<tr><td style="padding:6px 10px;border-bottom:1px solid #eee;font-weight:bold;vertical-align:top">${escapeHtml$b(label)}</td><td style="padding:6px 10px;border-bottom:1px solid #eee;white-space:pre-wrap">${escapeHtml$b(value)}</td></tr>`).join("")}</table></div>`;
+  const html = `<div style="font-family:Arial,sans-serif;max-width:640px;color:#111"><h1 style="font-size:18px">${escapeHtml$9(subject)}</h1><table style="width:100%;border-collapse:collapse">${fields.map(([label, value]) => `<tr><td style="padding:6px 10px;border-bottom:1px solid #eee;font-weight:bold;vertical-align:top">${escapeHtml$9(label)}</td><td style="padding:6px 10px;border-bottom:1px solid #eee;white-space:pre-wrap">${escapeHtml$9(value)}</td></tr>`).join("")}</table></div>`;
   return { subject, text: plain, html, orderNumber: orderNumber2, packageName };
 }
 function isTestOrder(clientName2, notes) {
@@ -7321,7 +9529,7 @@ function nested(value) {
 function text$r(value) {
   return typeof value === "string" ? value.trim() : "";
 }
-function escapeHtml$b(value) {
+function escapeHtml$9(value) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 const OFFICE_NEW_ORDER_EMAIL_TEMPLATE = "office_new_order";
@@ -7524,7 +9732,7 @@ function notificationEnabled(settings, key) {
 function text$q(value) {
   return typeof value === "string" ? value.trim() : "";
 }
-function escapeHtml$a(value) {
+function escapeHtml$8(value) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 function money$5(value) {
@@ -7540,7 +9748,7 @@ function firstText$1(record2, keys) {
   }
   return "";
 }
-function personName$2(record2) {
+function personName(record2) {
   const first = firstText$1(record2, ["firstName", "clientFirstName"]);
   const last = firstText$1(record2, ["lastName", "clientLastName"]);
   const full = firstText$1(record2, ["clientName", "customerName", "fullName"]) || `${first} ${last}`.trim();
@@ -7680,7 +9888,7 @@ function googleCalendarLink(input) {
   return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }
 function contextFromRecord(record2, extras = {}) {
-  const person2 = personName$2(record2);
+  const person2 = personName(record2);
   const id = extras.id || text$q(record2.id);
   const requestId = extras.requestId || text$q(record2.orderRequestId) || (extras.collection === "orderRequests" ? id : "");
   const orderId = text$q(record2.orderId) || (extras.collection === "orders" ? id : text$q(record2.id));
@@ -7799,15 +10007,15 @@ function p(html) {
   return `<div style="margin:0 0 12px;">${html}</div>`;
 }
 function orderDetailsHtml(ctx) {
-  const rows = ctx.lineItems.map((item) => `<tr><td style="padding:6px 0;color:#333;">${escapeHtml$a(item.name)}</td><td style="padding:6px 0;text-align:right;">${escapeHtml$a(item.price)}</td></tr>`).join("");
+  const rows = ctx.lineItems.map((item) => `<tr><td style="padding:6px 0;color:#333;">${escapeHtml$8(item.name)}</td><td style="padding:6px 0;text-align:right;">${escapeHtml$8(item.price)}</td></tr>`).join("");
   return `
     <div style="margin:16px 0;padding:16px;border:1px solid #eee;border-radius:8px;">
-      <div style="font-weight:bold;margin-bottom:8px;">Order ${escapeHtml$a(orderCode(ctx))}</div>
-      <div>${escapeHtml$a(ctx.address || "Address not on the order")}</div>
+      <div style="font-weight:bold;margin-bottom:8px;">Order ${escapeHtml$8(orderCode(ctx))}</div>
+      <div>${escapeHtml$8(ctx.address || "Address not on the order")}</div>
       ${rows ? `<table style="width:100%;border-collapse:collapse;margin-top:8px;">${rows}</table>` : ""}
-      ${ctx.total ? `<div style="margin-top:8px;"><strong>Total:</strong> ${escapeHtml$a(ctx.total)}</div>` : ""}
-      ${ctx.balanceDue ? `<div><strong>Balance due:</strong> ${escapeHtml$a(ctx.balanceDue)}</div>` : ""}
-      <div style="margin-top:12px;">Please remember: <strong>${escapeHtml$a(INVOICE_LICENSE_NOTE)}</strong></div>
+      ${ctx.total ? `<div style="margin-top:8px;"><strong>Total:</strong> ${escapeHtml$8(ctx.total)}</div>` : ""}
+      ${ctx.balanceDue ? `<div><strong>Balance due:</strong> ${escapeHtml$8(ctx.balanceDue)}</div>` : ""}
+      <div style="margin-top:12px;">Please remember: <strong>${escapeHtml$8(INVOICE_LICENSE_NOTE)}</strong></div>
     </div>
   `;
 }
@@ -7816,9 +10024,9 @@ function appointmentsHtml(ctx) {
   return `
     <div style="margin:16px 0;">
       <div style="font-weight:bold;">Appointment</div>
-      <div>${escapeHtml$a(ctx.appointmentWhen || "Time to be confirmed")}</div>
-      <div>${escapeHtml$a(ctx.address)}</div>
-      ${ctx.photographerName ? `<div>Photographer: ${escapeHtml$a(ctx.photographerName)}</div>` : ""}
+      <div>${escapeHtml$8(ctx.appointmentWhen || "Time to be confirmed")}</div>
+      <div>${escapeHtml$8(ctx.address)}</div>
+      ${ctx.photographerName ? `<div>Photographer: ${escapeHtml$8(ctx.photographerName)}</div>` : ""}
     </div>
   `;
 }
@@ -7830,33 +10038,33 @@ function calendarLinksHtml(ctx) {
     details: `Order ${ctx.orderNumber}`.trim()
   });
   const links = [
-    ctx.calendarUrl ? `<a href="${escapeHtml$a(ctx.calendarUrl)}">View the calendar event</a>` : "",
-    generated ? `<a href="${escapeHtml$a(generated)}">Add to Google Calendar</a>` : ""
+    ctx.calendarUrl ? `<a href="${escapeHtml$8(ctx.calendarUrl)}">View the calendar event</a>` : "",
+    generated ? `<a href="${escapeHtml$8(generated)}">Add to Google Calendar</a>` : ""
   ].filter(Boolean);
   if (links.length === 0) return "";
   return p(links.join("<br>"));
 }
 function actionsHtml() {
-  return p(`Questions or a new time? Call <a href="${BUSINESS_CONTACT.phoneHref}">${escapeHtml$a(BUSINESS_CONTACT.phoneDisplay)}</a> or email <a href="${BUSINESS_CONTACT.emailHref}">${escapeHtml$a(BUSINESS_CONTACT.email)}</a>.`);
+  return p(`Questions or a new time? Call <a href="${BUSINESS_CONTACT.phoneHref}">${escapeHtml$8(BUSINESS_CONTACT.phoneDisplay)}</a> or email <a href="${BUSINESS_CONTACT.emailHref}">${escapeHtml$8(BUSINESS_CONTACT.email)}</a>.`);
 }
 function statusBlock(ctx) {
   if (!ctx.statusUrl) return "";
-  return p(`You can view the most up to date status of your order here: <a href="${escapeHtml$a(ctx.statusUrl)}">${escapeHtml$a(ctx.statusUrl)}</a>`);
+  return p(`You can view the most up to date status of your order here: <a href="${escapeHtml$8(ctx.statusUrl)}">${escapeHtml$8(ctx.statusUrl)}</a>`);
 }
 function pendingLine(ctx) {
   if (!ctx.mediaOutstanding) return "";
-  return p(`<strong>Pending:</strong> ${escapeHtml$a(ctx.mediaOutstandingDetail)}`);
+  return p(`<strong>Pending:</strong> ${escapeHtml$8(ctx.mediaOutstandingDetail)}`);
 }
 function contactBlock() {
   return `
     <div>Iconic Images Crew<br>
-    <a href="${BUSINESS_CONTACT.emailHref}">${escapeHtml$a(BUSINESS_CONTACT.email)}</a><br>
-    <a href="${BUSINESS_CONTACT.phoneHref}">${escapeHtml$a(BUSINESS_CONTACT.phoneDisplay)}</a></div>
-    <div>${escapeHtml$a(BUSINESS_CONTACT.address)}</div>
+    <a href="${BUSINESS_CONTACT.emailHref}">${escapeHtml$8(BUSINESS_CONTACT.email)}</a><br>
+    <a href="${BUSINESS_CONTACT.phoneHref}">${escapeHtml$8(BUSINESS_CONTACT.phoneDisplay)}</a></div>
+    <div>${escapeHtml$8(BUSINESS_CONTACT.address)}</div>
   `;
 }
 function innerHtml(key, ctx) {
-  const number = escapeHtml$a(orderCode(ctx));
+  const number = escapeHtml$8(orderCode(ctx));
   switch (key) {
     case "customer_order_confirmation":
       return [
@@ -7903,13 +10111,13 @@ function innerHtml(key, ctx) {
       ].join("");
     case "listing_delivery":
       return [
-        p(`Hi ${escapeHtml$a(ctx.firstName || "there")}!`),
-        p(`Your media for ${escapeHtml$a(ctx.address || "your listing")} is ready for download! Check out the link below to access your content:`),
+        p(`Hi ${escapeHtml$8(ctx.firstName || "there")}!`),
+        p(`Your media for ${escapeHtml$8(ctx.address || "your listing")} is ready for download! Check out the link below to access your content:`),
         pendingLine(ctx),
-        ctx.downloadUrl ? p(`<strong>Iconic Media:</strong> <a href="${escapeHtml$a(ctx.downloadUrl)}">${escapeHtml$a(ctx.downloadUrl)}</a>`) : "",
-        ctx.brandedTourUrl ? p(`<strong>This listing also includes 3D Virtual content URL(s). Access with the links below:</strong><br><strong>3D Tour Branded:</strong> <a href="${escapeHtml$a(ctx.brandedTourUrl)}">${escapeHtml$a(ctx.brandedTourUrl)}</a>`) : "",
-        ctx.unbrandedTourUrl ? p(`<strong>3D Tour Unbranded:</strong> <a href="${escapeHtml$a(ctx.unbrandedTourUrl)}">${escapeHtml$a(ctx.unbrandedTourUrl)}</a>`) : "",
-        ctx.brandedWebsiteUrl || ctx.unbrandedWebsiteUrl ? p(`<strong>This listing also includes a property website. Login to your account if you'd like to customize it further.</strong><br>${ctx.brandedWebsiteUrl ? `<strong>Branded Property Website:</strong> <a href="${escapeHtml$a(ctx.brandedWebsiteUrl)}">${escapeHtml$a(ctx.brandedWebsiteUrl)}</a><br>` : ""}${ctx.unbrandedWebsiteUrl ? `<strong>Unbranded Property Website:</strong> <a href="${escapeHtml$a(ctx.unbrandedWebsiteUrl)}">${escapeHtml$a(ctx.unbrandedWebsiteUrl)}</a>` : ""}`) : "",
+        ctx.downloadUrl ? p(`<strong>Iconic Media:</strong> <a href="${escapeHtml$8(ctx.downloadUrl)}">${escapeHtml$8(ctx.downloadUrl)}</a>`) : "",
+        ctx.brandedTourUrl ? p(`<strong>This listing also includes 3D Virtual content URL(s). Access with the links below:</strong><br><strong>3D Tour Branded:</strong> <a href="${escapeHtml$8(ctx.brandedTourUrl)}">${escapeHtml$8(ctx.brandedTourUrl)}</a>`) : "",
+        ctx.unbrandedTourUrl ? p(`<strong>3D Tour Unbranded:</strong> <a href="${escapeHtml$8(ctx.unbrandedTourUrl)}">${escapeHtml$8(ctx.unbrandedTourUrl)}</a>`) : "",
+        ctx.brandedWebsiteUrl || ctx.unbrandedWebsiteUrl ? p(`<strong>This listing also includes a property website. Login to your account if you'd like to customize it further.</strong><br>${ctx.brandedWebsiteUrl ? `<strong>Branded Property Website:</strong> <a href="${escapeHtml$8(ctx.brandedWebsiteUrl)}">${escapeHtml$8(ctx.brandedWebsiteUrl)}</a><br>` : ""}${ctx.unbrandedWebsiteUrl ? `<strong>Unbranded Property Website:</strong> <a href="${escapeHtml$8(ctx.unbrandedWebsiteUrl)}">${escapeHtml$8(ctx.unbrandedWebsiteUrl)}</a>` : ""}`) : "",
         p("Happy Listing!"),
         contactBlock(),
         p("<strong>Book your Podcast Studio Rental, Photo Studio Rental, Headshots &amp; More @ Iconic Studios Ste 105</strong>"),
@@ -7917,11 +10125,11 @@ function innerHtml(key, ctx) {
       ].join("");
     case "listing_delivery_showcase_select":
       return [
-        p(`Hello ${escapeHtml$a(ctx.fullName || "there")},`),
-        p(`Your content for ${escapeHtml$a(ctx.address || "your listing")} is ready for download in your Showcase agent experience dashboard!`),
-        ctx.showcaseMediaUrl ? p(`Access your media with this link: <a href="${escapeHtml$a(ctx.showcaseMediaUrl)}">${escapeHtml$a(ctx.showcaseMediaUrl)}</a>`) : "",
+        p(`Hello ${escapeHtml$8(ctx.fullName || "there")},`),
+        p(`Your content for ${escapeHtml$8(ctx.address || "your listing")} is ready for download in your Showcase agent experience dashboard!`),
+        ctx.showcaseMediaUrl ? p(`Access your media with this link: <a href="${escapeHtml$8(ctx.showcaseMediaUrl)}">${escapeHtml$8(ctx.showcaseMediaUrl)}</a>`) : "",
         p("Thank you for your business,"),
-        p(escapeHtml$a(ARYEO_COMPANY_NAME))
+        p(escapeHtml$8(ARYEO_COMPANY_NAME))
       ].join("");
     case "customer_order_payment_required":
       return [
@@ -7929,7 +10137,7 @@ function innerHtml(key, ctx) {
         statusBlock(ctx),
         orderDetailsHtml(ctx),
         p("Thank you for your business,"),
-        p(escapeHtml$a(ARYEO_COMPANY_NAME))
+        p(escapeHtml$8(ARYEO_COMPANY_NAME))
       ].join("");
     case "customer_order_payment_overdue":
       return [
@@ -7937,12 +10145,12 @@ function innerHtml(key, ctx) {
         statusBlock(ctx),
         orderDetailsHtml(ctx),
         p("Thank you for your business,"),
-        p(escapeHtml$a(ARYEO_COMPANY_NAME))
+        p(escapeHtml$8(ARYEO_COMPANY_NAME))
       ].join("");
     case "creator_order_received":
       return [
         p("You have received a new order! This is an automated email notification. Please review the details below and take any further actions in your account."),
-        ctx.editUrl ? p(`You can manage your order here: <a href="${escapeHtml$a(ctx.editUrl)}">${escapeHtml$a(ctx.editUrl)}</a>`) : "",
+        ctx.editUrl ? p(`You can manage your order here: <a href="${escapeHtml$8(ctx.editUrl)}">${escapeHtml$8(ctx.editUrl)}</a>`) : "",
         orderDetailsHtml(ctx),
         appointmentsHtml(ctx)
       ].join("");
@@ -7954,7 +10162,7 @@ function innerHtml(key, ctx) {
       return [
         p("This is an automated message letting you know your appointment has been confirmed and scheduled."),
         appointmentsHtml(ctx),
-        ctx.teamMembers.length ? p(`<strong>Team:</strong> ${escapeHtml$a(ctx.teamMembers.join(", "))}`) : ctx.photographerName ? p(`<strong>Team:</strong> ${escapeHtml$a(ctx.photographerName)}`) : "",
+        ctx.teamMembers.length ? p(`<strong>Team:</strong> ${escapeHtml$8(ctx.teamMembers.join(", "))}`) : ctx.photographerName ? p(`<strong>Team:</strong> ${escapeHtml$8(ctx.photographerName)}`) : "",
         calendarLinksHtml(ctx),
         actionsHtml(),
         orderDetailsHtml(ctx)
@@ -7968,43 +10176,43 @@ function innerHtml(key, ctx) {
     case "creator_appointment_reminder":
       return [p(`This is an automated message reminding you of your scheduled appointment for Order ${number}.`), appointmentsHtml(ctx), calendarLinksHtml(ctx), actionsHtml(), orderDetailsHtml(ctx)].join("");
     case "creator_upcoming_appointments_summary": {
-      const rows = ctx.dailyAppointments.map((item) => `<li style="margin:0 0 8px;">${escapeHtml$a(item.when)} — ${escapeHtml$a(item.address)} — ${escapeHtml$a(item.orderNumber)} — ${escapeHtml$a(item.clientName)}</li>`).join("");
+      const rows = ctx.dailyAppointments.map((item) => `<li style="margin:0 0 8px;">${escapeHtml$8(item.when)} — ${escapeHtml$8(item.address)} — ${escapeHtml$8(item.orderNumber)} — ${escapeHtml$8(item.clientName)}</li>`).join("");
       return [p("This is an automated email with your daily schedule of appointments. Here are your upcoming appointments:"), `<ul>${rows}</ul>`].join("");
     }
     case "creator_order_payment_processed":
       return [
         p("Hello,"),
         p(`You have received a payment for Order ${number}.`),
-        p(`${escapeHtml$a(ctx.paymentAmount || "Payment")} ${ctx.paymentMethod ? `via ${escapeHtml$a(ctx.paymentMethod)}` : ""} ${ctx.paymentWhen ? `on ${escapeHtml$a(ctx.paymentWhen)}` : ""}`.trim()),
-        ctx.editUrl ? p(`You can manage your order here: <a href="${escapeHtml$a(ctx.editUrl)}">${escapeHtml$a(ctx.editUrl)}</a>`) : ""
+        p(`${escapeHtml$8(ctx.paymentAmount || "Payment")} ${ctx.paymentMethod ? `via ${escapeHtml$8(ctx.paymentMethod)}` : ""} ${ctx.paymentWhen ? `on ${escapeHtml$8(ctx.paymentWhen)}` : ""}`.trim()),
+        ctx.editUrl ? p(`You can manage your order here: <a href="${escapeHtml$8(ctx.editUrl)}">${escapeHtml$8(ctx.editUrl)}</a>`) : ""
       ].join("");
     case "customer_team_invitation":
       return [
-        p(`Hi ${escapeHtml$a(ctx.firstName || "there")},`),
-        p(`You've been invited by ${escapeHtml$a(ctx.invitingName || "a teammate")} (${escapeHtml$a(ctx.invitingEmail)}) to activate your account as a ${escapeHtml$a(ctx.teamRole)} of team ${escapeHtml$a(ctx.teamName)}.`),
+        p(`Hi ${escapeHtml$8(ctx.firstName || "there")},`),
+        p(`You've been invited by ${escapeHtml$8(ctx.invitingName || "a teammate")} (${escapeHtml$8(ctx.invitingEmail)}) to activate your account as a ${escapeHtml$8(ctx.teamRole)} of team ${escapeHtml$8(ctx.teamName)}.`),
         ctx.teamRole === "admin" ? "<ul><li>View and manage team members listings</li><li>Place orders on behalf of team members</li><li>Update the team roster</li><li>View and manage team settings.</li></ul>" : "<ul><li>Access your projects and files</li><li>Review upcoming appointments</li><li>Receive important account notifications and communication</li><li>Automatically share your listings with team admin</li></ul>",
-        ctx.activationUrl ? p(`Button not working? Copy and paste the link below into your browser: <a href="${escapeHtml$a(ctx.activationUrl)}">${escapeHtml$a(ctx.activationUrl)}</a>`) : ""
+        ctx.activationUrl ? p(`Button not working? Copy and paste the link below into your browser: <a href="${escapeHtml$8(ctx.activationUrl)}">${escapeHtml$8(ctx.activationUrl)}</a>`) : ""
       ].join("");
     case "customer_user_activation":
       return [
-        p(`Hi ${escapeHtml$a(ctx.firstName || "there")},`),
-        p(`You've been invited to activate your account with ${escapeHtml$a(ARYEO_COMPANY_NAME)}. This will allow you to:`),
+        p(`Hi ${escapeHtml$8(ctx.firstName || "there")},`),
+        p(`You've been invited to activate your account with ${escapeHtml$8(ARYEO_COMPANY_NAME)}. This will allow you to:`),
         "<ul><li>Access your projects and files</li><li>Review upcoming appointments</li><li>Receive important account notifications and communication</li></ul>",
-        ctx.activationUrl ? p(`Button not working? Copy and paste the link below into your browser: <a href="${escapeHtml$a(ctx.activationUrl)}">${escapeHtml$a(ctx.activationUrl)}</a>`) : ""
+        ctx.activationUrl ? p(`Button not working? Copy and paste the link below into your browser: <a href="${escapeHtml$8(ctx.activationUrl)}">${escapeHtml$8(ctx.activationUrl)}</a>`) : ""
       ].join("");
     case "customer_user_reset_password":
       return [
-        p(`Hi ${escapeHtml$a(ctx.firstName || "there")},`),
-        p(`You are receiving this email because we received a password reset request for your account with ${escapeHtml$a(ARYEO_COMPANY_NAME)}.`),
+        p(`Hi ${escapeHtml$8(ctx.firstName || "there")},`),
+        p(`You are receiving this email because we received a password reset request for your account with ${escapeHtml$8(ARYEO_COMPANY_NAME)}.`),
         p("This password reset link will expire in 60 minutes."),
         p("If you did not request a password reset, no further action is required."),
-        ctx.activationUrl ? p(`Button not working? Copy and paste the link below into your browser: <a href="${escapeHtml$a(ctx.activationUrl)}">${escapeHtml$a(ctx.activationUrl)}</a>`) : ""
+        ctx.activationUrl ? p(`Button not working? Copy and paste the link below into your browser: <a href="${escapeHtml$8(ctx.activationUrl)}">${escapeHtml$8(ctx.activationUrl)}</a>`) : ""
       ].join("");
     case "customer_user_verification":
       return [
-        p(`Hi ${escapeHtml$a(ctx.firstName || "there")},`),
-        p(`Your verification code for your account with ${escapeHtml$a(ARYEO_COMPANY_NAME)} is listed below. Please enter it along with a new password of your choosing and do not share this email.`),
-        ctx.verificationCode ? `<h1>${escapeHtml$a(ctx.verificationCode)}</h1>` : ""
+        p(`Hi ${escapeHtml$8(ctx.firstName || "there")},`),
+        p(`Your verification code for your account with ${escapeHtml$8(ARYEO_COMPANY_NAME)} is listed below. Please enter it along with a new password of your choosing and do not share this email.`),
+        ctx.verificationCode ? `<h1>${escapeHtml$8(ctx.verificationCode)}</h1>` : ""
       ].join("");
     default:
       return "";
@@ -8043,15 +10251,15 @@ function wrapEmailHtml(inner, env) {
   <div style="padding:24px 12px;">
     <div style="max-width:600px;margin:0 auto;background:#ffffff;font-family:Arial,Helvetica,sans-serif;color:${BRAND_INK};">
       <div style="background:#111111;padding:20px;text-align:center;">
-        <img src="${escapeHtml$a(logo)}" alt="Iconic Images" width="180" style="width:180px;max-width:70%;height:auto;border:0;">
+        <img src="${escapeHtml$8(logo)}" alt="Iconic Images" width="180" style="width:180px;max-width:70%;height:auto;border:0;">
       </div>
       <div style="height:6px;background:${BRAND_YELLOW};line-height:6px;font-size:0;">&nbsp;</div>
       <div style="padding:28px 24px;font-size:15px;line-height:1.5;">
         ${inner}
       </div>
       <div style="padding:8px 24px 28px;font-size:12px;line-height:1.5;color:#555555;text-align:center;">
-        <div>${escapeHtml$a(BUSINESS_CONTACT.line)}</div>
-        <div style="margin-top:6px;">${escapeHtml$a(ARYEO_EMAIL_FROM_NAME)}</div>
+        <div>${escapeHtml$8(BUSINESS_CONTACT.line)}</div>
+        <div style="margin-top:6px;">${escapeHtml$8(ARYEO_EMAIL_FROM_NAME)}</div>
       </div>
     </div>
   </div>
@@ -8254,18 +10462,18 @@ function createMemoryEmailNotifyStore() {
     }
   };
 }
-const memoryStore$3 = createMemoryEmailNotifyStore();
+const memoryStore$1 = createMemoryEmailNotifyStore();
 function productionFirestoreEnabled() {
   return process.env.NODE_ENV === "production" && admin.apps.length > 0;
 }
 function activeStore$1() {
-  if (productionFirestoreEnabled()) return firestoreStore$3();
-  return memoryStore$3;
+  if (productionFirestoreEnabled()) return firestoreStore$1();
+  return memoryStore$1;
 }
 const CLAIMS = "clientEmailNotifyClaims";
 const JOBS = "clientEmailNotifyJobs";
 const SETTINGS_DOC = "clientEmailNotify";
-function firestoreStore$3() {
+function firestoreStore$1() {
   const db2 = () => admin.firestore();
   return {
     async getSettings() {
@@ -9442,7 +11650,7 @@ const THANKFUL_RSVP_CONFIRM_ENV = "THANKFUL_RSVP_CONFIRM_LIVE";
 function thankfulRsvpConfirmLive(env = process.env) {
   return env[THANKFUL_RSVP_CONFIRM_ENV] === "true";
 }
-function escapeHtml$9(value) {
+function escapeHtml$7(value) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 function escapeIcsText(value) {
@@ -9475,9 +11683,9 @@ function thankfulRsvpConfirmHtml(input) {
   if (input.santa?.trim()) rows.push(["Photos with Santa", input.santa.trim()]);
   if (input.notes?.trim()) rows.push(["Notes", input.notes.trim()]);
   const detailRows = rows.map(
-    ([label, value]) => `<tr><td style="padding:8px 0;color:#8a7464;font-size:13px;width:140px;vertical-align:top;">${escapeHtml$9(label)}</td><td style="padding:8px 0;color:#1a120e;font-size:15px;font-weight:500;">${escapeHtml$9(value)}</td></tr>`
+    ([label, value]) => `<tr><td style="padding:8px 0;color:#8a7464;font-size:13px;width:140px;vertical-align:top;">${escapeHtml$7(label)}</td><td style="padding:8px 0;color:#1a120e;font-size:15px;font-weight:500;">${escapeHtml$7(value)}</td></tr>`
   ).join("");
-  const requestLine = input.requestId?.trim() ? `<p style="color:#8a7464;font-size:12px;margin:24px 0 0;">Confirmation ID: <strong style="color:#1a120e;">${escapeHtml$9(input.requestId.trim())}</strong></p>` : "";
+  const requestLine = input.requestId?.trim() ? `<p style="color:#8a7464;font-size:12px;margin:24px 0 0;">Confirmation ID: <strong style="color:#1a120e;">${escapeHtml$7(input.requestId.trim())}</strong></p>` : "";
   return `<div style="font-family:Georgia,'Times New Roman',serif;max-width:600px;margin:0 auto;padding:0;background:#f6efe4;">
   <div style="background:#1a120e;padding:28px 24px;text-align:center;">
     <p style="color:#e7d3a1;margin:0;font-size:11px;letter-spacing:0.18em;text-transform:uppercase;">Iconic Images</p>
@@ -9485,16 +11693,16 @@ function thankfulRsvpConfirmHtml(input) {
     <p style="color:#c4a574;margin:8px 0 0;font-size:14px;">Iconic Client Holiday Event · Thankful for You, ALWAYS ♥</p>
   </div>
   <div style="padding:28px 24px 8px;background:#ffffff;">
-    <p style="color:#1a120e;font-size:17px;line-height:1.55;margin:0 0 16px;">Hi ${escapeHtml$9(first)},</p>
+    <p style="color:#1a120e;font-size:17px;line-height:1.55;margin:0 0 16px;">Hi ${escapeHtml$7(first)},</p>
     <p style="color:#1a120e;font-size:16px;line-height:1.6;margin:0 0 16px;">Your RSVP went through — we can't wait to see you. Come hungry, bring everyone, and let us make you look amazing for 2027.</p>
     <table role="presentation" style="width:100%;border-collapse:collapse;margin:8px 0 20px;">${detailRows}</table>
-    <p style="color:#1a120e;font-size:15px;line-height:1.6;margin:0 0 8px;">Need to change your time or headcount? Call us at <a href="${BUSINESS_CONTACT.phoneHref}" style="color:#9b2c3a;font-weight:600;text-decoration:underline;">${escapeHtml$9(BUSINESS_CONTACT.phoneDisplay)}</a>.</p>
-    <p style="margin:22px 0 8px;text-align:center;"><a href="${escapeHtml$9(pageUrl)}" style="display:inline-block;background:#9b2c3a;color:#f6efe4;text-decoration:none;padding:12px 22px;border-radius:999px;font-size:14px;letter-spacing:0.04em;">View the event page</a></p>
+    <p style="color:#1a120e;font-size:15px;line-height:1.6;margin:0 0 8px;">Need to change your time or headcount? Call us at <a href="${BUSINESS_CONTACT.phoneHref}" style="color:#9b2c3a;font-weight:600;text-decoration:underline;">${escapeHtml$7(BUSINESS_CONTACT.phoneDisplay)}</a>.</p>
+    <p style="margin:22px 0 8px;text-align:center;"><a href="${escapeHtml$7(pageUrl)}" style="display:inline-block;background:#9b2c3a;color:#f6efe4;text-decoration:none;padding:12px 22px;border-radius:999px;font-size:14px;letter-spacing:0.04em;">View the event page</a></p>
     ${requestLine}
   </div>
   <div style="border-top:1px solid #e8dcc8;padding:18px 24px 28px;background:#ffffff;text-align:center;color:#8a7464;font-size:12px;line-height:1.6;">
     <p style="margin:0 0 6px;">${clientEmailContactLineHtml("#8a7464")}</p>
-    <p style="margin:0;"><a href="${escapeHtml$9(pageUrl)}" style="color:#8a7464;text-decoration:underline;">iconicimagestx.vercel.app/thankful</a></p>
+    <p style="margin:0;"><a href="${escapeHtml$7(pageUrl)}" style="color:#8a7464;text-decoration:underline;">iconicimagestx.vercel.app/thankful</a></p>
   </div>
 </div>`;
 }
@@ -9743,11 +11951,11 @@ async function createHolidaySquareCheckout(input) {
     squareOrderId: result.payment_link?.order_id
   };
 }
-const db$B = () => admin.firestore();
+const db$z = () => admin.firestore();
 async function holidayOrderSnaps() {
   const [rsvp, season] = await Promise.all([
-    db$B().collection("orderRequests").where("leadSource", "==", HOLIDAY_RSVP_LEAD).get(),
-    db$B().collection("orderRequests").where("leadSource", "==", HOLIDAY_SEASON_LEAD).get()
+    db$z().collection("orderRequests").where("leadSource", "==", HOLIDAY_RSVP_LEAD).get(),
+    db$z().collection("orderRequests").where("leadSource", "==", HOLIDAY_SEASON_LEAD).get()
   ]);
   const byId = /* @__PURE__ */ new Map();
   for (const doc of [...rsvp.docs, ...season.docs]) {
@@ -12012,7 +14220,7 @@ function quoteApprenticeship(input) {
     }
   };
 }
-const EMAIL_RE$5 = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const EMAIL_RE$4 = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 function text$j(value) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -12040,7 +14248,7 @@ function parseApprenticeshipOrder(body) {
   }
   if (firstName.length < 2) return { ok: false, error: "Enter your name." };
   if (`${firstName} ${lastName}`.trim().length > 80) return { ok: false, error: "Name is too long." };
-  if (!EMAIL_RE$5.test(email)) return { ok: false, error: "Enter a valid email." };
+  if (!EMAIL_RE$4.test(email)) return { ok: false, error: "Enter a valid email." };
   const digits2 = phone.replace(/\D/g, "");
   if (digits2.length < 10 || digits2.length > 15) return { ok: false, error: "Enter a phone number." };
   if (address.length < 5) return { ok: false, error: "Enter the property address." };
@@ -12566,7 +14774,7 @@ function publishHeadshotSlots(slots, quantity, options) {
   }
   return published;
 }
-const EMAIL_RE$4 = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const EMAIL_RE$3 = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 function text$i(value) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -12587,7 +14795,7 @@ function parseHeadshotOrder(body, options) {
   const slotStart = text$i(raw.slotStart);
   if (firstName.length < 2 || lastName.length < 1) return { ok: false, error: "Enter your first and last name." };
   if (`${firstName} ${lastName}`.length > 80) return { ok: false, error: "Name is too long." };
-  if (!EMAIL_RE$4.test(email)) return { ok: false, error: "Enter an email address." };
+  if (!EMAIL_RE$3.test(email)) return { ok: false, error: "Enter an email address." };
   const digits2 = phone.replace(/\D/g, "");
   if (digits2.length < 10 || digits2.length > 15) return { ok: false, error: "Enter a phone number." };
   if (!slotStart || Number.isNaN(Date.parse(slotStart))) return { ok: false, error: "Choose an open time." };
@@ -12639,25 +14847,25 @@ function headshotHoldExpired(order, now) {
 function headshotClientMailEnabled(env = typeof process === "undefined" ? {} : process.env) {
   return clientNotifyLive(env);
 }
-function escapeHtml$8(value) {
+function escapeHtml$6(value) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 function headshotConfirmationEmailHtml(input) {
-  const balance = input.quote.balanceLine ? `<p>${escapeHtml$8(input.quote.balanceLine)}. That charge is ${escapeHtml$8(money$4(input.quote.balanceTotal))}.</p>` : "<p>This booking is paid in full once the booking fee is received. Nothing further is due on delivery.</p>";
+  const balance = input.quote.balanceLine ? `<p>${escapeHtml$6(input.quote.balanceLine)}. That charge is ${escapeHtml$6(money$4(input.quote.balanceTotal))}.</p>` : "<p>This booking is paid in full once the booking fee is received. Nothing further is due on delivery.</p>";
   return `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#081228;">
-    <h1 style="font-size:24px;">${escapeHtml$8(HEADSHOTS_H1)}</h1>
-    <p>Hi ${escapeHtml$8(input.clientName)},</p>
+    <h1 style="font-size:24px;">${escapeHtml$6(HEADSHOTS_H1)}</h1>
+    <p>Hi ${escapeHtml$6(input.clientName)},</p>
     <p>Your Tuesday time is reserved once the $10 booking fee is paid. The $10 counts toward your headshots.</p>
-    <p><strong>${escapeHtml$8(input.whenDate)}</strong> at <strong>${escapeHtml$8(input.whenTime)}</strong><br/>
+    <p><strong>${escapeHtml$6(input.whenDate)}</strong> at <strong>${escapeHtml$6(input.whenTime)}</strong><br/>
     ${input.quantity} headshot${input.quantity === 1 ? "" : "s"}<br/>
-    ${escapeHtml$8(input.quote.dueTodayLine)}<br/>
-    Order total ${escapeHtml$8(money$4(input.quote.total))}</p>
+    ${escapeHtml$6(input.quote.dueTodayLine)}<br/>
+    Order total ${escapeHtml$6(money$4(input.quote.total))}</p>
     ${balance}
-    <p>${escapeHtml$8(HEADSHOTS_STUDIO_LINE)}</p>
-    <p><a href="${escapeHtml$8(input.wearUrl)}">What to wear</a></p>
-    <p>Confirmation: <strong>${escapeHtml$8(input.orderNumber)}</strong></p>
-    <p style="font-size:13px;">${escapeHtml$8(LEGAL_BUSINESS_NAME)} · ${escapeHtml$8(BUSINESS_CONTACT.line)}</p>
-    <p><a href="${escapeHtml$8(input.pageUrl)}">${escapeHtml$8(input.pageUrl)}</a></p>
+    <p>${escapeHtml$6(HEADSHOTS_STUDIO_LINE)}</p>
+    <p><a href="${escapeHtml$6(input.wearUrl)}">What to wear</a></p>
+    <p>Confirmation: <strong>${escapeHtml$6(input.orderNumber)}</strong></p>
+    <p style="font-size:13px;">${escapeHtml$6(LEGAL_BUSINESS_NAME)} · ${escapeHtml$6(BUSINESS_CONTACT.line)}</p>
+    <p><a href="${escapeHtml$6(input.pageUrl)}">${escapeHtml$6(input.pageUrl)}</a></p>
   </div>`;
 }
 const APPRENTICESHIP_HOLD_PREFIX = "HOLD · $25 fee due · ";
@@ -13281,7 +15489,7 @@ async function deleteHolidayCalendarEvent(input) {
     throw err;
   }
 }
-const db$A = () => admin.firestore();
+const db$y = () => admin.firestore();
 async function backfillHolidayCalendarEvents() {
   const orders = await loadHolidayCalendarOrders();
   const { report, patches } = await runHolidayBackfill({
@@ -13290,7 +15498,7 @@ async function backfillHolidayCalendarEvents() {
     create: (plan) => createHolidayCalendarEvent(plan)
   });
   for (const item of patches) {
-    await db$A().collection("orderRequests").doc(item.id).update({
+    await db$y().collection("orderRequests").doc(item.id).update({
       ...item.patch,
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
@@ -13358,12 +15566,12 @@ function createRateLimiter(options) {
   };
 }
 const router$G = Router();
-const db$z = () => admin.firestore();
+const db$x = () => admin.firestore();
 async function portalOrderLink(header2, source) {
   if (source !== "portal" || !header2?.startsWith("Bearer ") || !admin.apps.length) return null;
   try {
     const decoded = await admin.auth().verifyIdToken(header2.slice("Bearer ".length).trim());
-    const staff = await db$z().collection("staff").doc(decoded.uid).get();
+    const staff = await db$x().collection("staff").doc(decoded.uid).get();
     if (staff.exists && staff.data()?.isActive !== false) return null;
     return clientLinkStamp(decoded.uid, decoded.uid);
   } catch {
@@ -13409,7 +15617,7 @@ function failedCalendarHoldNote(slot) {
 }
 async function loadBookingCatalog() {
   try {
-    const snap = await db$z().collection("packages").get();
+    const snap = await db$x().collection("packages").get();
     return packagesForStaffEditor(snap.docs.map((entry2) => ({ id: entry2.id, ...entry2.data() })));
   } catch (err) {
     console.error("[Bookings] Catalog read failed — using the seeded catalog", err);
@@ -13706,6 +15914,10 @@ router$G.post("/", async (req, res) => {
       // Draft add-on. Quote only — do not price it or mention it in client email/SMS.
       lifeOfTheListingCare: lifeOfTheListingCareSelected(lifeOfTheListingCare),
       dotOptIn: dotOptInSelected(req.body.dotOptIn),
+      smsConsent: req.body.smsConsent === true,
+      smsConsentAt: req.body.smsConsent === true ? admin.firestore.FieldValue.serverTimestamp() : null,
+      smsConsentTextVersion: req.body.smsConsent === true ? TRANSACTIONAL_SMS_CONSENT_VERSION : null,
+      smsConsentText: req.body.smsConsent === true ? TRANSACTIONAL_SMS_CONSENT_TEXT : null,
       dotOptInToken: createPayToken(),
       status: "new",
       source: req.body.source === "portal" ? "portal" : "booking_form",
@@ -13716,7 +15928,7 @@ router$G.post("/", async (req, res) => {
       submittedAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     };
-    const docRef = await db$z().collection("orderRequests").add(orderRequest);
+    const docRef = await db$x().collection("orderRequests").add(orderRequest);
     await bumpAdminUnreadChannel(orderRequestSignal(orderRequest.leadSource));
     let orderNumber2 = docRef.id;
     let packageName = "";
@@ -13833,7 +16045,9 @@ router$G.post("/", async (req, res) => {
           photographerName: decision.slot?.photographerName || null,
           bookingPhotographerId: decision.slot?.photographerId || null,
           services: traveled.lineItems,
-          notes: typeof vibeNote2 === "string" ? vibeNote2 : ""
+          notes: typeof vibeNote2 === "string" ? vibeNote2 : "",
+          smsConsent: req.body.smsConsent === true,
+          smsConsentTextVersion: req.body.smsConsent === true ? TRANSACTIONAL_SMS_CONSENT_VERSION : null
         });
       } catch (err) {
         console.error("[Bookings] Appointment attach failed:", err);
@@ -13982,8 +16196,17 @@ router$G.post("/", async (req, res) => {
     }
     if (!studio105Request && !isThankfulRsvp) {
       if (phone) {
-        const clientSmsAllowed = clientNotifyLive() || isNotifyTestAllowlisted(normalizedEmail);
-        if (!clientSmsAllowed) {
+        const consentBlock = transactionalSmsBlockReason({
+          smsConsent: req.body.smsConsent,
+          stopped: await isSmsStopped(String(phone))
+        });
+        const clientSmsAllowed = !consentBlock && (clientNotifyLive() || isNotifyTestAllowlisted(normalizedEmail));
+        if (consentBlock) {
+          smsStatus = "skipped";
+          console.info(
+            `[Bookings] Client confirmation SMS skipped for request ${docRef.id}. ${consentBlock}. No message sent.`
+          );
+        } else if (!clientSmsAllowed) {
           smsStatus = "gated";
           console.info(
             `[Bookings] Client confirmation SMS skipped for request ${docRef.id}. ${clientNotifyBlockReason()}. No message sent.`
@@ -14095,7 +16318,7 @@ router$G.post("/", async (req, res) => {
         holidayCheckout = { payment: "fallback" };
       } else {
         try {
-          const invoiceSnap = await db$z().collection("invoices").doc(invoiceId).get();
+          const invoiceSnap = await db$x().collection("invoices").doc(invoiceId).get();
           const invoiceData = invoiceSnap.data() || {};
           const invoiceNumber = typeof invoiceData.invoiceNumber === "string" ? invoiceData.invoiceNumber : void 0;
           const linked = await createHolidaySquareCheckout({
@@ -14108,7 +16331,7 @@ router$G.post("/", async (req, res) => {
             orderNumber: orderNumber2
           });
           if (linked.payment === "square" && linked.checkoutUrl) {
-            await db$z().collection("invoices").doc(invoiceId).update({
+            await db$x().collection("invoices").doc(invoiceId).update({
               paymentProvider: "square",
               paymentUrl: linked.checkoutUrl,
               squarePaymentLinkId: linked.linkId || null,
@@ -14131,7 +16354,7 @@ router$G.post("/", async (req, res) => {
     let payNowCheckoutUrl = "";
     if (wantsPayNow && !wantsPayAtClose && holidayKind === "none" && invoiceId) {
       try {
-        const invoiceSnap = await db$z().collection("invoices").doc(invoiceId).get();
+        const invoiceSnap = await db$x().collection("invoices").doc(invoiceId).get();
         const invoiceData = invoiceSnap.data() || {};
         const invoiceNumber = typeof invoiceData.invoiceNumber === "string" ? invoiceData.invoiceNumber : void 0;
         const linked = await createHolidaySquareCheckout({
@@ -14148,7 +16371,7 @@ router$G.post("/", async (req, res) => {
         });
         if (linked.payment === "square" && linked.checkoutUrl) {
           payNowCheckoutUrl = linked.checkoutUrl;
-          await db$z().collection("invoices").doc(invoiceId).update({
+          await db$x().collection("invoices").doc(invoiceId).update({
             paymentMethod: PAY_NOW_METHOD,
             paymentProvider: "square",
             paymentUrl: linked.checkoutUrl,
@@ -14170,7 +16393,7 @@ router$G.post("/", async (req, res) => {
     let payAtCloseCheckoutUrl = "";
     if (wantsPayAtClose && invoiceId) {
       try {
-        const invoiceSnap = await db$z().collection("invoices").doc(invoiceId).get();
+        const invoiceSnap = await db$x().collection("invoices").doc(invoiceId).get();
         const invoiceData = invoiceSnap.data() || {};
         const payToken = typeof invoiceData.payToken === "string" ? invoiceData.payToken : "";
         const successUrl = clientInvoiceUrl({ id: invoiceId, payToken, status: "sent" }, void 0, { paid: "1" }) || "";
@@ -14190,7 +16413,7 @@ router$G.post("/", async (req, res) => {
         }, { env: process.env });
         if (created.ok === true) {
           payAtCloseCheckoutUrl = created.checkoutUrl;
-          await db$z().collection("invoices").doc(invoiceId).update({
+          await db$x().collection("invoices").doc(invoiceId).update({
             titusCheckoutId: created.checkoutId,
             titusCheckoutUrl: created.checkoutUrl,
             titusCheckoutStatus: created.status || "requires-payment",
@@ -14371,7 +16594,7 @@ router$G.get("/catalog", async (_req, res) => {
 });
 router$G.get("/", requireCoordinator, async (_req, res) => {
   try {
-    const snapshot = await db$z().collection("orderRequests").orderBy("createdAt", "desc").limit(100).get();
+    const snapshot = await db$x().collection("orderRequests").orderBy("createdAt", "desc").limit(100).get();
     const requests = snapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data()
@@ -14384,7 +16607,7 @@ router$G.get("/", requireCoordinator, async (_req, res) => {
 });
 router$G.get("/:id", requireCoordinator, async (req, res) => {
   try {
-    const doc = await db$z().collection("orderRequests").doc(req.params.id).get();
+    const doc = await db$x().collection("orderRequests").doc(req.params.id).get();
     if (!doc.exists) {
       return res.status(404).json({ error: "Booking request not found." });
     }
@@ -14396,7 +16619,7 @@ router$G.get("/:id", requireCoordinator, async (req, res) => {
 });
 router$G.post("/:id/assign-photographer", requireCoordinator, async (req, res) => {
   try {
-    const requestDoc = await db$z().collection("orderRequests").doc(req.params.id).get();
+    const requestDoc = await db$x().collection("orderRequests").doc(req.params.id).get();
     if (!requestDoc.exists) return res.status(404).json({ error: "Booking request not found." });
     const request = requestDoc.data() || {};
     const posted = typeof req.body?.listingId === "string" ? req.body.listingId.trim() : "";
@@ -14412,7 +16635,7 @@ router$G.post("/:id/assign-photographer", requireCoordinator, async (req, res) =
 router$G.patch("/:id/confirm", requireCoordinator, async (req, res) => {
   try {
     const { assignedPhotographerId, assignedPhotographerName: postedPhotographerName, scheduledDate, scheduledTime, internalNotes } = req.body;
-    const requestDoc = await db$z().collection("orderRequests").doc(req.params.id).get();
+    const requestDoc = await db$x().collection("orderRequests").doc(req.params.id).get();
     if (!requestDoc.exists) {
       return res.status(404).json({ error: "Booking request not found." });
     }
@@ -14438,7 +16661,7 @@ router$G.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       }
       const existingGalleryId = existingInvoiceId(request.galleryId);
       if (existingGalleryId && listingId2) {
-        await db$z().collection("galleries").doc(existingGalleryId).set({
+        await db$x().collection("galleries").doc(existingGalleryId).set({
           listingId: listingId2,
           updatedAt: admin.firestore.FieldValue.serverTimestamp()
         }, { merge: true });
@@ -14490,7 +16713,7 @@ router$G.patch("/:id/confirm", requireCoordinator, async (req, res) => {
     }
     let photographer = null;
     if (assignedPhotographerId) {
-      const staffDoc = await db$z().collection("staff").doc(assignedPhotographerId).get();
+      const staffDoc = await db$x().collection("staff").doc(assignedPhotographerId).get();
       photographer = staffDoc.exists ? { id: staffDoc.id, ...staffDoc.data() } : null;
       const refusal2 = await refuseQaStaffAssignment({
         staff: photographer ? [photographer] : [],
@@ -14500,7 +16723,7 @@ router$G.patch("/:id/confirm", requireCoordinator, async (req, res) => {
     }
     let clientId2;
     const attachedClientId = typeof request.clientId === "string" ? request.clientId.trim() : "";
-    const attachedClient = attachedClientId ? await db$z().collection("clients").doc(attachedClientId).get() : null;
+    const attachedClient = attachedClientId ? await db$x().collection("clients").doc(attachedClientId).get() : null;
     if (attachedClient?.exists) {
       clientId2 = attachedClient.id;
       await attachedClient.ref.update({
@@ -14509,7 +16732,7 @@ router$G.patch("/:id/confirm", requireCoordinator, async (req, res) => {
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
     } else {
-      const existingClients = await db$z().collection("clients").where("email", "==", requestEmail).limit(1).get();
+      const existingClients = await db$x().collection("clients").where("email", "==", requestEmail).limit(1).get();
       if (!existingClients.empty) {
         clientId2 = existingClients.docs[0].id;
         await existingClients.docs[0].ref.update({
@@ -14518,7 +16741,7 @@ router$G.patch("/:id/confirm", requireCoordinator, async (req, res) => {
           updatedAt: admin.firestore.FieldValue.serverTimestamp()
         });
       } else {
-        const clientRef = await db$z().collection("clients").add({
+        const clientRef = await db$x().collection("clients").add({
           firstName: requestFirstName,
           lastName: requestLastName,
           email: requestEmail,
@@ -14587,14 +16810,18 @@ router$G.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       internalNotes: internalNotes || "",
       lifeOfTheListingCare: lifeOfTheListingCareSelected(request.lifeOfTheListingCare),
       dotOptIn: dotOptInSelected(request.dotOptIn),
+      smsConsent: request.smsConsent === true,
+      smsConsentAt: request.smsConsent === true ? request.smsConsentAt || admin.firestore.FieldValue.serverTimestamp() : null,
+      smsConsentTextVersion: request.smsConsent === true ? request.smsConsentTextVersion || TRANSACTIONAL_SMS_CONSENT_VERSION : null,
+      smsConsentText: request.smsConsent === true ? request.smsConsentText || TRANSACTIONAL_SMS_CONSENT_TEXT : null,
       dotOptInToken: typeof request.dotOptInToken === "string" && request.dotOptInToken.trim() ? request.dotOptInToken.trim() : createPayToken(),
       confirmedAt: admin.firestore.FieldValue.serverTimestamp(),
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       ...revenueFields
     };
-    const orderRef = await db$z().collection("orders").add(orderData);
-    const existingAppointment = await db$z().collection("appointments").where("orderRequestId", "==", req.params.id).limit(1).get();
+    const orderRef = await db$x().collection("orders").add(orderData);
+    const existingAppointment = await db$x().collection("appointments").where("orderRequestId", "==", req.params.id).limit(1).get();
     const confirmedAppointment = {
       orderId: orderRef.id,
       orderRequestId: req.params.id,
@@ -14612,10 +16839,12 @@ router$G.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       status: "confirmed",
       notes: request.vibeNote || "",
       internalNotes: internalNotes || "",
+      smsConsent: request.smsConsent === true,
+      smsConsentTextVersion: request.smsConsent === true ? request.smsConsentTextVersion || TRANSACTIONAL_SMS_CONSENT_VERSION : null,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       ...revenueFields
     };
-    const appointmentRef = existingAppointment.empty ? db$z().collection("appointments").doc() : existingAppointment.docs[0].ref;
+    const appointmentRef = existingAppointment.empty ? db$x().collection("appointments").doc() : existingAppointment.docs[0].ref;
     if (existingAppointment.empty) {
       await appointmentRef.set({
         ...confirmedAppointment,
@@ -14631,7 +16860,7 @@ router$G.patch("/:id/confirm", requireCoordinator, async (req, res) => {
     } catch (err) {
       console.error("[Bookings] Listing ensure failed:", err);
     }
-    const galleryRef = await db$z().collection("galleries").add({
+    const galleryRef = await db$x().collection("galleries").add({
       orderId: orderRef.id,
       clientId: clientId2,
       clientName: requestClientName,
@@ -14641,6 +16870,7 @@ router$G.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       status: "pending_upload",
       mediaItems: [],
       downloadEnabled: false,
+      smsConsent: request.smsConsent === true,
       ...listingIdForGallery ? { listingId: listingIdForGallery } : {},
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
@@ -14666,7 +16896,7 @@ router$G.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       notes: internalNotes || request.vibeNote || ""
     }).catch(async (err) => {
       console.error("[Bookings] Calendar event creation failed:", err);
-      await db$z().collection("agentLogs").add({
+      await db$x().collection("agentLogs").add({
         agent: "nora",
         action: "Calendar event failed",
         summary: `Google Calendar event was not created for order ${orderRef.id}`,
@@ -14700,7 +16930,7 @@ router$G.patch("/:id/confirm", requireCoordinator, async (req, res) => {
     let listingId = listingIdForGallery;
     let invoiceId = linkedInvoiceId;
     if (linkedInvoiceId) {
-      const existingInvoice = await db$z().collection("invoices").doc(linkedInvoiceId).get();
+      const existingInvoice = await db$x().collection("invoices").doc(linkedInvoiceId).get();
       if (existingInvoice.exists) {
         const paidFields = settledFieldsFromInvoice(existingInvoice.data() || {});
         await existingInvoice.ref.update({
@@ -14722,7 +16952,7 @@ router$G.patch("/:id/confirm", requireCoordinator, async (req, res) => {
         console.error(`[Bookings] Confirm kept invoiceId ${linkedInvoiceId} but the invoice doc is missing. Not creating a second invoice.`);
       }
     } else {
-      const invoiceRef = db$z().collection("invoices").doc();
+      const invoiceRef = db$x().collection("invoices").doc();
       const payToken = createPayToken();
       const paymentUrl = clientInvoiceUrl({ id: invoiceRef.id, status: "draft", payToken });
       const draft = buildBookingInvoiceDraft({
@@ -14768,7 +16998,7 @@ router$G.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       ...revenueFields
     });
     if (listingId) {
-      await db$z().collection("listings").doc(listingId).update({
+      await db$x().collection("listings").doc(listingId).update({
         ...revenueFields,
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       }).catch((err) => console.error("[Bookings] Listing revenue flag failed:", err));
@@ -14886,7 +17116,7 @@ async function releaseOrderCalendar(data) {
 }
 router$G.patch("/:id/cancel", requireCoordinator, async (req, res) => {
   try {
-    const doc = await db$z().collection("orderRequests").doc(req.params.id).get();
+    const doc = await db$x().collection("orderRequests").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Not found." });
     const data = doc.data() || {};
     const calendarError = await releaseOrderCalendar(data);
@@ -14927,7 +17157,7 @@ router$G.patch("/:id/cancel", requireCoordinator, async (req, res) => {
 router$G.patch("/:id/decline", requireCoordinator, async (req, res) => {
   try {
     const { reason } = req.body;
-    const doc = await db$z().collection("orderRequests").doc(req.params.id).get();
+    const doc = await db$x().collection("orderRequests").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Not found." });
     const data = doc.data() || {};
     const calendarError = await releaseOrderCalendar(data);
@@ -14956,16 +17186,16 @@ async function stampDurableLinks(input) {
     orderInvoiceId: input.invoiceId
   });
   const now = admin.firestore.FieldValue.serverTimestamp();
-  const invoiceRef = db$z().collection("invoices").doc(plan.createId);
+  const invoiceRef = db$x().collection("invoices").doc(plan.createId);
   const invoiceSnap = await invoiceRef.get();
   if (invoiceSnap.exists && Object.keys(plan.invoiceFields).length > 0) {
     await invoiceRef.update({ ...plan.invoiceFields, updatedAt: now });
   }
   if (plan.orderFields) {
-    await db$z().collection("orders").doc(input.orderId).update({ ...plan.orderFields, updatedAt: now });
+    await db$x().collection("orders").doc(input.orderId).update({ ...plan.orderFields, updatedAt: now });
   }
   if (input.listingId && plan.listingFields) {
-    await db$z().collection("listings").doc(input.listingId).update({ ...plan.listingFields, updatedAt: now });
+    await db$x().collection("listings").doc(input.listingId).update({ ...plan.listingFields, updatedAt: now });
   }
 }
 function settledFieldsFromInvoice(invoice) {
@@ -14990,9 +17220,9 @@ function linesForConfirmedOrder(request) {
 }
 async function linkClientIdByEmail(email) {
   try {
-    const normalized = normalizeEmail$1(email);
+    const normalized = normalizeEmail(email);
     if (!normalized) return null;
-    const snap = await db$z().collection("clients").where("email", "==", normalized).limit(1).get();
+    const snap = await db$x().collection("clients").where("email", "==", normalized).limit(1).get();
     return snap.empty ? null : snap.docs[0].id;
   } catch (err) {
     console.error("[Bookings] Client lookup for invoice failed:", err);
@@ -15013,7 +17243,7 @@ async function createBookingInvoiceDraft(input) {
     promoDiscount: input.promoDiscount,
     travel: input.travel
   });
-  const invoiceRef = db$z().collection("invoices").doc();
+  const invoiceRef = db$x().collection("invoices").doc();
   const payToken = createPayToken();
   const paymentUrl = clientInvoiceUrl({ id: invoiceRef.id, status: "draft", payToken });
   await invoiceRef.set({
@@ -15031,7 +17261,7 @@ async function createBookingInvoiceDraft(input) {
 }
 async function generateInvoiceNumber() {
   const year = (/* @__PURE__ */ new Date()).getFullYear();
-  const snapshot = await db$z().collection("invoices").where("invoiceNumber", ">=", `INV-${year}-`).where("invoiceNumber", "<", `INV-${year + 1}`).get().catch((err) => {
+  const snapshot = await db$x().collection("invoices").where("invoiceNumber", ">=", `INV-${year}-`).where("invoiceNumber", "<", `INV-${year + 1}`).get().catch((err) => {
     console.error("[Bookings] Invoice number lookup failed:", err);
     return null;
   });
@@ -15096,7 +17326,7 @@ const SENIOR_LIVING_SERVICE_LABELS = {
   facility: "Whole-building facility"
 };
 const SERVICE_ID_SET = new Set(SENIOR_LIVING_SERVICE_IDS);
-const EMAIL_RE$3 = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const EMAIL_RE$2 = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 function text$h(value) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -15133,7 +17363,7 @@ function parseSeniorLivingRequest(body) {
     return { ok: false, honeypot: false, error: "Enter the community name." };
   if (text$h(raw.community).trim().length > 120)
     return { ok: false, honeypot: false, error: "Community name is too long." };
-  if (!EMAIL_RE$3.test(email))
+  if (!EMAIL_RE$2.test(email))
     return { ok: false, honeypot: false, error: "Enter a valid email." };
   const digits2 = phone.replace(/\D/g, "");
   if (digits2.length < 10 || digits2.length > 15)
@@ -15370,7 +17600,7 @@ function parseSeniorLivingOrder(body, rates) {
   if (name.length < 2) return { ok: false, honeypot: false, error: "Enter your name." };
   if (community.length < 2) return { ok: false, honeypot: false, error: "Enter the community name." };
   if (title.length < 2) return { ok: false, honeypot: false, error: "Enter your title." };
-  if (!EMAIL_RE$3.test(email)) return { ok: false, honeypot: false, error: "Enter a valid email." };
+  if (!EMAIL_RE$2.test(email)) return { ok: false, honeypot: false, error: "Enter a valid email." };
   const digits2 = phone.replace(/\D/g, "");
   if (digits2.length < 10 || digits2.length > 15) {
     return { ok: false, honeypot: false, error: "Enter a phone number." };
@@ -15419,7 +17649,7 @@ function parseSeniorLivingOrder(body, rates) {
     quote: quoted.quote
   };
 }
-const db$y = () => admin.firestore();
+const db$w = () => admin.firestore();
 async function releaseEvent$1(ref, order, deleteEvent, result) {
   const eventId = typeof order.calendarEventId === "string" ? order.calendarEventId : "";
   if (!eventId) {
@@ -15452,24 +17682,24 @@ async function releaseExpiredHeadshotHolds(options = {}) {
     await deleteBookingCalendarHold({ calendarId: input.calendarId, eventId: input.eventId });
     return true;
   });
-  const waiting = await db$y().collection("orders").where("source", "==", HEADSHOTS_ORDER_SOURCE).where("status", "==", "awaiting_deposit").get();
+  const waiting = await db$w().collection("orders").where("source", "==", HEADSHOTS_ORDER_SOURCE).where("status", "==", "awaiting_deposit").get();
   for (const snap of waiting.docs) {
     const listed = snap.data() || {};
     if (!headshotHoldExpired(listed, now)) continue;
     result.checked += 1;
-    const ref = db$y().collection("orders").doc(snap.id);
-    const expired = await db$y().runTransaction(async (tx) => {
+    const ref = db$w().collection("orders").doc(snap.id);
+    const expired = await db$w().runTransaction(async (tx) => {
       const orderSnap = await tx.get(ref);
       if (!orderSnap.exists) return null;
       const order = orderSnap.data() || {};
       if (!headshotHoldExpired(order, now)) return null;
       const invoiceId = typeof order.invoiceId === "string" ? order.invoiceId : "";
-      const invoiceRef = invoiceId ? db$y().collection("invoices").doc(invoiceId) : null;
+      const invoiceRef = invoiceId ? db$w().collection("invoices").doc(invoiceId) : null;
       const invoiceSnap = invoiceRef ? await tx.get(invoiceRef) : null;
       const invoice = invoiceSnap?.exists ? invoiceSnap.data() || {} : {};
       if ((Number(invoice.depositPaid) || 0) > 0 || invoice.depositPaidAt) return null;
       const requestId = typeof order.orderRequestId === "string" ? order.orderRequestId : "";
-      const requestRef = requestId ? db$y().collection("orderRequests").doc(requestId) : null;
+      const requestRef = requestId ? db$w().collection("orderRequests").doc(requestId) : null;
       const requestSnap = requestRef ? await tx.get(requestRef) : null;
       const stamp2 = admin.firestore.FieldValue.serverTimestamp();
       const note = `Hold released: the $10 booking fee was not paid within ${HEADSHOTS_HOLD_MINUTES} minutes.`;
@@ -15527,14 +17757,14 @@ async function confirmHeadshotHold(input) {
   });
 }
 async function resolveLateHeadshotPayment(orderId) {
-  const ref = db$y().collection("orders").doc(orderId);
+  const ref = db$w().collection("orders").doc(orderId);
   const snap = await ref.get();
   if (!snap.exists) return "skipped";
   const order = snap.data() || {};
   if (order.source !== HEADSHOTS_ORDER_SOURCE || order.status !== APPRENTICESHIP_EXPIRED_STATUS) return "skipped";
   const stamp2 = admin.firestore.FieldValue.serverTimestamp();
   const requestId = typeof order.orderRequestId === "string" ? order.orderRequestId : "";
-  const requestRef = requestId ? db$y().collection("orderRequests").doc(requestId) : null;
+  const requestRef = requestId ? db$w().collection("orderRequests").doc(requestId) : null;
   const orderNumber2 = String(order.orderNumber || "");
   const slotStart = typeof order.slotStart === "string" ? order.slotStart : "";
   const quantity = Number(order.quantity) || 1;
@@ -15607,11 +17837,11 @@ async function resolveLateHeadshotPayment(orderId) {
 }
 const router$F = Router();
 const limiter$4 = createRateLimiter({ windowMs: 15 * 60 * 1e3, max: 8 });
-const db$x = () => admin.firestore();
+const db$v = () => admin.firestore();
 async function nextInvoiceNumber$2() {
   const year = (/* @__PURE__ */ new Date()).getFullYear();
   try {
-    const snapshot = await db$x().collection("invoices").where("invoiceNumber", ">=", `INV-${year}-`).where("invoiceNumber", "<", `INV-${year + 1}`).get();
+    const snapshot = await db$v().collection("invoices").where("invoiceNumber", ">=", `INV-${year}-`).where("invoiceNumber", "<", `INV-${year + 1}`).get();
     return nextSequentialInvoiceNumber(snapshot.docs.map((entry2) => entry2.data().invoiceNumber), year);
   } catch (error) {
     console.error("[Headshots] Invoice number lookup failed:", error);
@@ -15764,7 +17994,7 @@ router$F.post("/order", async (req, res) => {
     wearUrl
   });
   try {
-    const requestRef = await db$x().collection("orderRequests").add({
+    const requestRef = await db$v().collection("orderRequests").add({
       firstName: value.firstName,
       lastName: value.lastName,
       clientName: clientName2,
@@ -15811,7 +18041,7 @@ router$F.post("/order", async (req, res) => {
       updatedAt: now
     });
     await bumpAdminUnreadChannel(orderRequestSignal(HEADSHOTS_LEAD_SOURCE));
-    const orderRef = await db$x().collection("orders").add({
+    const orderRef = await db$v().collection("orders").add({
       orderRequestId: requestRef.id,
       clientName: clientName2,
       clientEmail: value.email,
@@ -15847,7 +18077,7 @@ router$F.post("/order", async (req, res) => {
       createdAt: now,
       updatedAt: now
     });
-    const invoiceRef = db$x().collection("invoices").doc();
+    const invoiceRef = db$v().collection("invoices").doc();
     const payToken = createPayToken();
     const invoiceNumber = await nextInvoiceNumber$2();
     await invoiceRef.set({
@@ -16008,7 +18238,7 @@ async function ensureDotOptInLink(invoice) {
     return { dotOptIn: false, url: null };
   }
 }
-const db$w = () => admin.firestore();
+const db$u = () => admin.firestore();
 const LINKED = ["invoices", "appointments", "listings", "transactions", "galleries", "orders", "orderRequests"];
 async function loadRevenueDocs(id) {
   const docs = [];
@@ -16021,7 +18251,7 @@ async function loadRevenueDocs(id) {
     docs.push({ collection, id: docId, data });
   };
   for (const collection of ["orders", "orderRequests"]) {
-    const snap = await db$w().collection(collection).doc(id).get();
+    const snap = await db$u().collection(collection).doc(id).get();
     if (snap.exists) add(collection, snap.id, snap.data());
   }
   const orderIds = /* @__PURE__ */ new Set();
@@ -16038,12 +18268,12 @@ async function loadRevenueDocs(id) {
   }
   for (const orderId of orderIds) {
     if (docs.some((doc) => doc.collection === "orders" && doc.id === orderId)) continue;
-    const snap = await db$w().collection("orders").doc(orderId).get();
+    const snap = await db$u().collection("orders").doc(orderId).get();
     if (snap.exists) add("orders", snap.id, snap.data());
   }
   for (const requestId of requestIds) {
     if (docs.some((doc) => doc.collection === "orderRequests" && doc.id === requestId)) continue;
-    const snap = await db$w().collection("orderRequests").doc(requestId).get();
+    const snap = await db$u().collection("orderRequests").doc(requestId).get();
     if (snap.exists) add("orderRequests", snap.id, snap.data());
   }
   const queries = [];
@@ -16056,7 +18286,7 @@ async function loadRevenueDocs(id) {
   }
   for (const [collection, field, value] of queries) {
     try {
-      const snap = await db$w().collection(collection).where(field, "==", value).get();
+      const snap = await db$u().collection(collection).where(field, "==", value).get();
       snap.docs.forEach((doc) => add(collection, doc.id, doc.data()));
     } catch (err) {
       console.error(`[Revenue] Lookup ${collection}.${field} failed:`, err);
@@ -16424,7 +18654,7 @@ function amzDate(now) {
   return iso;
 }
 const router$E = Router();
-const db$v = () => admin.firestore();
+const db$t = () => admin.firestore();
 const dotOptInLimiter = createRateLimiter({ windowMs: 10 * 60 * 1e3, max: 30 });
 function sendDotOptInPage(res, status2, ok) {
   res.status(status2);
@@ -16455,7 +18685,7 @@ router$E.get("/dot-opt-in", async (req, res) => {
 router$E.get("/", requireStaff, async (req, res) => {
   try {
     const { status: status2, photographerId, limit = "50", startAfter } = req.query;
-    let query = db$v().collection("orders").orderBy("createdAt", "desc");
+    let query = db$t().collection("orders").orderBy("createdAt", "desc");
     if (status2) query = query.where("status", "==", status2);
     if (photographerId) {
       query = query.where("assignedPhotographerId", "==", photographerId);
@@ -16463,7 +18693,7 @@ router$E.get("/", requireStaff, async (req, res) => {
     const limitNum = Math.min(Number(limit), 200);
     query = query.limit(limitNum);
     if (startAfter) {
-      const cursorDoc = await db$v().collection("orders").doc(startAfter).get();
+      const cursorDoc = await db$t().collection("orders").doc(startAfter).get();
       if (cursorDoc.exists) {
         query = query.startAfter(cursorDoc);
       }
@@ -16486,10 +18716,10 @@ router$E.get("/dashboard", requireStaff, async (_req, res) => {
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const [allOrders, todayOrders, monthTransactions, pendingRequests] = await Promise.all([
-      db$v().collection("orders").get(),
-      db$v().collection("orders").where("createdAt", ">=", admin.firestore.Timestamp.fromDate(todayStart)).get(),
-      db$v().collection("transactions").where("createdAt", ">=", admin.firestore.Timestamp.fromDate(monthStart)).where("status", "==", "completed").get(),
-      db$v().collection("orderRequests").where("status", "==", "new").get()
+      db$t().collection("orders").get(),
+      db$t().collection("orders").where("createdAt", ">=", admin.firestore.Timestamp.fromDate(todayStart)).get(),
+      db$t().collection("transactions").where("createdAt", ">=", admin.firestore.Timestamp.fromDate(monthStart)).where("status", "==", "completed").get(),
+      db$t().collection("orderRequests").where("status", "==", "new").get()
     ]);
     const statusCounts = {};
     allOrders.docs.forEach((d) => {
@@ -16512,23 +18742,23 @@ router$E.get("/dashboard", requireStaff, async (_req, res) => {
 });
 router$E.get("/:id", requireStaff, async (req, res) => {
   try {
-    const orderDoc = await db$v().collection("orders").doc(req.params.id).get();
+    const orderDoc = await db$t().collection("orders").doc(req.params.id).get();
     if (!orderDoc.exists) return res.status(404).json({ error: "Order not found." });
     const order = presentStaffOrder({ id: orderDoc.id, ...orderDoc.data() });
     const [gallery, invoice, appointment, messages] = await Promise.all([
-      db$v().collection("galleries").where("orderId", "==", req.params.id).limit(1).get().catch((err) => {
+      db$t().collection("galleries").where("orderId", "==", req.params.id).limit(1).get().catch((err) => {
         console.error("[Orders] Gallery lookup failed:", err);
         return null;
       }),
-      db$v().collection("invoices").where("orderId", "==", req.params.id).limit(1).get().catch((err) => {
+      db$t().collection("invoices").where("orderId", "==", req.params.id).limit(1).get().catch((err) => {
         console.error("[Orders] Invoice lookup failed:", err);
         return null;
       }),
-      db$v().collection("appointments").where("orderId", "==", req.params.id).limit(1).get().catch((err) => {
+      db$t().collection("appointments").where("orderId", "==", req.params.id).limit(1).get().catch((err) => {
         console.error("[Orders] Appointment lookup failed:", err);
         return null;
       }),
-      db$v().collection("messages").where("orderId", "==", req.params.id).orderBy("createdAt", "desc").limit(20).get().catch((err) => {
+      db$t().collection("messages").where("orderId", "==", req.params.id).orderBy("createdAt", "desc").limit(20).get().catch((err) => {
         console.error("[Orders] Messages lookup failed:", err);
         return null;
       })
@@ -16559,7 +18789,7 @@ router$E.patch("/:id/revenue", requireCoordinator, async (req, res) => {
     });
     if (!plan.found) return res.status(404).json({ error: "Order not found." });
     for (const patch of plan.patches) {
-      await db$v().collection(patch.collection).doc(patch.id).update({
+      await db$t().collection(patch.collection).doc(patch.id).update({
         ...patch.fields,
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
@@ -16593,7 +18823,7 @@ router$E.patch("/:id", requireCoordinator, async (req, res) => {
     });
     const photographerId = typeof updates.assignedPhotographerId === "string" ? updates.assignedPhotographerId.trim() : "";
     if (photographerId) {
-      const orderDoc = await db$v().collection("orders").doc(req.params.id).get();
+      const orderDoc = await db$t().collection("orders").doc(req.params.id).get();
       if (!orderDoc.exists) return res.status(404).json({ error: "Order not found." });
       const refusal2 = await refuseQaStaffAssignment({
         staffIds: [photographerId],
@@ -16610,10 +18840,10 @@ router$E.patch("/:id", requireCoordinator, async (req, res) => {
     const watchKeys = ["status", "assignedPhotographerId", "scheduledDate", "scheduledTime"];
     let beforeRecord = null;
     if (watchKeys.some((key) => key in req.body)) {
-      const existing = await db$v().collection("orders").doc(req.params.id).get();
+      const existing = await db$t().collection("orders").doc(req.params.id).get();
       if (existing.exists) beforeRecord = { id: existing.id, ...existing.data() || {} };
     }
-    await db$v().collection("orders").doc(req.params.id).update(updates);
+    await db$t().collection("orders").doc(req.params.id).update(updates);
     if (beforeRecord) {
       const postedStatus = typeof req.body.status === "string" ? req.body.status.toLowerCase() : "";
       const type = postedStatus === "cancelled" || postedStatus === "canceled" ? "appointment_canceled" : postedStatus === "postponed" ? "appointment_postponed" : "appointment_changed";
@@ -16646,7 +18876,7 @@ const VALID_TRANSITIONS = {
 router$E.patch("/:id/status", requireCoordinator, async (req, res) => {
   try {
     const { status: status2, note } = req.body;
-    const orderDoc = await db$v().collection("orders").doc(req.params.id).get();
+    const orderDoc = await db$t().collection("orders").doc(req.params.id).get();
     if (!orderDoc.exists) return res.status(404).json({ error: "Order not found." });
     const currentStatus = orderDoc.data().status;
     const validNext = VALID_TRANSITIONS[currentStatus] || [];
@@ -16664,14 +18894,14 @@ router$E.patch("/:id/status", requireCoordinator, async (req, res) => {
       updates.completedAt = admin.firestore.FieldValue.serverTimestamp();
     }
     await orderDoc.ref.update(updates);
-    const apptSnapshot = await db$v().collection("appointments").where("orderId", "==", req.params.id).limit(1).get();
+    const apptSnapshot = await db$t().collection("appointments").where("orderId", "==", req.params.id).limit(1).get();
     if (!apptSnapshot.empty) {
       const apptStatus = status2 === "in_progress" ? "in_progress" : status2 === "shot_complete" || status2 === "editing" ? "completed" : status2 === "cancelled" ? "cancelled" : void 0;
       if (apptStatus) {
         await apptSnapshot.docs[0].ref.update({ status: apptStatus });
       }
     }
-    await db$v().collection("agentLogs").add({
+    await db$t().collection("agentLogs").add({
       agent: "nora",
       action: `Order status changed: ${currentStatus} → ${status2}`,
       summary: `Order ${req.params.id} transitioned to ${status2}`,
@@ -16719,9 +18949,9 @@ router$E.patch("/:id/status", requireCoordinator, async (req, res) => {
 router$E.get("/:id/timeline", requireStaff, async (req, res) => {
   try {
     const [messages, editRequests, agentLogs] = await Promise.all([
-      db$v().collection("messages").where("orderId", "==", req.params.id).orderBy("createdAt", "asc").get(),
-      db$v().collection("editRequests").where("orderId", "==", req.params.id).orderBy("createdAt", "asc").get(),
-      db$v().collection("agentLogs").where("relatedId", "==", req.params.id).orderBy("createdAt", "asc").get()
+      db$t().collection("messages").where("orderId", "==", req.params.id).orderBy("createdAt", "asc").get(),
+      db$t().collection("editRequests").where("orderId", "==", req.params.id).orderBy("createdAt", "asc").get(),
+      db$t().collection("agentLogs").where("relatedId", "==", req.params.id).orderBy("createdAt", "asc").get()
     ]);
     const timeline = [
       ...messages.docs.map((d) => ({ type: "message", ...d.data(), id: d.id })),
@@ -19241,7 +21471,7 @@ function finite$1(value) {
   const number = typeof value === "number" ? value : typeof value === "string" && value.trim() ? Number(value) : NaN;
   return Number.isFinite(number) ? number : null;
 }
-const db$u = () => admin.firestore();
+const db$s = () => admin.firestore();
 const bucket$4 = () => admin.storage().bucket();
 const BROWSER_ORIGINS = [
   "https://iconicimagestx.vercel.app",
@@ -19305,7 +21535,7 @@ async function registerListingPhoto(options) {
   if (!isListingStoragePath(listingId, storagePath)) {
     throw Object.assign(new Error("Storage path is not inside this listing."), { status: 400 });
   }
-  const listingRef = db$u().collection("listings").doc(listingId);
+  const listingRef = db$s().collection("listings").doc(listingId);
   const listingSnap = await listingRef.get();
   if (!listingSnap.exists) {
     throw Object.assign(new Error("Listing not found."), { status: 404 });
@@ -19392,7 +21622,7 @@ function galleryMediaItem(image) {
 async function syncListingGallery(listing, image) {
   const galleryId = typeof listing.galleryId === "string" ? listing.galleryId.trim() : "";
   if (!galleryId) return;
-  const ref = db$u().collection("galleries").doc(galleryId);
+  const ref = db$s().collection("galleries").doc(galleryId);
   const snap = await ref.get();
   if (!snap.exists) return;
   const items = Array.isArray(snap.data()?.mediaItems) ? snap.data().mediaItems : [];
@@ -19408,7 +21638,7 @@ async function syncPlaytestGallery(listingId, listing, image) {
     galleryIds.add(listing.playtestGalleryId);
   }
   if (listing.playtest === true) {
-    const snap = await db$u().collection("galleries").where("listingId", "==", listingId).limit(5).get();
+    const snap = await db$s().collection("galleries").where("listingId", "==", listingId).limit(5).get();
     snap.docs.forEach((doc) => {
       if (doc.data().playtest === true) galleryIds.add(doc.id);
     });
@@ -19416,7 +21646,7 @@ async function syncPlaytestGallery(listingId, listing, image) {
   if (galleryIds.size === 0) return;
   const mediaItem = galleryMediaItem(image);
   for (const galleryId of galleryIds) {
-    const ref = db$u().collection("galleries").doc(galleryId);
+    const ref = db$s().collection("galleries").doc(galleryId);
     const snap = await ref.get();
     if (!snap.exists || snap.data()?.playtest !== true) continue;
     const items = Array.isArray(snap.data()?.mediaItems) ? snap.data().mediaItems : [];
@@ -19429,7 +21659,7 @@ async function syncPlaytestGallery(listingId, listing, image) {
   }
 }
 async function saveListingPhotoOrder(listingId, order) {
-  const ref = db$u().collection("listings").doc(listingId);
+  const ref = db$s().collection("listings").doc(listingId);
   const snap = await ref.get();
   if (!snap.exists) throw Object.assign(new Error("Listing not found."), { status: 404 });
   const images = Array.isArray(snap.data()?.images) ? snap.data().images : [];
@@ -19444,12 +21674,12 @@ async function linkedGalleryIds(listingId, listing) {
   const ids = /* @__PURE__ */ new Set();
   if (typeof listing.galleryId === "string" && listing.galleryId.trim()) ids.add(listing.galleryId.trim());
   if (typeof listing.playtestGalleryId === "string" && listing.playtestGalleryId.trim()) ids.add(listing.playtestGalleryId.trim());
-  const snap = await db$u().collection("galleries").where("listingId", "==", listingId).limit(10).get();
+  const snap = await db$s().collection("galleries").where("listingId", "==", listingId).limit(10).get();
   snap.docs.forEach((doc) => ids.add(doc.id));
   return [...ids];
 }
 async function publishListingGallerySequence(listingId, uploadedBy, addressOverride = "") {
-  const ref = db$u().collection("listings").doc(listingId);
+  const ref = db$s().collection("listings").doc(listingId);
   const snap = await ref.get();
   if (!snap.exists) throw Object.assign(new Error("Listing not found."), { status: 404 });
   const listing = snap.data() || {};
@@ -19480,7 +21710,7 @@ async function publishListingGallerySequence(listingId, uploadedBy, addressOverr
   );
   const galleryIds = await linkedGalleryIds(listingId, listing);
   for (const galleryId of galleryIds) {
-    const galleryRef = db$u().collection("galleries").doc(galleryId);
+    const galleryRef = db$s().collection("galleries").doc(galleryId);
     const gallerySnap = await galleryRef.get();
     if (!gallerySnap.exists) continue;
     const data = gallerySnap.data() || {};
@@ -19525,7 +21755,7 @@ async function saveListingMediaArrangement(listingId, raw) {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
     throw Object.assign(new Error("Say how to arrange this media."), { status: 400 });
   }
-  const ref = db$u().collection("listings").doc(listingId);
+  const ref = db$s().collection("listings").doc(listingId);
   const snap = await ref.get();
   if (!snap.exists) throw Object.assign(new Error("Listing not found."), { status: 404 });
   const listing = snap.data() || {};
@@ -19546,7 +21776,7 @@ async function saveListingMediaArrangement(listingId, raw) {
   await ref.update(update);
   const galleryIds = await linkedGalleryIds(listingId, listing);
   for (const galleryId of galleryIds) {
-    const galleryRef = db$u().collection("galleries").doc(galleryId);
+    const galleryRef = db$s().collection("galleries").doc(galleryId);
     const gallerySnap = await galleryRef.get();
     if (!gallerySnap.exists) continue;
     const data = gallerySnap.data() || {};
@@ -19835,7 +22065,7 @@ async function inspectFinishedListingJpeg(input) {
   }
   return parseDeliveryInspection(body) || deliveryInspection("flag", [INSPECTION_FAILED_NOTE]);
 }
-const db$t = () => admin.firestore();
+const db$r = () => admin.firestore();
 const bucket$3 = () => admin.storage().bucket();
 function httpError$5(status2, message) {
   return Object.assign(new Error(message), { status: status2 });
@@ -19847,7 +22077,7 @@ async function bumpRawIngestJob(input) {
     name: input.image.name || input.image.path.split("/").pop() || "raw",
     contentType: input.image.contentType || ""
   };
-  const ref = db$t().collection("editJobs").doc(ingestJobId(input.listingId));
+  const ref = db$r().collection("editJobs").doc(ingestJobId(input.listingId));
   const snap = await ref.get();
   if (!snap.exists) {
     await ref.set({
@@ -19879,7 +22109,7 @@ async function bumpRawIngestJob(input) {
   return { id: ref.id, created: false, fileCount: files.length + 1 };
 }
 async function loadListing$1(listingId) {
-  const snap = await db$t().collection("listings").doc(listingId).get();
+  const snap = await db$r().collection("listings").doc(listingId).get();
   if (!snap.exists) throw httpError$5(404, "Listing not found.");
   return { id: snap.id, ref: snap.ref, data: snap.data() || {} };
 }
@@ -19891,10 +22121,10 @@ async function listingDelivery(listingId, data) {
     };
     push(data.galleryId);
     push(data.playtestGalleryId);
-    const snap = await db$t().collection("galleries").where("listingId", "==", listingId).limit(5).get();
+    const snap = await db$r().collection("galleries").where("listingId", "==", listingId).limit(5).get();
     snap.docs.forEach((doc) => ids.push(doc.id));
     for (const galleryId of [...new Set(ids)]) {
-      const doc = await db$t().collection("galleries").doc(galleryId).get();
+      const doc = await db$r().collection("galleries").doc(galleryId).get();
       if (!doc.exists) continue;
       const galleryStatus = typeof doc.data()?.status === "string" ? doc.data().status : "";
       const deliveryStatus = mediaDeliveryFromGalleryStatus(galleryStatus);
@@ -19914,14 +22144,14 @@ async function listingDelivery(listingId, data) {
 async function listingsForRole(uid, role) {
   if (role === "photographer") {
     const [byUid, byIds] = await Promise.all([
-      db$t().collection("listings").where("photographerUid", "==", uid).limit(50).get(),
-      db$t().collection("listings").where("photographerIds", "array-contains", uid).limit(50).get()
+      db$r().collection("listings").where("photographerUid", "==", uid).limit(50).get(),
+      db$r().collection("listings").where("photographerIds", "array-contains", uid).limit(50).get()
     ]);
     const merged = /* @__PURE__ */ new Map();
     for (const doc of [...byUid.docs, ...byIds.docs]) merged.set(doc.id, doc);
     return [...merged.values()].map((doc) => ({ id: doc.id, data: doc.data() }));
   }
-  const snap = await db$t().collection("listings").limit(80).get();
+  const snap = await db$r().collection("listings").limit(80).get();
   return snap.docs.map((doc) => ({ id: doc.id, data: doc.data() }));
 }
 async function assertStudioAccess(uid, role, listingId) {
@@ -19993,7 +22223,7 @@ async function loadOrderEditContext(listingId) {
   let order = null;
   const orderId = typeof listing.data.orderId === "string" ? listing.data.orderId : "";
   if (orderId) {
-    const snap = await db$t().collection("orders").doc(orderId).get();
+    const snap = await db$r().collection("orders").doc(orderId).get();
     if (snap.exists) order = snap.data() || {};
   }
   const plan = planOrderEdits({
@@ -20043,7 +22273,7 @@ async function prepareOrderEditJobs(input) {
   if (input.retryFailed) settled2.delete("failed");
   let prepared = 0;
   for (const draft of drafts) {
-    const ref = db$t().collection("editJobs").doc(orderEditDocId(input.listingId, draft.slot));
+    const ref = db$r().collection("editJobs").doc(orderEditDocId(input.listingId, draft.slot));
     const snap = await ref.get();
     const current = snap.data() || {};
     if (snap.exists && settled2.has(String(current.status || ""))) continue;
@@ -20073,7 +22303,7 @@ async function prepareOrderEditJobs(input) {
     await ref.set(payload, { merge: true });
     prepared += 1;
   }
-  const jobSnap = await db$t().collection("editJobs").where("listingId", "==", input.listingId).limit(200).get();
+  const jobSnap = await db$r().collection("editJobs").where("listingId", "==", input.listingId).limit(200).get();
   const jobs = queueJobsFromSnap(jobSnap.docs);
   const advance2 = orderQueueAdvancePlan(jobs);
   const waiting = jobs.filter((job) => job.origin === "order" && job.status === "pending" && !job.sourcePath).length;
@@ -20081,7 +22311,7 @@ async function prepareOrderEditJobs(input) {
 }
 async function claimOrderEdit(ref, now = Date.now()) {
   try {
-    await db$t().runTransaction(async (tx) => {
+    await db$r().runTransaction(async (tx) => {
       const snap = await tx.get(ref);
       if (!snap.exists) throw new Error("missing");
       const data = snap.data() || {};
@@ -20108,7 +22338,7 @@ async function claimOrderEdit(ref, now = Date.now()) {
 }
 async function advanceOrderEditQueue(input) {
   const prepared = await prepareOrderEditJobs(input);
-  const jobSnap = await db$t().collection("editJobs").where("listingId", "==", input.listingId).limit(200).get();
+  const jobSnap = await db$r().collection("editJobs").where("listingId", "==", input.listingId).limit(200).get();
   const advance2 = orderQueueAdvancePlan(queueJobsFromSnap(jobSnap.docs));
   const waiting = queueJobsFromSnap(jobSnap.docs).filter((job) => job.origin === "order" && job.status === "pending" && !job.sourcePath).length;
   if (!advance2.nextId) {
@@ -20231,7 +22461,7 @@ async function enqueueOrderEditsFromUpload(input) {
   return prepareOrderEditJobs({ ...input, retryFailed: false });
 }
 async function nextOrderEditListingId() {
-  const snap = await db$t().collection("editJobs").where("status", "==", "pending").limit(40).get();
+  const snap = await db$r().collection("editJobs").where("status", "==", "pending").limit(40).get();
   for (const doc of snap.docs) {
     const data = doc.data() || {};
     if (data.origin === "order" && data.sourcePath && typeof data.listingId === "string" && data.listingId) {
@@ -20248,7 +22478,7 @@ async function enqueueAiEdit(input) {
     throw httpError$5(400, "Choose a JPEG, PNG, or WebP. RAW stays in the queue until a preview exists.");
   }
   const beforeUrl = frame.url || input.imageUrl;
-  const ref = await db$t().collection("editJobs").add({
+  const ref = await db$r().collection("editJobs").add({
     kind: "ai_edit",
     origin: "staff_override",
     type: input.type,
@@ -20316,7 +22546,7 @@ async function enqueueAiEdit(input) {
   }
 }
 async function rejectStudioJob(input) {
-  const ref = db$t().collection("editJobs").doc(input.jobId);
+  const ref = db$r().collection("editJobs").doc(input.jobId);
   const snap = await ref.get();
   if (!snap.exists) throw httpError$5(404, "Edit job not found.");
   const job = snap.data() || {};
@@ -20354,7 +22584,7 @@ async function saveAdjustedJpeg(input) {
     existingUrl: saved.url,
     extra: { studioRole: "adjusted", sourcePath: input.sourcePath }
   });
-  const job = await db$t().collection("editJobs").add({
+  const job = await db$r().collection("editJobs").add({
     kind: "adjust",
     type: "adjust",
     listingId: input.listingId,
@@ -20420,11 +22650,11 @@ async function addFinalToGalleries(listingId, listing, image) {
   const ids = /* @__PURE__ */ new Set();
   if (typeof listing.galleryId === "string" && listing.galleryId) ids.add(listing.galleryId);
   if (typeof listing.playtestGalleryId === "string" && listing.playtestGalleryId) ids.add(listing.playtestGalleryId);
-  const snap = await db$t().collection("galleries").where("listingId", "==", listingId).limit(10).get();
+  const snap = await db$r().collection("galleries").where("listingId", "==", listingId).limit(10).get();
   snap.docs.forEach((doc) => ids.add(doc.id));
   const updated = [];
   for (const galleryId of ids) {
-    const ref = db$t().collection("galleries").doc(galleryId);
+    const ref = db$r().collection("galleries").doc(galleryId);
     const gallerySnap = await ref.get();
     if (!gallerySnap.exists) continue;
     const data = gallerySnap.data() || {};
@@ -20490,7 +22720,7 @@ async function approveStudioFinal(input) {
     sortOrder: sequenced?.sortOrder ?? (typeof source?.sortOrder === "number" ? source.sortOrder : void 0)
   });
   if (input.jobId) {
-    await db$t().collection("editJobs").doc(input.jobId).set({
+    await db$r().collection("editJobs").doc(input.jobId).set({
       status: "approved",
       resultPath: copied.storagePath,
       resultUrl: copied.url,
@@ -20509,7 +22739,7 @@ async function approveStudioFinal(input) {
 async function loadStudioWorkspace(input) {
   const listings = await listingsForRole(input.uid, input.role);
   const allowed = new Set(listings.map((item) => item.id));
-  const jobSnap = await db$t().collection("editJobs").limit(150).get();
+  const jobSnap = await db$r().collection("editJobs").limit(150).get();
   const jobs = jobSnap.docs.map((doc) => jsonSafe({ id: doc.id, ...doc.data() })).filter((job) => {
     const listingId = String(job.listingId || "");
     if (input.role === "photographer") return allowed.has(listingId);
@@ -20556,7 +22786,7 @@ async function loadStudioWorkspace(input) {
     listing
   };
 }
-const db$s = () => admin.firestore();
+const db$q = () => admin.firestore();
 function asMedia(value) {
   if (!Array.isArray(value)) return [];
   return value.flatMap((entry2) => {
@@ -20598,11 +22828,11 @@ async function galleryMediaForListing(listingId, listing, extra) {
   const ids = /* @__PURE__ */ new Set();
   if (typeof listing.galleryId === "string" && listing.galleryId) ids.add(listing.galleryId);
   if (typeof listing.playtestGalleryId === "string" && listing.playtestGalleryId) ids.add(listing.playtestGalleryId);
-  const snap = await db$s().collection("galleries").where("listingId", "==", listingId).limit(10).get();
+  const snap = await db$q().collection("galleries").where("listingId", "==", listingId).limit(10).get();
   snap.docs.forEach((doc) => ids.add(doc.id));
   for (const galleryId of ids) {
     if (extra && galleryId === extra.id) continue;
-    const doc = await db$s().collection("galleries").doc(galleryId).get();
+    const doc = await db$q().collection("galleries").doc(galleryId).get();
     if (!doc.exists) continue;
     const data = doc.data() || {};
     media.push(...asMedia(data.mediaItems), ...asMedia(data.videoLinks), ...asMedia(data.tourLinks));
@@ -20612,7 +22842,7 @@ async function galleryMediaForListing(listingId, listing, extra) {
 async function loadGalleryReleaseReport(listingId, gallery) {
   const { listing, plan } = await loadOrderEditContext(listingId);
   const files = filesFromListing(listing.data);
-  const jobSnap = await db$s().collection("editJobs").where("listingId", "==", listingId).limit(200).get();
+  const jobSnap = await db$q().collection("editJobs").where("listingId", "==", listingId).limit(200).get();
   const jobs = jobSnap.docs.map((doc) => {
     const data = doc.data() || {};
     return {
@@ -20637,7 +22867,7 @@ async function loadGalleryReleaseReport(listingId, gallery) {
   return report;
 }
 async function loadGalleryReleaseForGallery(galleryId) {
-  const snap = await db$s().collection("galleries").doc(galleryId).get();
+  const snap = await db$q().collection("galleries").doc(galleryId).get();
   if (!snap.exists) {
     throw Object.assign(new Error("Gallery not found."), { status: 404 });
   }
@@ -20646,13 +22876,13 @@ async function loadGalleryReleaseForGallery(galleryId) {
   if (playtestRelease) return playtestRelease;
   const listingId = typeof gallery.listingId === "string" ? gallery.listingId.trim() : "";
   if (listingId) {
-    const listingSnap = await db$s().collection("listings").doc(listingId).get();
+    const listingSnap = await db$q().collection("listings").doc(listingId).get();
     if (listingSnap.exists) return loadGalleryReleaseReport(listingId, gallery);
   }
   const orderId = typeof gallery.orderId === "string" ? gallery.orderId.trim() : "";
   let order = null;
   if (orderId) {
-    const orderSnap = await db$s().collection("orders").doc(orderId).get();
+    const orderSnap = await db$q().collection("orders").doc(orderId).get();
     if (orderSnap.exists) order = orderSnap.data() || {};
   }
   const plan = planOrderEdits({
@@ -20670,18 +22900,18 @@ async function loadGalleryReleaseForGallery(galleryId) {
     media: [...asMedia(gallery.mediaItems), ...asMedia(gallery.videoLinks), ...asMedia(gallery.tourLinks)]
   });
 }
-const db$r = () => admin.firestore();
+const db$p = () => admin.firestore();
 function httpError$4(status2, message, extra) {
   return Object.assign(new Error(message), { status: status2, ...extra });
 }
 async function invoiceForGallery$1(gallery) {
-  const load = (id) => db$r().collection("invoices").doc(id).get();
+  const load = (id) => db$p().collection("invoices").doc(id).get();
   if (typeof gallery.invoiceId === "string" && gallery.invoiceId) {
     const doc = await readInvoiceDoc(load, gallery.invoiceId);
     if (doc) return { id: doc.id, ...doc.data };
   }
   if (typeof gallery.orderId === "string" && gallery.orderId) {
-    const snap = await db$r().collection("invoices").where("orderId", "==", gallery.orderId).limit(1).get();
+    const snap = await db$p().collection("invoices").where("orderId", "==", gallery.orderId).limit(1).get();
     if (!snap.empty) {
       const doc = await readInvoiceDoc(load, snap.docs[0].id);
       if (doc) return { id: doc.id, ...doc.data };
@@ -20689,7 +22919,7 @@ async function invoiceForGallery$1(gallery) {
   }
   const listingId = typeof gallery.listingId === "string" ? gallery.listingId.trim() : "";
   if (listingId) {
-    const listing = await db$r().collection("listings").doc(listingId).get();
+    const listing = await db$p().collection("listings").doc(listingId).get();
     const invoiceId = listing.exists && typeof listing.data()?.invoiceId === "string" ? listing.data()?.invoiceId.trim() : "";
     if (invoiceId) {
       const doc = await readInvoiceDoc(load, invoiceId);
@@ -20701,7 +22931,7 @@ async function invoiceForGallery$1(gallery) {
 async function listingDownloadFlags$1(gallery) {
   const listingId = typeof gallery.listingId === "string" ? gallery.listingId.trim() : "";
   if (!listingId) return { lockDownloads: void 0, downloadsReleased: false };
-  const listing = await db$r().collection("listings").doc(listingId).get();
+  const listing = await db$p().collection("listings").doc(listingId).get();
   if (!listing.exists) return { lockDownloads: void 0, downloadsReleased: false };
   const data = listing.data() || {};
   return {
@@ -20720,7 +22950,7 @@ async function downloadGateForGallery$1(gallery) {
   };
 }
 async function deliverGalleryToClient(galleryId, options) {
-  const galleryDoc = await db$r().collection("galleries").doc(galleryId).get();
+  const galleryDoc = await db$p().collection("galleries").doc(galleryId).get();
   if (!galleryDoc.exists) throw httpError$4(404, "Gallery not found.");
   const report = await loadGalleryReleaseForGallery(galleryId);
   if (!report.complete) {
@@ -20743,13 +22973,13 @@ async function deliverGalleryToClient(galleryId, options) {
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
   });
   if (gallery.orderId) {
-    await db$r().collection("orders").doc(String(gallery.orderId)).update({
+    await db$p().collection("orders").doc(String(gallery.orderId)).update({
       status: "delivered",
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
   }
   const clientId2 = typeof gallery.clientId === "string" ? gallery.clientId : "";
-  const clientDoc = clientId2 ? await db$r().collection("clients").doc(clientId2).get() : null;
+  const clientDoc = clientId2 ? await db$p().collection("clients").doc(clientId2).get() : null;
   const client = clientDoc?.data();
   const address = recordAddressText(gallery) || "the property";
   const invoice = await invoiceForGallery$1(gallery);
@@ -20826,10 +23056,20 @@ async function deliverGalleryToClient(galleryId, options) {
     }).catch((err) => console.error("[Galleries] Payment required email notify failed:", err));
   }
   if (client?.phone) {
-    await sendSMS({
-      to: client.phone,
-      body: SMS_TEMPLATES.photosDelivered(gallery.clientName || client.name || "there", deliveryUrl)
-    }).catch((err) => console.error("[Galleries] Delivery SMS failed:", err));
+    const orderSnap = gallery.orderId ? await db$p().collection("orders").doc(String(gallery.orderId)).get() : null;
+    const order = orderSnap?.exists ? orderSnap.data() : null;
+    const consentBlock = transactionalSmsBlockReason({
+      smsConsent: order?.smsConsent === true || gallery.smsConsent === true,
+      stopped: await isSmsStopped(String(client.phone))
+    });
+    if (consentBlock) {
+      console.info(`[Galleries] Delivery SMS skipped for ${galleryId}. ${consentBlock}. No message sent.`);
+    } else {
+      await sendSMS({
+        to: client.phone,
+        body: SMS_TEMPLATES.photosDelivered(gallery.clientName || client.name || "there", deliveryUrl)
+      }).catch((err) => console.error("[Galleries] Delivery SMS failed:", err));
+    }
   }
   return { deliveryUrl, galleryStatus: "delivered" };
 }
@@ -20853,7 +23093,7 @@ async function recordGalleryDelivered(gallery, input) {
     return;
   }
   if (orderId) {
-    await db$r().collection("orders").doc(orderId).update({
+    await db$p().collection("orders").doc(orderId).update({
       history: admin.firestore.FieldValue.arrayUnion(entry2),
       updatedAt: stamp2
     });
@@ -20861,7 +23101,7 @@ async function recordGalleryDelivered(gallery, input) {
     console.warn("[Galleries] Gallery delivered with no order to attach history to.");
   }
   if (!listingId) return;
-  await db$r().collection("listings").doc(listingId).update({
+  await db$p().collection("listings").doc(listingId).update({
     auditLog: admin.firestore.FieldValue.arrayUnion(entry2),
     updatedAt: stamp2
   }).catch((err) => console.error("[Galleries] Project history was not saved:", err));
@@ -20870,11 +23110,11 @@ async function orderIdForGallery(gallery) {
   if (typeof gallery.orderId === "string" && gallery.orderId.trim()) return gallery.orderId.trim();
   const listingId = typeof gallery.listingId === "string" ? gallery.listingId.trim() : "";
   if (!listingId) return "";
-  const listing = await db$r().collection("listings").doc(listingId).get();
+  const listing = await db$p().collection("listings").doc(listingId).get();
   const orderId = listing.exists ? listing.data()?.orderId : "";
   return typeof orderId === "string" ? orderId.trim() : "";
 }
-const db$q = () => admin.firestore();
+const db$o = () => admin.firestore();
 function text$c(value) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -20888,7 +23128,7 @@ function mediaDoc(snap) {
 }
 async function galleriesWhere(field, id) {
   try {
-    const snap = await db$q().collection("galleries").where(field, "==", id).limit(8).get();
+    const snap = await db$o().collection("galleries").where(field, "==", id).limit(8).get();
     return snap.docs.map((doc) => mediaDoc(doc)).filter((doc) => Boolean(doc));
   } catch (err) {
     console.error(`[Galleries] ${field} lookup failed:`, err);
@@ -20897,7 +23137,7 @@ async function galleriesWhere(field, id) {
 }
 async function galleryById(id) {
   if (!id) return null;
-  return mediaDoc(await db$q().collection("galleries").doc(id).get());
+  return mediaDoc(await db$o().collection("galleries").doc(id).get());
 }
 async function relatedForListing(listing) {
   const related = await galleriesWhere("listingId", listing.id);
@@ -20911,8 +23151,8 @@ async function relatedForListing(listing) {
 }
 async function resolveClientGalleryLink(id) {
   const [gallerySnap, listingSnap] = await Promise.all([
-    db$q().collection("galleries").doc(id).get(),
-    db$q().collection("listings").doc(id).get()
+    db$o().collection("galleries").doc(id).get(),
+    db$o().collection("listings").doc(id).get()
   ]);
   const gallery = mediaDoc(gallerySnap);
   const listing = mediaDoc(listingSnap);
@@ -20944,8 +23184,8 @@ async function resolveClientGalleryLink(id) {
   }
   const relatedGalleries = await galleriesWhere("listingId", id);
   const [orderSnap, requestSnap] = await Promise.all([
-    db$q().collection("orders").doc(id).get(),
-    db$q().collection("orderRequests").doc(id).get()
+    db$o().collection("orders").doc(id).get(),
+    db$o().collection("orderRequests").doc(id).get()
   ]);
   const order = docRecord(orderSnap);
   const orderRequest = docRecord(requestSnap);
@@ -20956,7 +23196,7 @@ async function resolveClientGalleryLink(id) {
   let pointedListing = null;
   let pointedRelated = relatedGalleries;
   if (!pointedGallery && pointedListingId) {
-    pointedListing = mediaDoc(await db$q().collection("listings").doc(pointedListingId).get());
+    pointedListing = mediaDoc(await db$o().collection("listings").doc(pointedListingId).get());
     if (pointedListing) pointedRelated = await relatedForListing(pointedListing);
   }
   return decideClientGalleryLink({
@@ -20972,7 +23212,7 @@ async function resolveClientGalleryLink(id) {
   });
 }
 async function invoiceForListing(listing) {
-  const load = (id) => db$q().collection("invoices").doc(id).get();
+  const load = (id) => db$o().collection("invoices").doc(id).get();
   const invoiceId = text$c(listing.invoiceId);
   if (invoiceId) {
     const doc = await readInvoiceDoc(load, invoiceId);
@@ -20988,7 +23228,7 @@ async function invoiceForListing(listing) {
   const orderId = text$c(listing.orderId);
   if (!orderId) return null;
   try {
-    const snap = await db$q().collection("invoices").where("orderId", "==", orderId).limit(1).get();
+    const snap = await db$o().collection("invoices").where("orderId", "==", orderId).limit(1).get();
     if (snap.empty) return null;
     const doc = await readInvoiceDoc(load, snap.docs[0].id);
     if (!doc || invoiceRedirectTarget(doc.data)) return null;
@@ -21018,7 +23258,7 @@ async function readStudioCaller(req) {
       };
     }
     const decoded = await admin.auth().verifyIdToken(token);
-    const staffSnap = await db$q().collection("staff").doc(decoded.uid).get();
+    const staffSnap = await db$o().collection("staff").doc(decoded.uid).get();
     const staff = staffSnap.exists ? staffSnap.data() : null;
     const staffRole = isActiveStaffRecord(staff) ? String(staff?.role || "") : void 0;
     const identity = await resolveClientIdentity(decoded.uid, decoded.email);
@@ -21050,7 +23290,7 @@ function sharePlaybackOpen(listing, invoice, related) {
 }
 async function finishGalleryLink(result, caller) {
   if (!result.ok || result.kind !== "listing") return result;
-  const listing = mediaDoc(await db$q().collection("listings").doc(result.project.id).get());
+  const listing = mediaDoc(await db$o().collection("listings").doc(result.project.id).get());
   if (!listing) return result;
   const [invoice, related] = await Promise.all([
     invoiceForListing(listing),
@@ -21102,7 +23342,7 @@ const handlePublicGalleryLink = async (req, res) => {
   }
 };
 const router$D = Router();
-const db$p = () => admin.firestore();
+const db$n = () => admin.firestore();
 const storage = () => admin.storage().bucket();
 function cleanPosterUrl(value) {
   if (typeof value !== "string") return null;
@@ -21132,13 +23372,13 @@ async function holdIfOrderIncomplete(res, galleryId) {
   return true;
 }
 async function invoiceForGallery(gallery) {
-  const load = (id) => db$p().collection("invoices").doc(id).get();
+  const load = (id) => db$n().collection("invoices").doc(id).get();
   if (typeof gallery.invoiceId === "string" && gallery.invoiceId) {
     const doc = await readInvoiceDoc(load, gallery.invoiceId);
     if (doc) return { id: doc.id, ...doc.data };
   }
   if (typeof gallery.orderId === "string" && gallery.orderId) {
-    const snap = await db$p().collection("invoices").where("orderId", "==", gallery.orderId).limit(1).get();
+    const snap = await db$n().collection("invoices").where("orderId", "==", gallery.orderId).limit(1).get();
     if (!snap.empty) {
       const doc = await readInvoiceDoc(load, snap.docs[0].id);
       if (doc) return { id: doc.id, ...doc.data };
@@ -21149,7 +23389,7 @@ async function invoiceForGallery(gallery) {
 async function listingDownloadFlags(gallery) {
   const listingId = typeof gallery.listingId === "string" ? gallery.listingId.trim() : "";
   if (!listingId) return { lockDownloads: void 0, downloadsReleased: false };
-  const listing = await db$p().collection("listings").doc(listingId).get();
+  const listing = await db$n().collection("listings").doc(listingId).get();
   if (!listing.exists) return { lockDownloads: void 0, downloadsReleased: false };
   const data = listing.data() || {};
   return {
@@ -21201,7 +23441,7 @@ function clientGalleryPayload(id, gallery, gate2) {
 router$D.get("/", requireStaff, async (req, res) => {
   try {
     const { status: status2, orderId } = req.query;
-    let query = db$p().collection("galleries").orderBy("createdAt", "desc");
+    let query = db$n().collection("galleries").orderBy("createdAt", "desc");
     if (status2) query = query.where("status", "==", status2);
     if (orderId) query = query.where("orderId", "==", orderId);
     const snapshot = await query.limit(100).get();
@@ -21249,7 +23489,7 @@ router$D.get("/public/:id/photos.zip", async (req, res) => {
   if (malformedPublicGalleryId(id)) return publicGalleryNotFound(res);
   if (!admin.apps.length) return publicGalleryNotFound(res);
   try {
-    const doc = await db$p().collection("galleries").doc(id).get();
+    const doc = await db$n().collection("galleries").doc(id).get();
     if (!doc.exists) return publicGalleryNotFound(res);
     const gallery = doc.data() || {};
     if (!["delivered", "approved"].includes(String(gallery.status || ""))) {
@@ -21296,7 +23536,7 @@ router$D.get("/public/:id", async (req, res) => {
     return publicGalleryNotFound(res);
   }
   try {
-    const doc = await db$p().collection("galleries").doc(id).get();
+    const doc = await db$n().collection("galleries").doc(id).get();
     if (!doc.exists) {
       console.info("[Galleries] Public gallery not found.", id);
       return publicGalleryNotFound(res);
@@ -21316,10 +23556,10 @@ router$D.get("/public/:id", async (req, res) => {
 router$D.get("/link/:id", handlePublicGalleryLink);
 router$D.get("/:id", requireAuth, async (req, res) => {
   try {
-    const doc = await db$p().collection("galleries").doc(req.params.id).get();
+    const doc = await db$n().collection("galleries").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Gallery not found." });
     const gallery = doc.data();
-    const staffDoc = await db$p().collection("staff").doc(req.user.uid).get();
+    const staffDoc = await db$n().collection("staff").doc(req.user.uid).get();
     if (!staffDoc.exists) {
       if (gallery.clientId !== req.user.uid) {
         return res.status(403).json({ error: "Access denied." });
@@ -21344,7 +23584,7 @@ router$D.post("/:id/upload-url", requirePhotographer, async (req, res) => {
     if (!fileName2 || !fileType) {
       return res.status(400).json({ error: "fileName and fileType required." });
     }
-    const galleryDoc = await db$p().collection("galleries").doc(req.params.id).get();
+    const galleryDoc = await db$n().collection("galleries").doc(req.params.id).get();
     if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
     const folder = isRaw2 ? "raw" : "edited";
     const safeName2 = fileName2.replace(/[^a-zA-Z0-9._-]/g, "_");
@@ -21379,7 +23619,7 @@ router$D.post("/:id/media", requirePhotographer, async (req, res) => {
     if (!storagePath || !fileName2) {
       return res.status(400).json({ error: "storagePath and fileName required." });
     }
-    const galleryDoc = await db$p().collection("galleries").doc(req.params.id).get();
+    const galleryDoc = await db$n().collection("galleries").doc(req.params.id).get();
     if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
     const file = storage().file(storagePath);
     const [url] = await file.getSignedUrl({
@@ -21421,7 +23661,7 @@ router$D.post("/:id/media-link", requireCoordinator, async (req, res) => {
   try {
     const { url, title, type = "video", embedUrl, thumbnailUrl, downloadable = false, poster, posterUrl } = req.body;
     if (!url) return res.status(400).json({ error: "url required." });
-    const galleryDoc = await db$p().collection("galleries").doc(req.params.id).get();
+    const galleryDoc = await db$n().collection("galleries").doc(req.params.id).get();
     if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
     const item = {
       id: `${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
@@ -21476,7 +23716,7 @@ router$D.patch("/:id/status", requireCoordinator, async (req, res) => {
       if (!adminReady$5(res)) return;
       if (await holdIfOrderIncomplete(res, req.params.id)) return;
     }
-    await db$p().collection("galleries").doc(req.params.id).update({
+    await db$n().collection("galleries").doc(req.params.id).update({
       status: status2,
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
@@ -21523,7 +23763,7 @@ router$D.patch("/:id/downloads", requireCoordinator, async (req, res) => {
       return res.status(400).json({ error: "released must be true or false." });
     }
     const released = req.body.released === true;
-    const galleryDoc = await db$p().collection("galleries").doc(req.params.id).get();
+    const galleryDoc = await db$n().collection("galleries").doc(req.params.id).get();
     if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
     const gallery = galleryDoc.data() || {};
     const invoice = await invoiceForGallery(gallery);
@@ -21555,7 +23795,7 @@ router$D.patch("/:id/downloads", requireCoordinator, async (req, res) => {
 });
 router$D.delete("/:id/media/:mediaId", requireCoordinator, async (req, res) => {
   try {
-    const galleryDoc = await db$p().collection("galleries").doc(req.params.id).get();
+    const galleryDoc = await db$n().collection("galleries").doc(req.params.id).get();
     if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
     const gallery = galleryDoc.data();
     const mediaItems = (gallery.mediaItems || []).filter(
@@ -21824,7 +24064,7 @@ function readSquareWebhookRawBody(req) {
     setImmediate(finish);
   });
 }
-const db$o = () => admin.firestore();
+const db$m = () => admin.firestore();
 async function releaseEvent(ref, order, deleteEvent, result) {
   const eventId = typeof order.calendarEventId === "string" ? order.calendarEventId : "";
   if (!eventId) {
@@ -21854,24 +24094,24 @@ async function releaseExpiredApprenticeshipHolds(options = {}) {
   const now = options.now ?? /* @__PURE__ */ new Date();
   const deleteEvent = options.deleteEvent ?? deleteApprenticeshipEvent;
   const handled = /* @__PURE__ */ new Set();
-  const waiting = await db$o().collection("orders").where("source", "==", APPRENTICESHIP_ORDER_SOURCE).where("status", "==", APPRENTICESHIP_AWAITING_DEPOSIT_STATUS).get();
+  const waiting = await db$m().collection("orders").where("source", "==", APPRENTICESHIP_ORDER_SOURCE).where("status", "==", APPRENTICESHIP_AWAITING_DEPOSIT_STATUS).get();
   for (const snap of waiting.docs) {
     const listed = snap.data() || {};
     if (!apprenticeshipHoldExpired(listed, now)) continue;
     result.checked += 1;
-    const ref = db$o().collection("orders").doc(snap.id);
-    const expired = await db$o().runTransaction(async (tx) => {
+    const ref = db$m().collection("orders").doc(snap.id);
+    const expired = await db$m().runTransaction(async (tx) => {
       const orderSnap = await tx.get(ref);
       if (!orderSnap.exists) return null;
       const order = orderSnap.data() || {};
       if (!apprenticeshipHoldExpired(order, now)) return null;
       const invoiceId = typeof order.invoiceId === "string" ? order.invoiceId : "";
-      const invoiceRef = invoiceId ? db$o().collection("invoices").doc(invoiceId) : null;
+      const invoiceRef = invoiceId ? db$m().collection("invoices").doc(invoiceId) : null;
       const invoiceSnap = invoiceRef ? await tx.get(invoiceRef) : null;
       const invoice = invoiceSnap?.exists ? invoiceSnap.data() || {} : {};
       if ((Number(invoice.depositPaid) || 0) > 0 || invoice.depositPaidAt) return null;
       const requestId = typeof order.orderRequestId === "string" ? order.orderRequestId : "";
-      const requestRef = requestId ? db$o().collection("orderRequests").doc(requestId) : null;
+      const requestRef = requestId ? db$m().collection("orderRequests").doc(requestId) : null;
       const requestSnap = requestRef ? await tx.get(requestRef) : null;
       const stamp2 = admin.firestore.FieldValue.serverTimestamp();
       const note = `Hold released: the $25 booking fee was not paid within ${APPRENTICESHIP_HOLD_MINUTES} minutes.`;
@@ -21901,12 +24141,12 @@ async function releaseExpiredApprenticeshipHolds(options = {}) {
     result.released += 1;
     await releaseEvent(ref, expired, deleteEvent, result);
   }
-  const stuck = await db$o().collection("orders").where("source", "==", APPRENTICESHIP_ORDER_SOURCE).where("status", "==", APPRENTICESHIP_EXPIRED_STATUS).where("calendarEventReleased", "==", false).get();
+  const stuck = await db$m().collection("orders").where("source", "==", APPRENTICESHIP_ORDER_SOURCE).where("status", "==", APPRENTICESHIP_EXPIRED_STATUS).where("calendarEventReleased", "==", false).get();
   for (const snap of stuck.docs) {
     const order = snap.data() || {};
     if (handled.has(snap.id) || order.source !== APPRENTICESHIP_ORDER_SOURCE) continue;
     if (order.status !== APPRENTICESHIP_EXPIRED_STATUS || order.calendarEventReleased !== false) continue;
-    await releaseEvent(db$o().collection("orders").doc(snap.id), order, deleteEvent, result);
+    await releaseEvent(db$m().collection("orders").doc(snap.id), order, deleteEvent, result);
   }
   return result;
 }
@@ -21927,14 +24167,14 @@ async function maybeReleaseExpiredApprenticeshipHolds(now = /* @__PURE__ */ new 
   await Promise.race([lazyRunning, new Promise((resolve) => setTimeout(resolve, LAZY_TIMEOUT_MS))]);
 }
 async function resolveLateApprenticeshipPayment(orderId) {
-  const ref = db$o().collection("orders").doc(orderId);
+  const ref = db$m().collection("orders").doc(orderId);
   const snap = await ref.get();
   if (!snap.exists) return "skipped";
   const order = snap.data() || {};
   if (order.source !== APPRENTICESHIP_ORDER_SOURCE || order.status !== APPRENTICESHIP_EXPIRED_STATUS) return "skipped";
   const stamp2 = admin.firestore.FieldValue.serverTimestamp();
   const requestId = typeof order.orderRequestId === "string" ? order.orderRequestId : "";
-  const requestRef = requestId ? db$o().collection("orderRequests").doc(requestId) : null;
+  const requestRef = requestId ? db$m().collection("orderRequests").doc(requestId) : null;
   const orderNumber2 = String(order.orderNumber || "");
   const slotStart = typeof order.slotStart === "string" ? order.slotStart : "";
   const packageId = typeof order.packageId === "string" ? order.packageId : "";
@@ -22001,7 +24241,7 @@ async function resolveLateApprenticeshipPayment(orderId) {
     }).catch(() => {
     });
   }
-  await db$o().collection("agentLogs").add({
+  await db$m().collection("agentLogs").add({
     agent: "travis",
     action: "Apprentice fee paid after hold expired",
     summary: `Order ${orderNumber2 || orderId}: ${note}`,
@@ -22074,7 +24314,7 @@ async function fetchSquarePayment(paymentId, env = process.env, fetchImpl = fetc
   return payment && typeof payment === "object" ? payment : null;
 }
 const router$C = Router();
-const db$n = () => appFirestore();
+const db$l = () => appFirestore();
 const payNowReconcileLimiter = createRateLimiter({ windowMs: 10 * 60 * 1e3, max: 30 });
 const stripe$1 = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
   apiVersion: "2024-06-20"
@@ -22112,7 +24352,7 @@ async function loadInvoice(id) {
   for (let hop = 0; hop < 4; hop += 1) {
     if (!current || seen.has(current)) return null;
     seen.add(current);
-    const snap = await db$n().collection("invoices").doc(current).get();
+    const snap = await db$l().collection("invoices").doc(current).get();
     if (!snap.exists) return null;
     const next = invoiceRedirectTarget(snap.data() || {});
     if (!next || next === snap.id) return snap;
@@ -22123,8 +24363,8 @@ async function loadInvoice(id) {
 function ownsInvoice(ids, email, invoice) {
   const clientId2 = typeof invoice.clientId === "string" ? invoice.clientId.trim() : "";
   if (clientId2 && ids.includes(clientId2)) return true;
-  const invoiceEmail = normalizeEmail$1(invoice.clientEmail);
-  const viewerEmail = normalizeEmail$1(email);
+  const invoiceEmail = normalizeEmail(invoice.clientEmail);
+  const viewerEmail = normalizeEmail(email);
   return Boolean(invoiceEmail && viewerEmail && invoiceEmail === viewerEmail);
 }
 async function audienceFor(req, invoice) {
@@ -22135,7 +24375,7 @@ async function audienceFor(req, invoice) {
   try {
     if (isTempAdminEnabled(liveServerEnv()) && token === "temp-admin-token") return "staff";
     const decoded = await admin.auth().verifyIdToken(token);
-    const staffDoc = await db$n().collection("staff").doc(decoded.uid).get();
+    const staffDoc = await db$l().collection("staff").doc(decoded.uid).get();
     const staff = staffDoc.exists ? staffDoc.data() : null;
     if (isActiveStaffRecord(staff) && (staff?.role === "admin" || staff?.role === "coordinator")) {
       return "staff";
@@ -22191,30 +24431,30 @@ async function paymentAlreadyRecorded({
   titusRefundId
 }) {
   if (squarePaymentId) {
-    const existing = await db$n().collection("transactions").where("squarePaymentId", "==", squarePaymentId).limit(1).get();
+    const existing = await db$l().collection("transactions").where("squarePaymentId", "==", squarePaymentId).limit(1).get();
     if (!existing.empty) return true;
   }
   if (stripePaymentIntentId) {
-    const existing = await db$n().collection("transactions").where("stripePaymentIntentId", "==", stripePaymentIntentId).limit(1).get();
+    const existing = await db$l().collection("transactions").where("stripePaymentIntentId", "==", stripePaymentIntentId).limit(1).get();
     if (!existing.empty) return true;
   }
   if (titusCheckoutId) {
-    const existing = await db$n().collection("transactions").where("titusCheckoutId", "==", titusCheckoutId).limit(1).get();
+    const existing = await db$l().collection("transactions").where("titusCheckoutId", "==", titusCheckoutId).limit(1).get();
     if (!existing.empty) return true;
   }
   if (titusRefundId) {
-    const existing = await db$n().collection("transactions").where("titusRefundId", "==", titusRefundId).limit(1).get();
+    const existing = await db$l().collection("transactions").where("titusRefundId", "==", titusRefundId).limit(1).get();
     if (!existing.empty) return true;
   }
   return false;
 }
 async function refsForInvoice(collection, invoiceId, orderId, directId) {
   const refs = /* @__PURE__ */ new Map();
-  if (directId) refs.set(directId, db$n().collection(collection).doc(directId));
+  if (directId) refs.set(directId, db$l().collection(collection).doc(directId));
   const lookups = [
-    db$n().collection(collection).where("invoiceId", "==", invoiceId).get()
+    db$l().collection(collection).where("invoiceId", "==", invoiceId).get()
   ];
-  if (orderId) lookups.push(db$n().collection(collection).where("orderId", "==", orderId).get());
+  if (orderId) lookups.push(db$l().collection(collection).where("orderId", "==", orderId).get());
   const snaps = await Promise.all(lookups);
   snaps.forEach((snap) => snap.docs.forEach((doc) => refs.set(doc.id, doc.ref)));
   return refs;
@@ -22234,7 +24474,7 @@ async function syncDownloadAccess({
     const snap = await ref.get().catch(() => null);
     const linked = snap?.exists ? snap.data()?.listingId : void 0;
     if (typeof linked === "string" && linked.trim()) {
-      listings.set(linked, db$n().collection("listings").doc(linked));
+      listings.set(linked, db$l().collection("listings").doc(linked));
     }
   }
   const patch = unlocked ? {
@@ -22291,7 +24531,7 @@ function squarePaymentHistory({
 }
 async function appendOrderHistory(orderId, entry2) {
   if (!orderId) return;
-  const ref = db$n().collection("orders").doc(orderId);
+  const ref = db$l().collection("orders").doc(orderId);
   try {
     const snap = await ref.get();
     if (!snap.exists) return;
@@ -22315,13 +24555,13 @@ async function rememberPaymentOnRecords(input) {
   };
   const writes = [];
   if (input.orderId) {
-    writes.push(db$n().collection("orders").doc(input.orderId).update({
+    writes.push(db$l().collection("orders").doc(input.orderId).update({
       ...patch,
       ...input.incrementDeposit ? { depositPaid: admin.firestore.FieldValue.increment(input.incrementDeposit) } : {}
     }).catch((err) => console.error("[Payments] Order balance update failed:", err)));
   }
   if (input.orderRequestId) {
-    writes.push(db$n().collection("orderRequests").doc(input.orderRequestId).update(patch).catch((err) => {
+    writes.push(db$l().collection("orderRequests").doc(input.orderRequestId).update(patch).catch((err) => {
       console.error("[Payments] Order request balance update failed:", err);
     }));
   }
@@ -22340,7 +24580,7 @@ async function applySuccessfulPayment({
   titusPaidAt,
   skipReceipt
 }) {
-  const invoiceRef = db$n().collection("invoices").doc(invoiceId);
+  const invoiceRef = db$l().collection("invoices").doc(invoiceId);
   const invoiceDoc = await invoiceRef.get();
   if (!invoiceDoc.exists) return;
   const invoice = invoiceDoc.data();
@@ -22409,12 +24649,12 @@ async function applySuccessfulPayment({
   });
   const stamp2 = revenueStamp(invoice);
   if (resolvedClientId && stamp2.countsTowardRevenue) {
-    await db$n().collection("clients").doc(resolvedClientId).update({
+    await db$l().collection("clients").doc(resolvedClientId).update({
       totalSpend: admin.firestore.FieldValue.increment(amount),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     }).catch((err) => console.error("[Payments] Client spend update failed:", err));
   }
-  await db$n().collection("transactions").add({
+  await db$l().collection("transactions").add({
     type: "payment",
     orderId: resolvedOrderId,
     invoiceId,
@@ -22560,15 +24800,15 @@ async function applyDepositPayment({
   squarePaymentId
 }) {
   const paymentKey = squarePaymentId?.trim() || "";
-  const invoiceRef = db$n().collection("invoices").doc(invoiceId);
-  const transactionRef = db$n().collection("transactions").doc(
+  const invoiceRef = db$l().collection("invoices").doc(invoiceId);
+  const transactionRef = db$l().collection("transactions").doc(
     paymentKey ? `square-${paymentKey}` : `deposit-${invoiceId}`
   );
   let confirmEvent = null;
   let confirmHeadshot = null;
   let lateApprenticeOrderId = "";
   let lateHeadshotOrderId = "";
-  await db$n().runTransaction(async (tx) => {
+  await db$l().runTransaction(async (tx) => {
     const invoiceSnap = await tx.get(invoiceRef);
     if (!invoiceSnap.exists) return;
     const invoice = invoiceSnap.data() || {};
@@ -22590,8 +24830,8 @@ async function applyDepositPayment({
     ];
     const orderId = typeof invoice.orderId === "string" ? invoice.orderId : "";
     const orderRequestId = typeof invoice.orderRequestId === "string" ? invoice.orderRequestId : "";
-    const orderRef = orderId ? db$n().collection("orders").doc(orderId) : null;
-    const requestRef = orderRequestId ? db$n().collection("orderRequests").doc(orderRequestId) : null;
+    const orderRef = orderId ? db$l().collection("orders").doc(orderId) : null;
+    const requestRef = orderRequestId ? db$l().collection("orderRequests").doc(orderRequestId) : null;
     const orderSnap = orderRef ? await tx.get(orderRef) : null;
     const requestSnap = requestRef ? await tx.get(requestRef) : null;
     tx.update(invoiceRef, {
@@ -22710,7 +24950,7 @@ router$C.post("/create-intent", requireAuth, async (req, res) => {
     }
     const { invoiceId, amount, currency = "usd" } = req.body;
     if (!invoiceId || !amount) return res.status(400).json({ error: "invoiceId and amount required." });
-    const invoiceDoc = await db$n().collection("invoices").doc(invoiceId).get();
+    const invoiceDoc = await db$l().collection("invoices").doc(invoiceId).get();
     if (!invoiceDoc.exists) return res.status(404).json({ error: "Invoice not found." });
     const invoice = invoiceDoc.data();
     if (invoiceProvider(invoice) !== "stripe") {
@@ -22813,7 +25053,7 @@ router$C.get("/pay-at-close", async (_req, res) => {
   const offer = payAtCloseOfferFromAdjustments(process.env, adjustments);
   let catalog = packagesForStaffEditor([]);
   try {
-    const snap = await db$n().collection("packages").get();
+    const snap = await db$l().collection("packages").get();
     catalog = packagesForStaffEditor(snap.docs.map((entry2) => ({ id: entry2.id, ...entry2.data() })));
   } catch (err) {
     console.error("[Pay at Close] Catalog read failed — using the seeded catalog", err);
@@ -22895,7 +25135,7 @@ async function beginPayAtCloseCheckout(invoiceDoc) {
   });
   const requestId = typeof payable.orderRequestId === "string" ? payable.orderRequestId : "";
   if (requestId) {
-    await db$n().collection("orderRequests").doc(requestId).update({
+    await db$l().collection("orderRequests").doc(requestId).update({
       paymentMethod: PAY_AT_CLOSE_METHOD,
       paymentStatus: PAY_AT_CLOSE_PENDING_STATUS,
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
@@ -22938,17 +25178,17 @@ router$C.post("/pay-at-close-webhook", async (req, res) => {
     }, {
       env: process.env,
       findInvoiceById: async (id) => {
-        const snap = await db$n().collection("invoices").doc(id).get();
+        const snap = await db$l().collection("invoices").doc(id).get();
         return snap.exists ? { id: snap.id, data: snap.data() || {} } : null;
       },
       findInvoiceByCheckoutId: async (checkoutId) => {
-        const snap = await db$n().collection("invoices").where("titusCheckoutId", "==", checkoutId).limit(1).get();
+        const snap = await db$l().collection("invoices").where("titusCheckoutId", "==", checkoutId).limit(1).get();
         if (snap.empty) return null;
         const doc = snap.docs[0];
         return { id: doc.id, data: doc.data() || {} };
       },
       save: async (id, patch) => {
-        await db$n().collection("invoices").doc(id).update({
+        await db$l().collection("invoices").doc(id).update({
           ...patch,
           updatedAt: admin.firestore.FieldValue.serverTimestamp()
         });
@@ -22965,7 +25205,7 @@ router$C.post("/pay-at-close-webhook", async (req, res) => {
       }),
       recordRefund: async (input) => {
         if (await paymentAlreadyRecorded({ titusRefundId: input.refundId })) return { duplicate: true };
-        const ref = db$n().collection("invoices").doc(input.invoiceId);
+        const ref = db$l().collection("invoices").doc(input.invoiceId);
         const snap = await ref.get();
         if (!snap.exists) return { duplicate: false };
         const invoice = snap.data() || {};
@@ -22981,14 +25221,14 @@ router$C.post("/pay-at-close-webhook", async (req, res) => {
           updatedAt: admin.firestore.FieldValue.serverTimestamp()
         });
         if (typeof invoice.orderId === "string" && invoice.orderId) {
-          await db$n().collection("orders").doc(invoice.orderId).update({
+          await db$l().collection("orders").doc(invoice.orderId).update({
             balanceDue: nextDue,
             paymentStatus: nextDue <= 0 ? "paid" : "partial",
             paymentMethod: PAY_AT_CLOSE_METHOD,
             updatedAt: admin.firestore.FieldValue.serverTimestamp()
           }).catch((err) => console.error("[Pay at Close] Refund order update failed:", err));
         }
-        await db$n().collection("transactions").add({
+        await db$l().collection("transactions").add({
           type: "refund",
           invoiceId: input.invoiceId,
           orderId: invoice.orderId || "",
@@ -23246,7 +25486,7 @@ router$C.post("/invoice/:id/deposit-checkout", async (req, res) => {
       return res.status(403).json({ error: "This invoice does not take a deposit." });
     }
     const orderId = typeof invoice.orderId === "string" ? invoice.orderId : "";
-    const orderSnap = orderId ? await db$n().collection("orders").doc(orderId).get() : null;
+    const orderSnap = orderId ? await db$l().collection("orders").doc(orderId).get() : null;
     const order = orderSnap && orderSnap.exists ? orderSnap.data() || {} : null;
     const orderSource = String(order?.source || "");
     if (!order || orderSource !== "senior-living" && orderSource !== APPRENTICESHIP_ORDER_SOURCE && orderSource !== HEADSHOTS_ORDER_SOURCE) {
@@ -23360,19 +25600,19 @@ function squareSignatureValid(rawBody, received, key, urls = squareWebhookNotifi
 async function findInvoiceForSquarePayment(payment) {
   const hit = await matchSquarePaymentInvoice(payment, {
     async byId(id) {
-      const snap2 = await db$n().collection("invoices").doc(id).get();
+      const snap2 = await db$l().collection("invoices").doc(id).get();
       if (!snap2.exists) return null;
       return { id: snap2.id, data: snap2.data() || {} };
     },
     async byField(field, value) {
-      const snap2 = await db$n().collection("invoices").where(field, "==", value).limit(1).get();
+      const snap2 = await db$l().collection("invoices").where(field, "==", value).limit(1).get();
       if (snap2.empty) return null;
       const doc = snap2.docs[0];
       return { id: doc.id, data: doc.data() || {} };
     }
   });
   if (!hit) return null;
-  const snap = await db$n().collection("invoices").doc(hit.id).get();
+  const snap = await db$l().collection("invoices").doc(hit.id).get();
   return snap.exists ? snap : null;
 }
 async function findSquareSaleDoc(collectionName2, payment) {
@@ -23386,7 +25626,7 @@ async function findSquareSaleDoc(collectionName2, payment) {
     steps.push(["squareLinkId", linkId]);
   }
   for (const [field, value] of steps) {
-    const snap = await db$n().collection(collectionName2).where(field, "==", value).limit(1).get();
+    const snap = await db$l().collection(collectionName2).where(field, "==", value).limit(1).get();
     if (!snap.empty) return snap.docs[0];
   }
   return null;
@@ -23418,7 +25658,7 @@ async function settlePrepaidOrderRequest(payment, amount, options) {
   const data = primary.data() || {};
   const invoiceId = typeof data.invoiceId === "string" ? data.invoiceId.trim() : "";
   if (invoiceId) {
-    const invoiceSnap = await db$n().collection("invoices").doc(invoiceId).get();
+    const invoiceSnap = await db$l().collection("invoices").doc(invoiceId).get();
     if (invoiceSnap.exists) {
       const invoice = invoiceSnap.data() || {};
       if (invoiceProvider(invoice) !== "stripe" && !isMirroredPayAtCloseSquarePayment(payment, invoice)) {
@@ -23442,7 +25682,7 @@ async function settlePrepaidOrderRequest(payment, amount, options) {
     }
   }
   await markSquareOrderPaid(primary.ref, data, amount, paymentId);
-  const twin = await db$n().collection(request ? "orders" : "orderRequests").doc(primary.id).get();
+  const twin = await db$l().collection(request ? "orders" : "orderRequests").doc(primary.id).get();
   if (twin.exists) await markSquareOrderPaid(twin.ref, twin.data() || {}, amount, paymentId);
   return true;
 }
@@ -23473,7 +25713,7 @@ async function settleCompletedSquarePayment(payment, options) {
   if (!invoiceDoc) {
     const settledOrder = await settlePrepaidOrderRequest(matchedPayment, amount, options);
     if (settledOrder) return { received: true, orderRequest: true };
-    await db$n().collection("agentLogs").add({
+    await db$l().collection("agentLogs").add({
       agent: "travis",
       action: "Unmatched Square payment",
       summary: `Square payment ${payment.id} could not be matched to an invoice`,
@@ -23519,7 +25759,7 @@ async function reconcilePayNowOrder(rawOrderNumber) {
   if (!shown) return { paymentStatus: "unpaid", orderNumber: "" };
   let request = null;
   for (const key of keys) {
-    const snap = await db$n().collection("orderRequests").where("orderNumber", "==", key).limit(1).get();
+    const snap = await db$l().collection("orderRequests").where("orderNumber", "==", key).limit(1).get();
     if (!snap.empty) {
       request = snap.docs[0];
       break;
@@ -23529,7 +25769,7 @@ async function reconcilePayNowOrder(rawOrderNumber) {
   const data = request.data() || {};
   const orderNumber2 = typeof data.orderNumber === "string" && data.orderNumber ? data.orderNumber : shown;
   const invoiceId = typeof data.invoiceId === "string" ? data.invoiceId.trim() : "";
-  const invoiceSnap = invoiceId ? await db$n().collection("invoices").doc(invoiceId).get() : null;
+  const invoiceSnap = invoiceId ? await db$l().collection("invoices").doc(invoiceId).get() : null;
   const invoice = invoiceSnap?.exists ? invoiceSnap.data() || {} : {};
   const total = roundSettlementMoney(Number(invoice.total) || Number(data.total) || 0);
   const already = roundSettlementMoney(Math.max(Number(invoice.amountPaid) || 0, Number(data.amountPaid) || 0));
@@ -23560,7 +25800,7 @@ async function reconcilePayNowOrder(rawOrderNumber) {
     order_id: typeof payment.order_id === "string" && payment.order_id ? payment.order_id : squareOrderId,
     ...referenceId ? { reference_id: referenceId } : {}
   }, { skipReceipt: true });
-  const afterInvoice = invoiceId ? await db$n().collection("invoices").doc(invoiceId).get() : null;
+  const afterInvoice = invoiceId ? await db$l().collection("invoices").doc(invoiceId).get() : null;
   const afterRequest = await request.ref.get();
   const afterInvoiceData = afterInvoice?.exists ? afterInvoice.data() || {} : {};
   const afterRequestData = afterRequest.data() || {};
@@ -23630,7 +25870,7 @@ router$C.post("/square-webhook", async (req, res) => {
 router$C.get("/transactions", requireCoordinator, async (req, res) => {
   try {
     const { startDate, endDate, limit = "50" } = req.query;
-    let query = db$n().collection("transactions").orderBy("createdAt", "desc");
+    let query = db$l().collection("transactions").orderBy("createdAt", "desc");
     if (startDate) {
       query = query.where(
         "createdAt",
@@ -23678,7 +25918,7 @@ async function handleStripePaymentSucceeded(intent) {
 async function handleStripePaymentFailed(intent) {
   const { invoiceId } = intent.metadata;
   if (!invoiceId) return;
-  await db$n().collection("agentLogs").add({
+  await db$l().collection("agentLogs").add({
     agent: "travis",
     action: "Studio Noir payment failed",
     summary: `Stripe payment failed for invoice ${invoiceId}`,
@@ -23694,11 +25934,11 @@ async function handleStripePaymentFailed(intent) {
 async function handleStripeRefund(charge) {
   if (!charge.payment_intent) return;
   const intentId = typeof charge.payment_intent === "string" ? charge.payment_intent : charge.payment_intent.id;
-  const invoiceSnap = await db$n().collection("invoices").where("stripePaymentIntentId", "==", intentId).limit(1).get();
+  const invoiceSnap = await db$l().collection("invoices").where("stripePaymentIntentId", "==", intentId).limit(1).get();
   if (invoiceSnap.empty) return;
   const invoiceDoc = invoiceSnap.docs[0];
   const refundAmount = charge.amount_refunded / 100;
-  await db$n().collection("transactions").add({
+  await db$l().collection("transactions").add({
     type: "refund",
     invoiceId: invoiceDoc.id,
     clientId: invoiceDoc.data().clientId,
@@ -23714,7 +25954,7 @@ async function handleStripeRefund(charge) {
   });
 }
 const router$B = Router();
-const db$m = () => admin.firestore();
+const db$k = () => admin.firestore();
 const VSAI_API_BASE = "https://api.virtualstagingai.app/v1";
 const VSAI_API_KEY = process.env.VSAI_API_KEY || process.env.VIRTUAL_STAGING_AI_API_KEY || "";
 const VSAI_PRICE_CENTS = parseInt(process.env.VSAI_PRICE_CENTS || "1500", 10);
@@ -23772,7 +26012,7 @@ router$B.post("/create", requireAuth, async (req, res) => {
         error: `VSAI returned no render ID. Response: ${responseText}`
       });
     }
-    const jobRef = await db$m().collection("vsaiJobs").add({
+    const jobRef = await db$k().collection("vsaiJobs").add({
       userId,
       imageUrl,
       roomType,
@@ -23798,7 +26038,7 @@ router$B.post("/create", requireAuth, async (req, res) => {
 });
 router$B.get("/result/:jobId", requireAuth, async (req, res) => {
   try {
-    const jobDoc = await db$m().collection("vsaiJobs").doc(req.params.jobId).get();
+    const jobDoc = await db$k().collection("vsaiJobs").doc(req.params.jobId).get();
     if (!jobDoc.exists) return res.status(404).json({ error: "Job not found." });
     const job = jobDoc.data();
     if (job.userId !== req.user.uid) {
@@ -23873,7 +26113,7 @@ router$B.get("/result/:jobId", requireAuth, async (req, res) => {
 });
 router$B.get("/result/:jobId/file", requireAuth, async (req, res) => {
   try {
-    const jobDoc = await db$m().collection("vsaiJobs").doc(req.params.jobId).get();
+    const jobDoc = await db$k().collection("vsaiJobs").doc(req.params.jobId).get();
     if (!jobDoc.exists) return res.status(404).json({ error: "Job not found." });
     const job = jobDoc.data();
     if (job.userId !== req.user.uid) return res.status(403).json({ error: "Access denied." });
@@ -23899,14 +26139,14 @@ router$B.post("/variation", requireAuth, async (req, res) => {
     if (!jobId) {
       return res.status(400).json({ error: "jobId required." });
     }
-    let rootJobDoc = await db$m().collection("vsaiJobs").doc(jobId).get();
+    let rootJobDoc = await db$k().collection("vsaiJobs").doc(jobId).get();
     if (!rootJobDoc.exists) return res.status(404).json({ error: "Job not found." });
     let rootJob = rootJobDoc.data();
     if (rootJob.userId !== req.user.uid) {
       return res.status(403).json({ error: "Access denied." });
     }
     while (rootJob.parentJobId) {
-      const parentDoc = await db$m().collection("vsaiJobs").doc(rootJob.parentJobId).get();
+      const parentDoc = await db$k().collection("vsaiJobs").doc(rootJob.parentJobId).get();
       if (!parentDoc.exists) break;
       rootJob = parentDoc.data();
     }
@@ -23950,7 +26190,7 @@ router$B.post("/variation", requireAuth, async (req, res) => {
         error: `VSAI variation error: ${responseText}`
       });
     }
-    const variationRef = await db$m().collection("vsaiJobs").add({
+    const variationRef = await db$k().collection("vsaiJobs").add({
       userId: req.user.uid,
       imageUrl: rootJob.imageUrl,
       roomType: resolvedRoomType,
@@ -23985,7 +26225,7 @@ router$B.post("/checkout", requireAuth, async (req, res) => {
     }
     const userId = req.user.uid;
     const jobDocs = await Promise.all(
-      jobIds.map((id) => db$m().collection("vsaiJobs").doc(id).get())
+      jobIds.map((id) => db$k().collection("vsaiJobs").doc(id).get())
     );
     for (let i = 0; i < jobDocs.length; i++) {
       const doc = jobDocs[i];
@@ -24069,7 +26309,7 @@ router$B.post(
         const jobIds = JSON.parse(session.metadata.jobIds || "[]");
         await Promise.all(
           jobIds.map(
-            (id) => db$m().collection("vsaiJobs").doc(id).update({
+            (id) => db$k().collection("vsaiJobs").doc(id).update({
               isPaid: true,
               paymentStatus: "paid",
               stripeSessionId: session.id,
@@ -24115,7 +26355,7 @@ function capitalize(s) {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : "";
 }
 const router$A = Router();
-const db$l = () => admin.firestore();
+const db$j = () => admin.firestore();
 router$A.post("/email", requireStaff, async (req, res) => {
   try {
     const { to, subject, body, orderId, clientId: clientId2 } = req.body;
@@ -24132,7 +26372,7 @@ router$A.post("/email", requireStaff, async (req, res) => {
     });
     const delivery = result.sent ? result.delivery : "suppressed";
     if (admin.apps.length) {
-      await db$l().collection("messages").add({
+      await db$j().collection("messages").add({
         orderId: orderId || null,
         clientId: clientId2 || null,
         senderId: req.user.uid,
@@ -24158,20 +26398,20 @@ router$A.post("/email", requireStaff, async (req, res) => {
 });
 router$A.get("/:orderId", requireAuth, async (req, res) => {
   try {
-    const orderDoc = await db$l().collection("orders").doc(req.params.orderId).get();
+    const orderDoc = await db$j().collection("orders").doc(req.params.orderId).get();
     if (!orderDoc.exists) return res.status(404).json({ error: "Order not found." });
     const order = orderDoc.data();
-    const staffDoc = await db$l().collection("staff").doc(req.user.uid).get();
+    const staffDoc = await db$j().collection("staff").doc(req.user.uid).get();
     const isStaff = staffDoc.exists;
     if (!isStaff && order.clientId !== req.user.uid) {
       return res.status(403).json({ error: "Access denied." });
     }
-    const snapshot = await db$l().collection("messages").where("orderId", "==", req.params.orderId).orderBy("createdAt", "asc").limit(100).get();
+    const snapshot = await db$j().collection("messages").where("orderId", "==", req.params.orderId).orderBy("createdAt", "asc").limit(100).get();
     const messages = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
     const unread = snapshot.docs.filter(
       (d) => !d.data().isRead && d.data().senderId !== req.user.uid
     );
-    const batch = db$l().batch();
+    const batch = db$j().batch();
     unread.forEach((d) => {
       batch.update(d.ref, {
         isRead: true,
@@ -24191,10 +26431,10 @@ router$A.post("/:orderId", requireAuth, async (req, res) => {
     if (!content?.trim()) {
       return res.status(400).json({ error: "Message content required." });
     }
-    const orderDoc = await db$l().collection("orders").doc(req.params.orderId).get();
+    const orderDoc = await db$j().collection("orders").doc(req.params.orderId).get();
     if (!orderDoc.exists) return res.status(404).json({ error: "Order not found." });
     const order = orderDoc.data();
-    const staffDoc = await db$l().collection("staff").doc(req.user.uid).get();
+    const staffDoc = await db$j().collection("staff").doc(req.user.uid).get();
     const isStaff = staffDoc.exists;
     if (!isStaff && order.clientId !== req.user.uid) {
       return res.status(403).json({ error: "Access denied." });
@@ -24206,7 +26446,7 @@ router$A.post("/:orderId", requireAuth, async (req, res) => {
       senderName = `${staff.firstName} ${staff.lastName}`.trim();
       senderType = "staff";
     } else {
-      const clientDoc = await db$l().collection("clients").doc(order.clientId).get();
+      const clientDoc = await db$j().collection("clients").doc(order.clientId).get();
       if (clientDoc.exists) {
         const client = clientDoc.data();
         senderName = `${client.firstName} ${client.lastName}`.trim();
@@ -24222,9 +26462,9 @@ router$A.post("/:orderId", requireAuth, async (req, res) => {
       isRead: false,
       createdAt: admin.firestore.FieldValue.serverTimestamp()
     };
-    const docRef = await db$l().collection("messages").add(message);
+    const docRef = await db$j().collection("messages").add(message);
     if (senderType === "client") await bumpAdminUnreadChannel("inbox");
-    await db$l().collection("agentLogs").add({
+    await db$j().collection("agentLogs").add({
       agent: "nora",
       action: "New message",
       summary: `New message on order ${req.params.orderId} from ${senderName}`,
@@ -24243,7 +26483,7 @@ router$A.post("/:orderId", requireAuth, async (req, res) => {
 });
 router$A.get("/unread/count", requireStaff, async (_req, res) => {
   try {
-    const snapshot = await db$l().collection("messages").where("isRead", "==", false).where("senderType", "==", "client").get();
+    const snapshot = await db$j().collection("messages").where("isRead", "==", false).where("senderType", "==", "client").get();
     return res.json({ unreadCount: snapshot.size });
   } catch (err) {
     return res.status(500).json({ error: "Failed to get unread count." });
@@ -25702,11 +27942,11 @@ class PhotoEditRequestError extends Error {
     this.status = status2;
   }
 }
-const db$k = () => admin.firestore();
+const db$i = () => admin.firestore();
 async function writeRequests(listingId, change) {
-  const ref = db$k().collection("listings").doc(listingId);
+  const ref = db$i().collection("listings").doc(listingId);
   let saved = null;
-  await db$k().runTransaction(async (tx) => {
+  await db$i().runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     if (!snap.exists) throw new PhotoEditRequestError(404, "Listing not found.");
     const result = change(readPhotoEditRequests(snap.data()?.photoEditRequests));
@@ -25762,7 +28002,7 @@ async function savePhotoEditReplacement(input) {
   if (!admin.apps.length) {
     throw new PhotoEditRequestError(503, "File storage is not configured.");
   }
-  const existing = await db$k().collection("listings").doc(input.listingId).get();
+  const existing = await db$i().collection("listings").doc(input.listingId).get();
   if (!existing.exists) throw new PhotoEditRequestError(404, "Listing not found.");
   const known = readPhotoEditRequests(existing.data()?.photoEditRequests);
   if (!known.some((request) => request.id === input.requestId)) {
@@ -25976,7 +28216,7 @@ function uploadSummary(kind, fileName2) {
   if (kind === "social") return `Client uploaded social file ${fileName2}`;
   return `Client uploaded file ${fileName2}`;
 }
-const db$j = () => admin.firestore();
+const db$h = () => admin.firestore();
 const KINDS = /* @__PURE__ */ new Set(["photo", "video", "floorplan", "tour"]);
 function adminReady$4(res) {
   if (admin.apps.length) return true;
@@ -26000,7 +28240,7 @@ function sendKnownError$3(res, err, fallback) {
 async function readDoc$1(collectionName2, id) {
   if (!id) return null;
   try {
-    const snap = await db$j().collection(collectionName2).doc(id).get();
+    const snap = await db$h().collection(collectionName2).doc(id).get();
     if (!snap.exists) return null;
     return jsonSafe({ id: snap.id, ...snap.data() || {} });
   } catch (err) {
@@ -26011,7 +28251,7 @@ async function readDoc$1(collectionName2, id) {
 async function readWhere(collectionName2, field, value) {
   if (!value) return [];
   try {
-    const snap = await db$j().collection(collectionName2).where(field, "==", value).limit(10).get();
+    const snap = await db$h().collection(collectionName2).where(field, "==", value).limit(10).get();
     return snap.docs.map((doc) => jsonSafe({ id: doc.id, ...doc.data() || {} }));
   } catch (err) {
     console.error(`[Portal listing] ${collectionName2}.${field} lookup failed:`, err);
@@ -26090,7 +28330,7 @@ async function loadSources(listingId, listing) {
   };
 }
 async function authorizedListing(req, listingId) {
-  const snap = await db$j().collection("listings").doc(listingId).get();
+  const snap = await db$h().collection("listings").doc(listingId).get();
   if (!snap.exists) {
     throw Object.assign(new Error("Listing not found."), { status: 404 });
   }
@@ -26132,8 +28372,8 @@ function mediaChange(body) {
   return null;
 }
 async function appendPortalWrite(listingId, patch) {
-  const ref = db$j().collection("listings").doc(listingId);
-  await db$j().runTransaction(async (tx) => {
+  const ref = db$h().collection("listings").doc(listingId);
+  await db$h().runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     const data = snap.data() || {};
     const existing = Array.isArray(data.portalActivity) ? data.portalActivity : [];
@@ -26154,7 +28394,7 @@ const handleGetPublicPortalListing = async (req, res) => {
   if (!listingId) return res.status(404).json({ error: "Listing not found." });
   if (!adminReady$4(res)) return;
   try {
-    const snap = await db$j().collection("listings").doc(listingId).get();
+    const snap = await db$h().collection("listings").doc(listingId).get();
     if (!snap.exists) return res.status(404).json({ error: "Listing not found." });
     const listing = jsonSafe({ id: snap.id, ...snap.data() || {} });
     const detail = visitorPortalListingDetail(buildPortalListingDetail(await loadSources(listingId, listing)));
@@ -26339,7 +28579,7 @@ const handlePatchPortalWebsite = async (req, res) => {
   }
 };
 const router$z = Router();
-const db$i = () => admin.firestore();
+const db$g = () => admin.firestore();
 const HOME_LIMIT = 100;
 function asRecord$4(value) {
   return value && typeof value === "object" ? value : {};
@@ -26347,7 +28587,7 @@ function asRecord$4(value) {
 router$z.get("/", requireStaff, async (req, res) => {
   try {
     const { status: status2, search, limit = "50" } = req.query;
-    let query = db$i().collection("clients").orderBy("createdAt", "desc");
+    let query = db$g().collection("clients").orderBy("createdAt", "desc");
     if (status2) query = query.where("status", "==", status2);
     const snapshot = await query.limit(Number(limit)).get();
     let clients = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -26389,16 +28629,16 @@ router$z.post("/register", async (req, res) => {
     const authHeader = req.headers.authorization;
     if (authHeader?.startsWith("Bearer ")) {
       const decoded = await admin.auth().verifyIdToken(authHeader.slice("Bearer ".length));
-      const staffDoc = await db$i().collection("staff").doc(decoded.uid).get();
+      const staffDoc = await db$g().collection("staff").doc(decoded.uid).get();
       if (staffDoc.exists && staffDoc.data()?.isActive !== false) {
         return res.status(403).json({ error: "Staff accounts cannot register as clients." });
       }
-      const email2 = normalizeEmail$1(decoded.email || req.body?.email);
+      const email2 = normalizeEmail(decoded.email || req.body?.email);
       if (!email2) return res.status(400).json({ error: "A valid email is required." });
       const result = await upsertPortalClient({ uid: decoded.uid, email: email2, firstName, lastName, phone });
       return res.status(201).json(result);
     }
-    const email = normalizeEmail$1(req.body?.email);
+    const email = normalizeEmail(req.body?.email);
     const password = String(req.body?.password || "");
     if (!email || !email.includes("@")) {
       return res.status(400).json({ error: "A valid email is required." });
@@ -26406,7 +28646,7 @@ router$z.post("/register", async (req, res) => {
     if (password.length < 6) {
       return res.status(400).json({ error: "Password must be at least 6 characters." });
     }
-    const staffHit = await db$i().collection("staff").where("email", "==", email).limit(1).get();
+    const staffHit = await db$g().collection("staff").where("email", "==", email).limit(1).get();
     if (!staffHit.empty) {
       return res.status(403).json({ error: "This email is a staff login. Use the staff sign-in page." });
     }
@@ -26490,15 +28730,15 @@ router$z.get("/me/home", requireAuth, async (req, res) => {
     for (const clientId2 of identity.ids) {
       const profileKey = profileId("client", clientId2);
       const [gallerySnap, invoiceSnap, projectSnap, galleryByUid, invoiceByUid, projectByUid, galleryByProfile, invoiceByProfile, projectByProfile] = await Promise.all([
-        db$i().collection("galleries").where("clientId", "==", clientId2).limit(HOME_LIMIT).get(),
-        db$i().collection("invoices").where("clientId", "==", clientId2).limit(HOME_LIMIT).get(),
-        db$i().collection("listings").where("clientId", "==", clientId2).limit(HOME_LIMIT).get(),
-        db$i().collection("galleries").where("firebaseUid", "==", clientId2).limit(HOME_LIMIT).get(),
-        db$i().collection("invoices").where("firebaseUid", "==", clientId2).limit(HOME_LIMIT).get(),
-        db$i().collection("listings").where("firebaseUid", "==", clientId2).limit(HOME_LIMIT).get(),
-        db$i().collection("galleries").where("clientProfileId", "==", profileKey).limit(HOME_LIMIT).get(),
-        db$i().collection("invoices").where("clientProfileId", "==", profileKey).limit(HOME_LIMIT).get(),
-        db$i().collection("listings").where("clientProfileId", "==", profileKey).limit(HOME_LIMIT).get()
+        db$g().collection("galleries").where("clientId", "==", clientId2).limit(HOME_LIMIT).get(),
+        db$g().collection("invoices").where("clientId", "==", clientId2).limit(HOME_LIMIT).get(),
+        db$g().collection("listings").where("clientId", "==", clientId2).limit(HOME_LIMIT).get(),
+        db$g().collection("galleries").where("firebaseUid", "==", clientId2).limit(HOME_LIMIT).get(),
+        db$g().collection("invoices").where("firebaseUid", "==", clientId2).limit(HOME_LIMIT).get(),
+        db$g().collection("listings").where("firebaseUid", "==", clientId2).limit(HOME_LIMIT).get(),
+        db$g().collection("galleries").where("clientProfileId", "==", profileKey).limit(HOME_LIMIT).get(),
+        db$g().collection("invoices").where("clientProfileId", "==", profileKey).limit(HOME_LIMIT).get(),
+        db$g().collection("listings").where("clientProfileId", "==", profileKey).limit(HOME_LIMIT).get()
       ]);
       for (const doc of [...gallerySnap.docs, ...galleryByUid.docs, ...galleryByProfile.docs]) {
         if (seenGallery.has(doc.id)) continue;
@@ -26522,7 +28762,7 @@ router$z.get("/me/home", requireAuth, async (req, res) => {
       if (projectSnap.size >= HOME_LIMIT || projectByUid.size >= HOME_LIMIT || projectByProfile.size >= HOME_LIMIT) listingsTruncated = true;
       [...projectSnap.docs, ...projectByUid.docs, ...projectByProfile.docs].forEach(pushListing);
       try {
-        const appointmentSnap = await db$i().collection("appointments").where("clientId", "==", clientId2).limit(HOME_LIMIT).get();
+        const appointmentSnap = await db$g().collection("appointments").where("clientId", "==", clientId2).limit(HOME_LIMIT).get();
         if (appointmentSnap.size >= HOME_LIMIT) appointmentsTruncated = true;
         appointmentSnap.docs.forEach(pushAppointment);
       } catch (appointmentErr) {
@@ -26542,16 +28782,16 @@ router$z.get("/me/home", requireAuth, async (req, res) => {
       for (const clientId2 of identity.ids) {
         const profileKey = profileId("client", clientId2);
         const [byId, byUid, byProfile] = await Promise.all([
-          db$i().collection("orderRequests").where("clientId", "==", clientId2).limit(HOME_LIMIT).get(),
-          db$i().collection("orderRequests").where("firebaseUid", "==", clientId2).limit(HOME_LIMIT).get(),
-          db$i().collection("orderRequests").where("clientProfileId", "==", profileKey).limit(HOME_LIMIT).get()
+          db$g().collection("orderRequests").where("clientId", "==", clientId2).limit(HOME_LIMIT).get(),
+          db$g().collection("orderRequests").where("firebaseUid", "==", clientId2).limit(HOME_LIMIT).get(),
+          db$g().collection("orderRequests").where("clientProfileId", "==", profileKey).limit(HOME_LIMIT).get()
         ]);
         [...byId.docs, ...byUid.docs, ...byProfile.docs].forEach(collectOrder);
       }
       if (identity.email) {
         const [byEmail, byClientEmail] = await Promise.all([
-          db$i().collection("orderRequests").where("email", "==", identity.email).limit(HOME_LIMIT).get(),
-          db$i().collection("orderRequests").where("clientEmail", "==", identity.email).limit(HOME_LIMIT).get()
+          db$g().collection("orderRequests").where("email", "==", identity.email).limit(HOME_LIMIT).get(),
+          db$g().collection("orderRequests").where("clientEmail", "==", identity.email).limit(HOME_LIMIT).get()
         ]);
         byEmail.docs.forEach(collectOrder);
         byClientEmail.docs.forEach(collectOrder);
@@ -26561,7 +28801,7 @@ router$z.get("/me/home", requireAuth, async (req, res) => {
     }
     let otherClientIds;
     try {
-      otherClientIds = await otherKnownClientIds(db$i(), orderDocs.map((entry2) => entry2.data()), identity.ids);
+      otherClientIds = await otherKnownClientIds(db$g(), orderDocs.map((entry2) => entry2.data()), identity.ids);
     } catch (lookupErr) {
       console.error("[Clients] Client id lookup failed:", lookupErr);
     }
@@ -26594,7 +28834,7 @@ router$z.get("/me/home", requireAuth, async (req, res) => {
     }
     if (identity.email) {
       try {
-        const byInvoiceEmail = await db$i().collection("invoices").where("clientEmail", "==", identity.email).limit(HOME_LIMIT).get();
+        const byInvoiceEmail = await db$g().collection("invoices").where("clientEmail", "==", identity.email).limit(HOME_LIMIT).get();
         if (byInvoiceEmail.size >= HOME_LIMIT) invoicesTruncated = true;
         byInvoiceEmail.docs.forEach(pushInvoice);
       } catch (invoiceErr) {
@@ -26603,13 +28843,13 @@ router$z.get("/me/home", requireAuth, async (req, res) => {
     }
     if (identity.email) {
       try {
-        const appointmentsByEmail = await db$i().collection("appointments").where("clientEmail", "==", identity.email).limit(HOME_LIMIT).get();
+        const appointmentsByEmail = await db$g().collection("appointments").where("clientEmail", "==", identity.email).limit(HOME_LIMIT).get();
         if (appointmentsByEmail.size >= HOME_LIMIT) appointmentsTruncated = true;
         appointmentsByEmail.docs.forEach(pushAppointment);
       } catch (appointmentErr) {
         console.error("[Clients] Appointment email lookup failed:", appointmentErr);
       }
-      const byEmail = await db$i().collection("listings").where("clientEmail", "==", identity.email).limit(HOME_LIMIT).get();
+      const byEmail = await db$g().collection("listings").where("clientEmail", "==", identity.email).limit(HOME_LIMIT).get();
       if (byEmail.size >= HOME_LIMIT) listingsTruncated = true;
       byEmail.docs.forEach(pushListing);
     }
@@ -26655,11 +28895,11 @@ router$z.post("/me/listings/:id/uploads/url", requireAuth, handleCreatePortalUpl
 router$z.post("/me/listings/:id/uploads", requireAuth, handleRegisterPortalUpload);
 router$z.get("/me", requireAuth, async (req, res) => {
   try {
-    const directDoc = await db$i().collection("clients").doc(req.user.uid).get();
+    const directDoc = await db$g().collection("clients").doc(req.user.uid).get();
     if (directDoc.exists) {
       const data = directDoc.data();
       if (data._redirect) {
-        const realDoc = await db$i().collection("clients").doc(data._redirect).get();
+        const realDoc = await db$g().collection("clients").doc(data._redirect).get();
         if (realDoc.exists) return res.json({ id: realDoc.id, ...realDoc.data() });
       }
       return res.json({ id: directDoc.id, ...data });
@@ -26671,11 +28911,11 @@ router$z.get("/me", requireAuth, async (req, res) => {
 });
 router$z.get("/:id", requireStaff, async (req, res) => {
   try {
-    const doc = await db$i().collection("clients").doc(req.params.id).get();
+    const doc = await db$g().collection("clients").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Client not found." });
     const [orders, invoices] = await Promise.all([
-      db$i().collection("orders").where("clientId", "==", req.params.id).orderBy("createdAt", "desc").limit(10).get(),
-      db$i().collection("invoices").where("clientId", "==", req.params.id).orderBy("createdAt", "desc").limit(10).get()
+      db$g().collection("orders").where("clientId", "==", req.params.id).orderBy("createdAt", "desc").limit(10).get(),
+      db$g().collection("invoices").where("clientId", "==", req.params.id).orderBy("createdAt", "desc").limit(10).get()
     ]);
     return res.json({
       client: { id: doc.id, ...doc.data() },
@@ -26692,11 +28932,11 @@ router$z.post("/", requireCoordinator, async (req, res) => {
     if (!firstName || !lastName || !email) {
       return res.status(400).json({ error: "firstName, lastName, and email required." });
     }
-    const existing = await db$i().collection("clients").where("email", "==", email.toLowerCase()).limit(1).get();
+    const existing = await db$g().collection("clients").where("email", "==", email.toLowerCase()).limit(1).get();
     if (!existing.empty) {
       return res.status(409).json({ error: "Client with this email already exists.", id: existing.docs[0].id });
     }
-    const ref = await db$i().collection("clients").add({
+    const ref = await db$g().collection("clients").add({
       firstName,
       lastName,
       email: email.toLowerCase().trim(),
@@ -26723,7 +28963,7 @@ router$z.patch("/:id", requireCoordinator, async (req, res) => {
     allowed.forEach((k) => {
       if (k in req.body) updates[k] = req.body[k];
     });
-    await db$i().collection("clients").doc(req.params.id).update(updates);
+    await db$g().collection("clients").doc(req.params.id).update(updates);
     return res.json({ success: true });
   } catch (err) {
     return res.status(500).json({ error: "Failed to update client." });
@@ -26734,7 +28974,7 @@ async function orderRequestsById(ids) {
   const map = /* @__PURE__ */ new Map();
   if (unique2.length === 0) return map;
   try {
-    const snaps = await db$i().getAll(...unique2.map((id) => db$i().collection("orderRequests").doc(id)));
+    const snaps = await db$g().getAll(...unique2.map((id) => db$g().collection("orderRequests").doc(id)));
     snaps.forEach((snap) => {
       if (!snap.exists) return;
       map.set(snap.id, asRecord$4(jsonSafe(snap.data() || {})));
@@ -26851,7 +29091,7 @@ function readClientHubMemory(collection, id) {
 function useMemory$2() {
   return !admin.apps.length || process.env.CLIENT_HUB_STORE === "memory";
 }
-function db$h() {
+function db$f() {
   return admin.firestore();
 }
 function nowStamp() {
@@ -26865,7 +29105,7 @@ function asRecord$3(value) {
 }
 async function readDoc(collection, id) {
   if (useMemory$2()) return memory$6[collection].get(id) || null;
-  const snap = await db$h().collection(collectionName(collection)).doc(id).get();
+  const snap = await db$f().collection(collectionName(collection)).doc(id).get();
   return snap.exists ? { ...snap.data() || {} } : null;
 }
 async function writeDoc(collection, id, data, merge = true) {
@@ -26873,7 +29113,7 @@ async function writeDoc(collection, id, data, merge = true) {
     memory$6[collection].set(id, merge ? { ...memory$6[collection].get(id) || {}, ...data } : { ...data });
     return;
   }
-  await db$h().collection(collectionName(collection)).doc(id).set(data, { merge });
+  await db$f().collection(collectionName(collection)).doc(id).set(data, { merge });
 }
 function collectionName(collection) {
   if (collection === "teams") return "customerTeams";
@@ -26887,7 +29127,7 @@ async function queryEqual(collection, field, value) {
   if (useMemory$2()) {
     return [...memory$6[collection].entries()].filter(([, row]) => row[field] === value).map(([id, row]) => ({ id, data: row }));
   }
-  const snap = await db$h().collection(collectionName(collection)).where(field, "==", value).limit(50).get();
+  const snap = await db$f().collection(collectionName(collection)).where(field, "==", value).limit(50).get();
   return snap.docs.map((doc) => ({ id: doc.id, data: doc.data() || {} }));
 }
 function teamFrom(id, data) {
@@ -27333,7 +29573,7 @@ async function removeTeamMember(actor2, memberId) {
   const member = memberFrom(memberId, existing);
   requireTeamAdmin(actor2, member.ownerClientId);
   if (useMemory$2()) memory$6.members.delete(memberId);
-  else await db$h().collection("customerTeamMembers").doc(memberId).delete();
+  else await db$f().collection("customerTeamMembers").doc(memberId).delete();
   await refreshGrant(member.teamId, member.ownerClientId);
   return getTeam(await loadActor(actor2.uid, actor2.email));
 }
@@ -27415,7 +29655,7 @@ async function deleteContact(actor2, contactId) {
   const existing = await readDoc("contacts", contactId);
   if (!existing || existing.ownerClientId !== scope.ownerClientId) throw new HubError(404, "Contact not found.");
   if (useMemory$2()) memory$6.contacts.delete(contactId);
-  else await db$h().collection("agentContacts").doc(contactId).delete();
+  else await db$f().collection("agentContacts").doc(contactId).delete();
   return { ok: true };
 }
 async function importContacts(actor2, contacts) {
@@ -28103,20 +30343,20 @@ function readSetupSecret(headerValue2) {
   if (Array.isArray(headerValue2) && typeof headerValue2[0] === "string") return headerValue2[0].trim();
   return "";
 }
-const db$g = () => admin.firestore();
+const db$e = () => admin.firestore();
 function httpError$3(status2, error) {
   return Object.assign(new Error(error), { status: status2 });
 }
 async function bootstrapPlaytest(input) {
   const photographerInput = input.photographer || {};
-  const email = normalizeEmail$1(photographerInput.email);
+  const email = normalizeEmail(photographerInput.email);
   const password = String(photographerInput.password || "");
   const firstName = String(photographerInput.firstName || "Playtest").trim().slice(0, 80);
   const lastName = String(photographerInput.lastName || "Photographer").trim().slice(0, 80);
   const role = photographerInput.role || "photographer";
   const seedListing = input.seedListing !== false;
   const seedGallery = input.seedGallery !== false;
-  const clientEmail2 = normalizeEmail$1(input.clientEmail);
+  const clientEmail2 = normalizeEmail(input.clientEmail);
   if (!email || !email.includes("@")) throw httpError$3(400, "Photographer email is required.");
   if (password.length < 6) throw httpError$3(400, "Photographer password must be at least 6 characters.");
   if (!isStaffRole$1(role)) throw httpError$3(400, "Role must be admin, coordinator, photographer, or editor.");
@@ -28131,7 +30371,7 @@ async function bootstrapPlaytest(input) {
   let client = null;
   let clientStatus = clientEmail2 ? "not_found" : "skipped";
   if (clientEmail2) {
-    const matches = await db$g().collection("clients").where("email", "==", clientEmail2).limit(5).get();
+    const matches = await db$e().collection("clients").where("email", "==", clientEmail2).limit(5).get();
     const preferred = matches.docs.find((doc) => doc.data().firebaseUid === doc.id) || matches.docs[0];
     if (preferred) {
       client = {
@@ -28182,7 +30422,7 @@ async function ensurePlaytestStaff(input) {
     const code = err.code;
     if (code !== "auth/email-already-exists") throw err;
     user = await admin.auth().getUserByEmail(input.email);
-    const existing = await db$g().collection("staff").doc(user.uid).get();
+    const existing = await db$e().collection("staff").doc(user.uid).get();
     if (existing.exists && existing.data()?.playtest !== true) {
       throw httpError$3(409, "That email already belongs to a staff account that is not a playtest login. Use a different email.");
     }
@@ -28208,7 +30448,7 @@ async function ensurePlaytestStaff(input) {
     staffPayload.createdAt = now;
     staffPayload.assignedOrders = [];
   }
-  await db$g().collection("staff").doc(user.uid).set(staffPayload, { merge: true });
+  await db$e().collection("staff").doc(user.uid).set(staffPayload, { merge: true });
   try {
     await admin.auth().setCustomUserClaims(user.uid, { isStaff: true, role: input.role });
   } catch (err) {
@@ -28226,7 +30466,7 @@ async function upsertPlaytestListing(photographerUid, client) {
   const id = `playtest-job-${photographerUid}`;
   const now = admin.firestore.FieldValue.serverTimestamp();
   const when = admin.firestore.Timestamp.now();
-  const ref = db$g().collection("listings").doc(id);
+  const ref = db$e().collection("listings").doc(id);
   const existing = await ref.get();
   const previousImages = existing.exists && Array.isArray(existing.data()?.images) ? existing.data().images : [];
   await ref.set({
@@ -28256,11 +30496,11 @@ async function upsertPlaytestDelivery(photographerUid, client, listingId) {
   const orderId = `playtest-order-${client.id}`;
   const galleryId = `playtest-gallery-${client.id}`;
   const now = admin.firestore.FieldValue.serverTimestamp();
-  const listingSnap = await db$g().collection("listings").doc(listingId).get();
+  const listingSnap = await db$e().collection("listings").doc(listingId).get();
   const storedInvoiceId = typeof listingSnap.data()?.invoiceId === "string" ? listingSnap.data().invoiceId.trim() : "";
   const legacyInvoiceId = `playtest-invoice-${client.id}`;
   const foundInvoice = (storedInvoiceId ? await playtestInvoiceRecord(storedInvoiceId) : null) || (legacyInvoiceId !== storedInvoiceId ? await playtestInvoiceRecord(legacyInvoiceId) : null);
-  const invoiceId = foundInvoice?.id || db$g().collection("invoices").doc().id;
+  const invoiceId = foundInvoice?.id || db$e().collection("invoices").doc().id;
   const existingToken = typeof foundInvoice?.data.payToken === "string" ? foundInvoice.data.payToken.trim() : "";
   const payToken = existingToken || createPayToken();
   const urlPath = clientInvoiceUrl({ id: invoiceId, status: "sent", payToken }) || "";
@@ -28277,7 +30517,7 @@ async function upsertPlaytestDelivery(photographerUid, client, listingId) {
     uploadedBy: image.uploadedBy || photographerUid,
     uploadedAt: image.uploadedAt || (/* @__PURE__ */ new Date()).toISOString()
   }));
-  await db$g().collection("galleries").doc(galleryId).set({
+  await db$e().collection("galleries").doc(galleryId).set({
     playtest: true,
     listingId,
     orderId,
@@ -28294,7 +30534,7 @@ async function upsertPlaytestDelivery(photographerUid, client, listingId) {
     createdAt: now,
     updatedAt: now
   }, { merge: true });
-  await db$g().collection("invoices").doc(invoiceId).set({
+  await db$e().collection("invoices").doc(invoiceId).set({
     playtest: true,
     invoiceNumber: `PLAY-${client.id.slice(0, 6).toUpperCase()}`,
     clientId: client.id,
@@ -28316,7 +30556,7 @@ async function upsertPlaytestDelivery(photographerUid, client, listingId) {
     createdAt: now,
     updatedAt: now
   }, { merge: true });
-  await db$g().collection("listings").doc(listingId).set({
+  await db$e().collection("listings").doc(listingId).set({
     playtestGalleryId: galleryId,
     invoiceId,
     clientId: client.id,
@@ -28335,7 +30575,7 @@ async function playtestInvoiceRecord(id) {
   for (let hop = 0; hop < 4; hop += 1) {
     if (!current || seen.has(current)) return null;
     seen.add(current);
-    const snap = await db$g().collection("invoices").doc(current).get();
+    const snap = await db$e().collection("invoices").doc(current).get();
     if (!snap.exists) return null;
     const data = snap.data() || {};
     const next = invoiceRedirectTarget(data);
@@ -28465,7 +30705,7 @@ function editorFlags(role, email, flags) {
 async function provisionStaffLogin(input, actor2) {
   const firstName = cleanPersonName(input.firstName);
   const lastName = cleanPersonName(input.lastName);
-  const email = normalizeEmail$1(input.email);
+  const email = normalizeEmail(input.email);
   const phone = String(input.phone || "").trim().slice(0, 40);
   const role = input.role;
   const password = passwordFrom(input);
@@ -28514,7 +30754,7 @@ async function setStaffPassword(staffId, password, actor2, replaceExisting) {
   const snap = await db2.collection("staff").doc(staffId).get();
   if (!snap.exists) throw httpError$2(404, "Staff member not found.");
   const data = snap.data() || {};
-  const email = normalizeEmail$1(data.email);
+  const email = normalizeEmail(data.email);
   if (!email || !email.includes("@")) {
     throw httpError$2(400, "This team member needs an email before a password can be set.");
   }
@@ -28551,10 +30791,10 @@ async function setStaffPassword(staffId, password, actor2, replaceExisting) {
   return { uid, mustChangePassword: true };
 }
 const router$x = Router();
-const db$f = () => admin.firestore();
+const db$d = () => admin.firestore();
 router$x.get("/", requireStaff, async (_req, res) => {
   try {
-    const snapshot = await db$f().collection("staff").where("isActive", "==", true).orderBy("firstName").get();
+    const snapshot = await db$d().collection("staff").where("isActive", "==", true).orderBy("firstName").get();
     return res.json(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
   } catch (err) {
     return res.status(500).json({ error: "Failed to fetch staff." });
@@ -28605,7 +30845,7 @@ router$x.patch("/:id", requireAdmin, async (req, res) => {
       if (k in req.body) updates[k] = req.body[k];
     });
     if (req.body.siteEditor && typeof req.body.siteEditor === "object") {
-      const existing = await db$f().collection("staff").doc(req.params.id).get();
+      const existing = await db$d().collection("staff").doc(req.params.id).get();
       const data = existing.data() || {};
       const nextRole = typeof updates.role === "string" ? updates.role : data.role;
       const access = siteEditorAccess({
@@ -28616,7 +30856,7 @@ router$x.patch("/:id", requireAdmin, async (req, res) => {
       });
       updates.siteEditor = access.locked ? { view: true, edit: true, publish: true } : normalizeSiteEditorFlags(req.body.siteEditor);
     }
-    await db$f().collection("staff").doc(req.params.id).update(updates);
+    await db$d().collection("staff").doc(req.params.id).update(updates);
     return res.json({ success: true });
   } catch (err) {
     return res.status(500).json({ error: "Failed to update staff member." });
@@ -28665,7 +30905,7 @@ router$x.post("/setup", async (req, res) => {
         return res.status(403).json({ error: "Staff setup is disabled." });
       }
     }
-    const existing = await db$f().collection("staff").limit(1).get();
+    const existing = await db$d().collection("staff").limit(1).get();
     if (!existing.empty) {
       return res.status(403).json({ error: "Staff already configured." });
     }
@@ -28678,7 +30918,7 @@ router$x.post("/setup", async (req, res) => {
       password,
       displayName: `${firstName} ${lastName}`
     });
-    await db$f().collection("staff").doc(userRecord.uid).set({
+    await db$d().collection("staff").doc(userRecord.uid).set({
       firebaseUid: userRecord.uid,
       firstName,
       lastName,
@@ -28758,7 +30998,7 @@ function kickStudioQueue(listingId, env = process.env) {
   return { dispatched: true };
 }
 const router$v = Router();
-const db$e = () => admin.firestore();
+const db$c = () => admin.firestore();
 const DIRECT_UPLOAD_LIMIT = 3e6;
 function adminReady$2(res) {
   if (admin.apps.length) return true;
@@ -28771,7 +31011,7 @@ function folderFrom(value) {
   return value === "raw" ? "raw" : "photos";
 }
 async function loadListing(id) {
-  const snap = await db$e().collection("listings").doc(id).get();
+  const snap = await db$c().collection("listings").doc(id).get();
   if (!snap.exists) return null;
   return { id: snap.id, ...snap.data() };
 }
@@ -28781,7 +31021,7 @@ async function assertListingAccess(req, listingId) {
     const error = Object.assign(new Error("Listing not found."), { status: 404 });
     throw error;
   }
-  const staffDoc = await db$e().collection("staff").doc(req.user.uid).get();
+  const staffDoc = await db$c().collection("staff").doc(req.user.uid).get();
   if (staffDoc.exists && staffDoc.data()?.isActive !== false) {
     const role = String(staffDoc.data()?.role || req.staffRole || "");
     if (!staffCanAccessListing(role, req.user.uid, listing)) {
@@ -28832,12 +31072,12 @@ router$v.get("/assigned", requirePhotographer, async (req, res) => {
     const role = req.staffRole || "";
     let docs = [];
     if (role === "admin" || role === "coordinator") {
-      const snap = await db$e().collection("listings").limit(100).get();
+      const snap = await db$c().collection("listings").limit(100).get();
       docs = snap.docs;
     } else {
       const [byUid, byIds] = await Promise.all([
-        db$e().collection("listings").where("photographerUid", "==", uid).limit(50).get(),
-        db$e().collection("listings").where("photographerIds", "array-contains", uid).limit(50).get()
+        db$c().collection("listings").where("photographerUid", "==", uid).limit(50).get(),
+        db$c().collection("listings").where("photographerIds", "array-contains", uid).limit(50).get()
       ]);
       const merged = /* @__PURE__ */ new Map();
       for (const doc of [...byUid.docs, ...byIds.docs]) merged.set(doc.id, doc);
@@ -28858,7 +31098,7 @@ router$v.get("/:id", requireAuth, async (req, res) => {
   if (!adminReady$2(res)) return;
   try {
     const listing = await assertListingAccess(req, req.params.id);
-    const staffDoc = await db$e().collection("staff").doc(req.user.uid).get();
+    const staffDoc = await db$c().collection("staff").doc(req.user.uid).get();
     const payload = applyB2MediaUrls(serializeDoc(listing.id, listing));
     if (!staffDoc.exists) {
       delete payload.notes;
@@ -28979,7 +31219,7 @@ router$v.post("/:id/gallery-sequence", requirePhotographer, async (req, res) => 
   }
 });
 const router$u = Router();
-const db$d = () => admin.firestore();
+const db$b = () => admin.firestore();
 function mailchimpConfig() {
   const apiKey = process.env.MAILCHIMP_API_KEY || "";
   const serverPrefix = process.env.MAILCHIMP_SERVER_PREFIX || apiKey.split("-").pop() || "";
@@ -29008,7 +31248,7 @@ async function mailchimpRequest(path2, init = {}) {
 }
 router$u.get("/", requireCoordinator, async (_req, res) => {
   try {
-    const snapshot = await db$d().collection("campaigns").orderBy("createdAt", "desc").limit(50).get();
+    const snapshot = await db$b().collection("campaigns").orderBy("createdAt", "desc").limit(50).get();
     return res.json(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
   } catch (err) {
     return res.status(500).json({ error: "Failed to fetch campaigns." });
@@ -29049,9 +31289,9 @@ router$u.post("/mailchimp/sync", requireCoordinator, async (req, res) => {
   try {
     const { listId, audience = "all" } = req.body;
     if (!listId) return res.status(400).json({ error: "listId required." });
-    let recipientQuery = db$d().collection("clients").where("status", "==", "active");
+    let recipientQuery = db$b().collection("clients").where("status", "==", "active");
     if (audience === "vip") {
-      recipientQuery = db$d().collection("clients").where("status", "==", "vip");
+      recipientQuery = db$b().collection("clients").where("status", "==", "vip");
     }
     const clientsSnap = await recipientQuery.get();
     const clients = clientsSnap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((client) => client.email && client.emailMarketingOptOut !== true);
@@ -29089,7 +31329,7 @@ router$u.post("/mailchimp/sync", requireCoordinator, async (req, res) => {
         });
       }
     }
-    await db$d().collection("agentLogs").add({
+    await db$b().collection("agentLogs").add({
       agent: "remmi",
       action: "Mailchimp sync",
       summary: `Synced ${synced} clients to Mailchimp list ${listId}`,
@@ -29114,7 +31354,7 @@ router$u.post("/", requireCoordinator, async (req, res) => {
     if (!name || !body || !audience) {
       return res.status(400).json({ error: "name, body, and audience required." });
     }
-    const ref = await db$d().collection("campaigns").add({
+    const ref = await db$b().collection("campaigns").add({
       name,
       type: type || "email",
       status: "draft",
@@ -29135,7 +31375,7 @@ router$u.post("/", requireCoordinator, async (req, res) => {
 });
 router$u.post("/:id/send", requireCoordinator, async (req, res) => {
   try {
-    const campaignDoc = await db$d().collection("campaigns").doc(req.params.id).get();
+    const campaignDoc = await db$b().collection("campaigns").doc(req.params.id).get();
     if (!campaignDoc.exists) return res.status(404).json({ error: "Campaign not found." });
     const campaign = campaignDoc.data();
     if (campaign.status === "sent") {
@@ -29145,9 +31385,9 @@ router$u.post("/:id/send", requireCoordinator, async (req, res) => {
       console.warn(`[Campaigns] Suppressed send for ${req.params.id} — ${clientNotifyBlockReason()}.`);
       return res.status(503).json({ error: "Client notifications are off.", suppressed: true });
     }
-    let recipientQuery = db$d().collection("clients").where("status", "==", "active");
+    let recipientQuery = db$b().collection("clients").where("status", "==", "active");
     if (campaign.audience === "vip") {
-      recipientQuery = db$d().collection("clients").where("status", "==", "vip");
+      recipientQuery = db$b().collection("clients").where("status", "==", "vip");
     }
     const clientsSnap = await recipientQuery.get();
     let clients = clientsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -29157,9 +31397,16 @@ router$u.post("/:id/send", requireCoordinator, async (req, res) => {
     await campaignDoc.ref.update({ status: "sending", updatedAt: admin.firestore.FieldValue.serverTimestamp() });
     let sentCount = 0;
     if (campaign.type === "sms") {
-      const recipients = clients.filter((c) => c.phone && c.smsOptIn !== false).map((c) => ({
+      const eligible = [];
+      for (const client of clients) {
+        if (!marketingRecipientAllowed(client)) continue;
+        if (await isSmsStopped(String(client.phone))) continue;
+        eligible.push(client);
+      }
+      const recipients = eligible.map((c) => ({
         phone: c.phone,
-        name: `${c.firstName || ""} ${c.lastName || ""}`.trim() || "there"
+        name: `${c.firstName || ""} ${c.lastName || ""}`.trim() || "there",
+        marketingOptIn: true
       }));
       const results = await sendSMSCampaign(
         recipients,
@@ -29194,148 +31441,13 @@ router$u.post("/:id/send", requireCoordinator, async (req, res) => {
     return res.json({ success: true, sent: sentCount });
   } catch (err) {
     console.error("[Campaigns] Send error:", err);
-    await db$d().collection("campaigns").doc(req.params.id).update({ status: "draft" }).catch(() => {
+    await db$b().collection("campaigns").doc(req.params.id).update({ status: "draft" }).catch(() => {
     });
     return res.status(500).json({ error: "Failed to send campaign." });
   }
 });
-const EMAIL_RE$2 = /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i;
-function normalizeEmail(value) {
-  return String(value || "").trim().toLowerCase().replace(/\s+/g, "");
-}
-function isValidEmail(value) {
-  return EMAIL_RE$2.test(normalizeEmail(value));
-}
-function normalizePersonName(value) {
-  return String(value || "").toLowerCase().replace(/[^a-z\s]/g, " ").replace(/\s+/g, " ").trim();
-}
-function contactName(contact2) {
-  const name = `${contact2.firstName} ${contact2.lastName}`.trim();
-  return name || contact2.email;
-}
-function normalizeTag(value) {
-  return String(value || "").trim().replace(/\s+/g, " ").slice(0, 40);
-}
-function uniqueTags(tags) {
-  const seen = /* @__PURE__ */ new Set();
-  const out = [];
-  for (const tag of tags) {
-    const clean2 = normalizeTag(tag);
-    if (!clean2) continue;
-    const key = clean2.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(clean2);
-  }
-  return out;
-}
-function splitTags(value) {
-  return uniqueTags(String(value || "").split(/[,;|]/));
-}
-function applyTagChange(contact2, add, remove, now) {
-  const removeKeys = new Set(remove.map((tag) => normalizeTag(tag).toLowerCase()).filter(Boolean));
-  const next = contact2.tags.filter((tag) => !removeKeys.has(tag.toLowerCase()));
-  return { ...contact2, tags: uniqueTags([...next, ...add]), updatedAt: now };
-}
-function contactMatchesFilter(contact2, filter) {
-  const query = filter.query.trim().toLowerCase();
-  if (query) {
-    const haystack = [
-      contact2.email,
-      contact2.firstName,
-      contact2.lastName,
-      contact2.company,
-      contact2.phone,
-      contact2.tags.join(" "),
-      ...Object.values(contact2.custom)
-    ].join(" ").toLowerCase();
-    if (!haystack.includes(query)) return false;
-  }
-  const have = new Set(contact2.tags.map((tag) => tag.toLowerCase()));
-  if (filter.tagsAll.some((tag) => !have.has(tag.toLowerCase()))) return false;
-  if (filter.tagsAny.length && !filter.tagsAny.some((tag) => have.has(tag.toLowerCase()))) return false;
-  if (filter.tagsNone.some((tag) => have.has(tag.toLowerCase()))) return false;
-  if (filter.source && contact2.source !== filter.source) return false;
-  if (filter.verified === "yes" && !contact2.emailVerified) return false;
-  if (filter.verified === "no" && contact2.emailVerified) return false;
-  for (const field of filter.fields) {
-    const key = field.key.trim().toLowerCase();
-    if (!key) continue;
-    const actual = Object.entries(contact2.custom).find(([name]) => name.toLowerCase() === key)?.[1] || "";
-    if (actual.trim().toLowerCase() !== field.value.trim().toLowerCase()) return false;
-  }
-  return true;
-}
-function blankContact(email, source, now) {
-  return {
-    email: normalizeEmail(email),
-    firstName: "",
-    lastName: "",
-    company: "",
-    phone: "",
-    tags: [],
-    custom: {},
-    source,
-    clientId: "",
-    emailVerified: source === "client",
-    createdAt: now,
-    updatedAt: now
-  };
-}
-function prefer(current, incoming) {
-  return incoming.trim() || current;
-}
-function syncClientsIntoContacts(contacts, clients, now) {
-  const byEmail = new Map(contacts.map((contact2) => [contact2.email, { ...contact2, tags: [...contact2.tags], custom: { ...contact2.custom } }]));
-  let created = 0;
-  let relinked = 0;
-  let refreshed = 0;
-  for (const client of clients) {
-    const email = normalizeEmail(client.email);
-    if (!isValidEmail(email)) continue;
-    const previous = [...byEmail.values()].find((contact2) => contact2.clientId === client.id);
-    let target = byEmail.get(email);
-    if (previous && previous.email !== email) {
-      relinked += 1;
-      if (!target) {
-        target = { ...previous, email, updatedAt: now };
-        byEmail.set(email, target);
-      } else {
-        target = {
-          ...target,
-          tags: uniqueTags([...target.tags, ...previous.tags]),
-          custom: { ...previous.custom, ...target.custom },
-          updatedAt: now
-        };
-        byEmail.set(email, target);
-      }
-      if (previous.email !== email) byEmail.delete(previous.email);
-    }
-    if (!target) {
-      target = blankContact(email, "client", now);
-      created += 1;
-      byEmail.set(email, target);
-    } else {
-      refreshed += 1;
-    }
-    target.clientId = client.id;
-    target.firstName = prefer(target.firstName, client.firstName);
-    target.lastName = prefer(target.lastName, client.lastName);
-    target.phone = prefer(target.phone, client.phone);
-    target.company = prefer(target.company, client.company);
-    target.emailVerified = true;
-    target.updatedAt = now;
-    if (!target.source) target.source = "client";
-  }
-  return {
-    contacts: [...byEmail.values()].sort((a, b) => a.email.localeCompare(b.email)),
-    created,
-    relinked,
-    refreshed
-  };
-}
 function signUnsubscribeEmail(email, secret2) {
-  return crypto$1.createHmac("sha256", secret2).update(normalizeEmail(email)).digest("hex");
+  return crypto$1.createHmac("sha256", secret2).update(normalizeEmail$1(email)).digest("hex");
 }
 function unsubscribeTokenMatches(email, token, secret2) {
   const expected = signUnsubscribeEmail(email, secret2);
@@ -29345,7 +31457,7 @@ function unsubscribeTokenMatches(email, token, secret2) {
 }
 function signedUnsubscribeUrl(origin, email, secret2) {
   const url = new URL("/unsubscribe", origin);
-  const normalized = normalizeEmail(email);
+  const normalized = normalizeEmail$1(email);
   url.searchParams.set("email", normalized);
   if (secret2) url.searchParams.set("token", signUnsubscribeEmail(normalized, secret2));
   return url.toString();
@@ -29447,7 +31559,7 @@ function mapTable(table, mapping) {
       if (field === "ignore" || !value.trim()) return;
       if (field === "tags") mapped.tags = splitTags(value);
       else if (field === "custom") mapped.custom[header2] = value.trim();
-      else if (field === "email") mapped.email = normalizeEmail(value);
+      else if (field === "email") mapped.email = normalizeEmail$1(value);
       else mapped[field] = value.trim();
     });
     return mapped;
@@ -29511,1850 +31623,6 @@ function buildImportPlan(input) {
     },
     upserts: [...planned.values()]
   };
-}
-function entry(now, draft) {
-  const names = draft.names || [];
-  const aliases = (draft.aliases || names).map((name) => normalizePersonName(name)).filter(Boolean);
-  return {
-    id: draft.kind === "email" ? `email:${normalizeEmail(draft.value)}` : draft.kind === "domain" ? `domain:${draft.value.replace(/^@/, "").toLowerCase()}` : `name:${normalizePersonName(draft.value)}`,
-    kind: draft.kind,
-    value: draft.kind === "email" ? normalizeEmail(draft.value) : draft.kind === "domain" ? draft.value.replace(/^@/, "").trim().toLowerCase() : normalizePersonName(draft.value),
-    reason: draft.reason,
-    hold: draft.hold || "",
-    note: draft.note,
-    aliases,
-    email: normalizeEmail(draft.email || (draft.kind === "email" ? draft.value : "")),
-    source: draft.source || "manual",
-    createdAt: now,
-    updatedAt: now
-  };
-}
-function seedSuppression(now) {
-  const manual = "Standing blacklist. Add the email here when you have it. A matching customer name is already blocked.";
-  return [
-    entry(now, {
-      kind: "domain",
-      value: "thekinkteam.com",
-      reason: "manual",
-      note: "Standing blacklist: every @thekinkteam.com address.",
-      source: "seed"
-    }),
-    entry(now, { kind: "name", value: "Bruce Kink", reason: "manual", note: manual, source: "seed", names: ["Bruce Kink"] }),
-    entry(now, { kind: "name", value: "Lisa Cagle", reason: "manual", note: manual, source: "seed", names: ["Lisa Cagle"] }),
-    entry(now, { kind: "name", value: "Haley Garcia", reason: "manual", note: manual, source: "seed", names: ["Haley Garcia"] }),
-    entry(now, { kind: "name", value: "Shannon Cox", reason: "manual", note: manual, source: "seed", names: ["Shannon Cox"] }),
-    entry(now, { kind: "name", value: "Melissa Franklin", reason: "manual", note: manual, source: "seed", names: ["Melissa Franklin"] }),
-    entry(now, { kind: "name", value: "Justin McClung", reason: "manual", note: manual, source: "seed", names: ["Justin McClung"] }),
-    entry(now, {
-      kind: "name",
-      value: "Rebecca Nye",
-      reason: "manual",
-      hold: "personal",
-      note: "Personal hold. Cadi emails Rebecca herself.",
-      source: "seed",
-      names: ["Rebecca Nye"]
-    }),
-    entry(now, {
-      kind: "name",
-      value: "Jacalyn Henthorne",
-      reason: "manual",
-      hold: "personal",
-      note: "Personal hold. Cadi emails Jacki (Jacalyn) Henthorne herself.",
-      source: "seed",
-      names: ["Jacki Henthorne", "Jacalyn Henthorne", "Jacki Jacalyn Henthorne"]
-    })
-  ];
-}
-function buildSuppression(now, draft) {
-  if (draft.kind === "email" && !isValidEmail(draft.value)) return null;
-  if (draft.kind === "domain" && !draft.value.replace(/^@/, "").includes(".")) return null;
-  if (draft.kind === "name" && !normalizePersonName(draft.value)) return null;
-  return entry(now, draft);
-}
-function matchSuppression(contact2, list2) {
-  const email = normalizeEmail(contact2.email);
-  const domain = email.split("@")[1] || "";
-  const name = normalizePersonName(`${contact2.firstName} ${contact2.lastName}`);
-  for (const item of list2) {
-    if (item.kind === "email" && item.value === email) return item;
-    if (item.email && item.email === email) return item;
-    if (item.kind === "domain" && domain === item.value) return item;
-    if (item.kind === "name" && name && (name === item.value || item.aliases.includes(name))) return item;
-  }
-  return null;
-}
-function reasonLabel(reason, hold) {
-  if (hold === "personal") return "Personal hold";
-  if (reason === "bounced") return "Bounced";
-  if (reason === "blocked") return "Blocked";
-  if (reason === "unsubscribed") return "Unsubscribed";
-  if (reason === "complained") return "Complained";
-  return "Do not email";
-}
-const HELLO_SENDING_ACCOUNT = "hello@iconicimagestx.com";
-const PHOTOS_SENDING_ACCOUNT = "photos@iconicimagestx.com";
-function normalizeSendingAccounts(raw) {
-  const list2 = [];
-  const seen = /* @__PURE__ */ new Set();
-  const add = (email, label) => {
-    const normalized = normalizeEmail(String(email || ""));
-    if (!isValidEmail(normalized) || seen.has(normalized)) return;
-    seen.add(normalized);
-    const name = String(label || "").trim();
-    list2.push({ email: normalized, label: name || normalized });
-  };
-  if (Array.isArray(raw)) {
-    for (const item of raw) {
-      if (!item || typeof item !== "object") continue;
-      const row = item;
-      add(row.email, row.label);
-    }
-  }
-  if (!list2.length) {
-    add(HELLO_SENDING_ACCOUNT, "Hello");
-    add(PHOTOS_SENDING_ACCOUNT, "Photos");
-  }
-  if (!seen.has(HELLO_SENDING_ACCOUNT)) {
-    list2.unshift({ email: HELLO_SENDING_ACCOUNT, label: "Hello" });
-  }
-  return list2;
-}
-function matchSendingAccount(email, accounts) {
-  const normalized = normalizeEmail(email);
-  return accounts.some((account) => account.email === normalized) ? normalized : "";
-}
-const EMPTY_SEGMENT_FILTER = {
-  query: "",
-  tagsAll: [],
-  tagsAny: [],
-  tagsNone: [],
-  source: "",
-  verified: "",
-  fields: []
-};
-const DEFAULT_MARKETING_SETTINGS = {
-  frequencyMax: 2,
-  frequencyDays: 7,
-  overlapHours: 24,
-  gmailDailyLimit: 2e3,
-  bounceWarnRate: 0.05,
-  bouncePauseRate: 0.08,
-  fromName: "Iconic Images",
-  fromEmail: "hello@iconicimagestx.com",
-  replyTo: "hello@iconicimagestx.com",
-  sendingAccounts: [
-    { email: "hello@iconicimagestx.com", label: "Hello" },
-    { email: "photos@iconicimagestx.com", label: "Photos" }
-  ],
-  suppressionSeededAt: ""
-};
-function settingsFrom(raw) {
-  const merged = { ...DEFAULT_MARKETING_SETTINGS, ...raw || {} };
-  const sendingAccounts = normalizeSendingAccounts(
-    raw && Array.isArray(raw.sendingAccounts) ? raw.sendingAccounts : DEFAULT_MARKETING_SETTINGS.sendingAccounts
-  );
-  let fromEmail = matchSendingAccount(merged.fromEmail, sendingAccounts) || HELLO_SENDING_ACCOUNT;
-  let replyTo = normalizeEmail(merged.replyTo) || fromEmail;
-  const stored = raw && Array.isArray(raw.sendingAccounts) ? raw.sendingAccounts : null;
-  const legacyPhotosOnly = !stored || stored.length === 1 && normalizeEmail(stored[0]?.email) === PHOTOS_SENDING_ACCOUNT;
-  if (legacyPhotosOnly && fromEmail === PHOTOS_SENDING_ACCOUNT) fromEmail = HELLO_SENDING_ACCOUNT;
-  if (legacyPhotosOnly && replyTo === PHOTOS_SENDING_ACCOUNT) replyTo = HELLO_SENDING_ACCOUNT;
-  if (!matchSendingAccount(replyTo, sendingAccounts)) replyTo = fromEmail;
-  return { ...merged, sendingAccounts, fromEmail, replyTo };
-}
-function createMemoryMarketingStore() {
-  const contacts = /* @__PURE__ */ new Map();
-  const segments = /* @__PURE__ */ new Map();
-  const suppression = /* @__PURE__ */ new Map();
-  const events = [];
-  const campaigns = /* @__PURE__ */ new Map();
-  const templates = /* @__PURE__ */ new Map();
-  const sends = [];
-  const reports = /* @__PURE__ */ new Map();
-  let settings = { ...DEFAULT_MARKETING_SETTINGS };
-  let clients = [];
-  return {
-    async ensureSeed() {
-      if (settings.suppressionSeededAt) return;
-      const now = (/* @__PURE__ */ new Date()).toISOString();
-      for (const item of seedSuppression(now)) suppression.set(item.id, item);
-      settings = { ...settings, suppressionSeededAt: now };
-    },
-    async listContacts() {
-      return [...contacts.values()];
-    },
-    async saveContacts(next) {
-      for (const contact2 of next) contacts.set(contact2.email, contact2);
-    },
-    async deleteContacts(emails) {
-      for (const email of emails) contacts.delete(email);
-    },
-    async listSegments() {
-      return [...segments.values()];
-    },
-    async saveSegment(segment) {
-      segments.set(segment.id, segment);
-    },
-    async deleteSegment(id) {
-      segments.delete(id);
-    },
-    async listSuppression() {
-      return [...suppression.values()];
-    },
-    async saveSuppression(entry2) {
-      suppression.set(entry2.id, entry2);
-    },
-    async deleteSuppression(id) {
-      suppression.delete(id);
-    },
-    async listEvents(email) {
-      return events.filter((event) => !email || event.email === email);
-    },
-    async addEvents(next) {
-      events.push(...next);
-    },
-    async getSettings() {
-      settings = settingsFrom(settings);
-      return settings;
-    },
-    async saveSettings(next) {
-      settings = next;
-    },
-    async listClients() {
-      return clients;
-    },
-    replaceClients(next) {
-      clients = next;
-    },
-    async listCampaigns() {
-      return [...campaigns.values()];
-    },
-    async getCampaign(id) {
-      return campaigns.get(id) || null;
-    },
-    async saveCampaign(campaign) {
-      campaigns.set(campaign.id, campaign);
-    },
-    async deleteCampaign(id) {
-      campaigns.delete(id);
-    },
-    async listTemplates() {
-      return [...templates.values()];
-    },
-    async saveTemplate(template) {
-      templates.set(template.id, template);
-    },
-    async deleteTemplate(id) {
-      templates.delete(id);
-    },
-    async listSends() {
-      return sends;
-    },
-    async addSends(next) {
-      sends.push(...next);
-    },
-    async getReport(campaignId) {
-      return reports.get(campaignId) || null;
-    },
-    async saveReport(report) {
-      reports.set(report.campaignId, report);
-    },
-    async listReports() {
-      return [...reports.values()];
-    }
-  };
-}
-const memoryStore$2 = createMemoryMarketingStore();
-function getMarketingStore() {
-  if (process.env.MARKETING_STORE === "memory" || !admin.apps.length) return memoryStore$2;
-  return firestoreStore$2;
-}
-function db$c() {
-  return admin.firestore();
-}
-async function writeAll(collection, docs) {
-  for (let index = 0; index < docs.length; index += 400) {
-    const batch = db$c().batch();
-    for (const doc of docs.slice(index, index + 400)) {
-      batch.set(db$c().collection(collection).doc(doc.id), doc.data);
-    }
-    await batch.commit();
-  }
-}
-const firestoreStore$2 = {
-  async ensureSeed() {
-    const settings = await this.getSettings();
-    if (settings.suppressionSeededAt) return;
-    const now = (/* @__PURE__ */ new Date()).toISOString();
-    await writeAll("marketingSuppression", seedSuppression(now).map((item) => ({ id: item.id, data: item })));
-    await this.saveSettings({ ...settings, suppressionSeededAt: now });
-  },
-  async listContacts() {
-    const snap = await db$c().collection("marketingContacts").get();
-    return snap.docs.map((doc) => doc.data());
-  },
-  async saveContacts(contacts) {
-    await writeAll("marketingContacts", contacts.map((contact2) => ({ id: contact2.email, data: contact2 })));
-  },
-  async deleteContacts(emails) {
-    for (let index = 0; index < emails.length; index += 400) {
-      const batch = db$c().batch();
-      for (const email of emails.slice(index, index + 400)) {
-        batch.delete(db$c().collection("marketingContacts").doc(email));
-      }
-      await batch.commit();
-    }
-  },
-  async listSegments() {
-    const snap = await db$c().collection("marketingSegments").get();
-    return snap.docs.map((doc) => doc.data());
-  },
-  async saveSegment(segment) {
-    await db$c().collection("marketingSegments").doc(segment.id).set(segment);
-  },
-  async deleteSegment(id) {
-    await db$c().collection("marketingSegments").doc(id).delete();
-  },
-  async listSuppression() {
-    const snap = await db$c().collection("marketingSuppression").get();
-    return snap.docs.map((doc) => doc.data());
-  },
-  async saveSuppression(entry2) {
-    await db$c().collection("marketingSuppression").doc(entry2.id).set(entry2);
-  },
-  async deleteSuppression(id) {
-    await db$c().collection("marketingSuppression").doc(id).delete();
-  },
-  async listEvents(email) {
-    const query = email ? db$c().collection("marketingEvents").where("email", "==", email) : db$c().collection("marketingEvents");
-    const snap = await query.get();
-    return snap.docs.map((doc) => doc.data());
-  },
-  async addEvents(events) {
-    await writeAll("marketingEvents", events.map((event) => ({ id: event.id, data: event })));
-  },
-  async getSettings() {
-    const doc = await db$c().collection("marketingSettings").doc("default").get();
-    return settingsFrom(doc.exists ? doc.data() : void 0);
-  },
-  async saveSettings(settings) {
-    await db$c().collection("marketingSettings").doc("default").set(settings);
-  },
-  async listClients() {
-    const snap = await db$c().collection("clients").get();
-    return snap.docs.map((doc) => {
-      const data = doc.data();
-      return {
-        id: doc.id,
-        email: String(data.email || ""),
-        firstName: String(data.firstName || ""),
-        lastName: String(data.lastName || ""),
-        phone: String(data.phone || ""),
-        company: String(data.company || "")
-      };
-    });
-  },
-  async listCampaigns() {
-    const snap = await db$c().collection("marketingCampaigns").get();
-    return snap.docs.map((doc) => doc.data());
-  },
-  async getCampaign(id) {
-    const doc = await db$c().collection("marketingCampaigns").doc(id).get();
-    return doc.exists ? doc.data() : null;
-  },
-  async saveCampaign(campaign) {
-    await db$c().collection("marketingCampaigns").doc(campaign.id).set(campaign);
-  },
-  async deleteCampaign(id) {
-    await db$c().collection("marketingCampaigns").doc(id).delete();
-  },
-  async listTemplates() {
-    const snap = await db$c().collection("marketingTemplates").get();
-    return snap.docs.map((doc) => doc.data());
-  },
-  async saveTemplate(template) {
-    await db$c().collection("marketingTemplates").doc(template.id).set(template);
-  },
-  async deleteTemplate(id) {
-    await db$c().collection("marketingTemplates").doc(id).delete();
-  },
-  async listSends() {
-    const snap = await db$c().collection("marketingSends").get();
-    return snap.docs.map((doc) => doc.data());
-  },
-  async addSends(sends) {
-    await writeAll("marketingSends", sends.map((send) => ({
-      id: `${send.campaignId}_${send.email}`.replace(/[^\w@.-]+/g, "_"),
-      data: send
-    })));
-  },
-  async getReport(campaignId) {
-    const doc = await db$c().collection("marketingReports").doc(campaignId).get();
-    return doc.exists ? doc.data() : null;
-  },
-  async saveReport(report) {
-    await db$c().collection("marketingReports").doc(report.campaignId).set(report);
-  },
-  async listReports() {
-    const snap = await db$c().collection("marketingReports").get();
-    return snap.docs.map((doc) => doc.data());
-  }
-};
-async function syncCustomerContacts(store = getMarketingStore()) {
-  const now = (/* @__PURE__ */ new Date()).toISOString();
-  const [contacts, clients] = await Promise.all([store.listContacts(), store.listClients()]);
-  const result = syncClientsIntoContacts(contacts, clients, now);
-  const nextEmails = new Set(result.contacts.map((contact2) => contact2.email));
-  const removed = contacts.map((contact2) => contact2.email).filter((email) => !nextEmails.has(email));
-  await store.saveContacts(result.contacts);
-  if (removed.length) await store.deleteContacts(removed);
-  return {
-    created: result.created,
-    relinked: result.relinked,
-    refreshed: result.refreshed,
-    total: result.contacts.length
-  };
-}
-const MERGE = /\{([A-Za-z]+)(?:\|([^}]*))?\}/g;
-function escapeHtml$7(value) {
-  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-}
-function applyMerge(template, values) {
-  return template.replace(MERGE, (full, key, fallback) => {
-    const value = values[key];
-    if (value) return key === "UnsubscribeUrl" ? value : escapeHtml$7(value);
-    if (fallback !== void 0) return escapeHtml$7(fallback);
-    return full;
-  });
-}
-function mergeValues(contact2, unsubscribeUrl) {
-  return {
-    FirstName: contact2.firstName || "",
-    LastName: contact2.lastName || "",
-    Email: contact2.email || "",
-    Company: contact2.company || "",
-    UnsubscribeUrl: unsubscribeUrl
-  };
-}
-const MARKETING_POSTAL_ADDRESS = "Iconic Images, 26410 Oakridge Dr. Ste 105 - 108, Spring, TX 77380";
-function withUnsubscribeFooter(html, url) {
-  const link = `<p style="margin-top:24px;font-size:12px;color:#667085;">${MARKETING_POSTAL_ADDRESS}. <a href="{UnsubscribeUrl}" clicktracking="off">Unsubscribe</a>.</p>`;
-  let merged = html.includes("{UnsubscribeUrl}") ? html : `${html}
-${link}`;
-  if (!merged.includes("26410 Oakridge Dr")) merged = `${merged}
-${link}`;
-  return applyMerge(merged, { UnsubscribeUrl: url });
-}
-function hoursBetween(laterIso, earlierIso) {
-  const later = Date.parse(laterIso);
-  const earlier = Date.parse(earlierIso);
-  if (Number.isNaN(later) || Number.isNaN(earlier)) return Number.POSITIVE_INFINITY;
-  return (later - earlier) / 36e5;
-}
-function resolveAudience(input) {
-  const removed = [];
-  const seen = /* @__PURE__ */ new Set();
-  const recipients = [];
-  let duplicatesRemoved = 0;
-  const pool = input.filter ? input.contacts.filter((contact2) => contactMatchesFilter(contact2, input.filter)) : input.contacts;
-  for (const contact2 of pool) {
-    const email = normalizeEmail(contact2.email);
-    const name = `${contact2.firstName} ${contact2.lastName}`.trim() || email;
-    if (!isValidEmail(email)) {
-      removed.push({ email, name, reason: "invalid", detail: "Invalid email" });
-      continue;
-    }
-    if (seen.has(email)) {
-      duplicatesRemoved += 1;
-      removed.push({ email, name, reason: "duplicate", detail: "Duplicate in this send" });
-      continue;
-    }
-    seen.add(email);
-    const suppressed = matchSuppression(contact2, input.suppression);
-    if (suppressed) {
-      const detail = suppressed.hold === "personal" ? "Personal hold" : suppressed.reason;
-      removed.push({ email, name, reason: "suppressed", detail });
-      continue;
-    }
-    const windowStart = Date.parse(input.sendAt) - input.settings.frequencyDays * 864e5;
-    const recent = input.sends.filter((send) => {
-      return normalizeEmail(send.email) === email && Date.parse(send.sentAt) >= windowStart;
-    });
-    if (input.settings.frequencyMax > 0 && recent.length >= input.settings.frequencyMax) {
-      removed.push({
-        email,
-        name,
-        reason: "frequency",
-        detail: `${recent.length} marketing emails in ${input.settings.frequencyDays} days`
-      });
-      continue;
-    }
-    if (!input.overlapOverride) {
-      const clash = input.campaigns.find((campaign) => {
-        if (campaign.id === input.excludeCampaignId) return false;
-        if (!campaign.recipientEmails.map(normalizeEmail).includes(email)) return false;
-        if (campaign.status === "sending") return true;
-        if (campaign.status === "scheduled" && campaign.scheduledAt) {
-          return Math.abs(hoursBetween(campaign.scheduledAt, input.sendAt)) <= input.settings.overlapHours;
-        }
-        if (campaign.status === "sent" && campaign.sentAt) {
-          return hoursBetween(input.sendAt, campaign.sentAt) <= input.settings.overlapHours && hoursBetween(input.sendAt, campaign.sentAt) >= 0;
-        }
-        return false;
-      });
-      if (clash) {
-        removed.push({ email, name, reason: "overlap", detail: clash.name });
-        continue;
-      }
-    }
-    recipients.push({ ...contact2, email });
-  }
-  return {
-    recipients,
-    removed,
-    duplicatesRemoved,
-    suppressed: removed.filter((item) => item.reason === "suppressed").length,
-    frequencyCapped: removed.filter((item) => item.reason === "frequency").length,
-    overlapHeld: removed.filter((item) => item.reason === "overlap").length,
-    unverified: recipients.filter((contact2) => !contact2.emailVerified).length
-  };
-}
-const HOLY_GRAIL_SHEET_ID = "1kZWkEHWdH_2nsLHokPaTs4pRxpkgLcOWqIaXu9wGsX8";
-const HOLY_GRAIL_PAGE_LIMIT = 40;
-const HOLY_GRAIL_TABS = {
-  dashboard: "🏠 Dashboard",
-  howTo: "📖 How To",
-  touchLog: "📞 Touch Log",
-  startHere: "Start Here",
-  inbox: "🆕 New Leads Inbox",
-  topClients: "⭐ Top Clients",
-  recurring: "🔁 Recurring",
-  strays: "🌱 Strays & One-time",
-  winBack: "💤 Win-Back",
-  agentProspects: "🏡 Agent Prospects",
-  seniorCommunities: "🏥 Senior Communities",
-  apartmentComplexes: "🏢 Apartment Complexes",
-  hospitality: "🏨 Hospitality",
-  otherBusinesses: "🏪 Other Businesses",
-  doNotContact: "⛔ Do Not Contact",
-  contacts: "📇 Contacts",
-  suppression: "⛔ Suppression",
-  prospectsHospitality: "Prospects - Hospitality",
-  campaignCalendar: "Campaign Calendar",
-  ads: "Ads",
-  ideasBank: "Ideas Bank",
-  lists: "Lists & Segments",
-  socialCalendar: "Social Calendar"
-};
-const INBOX_VALUE_COLUMNS = ["A", "B", "C", "D", "E", "F", "G", "H"];
-const CONTACTS_FORMULA_HEADERS = [
-  "Client ID",
-  "Touch Count",
-  "Last Touch",
-  "Live Status",
-  "Section",
-  "Priority",
-  "Call OK"
-];
-const ACTION_POSSIBLE_DUPE = "possible dupe";
-const ACTION_SUPPRESSED = "suppressed";
-const ICONIC_CLIENT_ID = /^(IC-\d+|C\d+)$/i;
-const FORMULA_LEAD$1 = /^[=+\-@\t\r]/;
-const TEST_WORD = /\b(test|playtest|localhost|sandbox|fixture|testdata|test-data)\b/i;
-const STAGING_FIXTURE = /staging/i;
-function holyGrailLive(env = process.env) {
-  return env.HOLY_GRAIL_SYNC_LIVE === "true";
-}
-function columnLetter(index) {
-  let n = index + 1;
-  let out = "";
-  while (n > 0) {
-    const rem = (n - 1) % 26;
-    out = String.fromCharCode(65 + rem) + out;
-    n = Math.floor((n - 1) / 26);
-  }
-  return out;
-}
-function columnIndex$1(letter) {
-  let n = 0;
-  for (const char of letter.toUpperCase()) {
-    if (char < "A" || char > "Z") return -1;
-    n = n * 26 + (char.charCodeAt(0) - 64);
-  }
-  return n - 1;
-}
-function quoteTab(tab, a1) {
-  return `'${tab.replace(/'/g, "''")}'!${a1}`;
-}
-function compactUtc(ms) {
-  return new Date(ms).toISOString().slice(0, 16) + "Z";
-}
-function normalizeSyncEmail(value) {
-  return String(value ?? "").trim().toLowerCase().replace(/\s+/g, "");
-}
-function normalizeSyncPhone(value) {
-  let digits2 = String(value ?? "").replace(/\D/g, "");
-  if (digits2.length === 11 && digits2.startsWith("1")) digits2 = digits2.slice(1);
-  return digits2.length >= 7 ? digits2 : "";
-}
-function sheetText(value, max = 400) {
-  const text2 = String(value ?? "").replace(/[\r\n\t]+/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
-  return FORMULA_LEAD$1.test(text2) ? `'${text2}` : text2;
-}
-function mapOrderStatus(raw) {
-  const value = String(raw ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
-  if (!value) return "";
-  if (["cancelled", "canceled", "declined", "void", "voided", "expired_unpaid", "no_show"].includes(value)) return "Canceled";
-  if (["delivered", "paid", "delivered_paid", "complete", "completed"].includes(value)) return "Delivered";
-  if (["confirmed", "booked", "scheduled", "in_progress", "shooting", "editing"].includes(value)) return "Booked";
-  if (["new", "pending", "awaiting", "draft", "quoted"].includes(value)) return "Pending";
-  if (value === "archived") return "Archived";
-  return "";
-}
-function lastOrderLabel(orderNumber2, day) {
-  const ref = sheetText(orderNumber2, 80);
-  const date = /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : "";
-  if (ref && date) return `${ref} · ${date}`;
-  return ref || date;
-}
-function sourceSyncedValue(source, nowMs, harListingId = "") {
-  if (source === "HAR" && harListingId.trim()) return sheetText(`har:listing:${harListingId.trim()}`, 120);
-  if (source === "HAR") return `har:${compactUtc(nowMs)}`;
-  return `website:${compactUtc(nowMs)}`;
-}
-function cityFromAddressText(label) {
-  const parts = label.split(",").map((part) => part.trim()).filter(Boolean);
-  if (parts.length < 2) return "";
-  const tail = parts[parts.length - 1];
-  if (/^[A-Z]{2}(?:\s+\d{5}(?:-\d{4})?)?$/.test(tail)) return parts[parts.length - 2];
-  const embedded = tail.match(/^([A-Za-z .'-]+?)\s+[A-Z]{2}(?:\s+\d{5}(?:-\d{4})?)?$/);
-  if (embedded) return embedded[1].trim();
-  return "";
-}
-function isDncStatus(value) {
-  return /\bDNC\b/i.test(value) || value.includes("⛔ DNC");
-}
-function isEmailOkNo(value) {
-  return value.trim().toUpperCase() === "NO";
-}
-function asText$1(value) {
-  if (typeof value === "string") return value.trim();
-  if (typeof value === "number" && Number.isFinite(value)) return String(value);
-  return "";
-}
-function sourceBlob(data, id) {
-  const tags = Array.isArray(data.tags) ? data.tags.map((tag) => asText$1(tag)).join(" ") : asText$1(data.tags);
-  return [
-    id,
-    asText$1(data.source),
-    asText$1(data.leadSource),
-    asText$1(data.origin),
-    asText$1(data.environment),
-    asText$1(data.archivedFrom),
-    asText$1(data.createdFrom),
-    asText$1(data.fixtureName),
-    tags
-  ].join(" ");
-}
-function emailHostIsTest(email) {
-  const host = normalizeSyncEmail(email).split("@")[1] || "";
-  return host === "localhost" || host.endsWith(".localhost") || host.endsWith(".test");
-}
-function isTestRecord(id, data) {
-  if (data.playtest === true || data.sandbox === true || data.test === true || data.testData === true || data.fixture === true) {
-    return true;
-  }
-  const email = asText$1(data.email) || asText$1(data.clientEmail);
-  if (emailHostIsTest(email)) return true;
-  if (id.toLowerCase().includes("playtest")) return true;
-  const blob = sourceBlob(data, id);
-  if (TEST_WORD.test(blob) || STAGING_FIXTURE.test(blob)) return true;
-  if (/\/admin\/test-data/i.test(blob)) return true;
-  const status2 = asText$1(data.status).toLowerCase();
-  const archived = status2 === "archived" || data.archived === true;
-  if (archived && /test-data|testdata|\/admin\/test-data/i.test(blob)) return true;
-  return false;
-}
-function leadFromHar(input) {
-  const email = normalizeSyncEmail(input.email);
-  const phone = normalizeSyncPhone(input.phone);
-  const record2 = {
-    source: "HAR",
-    leadSource: "HAR",
-    email,
-    playtest: false
-  };
-  if (isTestRecord(input.listingId || "har", record2)) return null;
-  if (!email && !phone) return null;
-  const received = Number.isFinite(input.receivedAtMs) ? input.receivedAtMs : Date.now();
-  return {
-    key: email ? `email:${email}` : `phone:${phone}`,
-    siteClientId: input.listingId ? `har:${input.listingId}` : "",
-    iconicClientId: "",
-    name: sheetText(input.name, 120),
-    email,
-    phone,
-    phoneRaw: sheetText(input.phone, 40),
-    company: sheetText(input.company, 120),
-    city: sheetText(input.city, 80),
-    notes: sheetText(input.notes, 400),
-    source: "HAR",
-    receivedAt: compactUtc(received),
-    lastOrder: "",
-    orderStatus: "",
-    harListingId: sheetText(input.listingId, 80)
-  };
-}
-function timestampMillis$1(value) {
-  if (value && typeof value === "object" && "toMillis" in value && typeof value.toMillis === "function") {
-    const ms = value.toMillis();
-    return Number.isFinite(ms) ? ms : null;
-  }
-  if (value && typeof value === "object" && "seconds" in value) {
-    const seconds = Number(value.seconds);
-    return Number.isFinite(seconds) ? seconds * 1e3 : null;
-  }
-  if (typeof value === "string" || typeof value === "number") {
-    const parsed = new Date(value).getTime();
-    return Number.isFinite(parsed) ? parsed : null;
-  }
-  return null;
-}
-function dayFrom(value) {
-  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value.trim())) return value.trim().slice(0, 10);
-  const ms = timestampMillis$1(value);
-  return ms == null ? "" : new Date(ms).toISOString().slice(0, 10);
-}
-function cityFromData(data) {
-  const direct = asText$1(data.city);
-  if (direct) return direct;
-  const address = data.address;
-  if (address && typeof address === "object" && !Array.isArray(address)) {
-    const city = asText$1(address.city);
-    if (city) return city;
-  }
-  const label = asText$1(data.addressLabel) || (typeof address === "string" ? address.trim() : "");
-  return cityFromAddressText(label);
-}
-function personName$1(data) {
-  const combined = `${asText$1(data.firstName)} ${asText$1(data.lastName)}`.trim();
-  return combined || asText$1(data.clientName) || asText$1(data.name);
-}
-function iconicClientId(data) {
-  for (const key of ["iconicClientId", "crmClientId", "sheetClientId"]) {
-    const value = asText$1(data[key]);
-    if (ICONIC_CLIENT_ID.test(value)) return value.toUpperCase();
-  }
-  return "";
-}
-function nodeFromChange(doc) {
-  const data = doc.data;
-  const email = normalizeSyncEmail(asText$1(data.email) || asText$1(data.clientEmail));
-  const phoneRaw = asText$1(data.phone) || asText$1(data.clientPhone);
-  const phone = normalizeSyncPhone(phoneRaw);
-  const clientId2 = asText$1(data.clientId);
-  const clientIds = doc.collection === "clients" ? [doc.id] : clientId2 ? [clientId2] : [];
-  if (!email && !phone && clientIds.length === 0 && !iconicClientId(data)) return null;
-  const orderNumber2 = asText$1(data.orderNumber) || asText$1(data.orderCode);
-  const orderStatus = mapOrderStatus(data.status);
-  const orderRank = doc.collection === "orders" ? 2 : doc.collection === "orderRequests" ? 1 : 0;
-  const received = timestampMillis$1(data.createdAt) ?? timestampMillis$1(data.submittedAt) ?? doc.ms;
-  const orderDay = dayFrom(data.scheduledDate) || dayFrom(data.createdAt) || (orderRank > 0 ? dayFrom(doc.ms) : "");
-  return {
-    collection: doc.collection,
-    id: doc.id,
-    ms: doc.ms,
-    clientIds,
-    email,
-    phone,
-    phoneRaw,
-    iconicClientId: iconicClientId(data),
-    name: personName$1(data),
-    company: asText$1(data.company) || asText$1(data.brokerage) || asText$1(data.companyName),
-    city: cityFromData(data),
-    leadSource: asText$1(data.leadSource),
-    orderNumber: orderNumber2,
-    orderStatus,
-    orderRank,
-    orderMs: orderRank > 0 ? doc.ms : 0,
-    orderDay,
-    receivedMs: received
-  };
-}
-function preferText(current, next) {
-  return current || next;
-}
-function leadsFromChanges(docs) {
-  const nodes = [];
-  for (const doc of docs) {
-    if (isTestRecord(doc.id, doc.data)) continue;
-    const node = nodeFromChange(doc);
-    if (node) nodes.push(node);
-  }
-  const parent = nodes.map((_, index) => index);
-  const find = (index) => {
-    let cursor = index;
-    while (parent[cursor] !== cursor) {
-      parent[cursor] = parent[parent[cursor]];
-      cursor = parent[cursor];
-    }
-    return cursor;
-  };
-  const union = (left, right) => {
-    const a = find(left);
-    const b = find(right);
-    if (a !== b) parent[b] = a;
-  };
-  const emailAt = /* @__PURE__ */ new Map();
-  const clientAt = /* @__PURE__ */ new Map();
-  nodes.forEach((node, index) => {
-    if (node.email) {
-      const prev = emailAt.get(node.email);
-      if (prev != null) union(prev, index);
-      emailAt.set(node.email, index);
-    }
-    for (const id of node.clientIds) {
-      const prev = clientAt.get(id);
-      if (prev != null) union(prev, index);
-      clientAt.set(id, index);
-    }
-  });
-  const phoneRoots = /* @__PURE__ */ new Map();
-  nodes.forEach((node, index) => {
-    if (!node.phone) return;
-    const root = find(index);
-    const list2 = phoneRoots.get(node.phone) || [];
-    if (!list2.includes(root)) list2.push(root);
-    phoneRoots.set(node.phone, list2);
-  });
-  for (const roots of phoneRoots.values()) {
-    const emails = new Set(roots.map((root) => nodes.filter((_, index) => find(index) === root).map((node) => node.email).find(Boolean) || ""));
-    if ([...emails].filter(Boolean).length > 1) continue;
-    for (let index = 1; index < roots.length; index += 1) union(roots[0], roots[index]);
-  }
-  const groups = /* @__PURE__ */ new Map();
-  nodes.forEach((node, index) => {
-    const root = find(index);
-    const list2 = groups.get(root) || [];
-    list2.push(node);
-    groups.set(root, list2);
-  });
-  const leads = [];
-  for (const group of groups.values()) {
-    leads.push(mergeGroup(group));
-  }
-  return leads;
-}
-function mergeGroup(group) {
-  const clientNode = group.find((node) => node.collection === "clients");
-  const siteClientId = clientNode?.id || group.flatMap((node) => node.clientIds)[0] || `${group[0].collection}/${group[0].id}`;
-  const iconicIds = [...new Set(group.map((node) => node.iconicClientId).filter(Boolean))];
-  let email = "";
-  let phone = "";
-  let phoneRaw = "";
-  let name = "";
-  let company = "";
-  let city = "";
-  let leadSource = "";
-  let receivedMs = group[0].receivedMs;
-  let orderNumber2 = "";
-  let orderStatus = "";
-  let orderRank = 0;
-  let orderMs = 0;
-  let orderDay = "";
-  for (const node of group) {
-    email = preferText(email, node.email);
-    phone = preferText(phone, node.phone);
-    phoneRaw = preferText(phoneRaw, node.phoneRaw);
-    name = preferText(name, node.name);
-    company = preferText(company, node.company);
-    city = preferText(city, node.city);
-    leadSource = preferText(leadSource, node.leadSource);
-    receivedMs = Math.min(receivedMs, node.receivedMs);
-    if (node.orderRank > 0 && (node.orderRank > orderRank || node.orderRank === orderRank && node.orderMs >= orderMs)) {
-      orderRank = node.orderRank;
-      orderMs = node.orderMs;
-      orderNumber2 = node.orderNumber || orderNumber2;
-      orderStatus = node.orderStatus || orderStatus;
-      orderDay = node.orderDay || orderDay;
-    }
-  }
-  const notes = [
-    orderNumber2 ? `Order ${orderNumber2}` : "",
-    orderStatus,
-    leadSource && !isTestRecord("note", { leadSource }) ? leadSource : ""
-  ].filter(Boolean).join(" · ");
-  return {
-    key: email ? `email:${email}` : phone ? `phone:${phone}` : `site:${siteClientId}`,
-    siteClientId,
-    iconicClientId: iconicIds.length === 1 ? iconicIds[0] : "",
-    name: sheetText(name, 120),
-    email,
-    phone,
-    phoneRaw: sheetText(phoneRaw, 40),
-    company: sheetText(company, 120),
-    city: sheetText(city, 80),
-    notes: sheetText(notes, 400),
-    source: "Website",
-    receivedAt: compactUtc(receivedMs || group[0].ms),
-    lastOrder: lastOrderLabel(orderNumber2, orderDay || (orderMs ? new Date(orderMs).toISOString().slice(0, 10) : "")),
-    orderStatus: sheetText(orderStatus, 40),
-    harListingId: ""
-  };
-}
-function normalizeHeader(value) {
-  return value.trim().toLowerCase().replace(/\s+/g, " ");
-}
-const CONTACTS_HEADER_FIELDS = [
-  ["clientId", "Client ID"],
-  ["email", "Email"],
-  ["phone", "Phone"],
-  ["liveStatus", "Live Status"],
-  ["emailOk", "Email OK"],
-  ["sourceSynced", "Source / Synced"],
-  ["lastOrder", "Last Order"],
-  ["orderStatus", "Order Status"],
-  ["siteClientId", "Site Client ID"]
-];
-function resolveContactsColumns(header2) {
-  const found = /* @__PURE__ */ new Map();
-  header2.forEach((cell2, index) => {
-    const name = normalizeHeader(String(cell2 ?? ""));
-    if (!name) return;
-    const letters = found.get(name) || [];
-    letters.push(columnLetter(index));
-    found.set(name, letters);
-  });
-  const missing = [];
-  const columns = {};
-  for (const [key, label] of CONTACTS_HEADER_FIELDS) {
-    const letters = found.get(normalizeHeader(label)) || [];
-    if (letters.length === 1) columns[key] = letters[0];
-    else if (letters.length === 0) missing.push(label);
-    else missing.push(`${label} (duplicate)`);
-  }
-  if (missing.length) return { ok: false, missing };
-  const writeLetters = [columns.sourceSynced, columns.lastOrder, columns.orderStatus, columns.siteClientId];
-  for (const label of CONTACTS_FORMULA_HEADERS) {
-    const letters = found.get(normalizeHeader(label)) || [];
-    if (letters.some((letter) => writeLetters.includes(letter))) missing.push(`${label} (overlaps a write column)`);
-  }
-  if (missing.length) return { ok: false, missing };
-  return { ok: true, columns };
-}
-function contactsWriteLetters(columns) {
-  return [columns.sourceSynced, columns.lastOrder, columns.orderStatus, columns.siteClientId];
-}
-function buildContactIndex(input) {
-  const length = Math.max(input.clientIds.length, input.liveStatus.length, input.emails.length, input.phones.length, input.emailOk?.length || 0);
-  const rows = [];
-  for (let index = 1; index < length; index += 1) {
-    const clientId2 = (input.clientIds[index] || "").trim();
-    const email = normalizeSyncEmail(input.emails[index] || "");
-    const phone = normalizeSyncPhone(input.phones[index] || "");
-    if (!clientId2 && !email && !phone) continue;
-    rows.push({
-      row: index + 1,
-      clientId: clientId2.toUpperCase(),
-      email,
-      phone,
-      liveStatus: (input.liveStatus[index] || "").trim(),
-      emailOk: (input.emailOk?.[index] || "").trim()
-    });
-  }
-  return rows;
-}
-function headerIndexes(header2, names) {
-  const wanted = new Set(names);
-  const indexes = [];
-  header2.forEach((cell2, index) => {
-    if (wanted.has(cell2.trim().toLowerCase())) indexes.push(index);
-  });
-  return indexes;
-}
-function suppressionFromGrid(rows) {
-  const grid = rows.map((row) => row.map((cell2) => String(cell2 ?? "").trim()));
-  const header2 = (grid[0] || []).map((cell2) => cell2.toLowerCase());
-  const emailCols = headerIndexes(header2, ["email", "emails", "e-mail"]);
-  const phoneCols = headerIndexes(header2, ["phone", "phones", "mobile", "cell"]);
-  const nameCols = headerIndexes(header2, ["name", "names", "full name"]);
-  const hasHeader = emailCols.length + phoneCols.length + nameCols.length > 0;
-  const body = hasHeader ? grid.slice(1) : grid;
-  const emails = /* @__PURE__ */ new Set();
-  const phones = /* @__PURE__ */ new Set();
-  const names = /* @__PURE__ */ new Set();
-  const takeEmail = (cell2) => {
-    const email = normalizeSyncEmail(cell2);
-    if (email.includes("@")) emails.add(email);
-  };
-  const takePhone = (cell2) => {
-    const phone = normalizeSyncPhone(cell2);
-    if (phone) phones.add(phone);
-  };
-  for (const row of body) {
-    if (hasHeader) {
-      emailCols.forEach((index) => takeEmail(row[index] || ""));
-      phoneCols.forEach((index) => takePhone(row[index] || ""));
-      nameCols.forEach((index) => {
-        const name = normalizePersonName(row[index] || "");
-        if (name.includes(" ")) names.add(name);
-      });
-      row.forEach(takeEmail);
-    } else {
-      row.forEach((cell2) => {
-        takeEmail(cell2);
-        if (normalizeSyncPhone(cell2).length >= 10) takePhone(cell2);
-      });
-    }
-  }
-  return { emails: [...emails], phones: [...phones], names: [...names] };
-}
-function inboxFromLead(lead, notes) {
-  return {
-    A: lead.receivedAt,
-    B: lead.source,
-    C: lead.name,
-    D: lead.email,
-    E: lead.phoneRaw || lead.phone,
-    F: lead.company,
-    G: lead.city,
-    H: sheetText(notes || lead.notes, 400)
-  };
-}
-function contactCells(lead, nowMs) {
-  const cells = {
-    sourceSynced: sourceSyncedValue(lead.source, nowMs, lead.harListingId),
-    siteClientId: sheetText(lead.siteClientId, 160)
-  };
-  if (lead.lastOrder) cells.lastOrder = lead.lastOrder;
-  if (lead.orderStatus) cells.orderStatus = lead.orderStatus;
-  return cells;
-}
-function fingerprintFor(plan) {
-  return JSON.stringify({
-    disposition: plan.disposition,
-    inbox: plan.inbox,
-    action: plan.action,
-    contactRow: plan.contactRow,
-    contactCells: plan.contactCells
-  });
-}
-function marketingBlocked(lead, list2) {
-  if (!list2.length) return false;
-  const parts = lead.name.trim().split(/\s+/).filter(Boolean);
-  const firstName = parts[0] || "";
-  const lastName = parts.slice(1).join(" ");
-  return Boolean(matchSuppression({ email: lead.email, firstName, lastName }, list2));
-}
-function sheetBlocked(lead, index) {
-  if (lead.email && index.suppressionEmails.includes(lead.email)) return "suppression list email";
-  if (lead.phone && index.suppressionPhones.includes(lead.phone)) return "suppression list phone";
-  const name = normalizePersonName(lead.name);
-  if (name && index.suppressionNames.includes(name)) return "suppression list name";
-  if (marketingBlocked(lead, index.marketingSuppression)) return "Firestore marketingSuppression";
-  return "";
-}
-function rowBlocked(row) {
-  if (isDncStatus(row.liveStatus)) return "Live Status DNC";
-  if (isEmailOkNo(row.emailOk)) return "Email OK = NO";
-  return "";
-}
-function classify(lead, index, nowMs) {
-  const base = {
-    key: lead.key,
-    siteClientId: lead.siteClientId,
-    inboxAppended: false
-  };
-  if (!lead.email && !lead.phone && !lead.iconicClientId) {
-    const plan2 = { ...base, disposition: "no-identity", flag: "", reason: "No email, phone, or Client ID.", inbox: null, action: "", contactRow: null, contactCells: null };
-    return { ...plan2, fingerprint: fingerprintFor(plan2) };
-  }
-  const emailHits = lead.email ? index.contacts.filter((row) => row.email === lead.email) : [];
-  const phoneHits = lead.phone ? index.contacts.filter((row) => row.phone === lead.phone) : [];
-  const idHits = lead.iconicClientId ? index.contacts.filter((row) => row.clientId === lead.iconicClientId) : [];
-  const blockedOn = (rows) => rows.map(rowBlocked).find(Boolean) || "";
-  const listBlock = sheetBlocked(lead, index);
-  const suppressed = (reason, rows) => {
-    const plan2 = {
-      ...base,
-      disposition: "suppressed",
-      flag: ACTION_SUPPRESSED,
-      reason,
-      inbox: null,
-      action: "",
-      contactRow: rows[0]?.row ?? null,
-      contactCells: null
-    };
-    return { ...plan2, fingerprint: fingerprintFor(plan2) };
-  };
-  const possible = (reason) => {
-    const note = sheetText(`Possible duplicate. ${reason}`, 400);
-    const plan2 = {
-      ...base,
-      disposition: "possible-dupe",
-      flag: ACTION_POSSIBLE_DUPE,
-      reason,
-      inbox: inboxFromLead(lead, note),
-      action: ACTION_POSSIBLE_DUPE,
-      contactRow: null,
-      contactCells: null
-    };
-    return { ...plan2, fingerprint: fingerprintFor(plan2) };
-  };
-  const known = (row, reason, flag2) => {
-    const plan2 = {
-      ...base,
-      disposition: "known",
-      flag: flag2,
-      reason,
-      inbox: null,
-      action: "",
-      contactRow: row.row,
-      contactCells: contactCells(lead, nowMs)
-    };
-    return { ...plan2, fingerprint: fingerprintFor(plan2) };
-  };
-  if (idHits.length > 1) {
-    const reason = "Client ID matches more than one Contacts row.";
-    return listBlock || blockedOn(idHits) ? suppressed(`${reason} ${listBlock || blockedOn(idHits)}`, idHits) : possible(reason);
-  }
-  if (idHits.length === 1) {
-    const row = idHits[0];
-    const emailConflict = emailHits.some((hit) => hit.row !== row.row);
-    const phoneConflict = phoneHits.some((hit) => hit.row !== row.row);
-    const sameRowPhoneConflict = Boolean(lead.phone && row.phone && lead.phone !== row.phone);
-    if (emailConflict || phoneConflict || sameRowPhoneConflict) {
-      const reason = "Client ID row does not agree with email or phone.";
-      return listBlock || blockedOn([row, ...emailHits, ...phoneHits]) ? suppressed(`${reason} ${listBlock || blockedOn([row, ...emailHits, ...phoneHits])}`, [row]) : possible(reason);
-    }
-    const block2 = listBlock || rowBlocked(row);
-    return known(row, block2 ? `Client ID match. ${block2}` : "Client ID match.", block2 ? ACTION_SUPPRESSED : "");
-  }
-  const emailRows = [...new Set(emailHits.map((row) => row.row))];
-  const phoneRows = [...new Set(phoneHits.map((row) => row.row))];
-  if (emailRows.length > 1) {
-    const reason = "Email matches more than one Contacts row.";
-    return listBlock || blockedOn(emailHits) ? suppressed(`${reason} ${listBlock || blockedOn(emailHits)}`, emailHits) : possible(reason);
-  }
-  if (emailRows.length === 1) {
-    const row = emailHits[0];
-    const phoneOnOther = phoneHits.some((hit) => hit.row !== row.row);
-    const phoneDisagrees = Boolean(lead.phone && row.phone && lead.phone !== row.phone);
-    if (phoneOnOther || phoneDisagrees) {
-      const reason = phoneOnOther ? "Email matches one contact and phone matches another." : "Email matches a contact with a different phone.";
-      return listBlock || blockedOn([row, ...phoneHits]) ? suppressed(`${reason} ${listBlock || blockedOn([row, ...phoneHits])}`, [row]) : possible(reason);
-    }
-    const block2 = listBlock || rowBlocked(row);
-    return known(row, block2 ? `Email match. ${block2}` : "Email match.", block2 ? ACTION_SUPPRESSED : "");
-  }
-  if (phoneRows.length > 0) {
-    const reason = phoneRows.length > 1 ? "Phone matches more than one Contacts row and email does not." : "Phone matches a contact with a different or missing email.";
-    return listBlock || blockedOn(phoneHits) ? suppressed(`${reason} ${listBlock || blockedOn(phoneHits)}`, phoneHits) : possible(reason);
-  }
-  if (listBlock) return suppressed(listBlock, []);
-  const plan = {
-    ...base,
-    disposition: "append",
-    flag: "",
-    reason: "No Contacts match.",
-    inbox: inboxFromLead(lead, lead.notes),
-    action: "",
-    contactRow: null,
-    contactCells: null
-  };
-  return { ...plan, fingerprint: fingerprintFor(plan) };
-}
-function planHolyGrailLead(lead, index, nowMs, memory2) {
-  const next = classify(lead, index, nowMs);
-  if (!memory2) return next;
-  const alreadyAppended = memory2.inboxAppended && (next.disposition === "append" || next.disposition === "possible-dupe");
-  const sameWrite = memory2.fingerprint === next.fingerprint && (next.disposition === "known" || next.disposition === "suppressed" || next.disposition === "no-identity");
-  if (!alreadyAppended && !sameWrite) return next;
-  const unchanged = {
-    ...next,
-    disposition: "unchanged",
-    inbox: null,
-    action: "",
-    contactCells: null,
-    inboxAppended: memory2.inboxAppended,
-    contactRow: memory2.contactRow ?? next.contactRow,
-    reason: alreadyAppended ? "Inbox row already appended." : "Already synced."
-  };
-  return { ...unchanged, fingerprint: memory2.fingerprint };
-}
-function planHolyGrailBatch(leads, index, nowMs, memory2 = {}) {
-  return leads.map((lead) => planHolyGrailLead(lead, index, nowMs, memory2[lead.key]));
-}
-function inboxAppendRange() {
-  return quoteTab(HOLY_GRAIL_TABS.inbox, "A:H");
-}
-function inboxActionRange(row) {
-  return quoteTab(HOLY_GRAIL_TABS.inbox, `J${row}`);
-}
-function contactCellRange(column2, row) {
-  return quoteTab(HOLY_GRAIL_TABS.contacts, `${column2}${row}`);
-}
-function contactWrites(plan, columns) {
-  if (plan.disposition !== "known" || plan.contactRow == null || !plan.contactCells) return [];
-  const cells = plan.contactCells;
-  const writes = [
-    { range: contactCellRange(columns.sourceSynced, plan.contactRow), value: cells.sourceSynced },
-    { range: contactCellRange(columns.siteClientId, plan.contactRow), value: cells.siteClientId }
-  ];
-  if (cells.lastOrder) writes.push({ range: contactCellRange(columns.lastOrder, plan.contactRow), value: cells.lastOrder });
-  if (cells.orderStatus) writes.push({ range: contactCellRange(columns.orderStatus, plan.contactRow), value: cells.orderStatus });
-  return writes;
-}
-function inboxRowValues(cells) {
-  return INBOX_VALUE_COLUMNS.map((column2) => cells[column2]);
-}
-function parseSheetRange(range) {
-  const bang = range.lastIndexOf("!");
-  if (bang < 0) throw new Error("Sheet range is missing a tab name.");
-  let tab = range.slice(0, bang);
-  if (tab.startsWith("'") && tab.endsWith("'")) tab = tab.slice(1, -1).replace(/''/g, "'");
-  const a1 = range.slice(bang + 1).toUpperCase();
-  const match = a1.match(/^([A-Z]+)(\d+)?(?::([A-Z]+)(\d+)?)?$/);
-  if (!match) throw new Error(`Sheet range ${a1} is not a cell or column range.`);
-  const startCol = columnIndex$1(match[1]);
-  const endCol = match[3] ? columnIndex$1(match[3]) : startCol;
-  if (startCol < 0 || endCol < startCol) throw new Error(`Sheet range ${a1} is not ordered.`);
-  return { tab, startCol, endCol };
-}
-function assertAllowedSheetRange(range, columns) {
-  const parsed = parseSheetRange(range);
-  if (parsed.tab === HOLY_GRAIL_TABS.inbox) {
-    for (let col = parsed.startCol; col <= parsed.endCol; col += 1) {
-      if (col !== 9 && (col < 0 || col > 7)) {
-        throw new Error(`Refusing to write ${HOLY_GRAIL_TABS.inbox} column ${columnLetter(col)}.`);
-      }
-    }
-    return;
-  }
-  if (parsed.tab === HOLY_GRAIL_TABS.contacts) {
-    if (!columns) throw new Error(`Refusing to write ${HOLY_GRAIL_TABS.contacts} without a header map.`);
-    const allowed = new Set(contactsWriteLetters(columns));
-    for (let col = parsed.startCol; col <= parsed.endCol; col += 1) {
-      const letter = columnLetter(col);
-      if (!allowed.has(letter)) {
-        throw new Error(`Refusing to write ${HOLY_GRAIL_TABS.contacts} column ${letter}.`);
-      }
-    }
-    return;
-  }
-  throw new Error(`Refusing to write tab ${parsed.tab}.`);
-}
-function emptyCursor(ms) {
-  return { ms, seenIds: [] };
-}
-function selectFresh(previous, page2, limit) {
-  const seen = new Set(previous.seenIds);
-  const fresh = page2.filter((doc) => doc.ms > previous.ms || !seen.has(doc.id));
-  if (fresh.length === 0) {
-    if (page2.length < limit) return { fresh, next: previous, stalled: false };
-    return { fresh, next: { ms: previous.ms + 1, seenIds: [] }, stalled: true };
-  }
-  const max = fresh.reduce((top, doc) => Math.max(top, doc.ms), previous.ms);
-  const seenIds = /* @__PURE__ */ new Set();
-  for (const doc of page2) if (doc.ms === max) seenIds.add(doc.id);
-  for (const doc of fresh) if (doc.ms === max) seenIds.add(doc.id);
-  return { fresh, next: { ms: max, seenIds: [...seenIds] }, stalled: false };
-}
-const CAMPAIGN_STATUSES = ["idea", "draft", "ready", "approved", "scheduled", "sent", "archived"];
-const STATUS_LABEL = {
-  idea: "Idea",
-  draft: "Draft",
-  ready: "Ready for review",
-  approved: "Approved",
-  scheduled: "Scheduled",
-  sent: "Sent",
-  archived: "Archived"
-};
-const POST_PLATFORMS = [
-  { id: "facebook", label: "Facebook" },
-  { id: "instagram", label: "Instagram" },
-  { id: "tiktok", label: "TikTok" },
-  { id: "x", label: "X" },
-  { id: "pinterest", label: "Pinterest" },
-  { id: "youtube", label: "YouTube" },
-  { id: "linkedin", label: "LinkedIn" }
-];
-const CAMPAIGN_SHEET_NEVER_WRITE = ["H", "I", "J", "K", "L", "M", "N", "P"];
-const SEND_BATCH_SIZE = 25;
-const AUDIENCE_PAGE_SIZE = 200;
-const AUDIENCE_MAX_PAGES = 10;
-function campaignSendLive(env = process.env) {
-  return env.CAMPAIGN_SEND_LIVE === "true";
-}
-function campaignSheetAccess(method, range) {
-  const verb = method.toLowerCase();
-  if (verb === "get" || verb === "values.get") return;
-  let letters = [];
-  try {
-    const parsed = parseSheetRange(range);
-    for (let col = parsed.startCol; col <= parsed.endCol; col += 1) letters.push(columnLetter(col));
-  } catch {
-    letters = [];
-  }
-  const blocked = letters.filter((letter) => CAMPAIGN_SHEET_NEVER_WRITE.includes(letter));
-  if (blocked.length) {
-    throw new Error(`Refusing to write Marketing Holy Grail columns ${blocked.join(", ")}.`);
-  }
-  throw new Error("Campaign audience is read-only. Refusing to write the Marketing Holy Grail sheet.");
-}
-function emptyStats() {
-  return { sent: 0, delivered: 0, opened: 0, clicked: 0, unsubscribed: 0, replies: 0, failed: 0 };
-}
-function emptyEmail() {
-  return { enabled: true, mode: "builder", subject: "", preheader: "", html: "", blocks: [], scheduledAt: "" };
-}
-function emptySms() {
-  return { enabled: false, body: "", scheduledAt: "" };
-}
-function personName(person2) {
-  const name = `${person2.firstName} ${person2.lastName}`.trim();
-  return name || person2.email || person2.phone || "Contact";
-}
-function phoneDigits(value) {
-  let digits2 = String(value || "").replace(/\D/g, "");
-  if (digits2.length === 11 && digits2.startsWith("1")) digits2 = digits2.slice(1);
-  return digits2.length >= 10 ? digits2.slice(-10) : "";
-}
-function hasChannelSchedule(campaign) {
-  if (campaign.email.scheduledAt) return true;
-  if (campaign.sms.scheduledAt) return true;
-  return campaign.posts.some((post) => post.scheduledAt);
-}
-function statusChangeError(input) {
-  if (!CAMPAIGN_STATUSES.includes(input.to)) return "Unknown status.";
-  if (input.from === input.to) return null;
-  if (input.to === "approved") {
-    if (input.from === "scheduled") return null;
-    if (!input.isAdmin) return "Only an admin can approve a campaign.";
-    if (input.from !== "ready") return "Move the campaign to Ready for review before approving it.";
-    return null;
-  }
-  if (input.to === "scheduled") {
-    if (input.from !== "approved") return "Approve the campaign before scheduling it.";
-    if (!input.hasSchedule) return "Add a date on the email, text, or a post before scheduling.";
-    return null;
-  }
-  if (input.to === "sent") return "Sent is set by a live send.";
-  const allowed = {
-    idea: ["draft", "archived"],
-    draft: ["idea", "ready", "archived"],
-    ready: ["draft", "archived"],
-    approved: ["ready", "archived"],
-    scheduled: ["approved", "archived"],
-    sent: ["archived"],
-    archived: ["draft"]
-  };
-  if (!allowed[input.from].includes(input.to)) {
-    return `Cannot move from ${STATUS_LABEL[input.from]} to ${STATUS_LABEL[input.to]}.`;
-  }
-  if ((input.from === "approved" || input.from === "scheduled") && input.to === "ready" && !input.isAdmin) {
-    return "Only an admin can move an approved campaign back to review.";
-  }
-  return null;
-}
-new Set(`@£$¥èéùìòÇ
-Øø\rÅåΔ_ΦΓΛΩΠΨΣΘΞ\x1BÆæßÉ !"#¤%&'()*+,-./0123456789:;<=>?¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§¿abcdefghijklmnopqrstuvwxyzäöñüà`);
-new Set("^{}\\[~]|€");
-const STOP_WORDS = ["STOP", "STOPALL", "UNSUBSCRIBE", "CANCEL", "END", "QUIT"];
-function isStopKeyword(body) {
-  return STOP_WORDS.includes(body.trim().toUpperCase());
-}
-function campaignSmsBody(template, firstName) {
-  const name = firstName.trim() || "there";
-  let body = template.replace(/\{FirstName\}/g, name).trim();
-  if (!/\bSTOP\b/i.test(body)) body = `${body}
-Reply STOP to opt out.`.trim();
-  return body.slice(0, 1600);
-}
-function escapeHtml$6(value) {
-  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-}
-function compileBlocks(blocks, preheader) {
-  const hidden = preheader ? `<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">${escapeHtml$6(preheader)}</div>` : "";
-  const rows = blocks.map((block2) => {
-    if (block2.type === "heading") {
-      return `<h1 style="margin:0 0 12px;font-family:Inter,Arial,sans-serif;font-size:28px;line-height:1.2;color:#111827;">${escapeHtml$6(block2.text)}</h1>`;
-    }
-    if (block2.type === "image" && block2.url) {
-      return `<p style="margin:0 0 16px;"><img src="${escapeHtml$6(block2.url)}" alt="${escapeHtml$6(block2.text)}" style="max-width:100%;border-radius:12px;display:block;" /></p>`;
-    }
-    if (block2.type === "button" && block2.href) {
-      return `<p style="margin:0 0 16px;"><a href="${escapeHtml$6(block2.href)}" style="display:inline-block;background:#0d9488;color:#ffffff;font-family:Inter,Arial,sans-serif;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;text-decoration:none;padding:12px 18px;border-radius:12px;">${escapeHtml$6(block2.text || "Open")}</a></p>`;
-    }
-    return `<p style="margin:0 0 14px;font-family:Inter,Arial,sans-serif;font-size:16px;line-height:1.55;color:#1f2937;">${escapeHtml$6(block2.text)}</p>`;
-  }).join("");
-  return `<!DOCTYPE html><html><body style="margin:0;background:#f5f2ea;">${hidden}<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f5f2ea;"><tr><td align="center" style="padding:24px;"><table role="presentation" width="100%" style="max-width:560px;background:#ffffff;border-radius:16px;"><tr><td style="padding:28px;">${rows || `<p style="font-family:Inter,Arial,sans-serif;color:#1f2937;">Hello {FirstName},</p>`}</td></tr></table></td></tr></table></body></html>`;
-}
-function campaignHtml(email) {
-  if (email.mode === "html") {
-    const html = email.html || "";
-    if (email.preheader && !html.includes(email.preheader)) {
-      return `<div style="display:none;max-height:0;overflow:hidden;">${escapeHtml$6(email.preheader)}</div>${html}`;
-    }
-    return html;
-  }
-  return compileBlocks(email.blocks, email.preheader);
-}
-function renderCampaignEmail(email, person2, unsubscribeUrl) {
-  const values = mergeValues(person2, unsubscribeUrl);
-  const subject = applyMerge(email.subject || "Iconic Images", values);
-  const html = withUnsubscribeFooter(applyMerge(campaignHtml(email), values), unsubscribeUrl);
-  const text2 = [
-    applyMerge(email.preheader || email.subject || "", values),
-    `Hello ${person2.firstName || "there"},`,
-    "Iconic Images, 26410 Oakridge Dr. Ste 105 - 108, Spring, TX 77380",
-    `Unsubscribe: ${unsubscribeUrl}`
-  ].filter(Boolean).join("\n");
-  return { subject, html, text: text2 };
-}
-function toMarketingContact(person2, now) {
-  return {
-    email: normalizeEmail(person2.email),
-    firstName: person2.firstName,
-    lastName: person2.lastName,
-    company: person2.company,
-    phone: person2.phone,
-    tags: person2.tags,
-    custom: {},
-    source: person2.source === "sheet" ? "import" : person2.source,
-    clientId: "",
-    emailVerified: person2.emailVerified,
-    createdAt: now,
-    updatedAt: now
-  };
-}
-function suppressionBucket(entry2, doNotContact) {
-  if (doNotContact) return "doNotContact";
-  if (!entry2) return "ok";
-  if (entry2.reason === "unsubscribed") return "unsubscribe";
-  if (entry2.reason === "bounced") return "bounce";
-  return "doNotContact";
-}
-function buildChannelAudience(input) {
-  const now = input.sendAt || (/* @__PURE__ */ new Date()).toISOString();
-  const settings = input.settings || DEFAULT_MARKETING_SETTINGS;
-  const pool = input.segment ? input.people.filter((person2) => contactMatchesFilter(toMarketingContact(person2, now), input.segment.filter)) : input.people;
-  const counts2 = { emailCount: 0, smsCount: 0, unsubscribe: 0, bounce: 0, doNotContact: 0, held: 0 };
-  const removed = [];
-  const emailCandidates = [];
-  const smsPeople = [];
-  const stops = new Set(input.phoneStops.map(phoneDigits).filter(Boolean));
-  for (const person2 of pool) {
-    const bucket2 = suppressionBucket(matchSuppression(toMarketingContact(person2, now), input.suppression), person2.doNotContact);
-    if (bucket2 === "unsubscribe") counts2.unsubscribe += 1;
-    if (bucket2 === "bounce") counts2.bounce += 1;
-    if (bucket2 === "doNotContact") counts2.doNotContact += 1;
-    if (bucket2 !== "ok") {
-      removed.push({ name: personName(person2), email: person2.email, reason: bucket2 === "doNotContact" ? "Do not contact" : bucket2 === "bounce" ? "Bounced" : "Unsubscribed" });
-    }
-    if (bucket2 === "ok" && isValidEmail(person2.email)) emailCandidates.push({ ...person2, email: normalizeEmail(person2.email) });
-    const phone = phoneDigits(person2.phone);
-    const smsBlocked = bucket2 === "doNotContact" || phone && stops.has(phone);
-    if (phone && !smsBlocked) smsPeople.push(person2);
-  }
-  const resolved = resolveAudience({
-    contacts: emailCandidates.map((person2) => toMarketingContact(person2, now)),
-    suppression: input.suppression,
-    sends: input.sends || [],
-    campaigns: input.overlap || [],
-    settings,
-    filter: null,
-    sendAt: now,
-    excludeCampaignId: input.excludeCampaignId
-  });
-  const emailAllowedSet = new Set(resolved.recipients.map((contact2) => contact2.email));
-  const emailPeople = emailCandidates.filter((person2) => emailAllowedSet.has(person2.email));
-  counts2.held = resolved.removed.filter((item) => item.reason === "frequency" || item.reason === "overlap" || item.reason === "duplicate" || item.reason === "invalid").length;
-  for (const item of resolved.removed) {
-    if (item.reason === "suppressed") continue;
-    removed.push({ name: item.name, email: item.email, reason: item.detail || item.reason });
-  }
-  counts2.emailCount = emailPeople.length;
-  counts2.smsCount = smsPeople.length;
-  const byEmail = /* @__PURE__ */ new Map();
-  for (const person2 of emailPeople) {
-    byEmail.set(person2.email, { name: personName(person2), email: person2.email, phone: phoneDigits(person2.phone), channels: ["email"] });
-  }
-  for (const person2 of smsPeople) {
-    const key = person2.email || phoneDigits(person2.phone);
-    const existing = byEmail.get(key);
-    if (existing) existing.channels.push("sms");
-    else byEmail.set(key, { name: personName(person2), email: person2.email, phone: phoneDigits(person2.phone), channels: ["sms"] });
-  }
-  return {
-    ...counts2,
-    recipients: [...byEmail.values()],
-    removed,
-    source: input.source || "contacts",
-    sheetConfigured: Boolean(input.sheetConfigured),
-    sheetNote: input.sheetNote || "",
-    truncated: Boolean(input.truncated),
-    emailPeople,
-    smsPeople
-  };
-}
-function planDelivery(campaign, audience, unsubscribeUrlFor) {
-  const lines = [];
-  if (campaign.email.enabled) {
-    for (const person2 of audience.emailPeople) {
-      const rendered = renderCampaignEmail(campaign.email, person2, unsubscribeUrlFor(person2.email));
-      lines.push({
-        channel: "email",
-        to: person2.email,
-        name: personName(person2),
-        detail: `${rendered.subject} — ${campaign.email.preheader || "no preheader"}`
-      });
-    }
-  }
-  if (campaign.sms.enabled) {
-    for (const person2 of audience.smsPeople) {
-      lines.push({
-        channel: "sms",
-        to: phoneDigits(person2.phone),
-        name: personName(person2),
-        detail: campaignSmsBody(campaign.sms.body, person2.firstName)
-      });
-    }
-  }
-  for (const post of campaign.posts) {
-    lines.push({
-      channel: "post",
-      to: post.platform,
-      name: campaign.name,
-      detail: post.copy
-    });
-  }
-  return lines;
-}
-function chicagoDay(isoOrDay) {
-  if (/^\d{4}-\d{2}-\d{2}$/.test(isoOrDay)) return isoOrDay;
-  const ms = Date.parse(isoOrDay);
-  if (Number.isNaN(ms)) return "";
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago", year: "numeric", month: "2-digit", day: "2-digit" }).format(ms);
-}
-function calendarItems(campaigns) {
-  const items = [];
-  for (const campaign of campaigns) {
-    if (campaign.status === "archived") continue;
-    if (campaign.startsOn) {
-      items.push({ date: campaign.startsOn, campaignId: campaign.id, campaignName: campaign.name, channel: "window", label: "Starts" });
-    }
-    if (campaign.email.enabled && campaign.email.scheduledAt) {
-      const date = chicagoDay(campaign.email.scheduledAt);
-      if (date) items.push({ date, campaignId: campaign.id, campaignName: campaign.name, channel: "email", label: "Email" });
-    }
-    if (campaign.sms.enabled && campaign.sms.scheduledAt) {
-      const date = chicagoDay(campaign.sms.scheduledAt);
-      if (date) items.push({ date, campaignId: campaign.id, campaignName: campaign.name, channel: "sms", label: "Text" });
-    }
-    for (const post of campaign.posts) {
-      if (!post.scheduledAt) continue;
-      const date = chicagoDay(post.scheduledAt);
-      if (date) items.push({ date, campaignId: campaign.id, campaignName: campaign.name, channel: "post", label: post.platform });
-    }
-  }
-  return items.sort((a, b) => a.date.localeCompare(b.date) || a.campaignName.localeCompare(b.campaignName));
-}
-function batchItems(items, size = SEND_BATCH_SIZE) {
-  const batches = [];
-  for (let index = 0; index < items.length; index += size) batches.push(items.slice(index, index + size));
-  return batches;
-}
-const PLATFORM_SET$1 = new Set(POST_PLATFORMS.map((item) => item.id));
-function normalizeCampaign(raw, now, id) {
-  const status2 = CAMPAIGN_STATUSES.includes(raw.status) ? raw.status : "draft";
-  const email = { ...emptyEmail(), ...raw.email || {} };
-  email.mode = email.mode === "html" ? "html" : "builder";
-  email.blocks = Array.isArray(email.blocks) ? email.blocks.slice(0, 40).map((block2, index) => ({
-    id: String(block2?.id || `block-${index}`),
-    type: block2?.type === "heading" || block2?.type === "image" || block2?.type === "button" || block2?.type === "text" ? block2.type : "text",
-    text: String(block2?.text || "").slice(0, 5e3),
-    url: String(block2?.url || "").slice(0, 2e3),
-    href: String(block2?.href || "").slice(0, 2e3)
-  })) : [];
-  const sms = { ...emptySms(), ...raw.sms || {} };
-  const posts = Array.isArray(raw.posts) ? raw.posts.slice(0, 20).flatMap((post, index) => {
-    const platform = String(post?.platform || "");
-    if (!PLATFORM_SET$1.has(platform)) return [];
-    return [{
-      id: String(post?.id || `post-${index}`),
-      platform,
-      copy: String(post?.copy || "").slice(0, 5e3),
-      mediaUrl: String(post?.mediaUrl || "").slice(0, 2e3),
-      mediaName: String(post?.mediaName || "").slice(0, 180),
-      scheduledAt: String(post?.scheduledAt || ""),
-      queuedAt: String(post?.queuedAt || "")
-    }];
-  }) : [];
-  return {
-    id,
-    name: String(raw.name || "Untitled campaign").slice(0, 120),
-    purpose: String(raw.purpose || "").slice(0, 2e3),
-    status: status2,
-    ownerUid: String(raw.ownerUid || ""),
-    ownerName: String(raw.ownerName || "").slice(0, 120),
-    ownerEmail: normalizeEmail(raw.ownerEmail || ""),
-    startsOn: /^\d{4}-\d{2}-\d{2}$/.test(String(raw.startsOn || "")) ? String(raw.startsOn) : "",
-    endsOn: /^\d{4}-\d{2}-\d{2}$/.test(String(raw.endsOn || "")) ? String(raw.endsOn) : "",
-    segmentId: String(raw.segmentId || "").slice(0, 80),
-    email: {
-      ...email,
-      subject: String(email.subject || "").slice(0, 200),
-      preheader: String(email.preheader || "").slice(0, 200),
-      html: String(email.html || "").slice(0, 1e5),
-      scheduledAt: String(email.scheduledAt || ""),
-      enabled: email.enabled !== false
-    },
-    sms: {
-      enabled: Boolean(sms.enabled),
-      body: String(sms.body || "").slice(0, 1600),
-      scheduledAt: String(sms.scheduledAt || "")
-    },
-    posts,
-    stats: { ...emptyStats(), ...raw.stats || {} },
-    sentAt: String(raw.sentAt || ""),
-    createdAt: String(raw.createdAt || now),
-    updatedAt: now
-  };
-}
-function publicAudience(preview) {
-  return {
-    emailCount: preview.emailCount,
-    smsCount: preview.smsCount,
-    unsubscribe: preview.unsubscribe,
-    bounce: preview.bounce,
-    doNotContact: preview.doNotContact,
-    held: preview.held,
-    recipients: preview.recipients.slice(0, 50),
-    recipientTotal: preview.recipients.length,
-    removed: preview.removed.slice(0, 50),
-    source: preview.source,
-    sheetConfigured: preview.sheetConfigured,
-    sheetNote: preview.sheetNote,
-    truncated: preview.truncated
-  };
-}
-function emptyCounter() {
-  return { total: 0, byStatus: {} };
-}
-function applyCounter(counter, from, to, created) {
-  const byStatus = { ...counter.byStatus };
-  if (created && to) {
-    byStatus[to] = (byStatus[to] || 0) + 1;
-    return { total: counter.total + 1, byStatus };
-  }
-  if (from && to && from !== to) {
-    byStatus[from] = Math.max(0, (byStatus[from] || 0) - 1);
-    byStatus[to] = (byStatus[to] || 0) + 1;
-  }
-  return { total: counter.total, byStatus };
-}
-function createMemoryChannelCampaignStore() {
-  const campaigns = /* @__PURE__ */ new Map();
-  const logs = [];
-  const phones = /* @__PURE__ */ new Map();
-  const stops = /* @__PURE__ */ new Set();
-  const events = /* @__PURE__ */ new Set();
-  const queue = [];
-  let counter = emptyCounter();
-  return {
-    async list(limit, cursor) {
-      const sorted = [...campaigns.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-      const start = cursor ? sorted.findIndex((item) => item.id === cursor) + 1 : 0;
-      const page2 = sorted.slice(Math.max(0, start), Math.max(0, start) + limit);
-      const next = sorted[Math.max(0, start) + limit];
-      return { campaigns: page2, nextCursor: next?.id || "", counter };
-    },
-    async listAll(limit) {
-      return [...campaigns.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, limit);
-    },
-    async get(id) {
-      return campaigns.get(id) || null;
-    },
-    async save(campaign, previousStatus) {
-      const created = !campaigns.has(campaign.id);
-      campaigns.set(campaign.id, campaign);
-      counter = applyCounter(counter, created ? void 0 : previousStatus, campaign.status, created);
-    },
-    async addLog(log) {
-      logs.unshift(log);
-    },
-    async listLogs(campaignId, limit, cursor) {
-      const rows = logs.filter((log) => log.campaignId === campaignId);
-      const start = cursor ? rows.findIndex((log) => log.id === cursor) + 1 : 0;
-      const page2 = rows.slice(Math.max(0, start), Math.max(0, start) + limit);
-      const next = rows[Math.max(0, start) + limit];
-      return { logs: page2, nextCursor: next?.id || "" };
-    },
-    async bump(id, field, amount = 1) {
-      const campaign = campaigns.get(id);
-      if (!campaign) return;
-      campaign.stats = { ...campaign.stats, [field]: (campaign.stats[field] || 0) + amount };
-      campaigns.set(id, campaign);
-    },
-    async rememberPhone(phone, campaignId, at) {
-      const key = phoneDigits(phone);
-      if (!key) return;
-      phones.set(key, { phone: key, campaignId, updatedAt: at });
-    },
-    async phoneIndex(phone) {
-      return phones.get(phoneDigits(phone)) || null;
-    },
-    async suppressPhone(phone, at) {
-      const key = phoneDigits(phone);
-      if (!key) return;
-      stops.add(key);
-    },
-    async phoneStops() {
-      return [...stops];
-    },
-    async markEvent(id) {
-      if (events.has(id)) return false;
-      events.add(id);
-      return true;
-    },
-    async queuePost(item) {
-      const existing = queue.findIndex((row) => row.id === item.id);
-      if (existing >= 0) queue[existing] = item;
-      else queue.unshift(item);
-    },
-    async listQueue(limit) {
-      return queue.slice(0, limit);
-    }
-  };
-}
-const memoryStore$1 = createMemoryChannelCampaignStore();
-function getChannelCampaignStore() {
-  if (process.env.CHANNEL_CAMPAIGN_STORE === "memory" || !admin.apps.length) return memoryStore$1;
-  return firestoreStore$1;
-}
-function db$b() {
-  return admin.firestore();
-}
-const COL = "channelCampaigns";
-const firestoreStore$1 = {
-  async list(limit, cursor) {
-    let query = db$b().collection(COL).orderBy("updatedAt", "desc").limit(limit);
-    if (cursor) {
-      const cursorDoc = await db$b().collection(COL).doc(cursor).get();
-      if (cursorDoc.exists) query = query.startAfter(cursorDoc);
-    }
-    const [snap, counterDoc] = await Promise.all([
-      query.get(),
-      db$b().collection("channelCampaignCounters").doc("summary").get()
-    ]);
-    const campaigns = snap.docs.map((doc) => doc.data());
-    const counter = counterDoc.exists ? counterDoc.data() : emptyCounter();
-    const nextCursor = snap.size === limit ? snap.docs[snap.docs.length - 1]?.id || "" : "";
-    return { campaigns, nextCursor, counter };
-  },
-  async listAll(limit) {
-    const snap = await db$b().collection(COL).orderBy("updatedAt", "desc").limit(limit).get();
-    return snap.docs.map((doc) => doc.data());
-  },
-  async get(id) {
-    const doc = await db$b().collection(COL).doc(id).get();
-    return doc.exists ? doc.data() : null;
-  },
-  async save(campaign, previousStatus) {
-    const ref = db$b().collection(COL).doc(campaign.id);
-    const counterRef = db$b().collection("channelCampaignCounters").doc("summary");
-    await db$b().runTransaction(async (tx) => {
-      const existing = await tx.get(ref);
-      const counterSnap = await tx.get(counterRef);
-      const counter = counterSnap.exists ? counterSnap.data() : emptyCounter();
-      const created = !existing.exists;
-      const from = created ? void 0 : previousStatus || existing.data()?.status;
-      tx.set(ref, campaign);
-      tx.set(counterRef, applyCounter(counter, from, campaign.status, created));
-    });
-  },
-  async addLog(log) {
-    await db$b().collection(COL).doc(log.campaignId).collection("logs").doc(log.id).set(log);
-  },
-  async listLogs(campaignId, limit, cursor) {
-    let query = db$b().collection(COL).doc(campaignId).collection("logs").orderBy(admin.firestore.FieldPath.documentId(), "desc").limit(limit);
-    if (cursor) {
-      const cursorDoc = await db$b().collection(COL).doc(campaignId).collection("logs").doc(cursor).get();
-      if (cursorDoc.exists) query = query.startAfter(cursorDoc);
-    }
-    const snap = await query.get();
-    return {
-      logs: snap.docs.map((doc) => doc.data()),
-      nextCursor: snap.size === limit ? snap.docs[snap.docs.length - 1]?.id || "" : ""
-    };
-  },
-  async bump(id, field, amount = 1) {
-    await db$b().collection(COL).doc(id).update({ [`stats.${field}`]: admin.firestore.FieldValue.increment(amount) });
-  },
-  async rememberPhone(phone, campaignId, at) {
-    const key = phoneDigits(phone);
-    if (!key) return;
-    await db$b().collection("channelSmsIndex").doc(key).set({ phone: key, campaignId, updatedAt: at });
-  },
-  async phoneIndex(phone) {
-    const key = phoneDigits(phone);
-    if (!key) return null;
-    const doc = await db$b().collection("channelSmsIndex").doc(key).get();
-    return doc.exists ? doc.data() : null;
-  },
-  async suppressPhone(phone, at) {
-    const key = phoneDigits(phone);
-    if (!key) return;
-    await db$b().collection("channelSmsStops").doc(key).set({ phone: key, at, reason: "stop" });
-  },
-  async phoneStops() {
-    const stops = [];
-    let cursor = null;
-    for (let page2 = 0; page2 < 10; page2 += 1) {
-      let query = db$b().collection("channelSmsStops").orderBy(admin.firestore.FieldPath.documentId()).limit(200);
-      if (cursor) query = query.startAfter(cursor);
-      const snap = await query.get();
-      stops.push(...snap.docs.map((doc) => doc.id));
-      if (snap.size < 200) break;
-      cursor = snap.docs[snap.docs.length - 1];
-    }
-    return stops;
-  },
-  async markEvent(id) {
-    const ref = db$b().collection("channelCampaignEvents").doc(id);
-    return db$b().runTransaction(async (tx) => {
-      const snap = await tx.get(ref);
-      if (snap.exists) return false;
-      tx.set(ref, { id, at: (/* @__PURE__ */ new Date()).toISOString() });
-      return true;
-    });
-  },
-  async queuePost(item) {
-    await db$b().collection("socialHandoff").doc(item.id).set(item);
-  },
-  async listQueue(limit) {
-    const snap = await db$b().collection("socialHandoff").orderBy("createdAt", "desc").limit(limit).get();
-    return snap.docs.map((doc) => doc.data());
-  }
-};
-async function noteCampaignSmsInbound(from, body) {
-  const store = getChannelCampaignStore();
-  const at = (/* @__PURE__ */ new Date()).toISOString();
-  const phone = phoneDigits(from);
-  if (!phone) return;
-  if (isStopKeyword(body)) await store.suppressPhone(from, at);
-  const index = await store.phoneIndex(from);
-  if (!index) return;
-  if (isStopKeyword(body)) await store.bump(index.campaignId, "unsubscribed");
-  else if (!["HELP", "INFO"].includes(body.trim().toUpperCase())) await store.bump(index.campaignId, "replies");
-}
-async function recordCampaignUnsubscribe(campaignId, email) {
-  const store = getChannelCampaignStore();
-  const campaign = await store.get(campaignId);
-  if (!campaign) return;
-  const fresh = await store.markEvent(`${campaignId}_${email}_unsubscribe`);
-  if (fresh) await store.bump(campaignId, "unsubscribed");
 }
 function parseTabularUpload(input) {
   const name = (input.filename || "").toLowerCase();
@@ -31454,7 +31722,7 @@ router$t.get("/contacts", requireMarketing$1("view"), async (req, res) => {
   res.json({ contacts: filtered, tags, total: contacts.length });
 });
 router$t.get("/contacts/detail", requireMarketing$1("view"), async (req, res) => {
-  const email = normalizeEmail(req.query.email);
+  const email = normalizeEmail$1(req.query.email);
   if (!isValidEmail(email)) return res.status(400).json({ error: "A valid email is required." });
   const store = getMarketingStore();
   await store.ensureSeed();
@@ -31471,7 +31739,7 @@ router$t.get("/contacts/detail", requireMarketing$1("view"), async (req, res) =>
   });
 });
 router$t.post("/contacts", requireMarketing$1("manage"), async (req, res) => {
-  const email = normalizeEmail(req.body?.email);
+  const email = normalizeEmail$1(req.body?.email);
   if (!isValidEmail(email)) return res.status(400).json({ error: "A valid email is required." });
   const store = getMarketingStore();
   const contacts = await store.listContacts();
@@ -31483,6 +31751,8 @@ router$t.post("/contacts", requireMarketing$1("manage"), async (req, res) => {
     lastName: String(req.body?.lastName || existing?.lastName || "").trim(),
     company: String(req.body?.company || existing?.company || "").trim(),
     phone: String(req.body?.phone || existing?.phone || "").trim(),
+    marketingSmsOptIn: req.body?.marketingSmsOptIn === true || existing?.marketingSmsOptIn === true,
+    smsStopped: req.body?.smsStopped === true || existing?.smsStopped === true,
     tags: Array.isArray(req.body?.tags) ? req.body.tags.map(String) : existing?.tags || [],
     custom: existing?.custom || {},
     source: existing?.source || "manual",
@@ -31496,7 +31766,7 @@ router$t.post("/contacts", requireMarketing$1("manage"), async (req, res) => {
   res.json({ contact: contact2 });
 });
 router$t.post("/contacts/tags", requireMarketing$1("manage"), async (req, res) => {
-  const emails = Array.isArray(req.body?.emails) ? req.body.emails.map((email) => normalizeEmail(email)) : [];
+  const emails = Array.isArray(req.body?.emails) ? req.body.emails.map((email) => normalizeEmail$1(email)) : [];
   const add = Array.isArray(req.body?.add) ? req.body.add.map(String) : [];
   const remove = Array.isArray(req.body?.remove) ? req.body.remove.map(String) : [];
   if (!emails.length) return res.status(400).json({ error: "Choose at least one contact." });
@@ -31615,7 +31885,7 @@ router$t.delete("/suppression/:id", requireMarketing$1("manage"), async (req, re
 router$t.post("/unsubscribe", async (req, res) => {
   const limit = unsubscribeLimit.check(clientIp(req));
   if (!limit.allowed) return res.status(429).json({ error: "Too many attempts. Try again later." });
-  const email = normalizeEmail(req.body?.email);
+  const email = normalizeEmail$1(req.body?.email);
   if (!isValidEmail(email)) return res.status(400).json({ error: "Enter the email address you want removed." });
   const token = String(req.body?.token || "");
   const secret2 = process.env.MARKETING_UNSUBSCRIBE_SECRET || "";
@@ -32066,8 +32336,8 @@ function readCampaign(body, current, now) {
     subject: String(body.subject ?? current.subject),
     preheader: String(body.preheader ?? current.preheader),
     fromName: String(body.fromName ?? current.fromName),
-    fromEmail: normalizeEmail(body.fromEmail ?? current.fromEmail) || current.fromEmail,
-    replyTo: normalizeEmail(body.replyTo ?? current.replyTo) || current.replyTo,
+    fromEmail: normalizeEmail$1(body.fromEmail ?? current.fromEmail) || current.fromEmail,
+    replyTo: normalizeEmail$1(body.replyTo ?? current.replyTo) || current.replyTo,
     html: String(body.html ?? current.html),
     templateId: String(body.templateId ?? current.templateId),
     scheduledAt: String(body.scheduledAt ?? current.scheduledAt),
@@ -32214,7 +32484,7 @@ router$s.post("/campaigns/:id/preview", requireMarketing("send"), async (req, re
   res.json({ confirmation });
 });
 router$s.post("/campaigns/:id/test", requireMarketing("send"), async (req, res) => {
-  const to = normalizeEmail(req.body?.to);
+  const to = normalizeEmail$1(req.body?.to);
   if (!isValidEmail(to)) return res.status(400).json({ error: "Enter a test email address." });
   const gmass = getGmassClient();
   if (sendBlocked(res, gmass)) return;
@@ -32491,7 +32761,7 @@ router$s.post("/settings", requireMarketing("send"), async (req, res) => {
     bounceWarnRate: Number(req.body?.bounceWarnRate ?? current.bounceWarnRate),
     bouncePauseRate: Number(req.body?.bouncePauseRate ?? current.bouncePauseRate),
     fromName: String(req.body?.fromName ?? current.fromName),
-    replyTo: normalizeEmail(req.body?.replyTo ?? current.replyTo) || current.replyTo,
+    replyTo: normalizeEmail$1(req.body?.replyTo ?? current.replyTo) || current.replyTo,
     sendingAccounts: normalizeSendingAccounts(req.body?.sendingAccounts ?? current.sendingAccounts),
     fromEmail: ""
   };
@@ -32505,7 +32775,7 @@ router$s.post("/settings", requireMarketing("send"), async (req, res) => {
 router$s.post("/account/unsubscribes", requireMarketing("send"), async (req, res) => {
   const gmass = getGmassClient();
   if (!gmass.configured) return res.status(503).json({ error: "Set GMASS_API_KEY before syncing a suppression to GMass." });
-  const email = normalizeEmail(req.body?.email);
+  const email = normalizeEmail$1(req.body?.email);
   const domain = String(req.body?.domain || "").replace(/^@/, "").trim().toLowerCase();
   try {
     if (domain) {
@@ -33900,7 +34170,8 @@ function peopleFromContacts(rows) {
       tags,
       emailVerified: true,
       source: "sheet",
-      doNotContact: isDncStatus(live) || isEmailOkNo(emailOk)
+      doNotContact: isDncStatus(live) || isEmailOkNo(emailOk),
+      marketingSmsOptIn: false
     });
   }
   return people;
@@ -33925,7 +34196,7 @@ async function readHolyGrailAudience(reader) {
       people: peopleFromContacts(contacts.rows),
       blockedEmails: [...blocked.emails, ...held.emails],
       blockedPhones: [...blocked.phones, ...held.phones].map((phone) => phoneDigits(phone) || phone),
-      blockedNames: [...blocked.names, ...held.names].map((name) => normalizePersonName(name)).filter(Boolean),
+      blockedNames: [...blocked.names, ...held.names].map((name) => normalizePersonName$1(name)).filter(Boolean),
       truncated: contacts.truncated || suppression.truncated || dnc.truncated
     };
   } catch (error) {
@@ -33981,6 +34252,8 @@ function asContact(row) {
     lastName: String(row.lastName || ""),
     company: String(row.company || ""),
     phone: String(row.phone || ""),
+    marketingSmsOptIn: row.marketingSmsOptIn === true,
+    smsStopped: row.smsStopped === true,
     tags: Array.isArray(row.tags) ? row.tags.map(String) : [],
     custom: row.custom && typeof row.custom === "object" ? row.custom : {},
     source: row.source === "client" || row.source === "manual" ? row.source : "import",
@@ -33999,6 +34272,30 @@ function asClient(row) {
     phone: String(row.phone || ""),
     company: String(row.company || "")
   };
+}
+function optedInPhone(row) {
+  if (row.smsStopped === true || row.stopped === true) return "";
+  if (row.marketingSmsOptIn !== true && row.smsOptIn !== true) return "";
+  return phoneDigits(String(row.phone || row.id || ""));
+}
+async function explicitOptInPhones() {
+  if (memoryMarketing() || !admin.apps.length) return /* @__PURE__ */ new Set();
+  const [optIns, clients, contacts] = await Promise.all([
+    pageDocs("marketingSmsOptIns"),
+    pageDocs("clients"),
+    pageDocs("marketingContacts")
+  ]);
+  const phones = /* @__PURE__ */ new Set();
+  for (const row of [...optIns.rows, ...clients.rows, ...contacts.rows]) {
+    const phone = optedInPhone(row);
+    if (phone) phones.add(phone);
+  }
+  return phones;
+}
+async function stoppedPhones() {
+  if (memoryMarketing() || !admin.apps.length) return [];
+  const page2 = await pageDocs("smsStops");
+  return page2.rows.filter((row) => row.stopped !== false).map((row) => phoneDigits(String(row.phone || row.id || ""))).filter(Boolean);
 }
 async function loadContacts() {
   const store = getMarketingStore();
@@ -34033,7 +34330,8 @@ function fromContact(contact2) {
     tags: contact2.tags,
     emailVerified: contact2.emailVerified,
     source: contact2.source,
-    doNotContact: false
+    doNotContact: false,
+    marketingSmsOptIn: contact2.marketingSmsOptIn === true && contact2.smsStopped !== true
   };
 }
 async function loadChannelAudience(segmentId = "", excludeCampaignId = "") {
@@ -34052,6 +34350,7 @@ async function loadChannelAudience(segmentId = "", excludeCampaignId = "") {
     const person2 = fromContact(contact2);
     if (previous) {
       person2.doNotContact = previous.doNotContact;
+      person2.marketingSmsOptIn = person2.marketingSmsOptIn || previous.marketingSmsOptIn;
       person2.phone = person2.phone || previous.phone;
       person2.tags = [.../* @__PURE__ */ new Set([...previous.tags, ...person2.tags])];
       if (!person2.firstName) person2.firstName = previous.firstName;
@@ -34067,12 +34366,12 @@ async function loadChannelAudience(segmentId = "", excludeCampaignId = "") {
   const blockedPhones = new Set(sheet.blockedPhones.map((phone) => phoneDigits(phone) || phone));
   const blockedNames = new Set(sheet.blockedNames);
   for (const person2 of byEmail.values()) {
-    const name = normalizePersonName(`${person2.firstName} ${person2.lastName}`);
+    const name = normalizePersonName$1(`${person2.firstName} ${person2.lastName}`);
     if (blockedEmails.has(person2.email) || blockedPhones.has(phoneDigits(person2.phone)) || name && blockedNames.has(name)) {
       person2.doNotContact = true;
     }
   }
-  const [segments, settings, sends, campaigns, stops] = await Promise.all([
+  const [segments, settings, sends, campaigns, stops, extraOptIns, extraStops] = await Promise.all([
     store.listSegments(),
     store.getSettings(),
     memoryMarketing() ? store.listSends() : pageDocs("marketingSends").then((page2) => page2.rows.map((row) => ({
@@ -34081,8 +34380,28 @@ async function loadChannelAudience(segmentId = "", excludeCampaignId = "") {
       sentAt: String(row.sentAt || "")
     }))),
     memoryMarketing() ? store.listCampaigns() : admin.firestore().collection("marketingCampaigns").limit(50).get().then((snap) => snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }))),
-    getChannelCampaignStore().phoneStops()
+    getChannelCampaignStore().phoneStops(),
+    explicitOptInPhones(),
+    stoppedPhones()
   ]);
+  for (const person2 of byEmail.values()) {
+    if (extraOptIns.has(phoneDigits(person2.phone))) person2.marketingSmsOptIn = true;
+  }
+  for (const phone of extraOptIns) {
+    if ([...byEmail.values()].some((person2) => phoneDigits(person2.phone) === phone)) continue;
+    byEmail.set(`phone:${phone}`, {
+      email: "",
+      firstName: "",
+      lastName: "",
+      phone,
+      company: "",
+      tags: [],
+      emailVerified: false,
+      source: "manual",
+      doNotContact: false,
+      marketingSmsOptIn: true
+    });
+  }
   const segment = segments.find((item) => item.id === segmentId) || null;
   const overlap = campaigns.map((campaign) => ({
     id: String(campaign.id || ""),
@@ -34095,7 +34414,7 @@ async function loadChannelAudience(segmentId = "", excludeCampaignId = "") {
   return buildChannelAudience({
     people: [...byEmail.values()],
     suppression: loaded.suppression,
-    phoneStops: stops,
+    phoneStops: [...stops, ...extraStops],
     segment,
     settings,
     sends,
@@ -34258,8 +34577,11 @@ function sampleCampaign(now) {
 async function sendCampaignEmail(message) {
   await deliverRawEmail(message);
 }
-async function sendCampaignText(to, body) {
-  const result = await deliverCampaignSms(to, body);
+async function sendCampaignText(to, body, marketingOptIn = false) {
+  if (marketingOptIn !== true) {
+    throw new Error("Marketing SMS requires an explicit opt-in.");
+  }
+  const result = await deliverCampaignSms(to, body, true);
   return { sid: result.sid };
 }
 function trackToken(secret2, payload) {
@@ -34339,7 +34661,7 @@ async function runBatches(items, worker) {
 router$r.get("/t/open.gif", async (req, res) => {
   const limit = trackLimit.check(clientIp(req));
   const campaignId = String(req.query.c || "").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 80);
-  const email = normalizeEmail(req.query.e);
+  const email = normalizeEmail$1(req.query.e);
   const token = String(req.query.t || "");
   const key = secret();
   if (limit.allowed && key && campaignId && token === trackToken(key, `${campaignId}|${email}|open`)) {
@@ -34355,7 +34677,7 @@ router$r.get("/t/click", async (req, res) => {
   const limit = trackLimit.check(clientIp(req));
   if (!limit.allowed) return res.status(429).send("Too many requests.");
   const campaignId = String(req.query.c || "").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 80);
-  const email = normalizeEmail(req.query.e);
+  const email = normalizeEmail$1(req.query.e);
   const url = String(req.query.u || "");
   const token = String(req.query.t || "");
   const key = secret();
@@ -34429,7 +34751,7 @@ router$r.post("/", staffGate, async (req, res) => {
     status: "idea",
     ownerUid: req.user?.uid || "",
     ownerName: String(req.body?.ownerName || req.user?.email || "Staff"),
-    ownerEmail: normalizeEmail(req.user?.email || ""),
+    ownerEmail: normalizeEmail$1(req.user?.email || ""),
     stats: void 0,
     sentAt: ""
   }, now, id);
@@ -34538,7 +34860,7 @@ router$r.get("/:id/logs", staffGate, async (req, res) => {
 router$r.post("/:id/test", staffGate, async (req, res) => {
   const limit = sendLimit.check(req.user?.uid || clientIp(req));
   if (!limit.allowed) return res.status(429).json({ error: "Too many send attempts. Try again shortly." });
-  const to = normalizeEmail(req.user?.email || "");
+  const to = normalizeEmail$1(req.user?.email || "");
   if (!to) return res.status(400).json({ error: "Your staff account has no email address." });
   const campaign = await getChannelCampaignStore().get(req.params.id);
   if (!campaign) return res.status(404).json({ error: "Campaign not found." });
@@ -34567,7 +34889,7 @@ router$r.post("/:id/test", staffGate, async (req, res) => {
     kind: "test",
     at: (/* @__PURE__ */ new Date()).toISOString(),
     live: delivered,
-    lines: [{ channel: "email", to, name: personName(person2), detail: rendered.subject }],
+    lines: [{ channel: "email", to, name: personName$1(person2), detail: rendered.subject }],
     note
   };
   await getChannelCampaignStore().addLog(log);
@@ -34624,7 +34946,7 @@ router$r.post("/:id/send", staffGate, async (req, res) => {
     await runBatches(preview.smsPeople, async (person2) => {
       const body = campaignSmsBody(campaign.sms.body, person2.firstName);
       try {
-        await sendCampaignText(phoneDigits(person2.phone), body);
+        await sendCampaignText(phoneDigits(person2.phone), body, person2.marketingSmsOptIn === true);
         sent += 1;
         delivered += 1;
         await store.rememberPhone(person2.phone, campaign.id, at);
@@ -34855,6 +35177,14 @@ async function runReminderSweep(req, res) {
       for (const type of dueTypes) {
         if (!phone) {
           results.push({ appointmentId: appointmentDoc.id, orderId, type, skipped: "missing_phone" });
+          continue;
+        }
+        const consentBlock = transactionalSmsBlockReason({
+          smsConsent: merged.smsConsent,
+          stopped: await isSmsStopped(String(phone))
+        });
+        if (consentBlock) {
+          results.push({ appointmentId: appointmentDoc.id, orderId, type, skipped: consentBlock });
           continue;
         }
         const body = type === "1h" ? SMS_TEMPLATES.appointmentReminder1h(name, String(time)) : SMS_TEMPLATES.appointmentReminder24h(name, bookingDateLabel(scheduledDate, "your scheduled date"), String(time), address);
@@ -36738,6 +37068,21 @@ router$k.get("/distance", async (req, res) => {
 });
 const router$j = Router();
 const db$6 = () => admin.firestore();
+const marketingOptInLimiter = createRateLimiter({ windowMs: 15 * 60 * 1e3, max: 8 });
+async function applyInboundKeyword(from, body) {
+  if (from && body) {
+    try {
+      await noteCampaignSmsInbound(from, body);
+    } catch {
+    }
+  }
+  if (isStopKeyword(body)) {
+    await optOutEverywhere(from);
+    return "stop";
+  }
+  if (isHelpKeyword(body)) return "help";
+  return "other";
+}
 async function findOrderLikeDocument(id) {
   const orderRequestDoc = await db$6().collection("orderRequests").doc(id).get();
   if (orderRequestDoc.exists) return orderRequestDoc;
@@ -36817,6 +37162,12 @@ router$j.post("/remind/:orderId", requireStaff, async (req, res) => {
     const order = orderDoc.data();
     const phone = order.phone || order.clientPhone;
     if (!phone) return res.status(400).json({ error: "No phone number on order." });
+    if (order.smsConsent !== true) {
+      return res.status(409).json({ error: "This booking does not have SMS consent.", skipped: "no_sms_consent" });
+    }
+    if (await isSmsStopped(String(phone))) {
+      return res.status(409).json({ error: "This number opted out.", skipped: "sms_stopped" });
+    }
     const name = order.firstName || order.clientName?.split(" ")[0] || "there";
     const date = bookingDateLabel(order.scheduledDate, "your scheduled date");
     const time = order.scheduledTime || "your appointment time";
@@ -36937,16 +37288,17 @@ router$j.post("/webhook", express_raw_or_json, async (req, res) => {
       ConversationSid,
       Body,
       Author,
-      ParticipantSid,
+      From,
       MessageSid
     } = req.body;
-    if (Author && Body) {
-      try {
-        await noteCampaignSmsInbound(String(Author), String(Body));
-      } catch {
-      }
-    }
+    const inboundFrom = String(From || Author || "");
+    const inboundBody = String(Body || "");
+    const keyword = await applyInboundKeyword(inboundFrom, inboundBody);
     if (!ConversationSid || !Body) {
+      if (keyword === "help") {
+        res.type("text/xml");
+        return res.status(200).send(twimlMessage(SMS_HELP_REPLY));
+      }
       return res.status(200).send("OK");
     }
     const convoSnap = await db$6().collection("conversations").where("conversationSid", "==", ConversationSid).limit(1).get();
@@ -36983,6 +37335,10 @@ router$j.post("/webhook", express_raw_or_json, async (req, res) => {
       });
     }
     if (senderType !== "staff") await bumpAdminUnreadChannel("sms");
+    if (keyword === "help") {
+      res.type("text/xml");
+      return res.status(200).send(twimlMessage(SMS_HELP_REPLY));
+    }
     return res.status(200).send("");
   } catch (err) {
     console.error("[SMS Webhook] Error:", err);
@@ -37000,15 +37356,28 @@ router$j.post("/campaign/:id/send", requireCoordinator, async (req, res) => {
       console.warn(`[SMS] Suppressed campaign ${req.params.id} — ${clientNotifyBlockReason()}.`);
       return res.status(503).json({ error: "Client notifications are off.", suppressed: true });
     }
-    const clientsSnap = await db$6().collection("clients").where("smsOptIn", "==", true).get();
-    let clients = clientsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const [bySmsOptIn, byMarketingOptIn] = await Promise.all([
+      db$6().collection("clients").where("smsOptIn", "==", true).get(),
+      db$6().collection("clients").where("marketingSmsOptIn", "==", true).get()
+    ]);
+    const byId = /* @__PURE__ */ new Map();
+    for (const doc of [...bySmsOptIn.docs, ...byMarketingOptIn.docs]) {
+      byId.set(doc.id, { id: doc.id, ...doc.data() });
+    }
+    let clients = [...byId.values()];
     if (campaign.audience === "custom" && campaign.audienceIds?.length) {
       clients = clients.filter((c) => campaign.audienceIds.includes(c.id));
     }
-    const recipients = clients.filter((c) => c.phone).map((c) => ({
-      phone: c.phone,
-      name: (c.firstName || "") + " " + (c.lastName || "")
-    }));
+    const recipients = [];
+    for (const client of clients) {
+      if (!marketingRecipientAllowed(client)) continue;
+      if (await isSmsStopped(String(client.phone))) continue;
+      recipients.push({
+        phone: client.phone,
+        name: (client.firstName || "") + " " + (client.lastName || ""),
+        marketingOptIn: true
+      });
+    }
     await campaignDoc.ref.update({ status: "sending" });
     const results = await sendSMSCampaign(
       recipients,
@@ -37034,22 +37403,67 @@ router$j.post("/campaign/:id/send", requireCoordinator, async (req, res) => {
 });
 router$j.post("/opt-out", async (req, res) => {
   try {
-    const { From, Body } = req.body;
-    if (!From) return res.status(200).send("");
-    const keyword = (Body || "").trim().toUpperCase();
-    if (["STOP", "STOPALL", "UNSUBSCRIBE", "CANCEL", "END", "QUIT"].includes(keyword)) {
+    const from = String(req.body?.From || "");
+    const body = String(req.body?.Body || "");
+    res.type("text/xml");
+    if (!from) return res.status(200).send(twimlEmpty());
+    const keyword = await applyInboundKeyword(from, body);
+    if (keyword === "help") return res.status(200).send(twimlMessage(SMS_HELP_REPLY));
+    return res.status(200).send(twimlEmpty());
+  } catch (err) {
+    res.type("text/xml");
+    return res.status(200).send(twimlEmpty());
+  }
+});
+router$j.post("/marketing-opt-in", async (req, res) => {
+  const limit = marketingOptInLimiter.check(clientIp(req));
+  if (!limit.allowed) {
+    res.setHeader("Retry-After", String(limit.retryAfterSec));
+    return res.status(429).json({ error: "Too many signups. Please wait and try again." });
+  }
+  const name = String(req.body?.name || "").trim();
+  const phone = String(req.body?.phone || "").trim();
+  const consent = req.body?.consent === true || req.body?.consent === "yes" || req.body?.consent === "on";
+  const source = String(req.body?.source || "/sms");
+  if (!name || !phoneDigits10(phone)) {
+    return res.status(400).json({ error: "Name and a mobile number are required." });
+  }
+  if (!consent) {
+    return res.status(400).json({ error: "Check the box to agree to promotional texts." });
+  }
+  if (source !== "/sms") {
+    return res.status(400).json({ error: "Unknown opt-in source." });
+  }
+  try {
+    const record2 = await saveMarketingOptIn({
+      name,
+      phone,
+      ip: clientIp(req),
+      userAgent: String(req.headers["user-agent"] || "")
+    });
+    let confirmation = "skipped";
+    if (campaignSendLive()) {
       try {
-        await noteCampaignSmsInbound(String(From), String(Body || keyword));
-      } catch {
-      }
-      const snap = await db$6().collection("clients").where("phone", "==", From).limit(1).get();
-      if (!snap.empty) {
-        await snap.docs[0].ref.update({ smsOptIn: false });
+        await deliverCampaignSms(phone, MARKETING_OPT_IN_CONFIRMATION, true);
+        confirmation = "sent";
+      } catch (error) {
+        console.error("[SMS] Opt-in confirmation failed:", error);
+        confirmation = "failed";
       }
     }
-    return res.status(200).send('<?xml version="1.0" encoding="UTF-8"?><Response/>');
-  } catch (err) {
-    return res.status(200).send('<?xml version="1.0" encoding="UTF-8"?><Response/>');
+    const accept = String(req.headers.accept || "");
+    const formPost = req.is("application/x-www-form-urlencoded") && !accept.includes("application/json");
+    if (formPost) return res.redirect(303, "/sms?joined=1");
+    return res.status(201).json({
+      ok: true,
+      phone: record2.phone,
+      consentTextVersion: record2.consentTextVersion,
+      source: record2.source,
+      confirmation
+    });
+  } catch (error) {
+    console.error("[SMS] Marketing opt-in failed:", error);
+    return res.status(500).json({ error: "Could not save your opt-in." });
   }
 });
 function express_raw_or_json(req, _res, next) {
@@ -40103,6 +40517,12 @@ const PUBLIC_PAGES = [
     description: "Terms and Conditions for photography, video, and listing media from Iconic Images in Texas."
   },
   {
+    path: "/sms",
+    file: "seo/sms.html",
+    title: "Text Updates | Iconic Images",
+    description: "Opt in to promotional text messages from Iconic Images about photography services, offers, and events."
+  },
+  {
     path: "/login",
     file: "seo/login.html",
     title: "Client Login | Iconic Images",
@@ -41583,6 +42003,7 @@ const PAGES = [
       linkItem("insights", "Insights", "/insights"),
       linkItem("studio", "Studio 105", "/studio-105"),
       linkItem("contact", "Contact Us", "/contact"),
+      linkItem("sms", "Text updates", "/sms"),
       linkItem("login", "Client Login", "/login")
     ]),
     block("socials", "Social profiles", [], [
@@ -44433,11 +44854,11 @@ async function loadMarketingSuppression() {
     const kind = data.kind === "email" || data.kind === "domain" || data.kind === "name" ? data.kind : null;
     const value = typeof data.value === "string" ? data.value.trim() : "";
     if (!kind || !value) continue;
-    const aliases = Array.isArray(data.aliases) ? data.aliases.map((item) => normalizePersonName(item)).filter(Boolean) : [];
+    const aliases = Array.isArray(data.aliases) ? data.aliases.map((item) => normalizePersonName$1(item)).filter(Boolean) : [];
     entries.push({
       id: doc.id,
       kind,
-      value: kind === "name" ? normalizePersonName(value) : kind === "email" ? normalizeSyncEmail(value) : value.replace(/^@/, "").toLowerCase(),
+      value: kind === "name" ? normalizePersonName$1(value) : kind === "email" ? normalizeSyncEmail(value) : value.replace(/^@/, "").toLowerCase(),
       reason: "manual",
       hold: data.hold === "personal" ? "personal" : "",
       note: "",
