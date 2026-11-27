@@ -17,11 +17,21 @@
  *   and the status string is unrecognized. That order is not this card.
  *
  * In progress
- *   adminOrderGalleryLabel is exactly "In progress".
- *   That helper reads galleryStatus, deliveryStatus, gallery.status, and
- *   gallery.galleryStatus through GALLERY_LABEL. With none of those, and
- *   no deliveredAt, it uses the tile delivery label the list already prints.
- *   Archived and cancelled orders are left out.
+ *   galleryStatus, deliveryStatus, gallery.status, or gallery.galleryStatus
+ *   is exactly "in_progress".
+ *   A scheduled or pending order with none of those fields is not in progress.
+ *   The tile used to label that order "In progress", and the badge followed
+ *   the tile, so every booked shoot raised the count.
+ *   Archived, cancelled, playtest, and qa-only orders are left out.
+ *
+ * Badges
+ *   Documents that share an order number, or point at each other, count once.
+ *   Playtest and qa-only rows are left out of the open badges.
+ *   Unscheduled means a new or unhandled request with no shoot date.
+ *   A delivered order, or one already scheduled, confirmed, or in review,
+ *   is not unscheduled and is not "no photographer" just because a name is blank.
+ *   The new-request badge is intake only: new, request, submitted,
+ *   awaiting payment, awaiting deposit, or pending confirmation.
  *
  * Revenue this week
  *   Money collected whose payment day falls in the current America/Chicago
@@ -43,7 +53,7 @@
  * Open edit request, Ready for review.
  */
 
-import { adminOrderGalleryLabel, adminOrderPaymentLabel, adminOrderPhotographer, adminOrderShoot, adminOrderStatusLabel, type AdminOrderListStaff } from "./adminOrderList.ts";
+import { adminOrderGalleryLabel, adminOrderPaymentLabel, adminOrderPhotographer, adminOrderPlaced, adminOrderShoot, adminOrderStatusLabel, type AdminOrderListStaff } from "./adminOrderList.ts";
 import { calendarDateKey, formatChicagoDate } from "./clientHome.ts";
 import { isPlaytestRecord, isQaOnlyRecord } from "./revenueCount.ts";
 
@@ -123,6 +133,15 @@ export interface OrderDeskTriage {
 
 const CLOSED_EDIT = new Set(["done", "completed", "resolved", "closed", "cancelled", "canceled", "received_back"]);
 const OPEN_EDIT = new Set(["open", "requested", "pending", "sent_out", "in_progress", "needs_edit", "pending_edit"]);
+const INTAKE_STATUS = new Set(["new", "request", "submitted", "awaiting_payment", "awaiting_deposit", "pending_confirmation"]);
+const WORKED_STATUS = new Set([
+  "scheduled", "confirmed", "consult_scheduled", "appt_scheduled", "in_progress", "pending",
+  "pending_edit", "in_review", "delivered", "delivered_paid", "paid", "complete", "completed", "done",
+]);
+const LINK_FIELDS = ["orderId", "convertedToOrderId", "orderRequestId", "twinOrderId", "duplicateOf", "sourceRequestId", "pairedOrderId"] as const;
+
+export const ORDER_DESK_SORTS = ["newest", "oldest", "status", "custom"] as const;
+export type OrderDeskSort = (typeof ORDER_DESK_SORTS)[number];
 
 const FROM_MONDAY: Record<string, number> = { Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6 };
 
@@ -161,6 +180,102 @@ export function orderIsArchived(order: Record<string, unknown>): boolean {
   return status === "Archived" || status === "Cancelled";
 }
 
+/** Playtest and qa-only rows stay out of the open badges and the open list. */
+export function orderCountsOnDesk(order: Record<string, unknown>): boolean {
+  return !isPlaytestRecord(order) && !isQaOnlyRecord(order);
+}
+
+export function orderIsDelivered(order: Record<string, unknown>): boolean {
+  const status = normalize(order.status);
+  if (status.includes("delivered")) return true;
+  const gallery = explicitGalleryState(order);
+  return gallery === "delivered" || gallery === "approved";
+}
+
+/**
+ * One row per real order. Same document id, the same sequential order number,
+ * or an id stored on orderId / convertedToOrderId / orderRequestId collapses.
+ * The newest non-test copy is kept. Document ids are not rewritten.
+ */
+export function dedupeOrderRecords<T extends Record<string, unknown>>(orders: readonly T[]): T[] {
+  const noId: T[] = [];
+  const byId = new Map<string, T>();
+  for (const order of orders) {
+    const id = text(order.id);
+    if (!id) {
+      noId.push(order);
+      continue;
+    }
+    byId.set(id, preferOrder(byId.get(id), order));
+  }
+  const parent = new Map<string, string>();
+  const find = (id: string): string => {
+    let root = id;
+    while (parent.get(root) && parent.get(root) !== root) root = parent.get(root) as string;
+    let cursor = id;
+    while (cursor !== root) {
+      const next = parent.get(cursor) as string;
+      parent.set(cursor, root);
+      cursor = next;
+    }
+    return root;
+  };
+  const union = (left: string, right: string) => {
+    const leftRoot = find(left);
+    const rightRoot = find(right);
+    if (leftRoot !== rightRoot) parent.set(rightRoot, leftRoot);
+  };
+  for (const id of byId.keys()) parent.set(id, id);
+  const byNumber = new Map<string, string>();
+  for (const [id, order] of byId) {
+    const key = sequentialKey(order);
+    if (!key) continue;
+    const previous = byNumber.get(key);
+    if (previous) union(previous, id);
+    else byNumber.set(key, id);
+  }
+  for (const [id, order] of byId) {
+    for (const field of LINK_FIELDS) {
+      const link = text(order[field]);
+      if (link && link !== id && byId.has(link)) union(id, link);
+    }
+  }
+  const groups = new Map<string, T>();
+  for (const [id, order] of byId) {
+    const root = find(id);
+    groups.set(root, preferOrder(groups.get(root), order));
+  }
+  return [...groups.values(), ...noId];
+}
+
+/** Open rows plus archives, with duplicate copies removed. */
+export function ordersOnDesk(orders: readonly Record<string, unknown>[]): Record<string, unknown>[] {
+  return dedupeOrderRecords(orders).filter((order) => orderIsArchived(order) || orderCountsOnDesk(order));
+}
+
+export function summarizeOrderDesk(orders: readonly Record<string, unknown>[]): {
+  openCount: number;
+  archivedCount: number;
+  newCount: number;
+} {
+  const rows = ordersOnDesk(orders);
+  const archivedCount = rows.filter(orderIsArchived).length;
+  const open = rows.filter((order) => !orderIsArchived(order));
+  return { openCount: open.length, archivedCount, newCount: open.filter(orderIsUnhandled).length };
+}
+
+/** Intake that still needs a first response. Worked, delivered, and test rows do not count. */
+export function orderIsUnhandled(order: Record<string, unknown>): boolean {
+  if (orderIsArchived(order) || !orderCountsOnDesk(order) || orderIsDelivered(order)) return false;
+  const status = normalize(order.status);
+  if (INTAKE_STATUS.has(status)) return true;
+  return !status && !bookedShootDay(order);
+}
+
+export function actionableOrderCount(orders: readonly Record<string, unknown>[]): number {
+  return summarizeOrderDesk(orders).newCount;
+}
+
 export function orderIsTodayShoot(order: Record<string, unknown>, now: Date): boolean {
   if (orderIsArchived(order)) return false;
   const day = bookedShootDay(order);
@@ -168,8 +283,11 @@ export function orderIsTodayShoot(order: Record<string, unknown>, now: Date): bo
 }
 
 export function orderIsUnscheduled(order: Record<string, unknown>): boolean {
-  if (orderIsArchived(order)) return false;
-  return !bookedShootDay(order);
+  if (orderIsArchived(order) || !orderCountsOnDesk(order) || orderIsDelivered(order)) return false;
+  if (bookedShootDay(order)) return false;
+  const status = normalize(order.status);
+  if (status && WORKED_STATUS.has(status)) return false;
+  return true;
 }
 
 export function orderIsThisWeek(order: Record<string, unknown>, now: Date): boolean {
@@ -179,13 +297,20 @@ export function orderIsThisWeek(order: Record<string, unknown>, now: Date): bool
 }
 
 export function orderHasNoPhotographer(order: Record<string, unknown>, staff: AdminOrderListStaff[] = []): boolean {
-  if (orderIsArchived(order)) return false;
+  if (orderIsArchived(order) || !orderCountsOnDesk(order) || orderIsDelivered(order)) return false;
+  if (!bookedShootDay(order)) return false;
   return adminOrderPhotographer(order, staff) === "—";
 }
 
+export function explicitGalleryState(order: Record<string, unknown>): string {
+  const gallery = nested(order.gallery);
+  const explicit = text(order.galleryStatus) || text(order.deliveryStatus) || text(gallery.status) || text(gallery.galleryStatus);
+  return normalize(explicit);
+}
+
 export function orderGalleryInProgress(order: Record<string, unknown>): boolean {
-  if (orderIsArchived(order)) return false;
-  return adminOrderGalleryLabel(order) === "In progress";
+  if (orderIsArchived(order) || !orderCountsOnDesk(order)) return false;
+  return explicitGalleryState(order) === "in_progress";
 }
 
 export function orderPaidThisWeek(order: Record<string, unknown>, now: Date): boolean {
@@ -196,17 +321,18 @@ export function computeOrderDeskKpis(
   orders: readonly Record<string, unknown>[],
   now: Date,
 ): OrderDeskKpis {
+  const rows = ordersOnDesk(orders);
   const week = chicagoWeek(now);
-  const todayOrders = orders.filter((order) => orderIsTodayShoot(order, now));
-  const revenueOrders = orders
+  const todayOrders = rows.filter((order) => orderIsTodayShoot(order, now));
+  const revenueOrders = rows
     .map((order) => ({ order, amount: paidThisWeekAmount(order, now) }))
     .filter((entry): entry is { order: Record<string, unknown>; amount: number } => entry.amount != null);
   const revenueAmount = revenueOrders.reduce((sum, entry) => sum + entry.amount, 0);
   return {
     todayCount: todayOrders.length,
     todayHint: todayShootsHint(todayOrders, now),
-    unscheduledCount: orders.filter(orderIsUnscheduled).length,
-    progressCount: orders.filter(orderGalleryInProgress).length,
+    unscheduledCount: rows.filter(orderIsUnscheduled).length,
+    progressCount: rows.filter(orderGalleryInProgress).length,
     revenueAmount,
     revenueCount: revenueOrders.length,
     revenueHint: `${revenueOrders.length} ${revenueOrders.length === 1 ? "order" : "orders"} · ${week.label}`,
@@ -234,15 +360,16 @@ export function deskFilterCounts(
   now: Date,
   staff: AdminOrderListStaff[] = [],
 ): Record<OrderDeskFilter, number> {
-  const open = orders.filter((order) => !orderIsArchived(order)).length;
+  const rows = ordersOnDesk(orders);
+  const open = rows.filter((order) => !orderIsArchived(order)).length;
   return {
     all: open,
-    today: orders.filter((order) => orderIsTodayShoot(order, now)).length,
-    week: orders.filter((order) => orderIsThisWeek(order, now)).length,
-    unscheduled: orders.filter(orderIsUnscheduled).length,
-    nophoto: orders.filter((order) => orderHasNoPhotographer(order, staff)).length,
-    progress: orders.filter(orderGalleryInProgress).length,
-    revenue: orders.filter((order) => orderPaidThisWeek(order, now)).length,
+    today: rows.filter((order) => orderIsTodayShoot(order, now)).length,
+    week: rows.filter((order) => orderIsThisWeek(order, now)).length,
+    unscheduled: rows.filter(orderIsUnscheduled).length,
+    nophoto: rows.filter((order) => orderHasNoPhotographer(order, staff)).length,
+    progress: rows.filter(orderGalleryInProgress).length,
+    revenue: rows.filter((order) => orderPaidThisWeek(order, now)).length,
   };
 }
 
@@ -255,7 +382,7 @@ export function orderDeskTriage(
   staff: AdminOrderListStaff[] = [],
   editRequests: readonly Record<string, unknown>[] = [],
 ): OrderDeskTriage | null {
-  if (orderIsArchived(order)) return null;
+  if (orderIsArchived(order) || !orderCountsOnDesk(order) || orderIsDelivered(order)) return null;
   if (orderIsUnscheduled(order)) return { reason: "unscheduled", label: "Unscheduled", action: "Schedule" };
   if (orderHasNoPhotographer(order, staff)) return { reason: "nophoto", label: "No photographer assigned", action: "Assign" };
   if (orderHasOpenEdit(order, editRequests)) return { reason: "edit", label: "Open edit request", action: "Open request" };
@@ -432,8 +559,9 @@ function editEntryOpen(value: unknown): boolean {
   const row = nested(value);
   if (!Object.keys(row).length && typeof value !== "object") return false;
   const status = normalize(row.status);
-  if (!status) return Boolean(text(row.id) || text(row.note) || text(row.photoId));
-  return !CLOSED_EDIT.has(status);
+  if (!status) return false;
+  if (CLOSED_EDIT.has(status)) return false;
+  return OPEN_EDIT.has(status) || status.length > 0;
 }
 
 function imageIsDelivered(value: unknown): boolean {
@@ -530,4 +658,98 @@ function text(value: unknown): string {
 
 function normalize(value: unknown): string {
   return String(value ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+}
+
+function preferOrder<T extends Record<string, unknown>>(current: T | undefined, next: T): T {
+  if (!current) return next;
+  const currentTest = !orderCountsOnDesk(current);
+  const nextTest = !orderCountsOnDesk(next);
+  if (currentTest !== nextTest) return currentTest ? next : current;
+  const currentStamp = placedMillis(current);
+  const nextStamp = placedMillis(next);
+  if (nextStamp !== currentStamp) return nextStamp > currentStamp ? next : current;
+  return text(next.id) < text(current.id) ? next : current;
+}
+
+function placedMillis(order: Record<string, unknown>): number {
+  const key = adminOrderPlaced(order).sortKey;
+  if (!key) return 0;
+  const time = Date.parse(key);
+  return Number.isFinite(time) ? time : 0;
+}
+
+function sequentialKey(order: Record<string, unknown>): string | null {
+  const value = order.orderNumber;
+  if (typeof value === "number" && Number.isInteger(value) && value >= 1) return String(value);
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  const hashed = trimmed.match(/^#(\d+)$/);
+  const digits = hashed ? hashed[1] : (/^\d+$/.test(trimmed) ? trimmed : "");
+  if (!digits) return null;
+  const n = Number(digits);
+  if (!Number.isInteger(n) || n < 1) return null;
+  return String(n);
+}
+
+export function parseOrderDeskSort(value: unknown): OrderDeskSort {
+  return ORDER_DESK_SORTS.includes(value as OrderDeskSort) ? value as OrderDeskSort : "newest";
+}
+
+export function sortDeskOrders(
+  orders: readonly Record<string, unknown>[],
+  mode: OrderDeskSort,
+  manualIds: readonly string[] = [],
+): Record<string, unknown>[] {
+  if (mode === "custom") return applyManualOrder(orders, manualIds);
+  if (mode === "status") return [...orders].sort(compareStatus);
+  if (mode === "oldest") return [...orders].sort((left, right) => comparePlaced(left, right, "asc"));
+  return [...orders].sort((left, right) => comparePlaced(left, right, "desc"));
+}
+
+/** Saved ids keep their order. Orders that are not saved yet stay at the top, newest first. */
+export function applyManualOrder(
+  orders: readonly Record<string, unknown>[],
+  manualIds: readonly string[],
+): Record<string, unknown>[] {
+  const index = new Map(manualIds.map((id, position) => [id, position]));
+  return [...orders].sort((left, right) => {
+    const leftIndex = index.has(text(left.id)) ? index.get(text(left.id)) as number : -1;
+    const rightIndex = index.has(text(right.id)) ? index.get(text(right.id)) as number : -1;
+    if (leftIndex !== rightIndex) return leftIndex - rightIndex;
+    return comparePlaced(left, right, "desc");
+  });
+}
+
+export function moveManualId(ids: readonly string[], moving: string, before: string | "end"): string[] {
+  const known = ids.includes(moving) ? [...ids] : [moving, ...ids];
+  const rest = known.filter((id) => id !== moving);
+  if (before === "end" || before === moving) return [...rest, moving];
+  const index = rest.indexOf(before);
+  if (index < 0) return [moving, ...rest];
+  rest.splice(index, 0, moving);
+  return rest;
+}
+
+function comparePlaced(left: Record<string, unknown>, right: Record<string, unknown>, direction: "asc" | "desc"): number {
+  const leftKey = adminOrderPlaced(left).sortKey || "";
+  const rightKey = adminOrderPlaced(right).sortKey || "";
+  if (!leftKey && !rightKey) return text(left.id).localeCompare(text(right.id));
+  if (!leftKey) return 1;
+  if (!rightKey) return -1;
+  if (leftKey !== rightKey) {
+    const ranked = leftKey < rightKey ? -1 : 1;
+    return direction === "asc" ? ranked : -ranked;
+  }
+  return text(left.id).localeCompare(text(right.id));
+}
+
+function compareStatus(left: Record<string, unknown>, right: Record<string, unknown>): number {
+  const leftLabel = adminOrderStatusLabel(left);
+  const rightLabel = adminOrderStatusLabel(right);
+  const leftRank = ADMIN_ORDER_BOARD_COLUMNS.indexOf(leftLabel as (typeof ADMIN_ORDER_BOARD_COLUMNS)[number]);
+  const rightRank = ADMIN_ORDER_BOARD_COLUMNS.indexOf(rightLabel as (typeof ADMIN_ORDER_BOARD_COLUMNS)[number]);
+  const leftOrder = leftRank < 0 ? ADMIN_ORDER_BOARD_COLUMNS.length : leftRank;
+  const rightOrder = rightRank < 0 ? ADMIN_ORDER_BOARD_COLUMNS.length : rightRank;
+  if (leftOrder !== rightOrder) return leftOrder - rightOrder;
+  return comparePlaced(left, right, "desc");
 }
