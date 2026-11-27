@@ -52,6 +52,12 @@ export const PUBLIC_PAGES: readonly PublicPage[] = [
       "Iconic Images is a Spring, Texas studio for real estate media, serving The Woodlands, Houston, and nearby communities since 2016.",
   },
   {
+    path: "/about/cadi",
+    file: "seo/about-cadi.html",
+    title: "Cadi Torres | Iconic Images",
+    description: "Cadi Torres founded Iconic Images in 2016. Meet the owner of the Spring, Texas real estate media studio.",
+  },
+  {
     path: "/what-we-do",
     file: "seo/what-we-do.html",
     title: "What does Iconic do? | Iconic Images",

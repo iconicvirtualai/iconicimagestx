@@ -1,27 +1,40 @@
 import { describe, expect, it } from "vitest";
 import { renderToString } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
+import { CREW } from "@/data/videoTeam";
 import About from "./About";
-import { ABOUT_TEAM, CADI_PHOTO, PLACEHOLDER_BIO } from "@/content/aboutTeam";
+import AboutOwner from "./AboutOwner";
+import {
+  ABOUT_TEAM,
+  CADI_PHOTO,
+  OWNER_PATH,
+  OWNER_STORY,
+} from "@/content/aboutTeam";
+
+function render(node: JSX.Element) {
+  return renderToString(<MemoryRouter>{node}</MemoryRouter>);
+}
 
 describe("About team", () => {
-  it("shows the crew in order, with Cadi as one circular card", () => {
-    const html = renderToString(
-      <MemoryRouter>
-        <About />
-      </MemoryRouter>,
-    );
+  it("shows the crew as equal cards and sends the bar photo to the owner page", () => {
+    const html = render(<About />);
+    const text = html.replace(/<[^>]+>/g, "");
 
-    expect(html).not.toContain("About the owner");
-    expect(html).not.toContain("around 2016");
-    expect(html).toContain("Founded Iconic in 2016.");
     expect(html).toContain("Meet the team");
-    expect(html).not.toContain('href="/video-team"');
+    expect(html).toContain(`href="${OWNER_PATH}"`);
+    expect(html).toContain("About the Owner");
+    expect(html).not.toContain("About the owner");
+    expect(html).not.toContain(CADI_PHOTO);
+    expect(html).not.toContain("around 2016");
     expect(html).not.toMatch(/jazmin/i);
-    expect(html).not.toContain("b694584c91da4099bb13e517f9890e59");
-    expect(html).not.toContain("crew-cadi");
-    expect(html).not.toContain("Visionary Creator");
-    expect(html.split(CADI_PHOTO).length - 1).toBe(1);
+    expect(html).not.toContain("crew-pedro");
+    expect(html).not.toContain("crew-david");
+    expect(text).toContain("Founded Iconic in 2016.");
+    expect(text).toContain("Joined in 2019.");
+    expect(text).toContain("Joined in 2021.");
+    expect(text).toContain("Joined in 2018.");
+    expect(text).toContain("Joined in 2026.");
+    expect(text).toContain("2023 · Part-Time");
 
     const names = [
       ...html.matchAll(
@@ -30,29 +43,47 @@ describe("About team", () => {
     ].map((match) => match[1]);
     expect(names).toEqual(ABOUT_TEAM.map((person) => person.name));
 
-    const text = html.replace(/<[^>]+>/g, "");
-    for (const person of ABOUT_TEAM) {
-      expect(html).toContain(`src="${person.photo}"`);
-      expect(text).toContain(person.role);
-    }
-
-    const photos = [...html.matchAll(/<img\b[^>]*>/g)]
-      .map((match) => match[0])
-      .filter((tag) => ABOUT_TEAM.some((person) => tag.includes(person.photo)));
-    expect(photos).toHaveLength(ABOUT_TEAM.length);
-    for (const tag of photos) {
-      expect(tag).toContain("rounded-full");
-      expect(tag).toContain("h-24 w-24");
-      expect(tag).toContain("sm:h-36 sm:w-36");
-      expect(tag).not.toContain("aspect-");
-    }
-    expect(photos[0]).toContain("object-top");
-
-    const placeholderBios = [...html.matchAll(/data-bio="placeholder"/g)];
-    expect(placeholderBios).toHaveLength(
-      ABOUT_TEAM.filter((person) => person.bioIsPlaceholder).length,
+    const photos = [...html.matchAll(/<img\b[^>]*src="([^"]+)"[^>]*>/g)];
+    const teamPhotos = photos.filter((match) =>
+      ABOUT_TEAM.some((person) => person.photo && match[1] === person.photo),
     );
-    expect(html).toContain(PLACEHOLDER_BIO);
+    expect(teamPhotos.map((match) => match[1])).toEqual(
+      ABOUT_TEAM.flatMap((person) => (person.photo ? [person.photo] : [])),
+    );
+    for (const match of teamPhotos) {
+      expect(match[0]).toContain("rounded-full");
+      expect(match[0]).not.toContain("aspect-");
+    }
+    for (const name of [
+      "Cadi Torres",
+      "Mike Luna",
+      "Armando Martinez",
+      "Daniel Adaclog",
+      "Steven Banda",
+    ]) {
+      const crew = CREW.find((person) => person.name === name);
+      expect(html).toContain(`src="${crew?.image}"`);
+    }
+    expect(html).toContain(">PH<");
+    expect(html).toContain(">DG<");
     expect(html).not.toContain('data-role="placeholder"');
+    expect(html).not.toContain('data-bio="placeholder"');
+  });
+});
+
+describe("About the owner", () => {
+  it("uses the bar portrait in a circle and the published founder story", () => {
+    const html = render(<AboutOwner />);
+    expect(html).toContain(`src="${CADI_PHOTO}"`);
+    expect(html).toContain("rounded-full");
+    expect(html).toContain("object-top");
+    expect(html).toContain("Cadi Torres");
+    expect(html).toContain("Founded Iconic in 2016.");
+    expect(html).toContain('href="/about"');
+    expect(html).toContain("engineered a media powerhouse");
+    expect(html).toContain("Celebrity Agent");
+    expect(html).not.toMatch(/jazmin/i);
+    expect(html).not.toContain("aspect-square");
+    expect(html).not.toContain("aspect-[");
   });
 });
