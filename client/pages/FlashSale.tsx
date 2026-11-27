@@ -55,17 +55,37 @@ export default function FlashSale() {
   return (
     <Layout>
       <div className="min-h-screen bg-[#f4eee4] text-[#141414]">
-        <section className="mx-auto max-w-xl px-4 pb-20 pt-40 sm:px-6 sm:pt-36">
-          <p className="inline-flex rounded-full bg-gradient-to-r from-[#0b0b0b] via-[#c9a227] to-[#e6c35c] px-4 py-1.5 text-xs font-black uppercase tracking-[0.18em] text-white shadow-sm [text-shadow:0_1px_1px_rgba(0,0,0,0.9)]">
-            Black Friday Sale
-          </p>
-          <h1 className="mt-3 text-4xl font-black tracking-tight">Stock up on shoots.</h1>
-          <p className="mt-3 text-base leading-relaxed text-[#5b5249]">
-            Each shoot is 50 photos, 3 aerials, and your choice of one add-on. Paid upfront. Use the shoots within 90 days.
-          </p>
-          {open && (
-            <p className="mt-3 text-sm font-semibold text-[#141414]">Ends Friday, Nov 27 at 11:59pm CT.</p>
-          )}
+        <section className="mx-auto grid max-w-6xl items-center gap-8 px-4 pb-2 pt-36 sm:px-6 sm:pt-40 lg:grid-cols-[minmax(0,1fr)_minmax(280px,520px)] lg:gap-12 lg:pb-6">
+          <div>
+            <p className="inline-flex rounded-full bg-gradient-to-r from-[#0b0b0b] via-[#c9a227] to-[#e6c35c] px-4 py-1.5 text-xs font-black uppercase tracking-[0.18em] text-white shadow-sm [text-shadow:0_1px_1px_rgba(0,0,0,0.9)]">
+              Black Friday Sale
+            </p>
+            <h1 className="mt-3 text-4xl font-black tracking-tight sm:text-5xl">Stock up on shoots.</h1>
+            <p className="mt-3 text-base leading-relaxed text-[#5b5249]">
+              Each shoot is 50 photos, 3 aerials, and your choice of one add-on. Paid upfront.
+            </p>
+            <p className="mt-3 text-base font-semibold leading-relaxed text-[#141414]">
+              Shoots never expire. Use your shoots whenever — no rush — or transfer them to another Iconic customer.
+            </p>
+            <p className="mt-4 inline-flex rounded-full bg-[#141414] px-4 py-1.5 text-xs font-black uppercase tracking-[0.14em] text-[#e6c35c]">
+              Never expire · Transferable
+            </p>
+            {open && (
+              <p className="mt-3 text-sm font-semibold text-[#141414]">Ends Friday, Nov 27 at 11:59pm CT.</p>
+            )}
+          </div>
+          <figure className="overflow-hidden rounded-[1.75rem] bg-[#0b0b0b] p-2.5 shadow-[0_24px_60px_rgba(11,11,11,0.28)] ring-1 ring-black/15 sm:p-3">
+            <img
+              src="/marketing/black-friday/hero-showcase.gif"
+              alt="Listing shoot bundle with 50 photos, 3 aerials, a 2D floor plan, and a walkthrough reel"
+              width={760}
+              height={621}
+              data-testid="bf-hero-showcase"
+              className="h-auto w-full rounded-[1.25rem]"
+            />
+          </figure>
+        </section>
+        <section className="mx-auto max-w-xl px-4 pb-20 sm:px-6">
           {paid && (
             <p className="mt-6 rounded-3xl bg-[#fffdf9] px-5 py-4 text-sm leading-relaxed ring-1 ring-[#e4dacb]">
               If Square confirmed the payment, your bundle is recorded. We did not send a receipt from this page.

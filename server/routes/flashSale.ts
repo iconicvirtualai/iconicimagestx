@@ -12,7 +12,6 @@ import {
   FLASH_SALE_SOURCE,
   flashSaleAddon,
   flashSaleOpen,
-  flashSaleUseBy,
   formatFlashCents,
   quoteFlashSale,
 } from "../../shared/flashSale";
@@ -114,10 +113,9 @@ router.post("/checkout", async (req, res) => {
     },
     notes: [
       `Each shoot: 50 photos + 3 aerials + ${addon.label}.`,
-      "Paid upfront. Use the shoots within 90 days.",
-      `Use by ${flashSaleUseBy(purchasedAt).slice(0, 10)}.`,
+      "Paid upfront.",
+      "Shoots never expire. Use your shoots whenever — no rush — or transfer them to another Iconic customer.",
     ].join(" "),
-    useBy: flashSaleUseBy(purchasedAt),
     orderNumber: number,
     squareLinkId: linked.linkId || "",
     squareOrderId: linked.squareOrderId || "",

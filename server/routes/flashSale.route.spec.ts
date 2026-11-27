@@ -89,6 +89,11 @@ describe("flash sale checkout", () => {
     expect(String(saved[0].source)).toBe("flash-sale");
     expect(saved[0].title).toBe("Black Friday Sale · 5 shoots");
     expect(saved[0].leadSource).toBe("Black Friday Sale");
+    expect(String(saved[0].notes)).toContain(
+      "Shoots never expire. Use your shoots whenever — no rush — or transfer them to another Iconic customer.",
+    );
+    expect(String(saved[0].notes)).not.toMatch(/90[-\s]?days?/i);
+    expect(saved[0].useBy).toBeUndefined();
     const twin = flashSaleMemoryOrderTwins();
     expect(twin).toHaveLength(1);
     expect(twin[0].collection).toBe("orders");
