@@ -85,9 +85,36 @@ async function downloadGateForGallery(gallery: Record<string, unknown>): Promise
   };
 }
 
+function safeDeliveryUrl(value: string | undefined, fallback: string): string {
+  const raw = value?.trim() || "";
+  if (!raw) return fallback;
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== "https:") return fallback;
+    return url.toString();
+  } catch {
+    return fallback;
+  }
+}
+
+export interface GalleryDeliverNotice {
+  to: string;
+  cc?: string;
+  subject: string;
+  text: string;
+  html: string;
+}
+
 export async function deliverGalleryToClient(
   galleryId: string,
-  options?: { expiresInDays?: number; actor?: GalleryDeliverActor; now?: Date },
+  options?: {
+    expiresInDays?: number;
+    actor?: GalleryDeliverActor;
+    now?: Date;
+    notice?: GalleryDeliverNotice;
+    deliveryUrl?: string;
+    skipSms?: boolean;
+  },
 ) {
   const galleryDoc = await db().collection("galleries").doc(galleryId).get();
   if (!galleryDoc.exists) throw httpError(404, "Gallery not found.");
@@ -106,7 +133,7 @@ export async function deliverGalleryToClient(
   const expiresAt = admin.firestore.Timestamp.fromDate(
     new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000),
   );
-  const deliveryUrl = galleryDeliveryUrl(galleryId);
+  const deliveryUrl = safeDeliveryUrl(options?.deliveryUrl, galleryDeliveryUrl(galleryId));
 
   await galleryDoc.ref.update({
     status: "delivered",
@@ -130,9 +157,11 @@ export async function deliverGalleryToClient(
   const address = recordAddressText(gallery) || "the property";
   const invoice = await invoiceForGallery(gallery);
   const payUrl = galleryDeliveryPayUrl(invoice);
-  const recipients = typeof client?.email === "string" && client.email.trim()
-    ? client.email.split(/[,;]/).map((item: string) => item.trim()).filter(Boolean)
-    : [];
+  const recipients = options?.notice
+    ? [options.notice.to, options.notice.cc || ""].join(",").split(/[,;]/).map((item) => item.trim()).filter(Boolean)
+    : typeof client?.email === "string" && client.email.trim()
+      ? client.email.split(/[,;]/).map((item: string) => item.trim()).filter(Boolean)
+      : [];
   let emailDelivery: GalleryEmailDelivery = "suppressed";
 
   try {
@@ -147,12 +176,23 @@ export async function deliverGalleryToClient(
         paymentUrl: payUrl || "",
         expiresAt: `${expiresInDays} days`,
       };
-      const result = await sendEmail({
-        to: recipients.join(", "),
-        template: "gallery_delivery",
-        subject: galleryDeliverySubject(address),
-        variables,
-      });
+      const result = options?.notice
+        ? await sendEmail({
+            to: options.notice.to,
+            cc: options.notice.cc,
+            template: "gallery_delivery",
+            subject: options.notice.subject,
+            html: options.notice.html,
+            text: options.notice.text,
+            lockHtml: true,
+            variables,
+          })
+        : await sendEmail({
+            to: recipients.join(", "),
+            template: "gallery_delivery",
+            subject: galleryDeliverySubject(address),
+            variables,
+          });
       emailDelivery = result.delivery;
     }
   } catch (err) {
@@ -207,7 +247,7 @@ export async function deliverGalleryToClient(
     }).catch((err) => console.error("[Galleries] Payment required email notify failed:", err));
   }
 
-  if (client?.phone) {
+  if (!options?.skipSms && client?.phone) {
     const orderSnap = gallery.orderId
       ? await db().collection("orders").doc(String(gallery.orderId)).get()
       : null;

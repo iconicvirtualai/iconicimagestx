@@ -34,6 +34,9 @@ const AdminOrdersDeskFixture = import.meta.env.DEV
 const OrderNumberFaces = import.meta.env.DEV
   ? lazy(() => import("./pages/OrderNumberFaces"))
   : null;
+const AdminProjectsDeliveryFixture = import.meta.env.DEV
+  ? lazy(() => import("./pages/AdminProjectsDeliveryFixture"))
+  : null;
 
 // Public pages
 import Index from "./pages/Index";
@@ -67,6 +70,7 @@ import ClientStudio from "./pages/ClientStudio";
 import ClientInvoice from "./pages/ClientInvoice";
 import InvoiceTemplatePreview from "./pages/InvoiceTemplatePreview";
 import PublicGallery from "./pages/PublicGallery";
+import ClientDelivery from "./pages/ClientDelivery";
 import ListingPresentation from "./pages/ListingPresentation";
 import ListingSite from "./pages/ListingSite";
 import VirtualStaging from "./pages/VirtualStaging";
@@ -261,6 +265,7 @@ const App = () => (
             <Route path="/services" element={<Navigate to="/pricing" replace />} />
             <Route path="/studio/:listingId" element={<ClientStudio />} />
             <Route path="/gallery/:galleryId" element={<PublicGallery />} />
+            <Route path="/deliver/:deliveryId" element={<ClientDelivery />} />
             <Route path="/present/:token" element={<ListingPresentation />} />
             <Route path="/l/:slug" element={<ListingSite />} />
             <Route path="/invoice/:invoiceId" element={<ClientInvoice />} />
@@ -324,6 +329,9 @@ const App = () => (
             ) : null}
             {OrderNumberFaces ? (
               <Route path="/dev/order-number-faces" element={<Suspense fallback={null}><OrderNumberFaces /></Suspense>} />
+            ) : null}
+            {AdminProjectsDeliveryFixture ? (
+              <Route path="/dev/projects-send" element={<Suspense fallback={null}><AdminProjectsDeliveryFixture /></Suspense>} />
             ) : null}
             <Route path="/admin/botroom" element={<ProtectedRoute requiredRole="admin"><AdminMessages /></ProtectedRoute>} />
             <Route path="/admin/botroom/connect" element={<ProtectedRoute requiredRole="admin"><AdminBotRoomConnect /></ProtectedRoute>} />

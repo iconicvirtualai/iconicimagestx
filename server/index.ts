@@ -17,6 +17,7 @@ import headshotsRouter from "./routes/headshots10";
 import ordersRouter from "./routes/orders";
 import { handleOrderApproval } from "./routes/orderApproval";
 import galleriesRouter from "./routes/galleries";
+import clientDeliveryRouter from "./routes/clientDelivery";
 import paymentsRouter from "./routes/payments";
 import vsaiRouter from "./routes/vsai";
 import messagingRouter from "./routes/messaging";
@@ -280,6 +281,7 @@ export function createServer() {
   app.use("/api/orders", ordersRouter);
   app.patch("/api/admin/orders/:id/approval", handleOrderApproval);
   app.use("/api/galleries", galleriesRouter);
+  app.use("/api/deliver", clientDeliveryRouter);
   app.use("/api/payments", paymentsRouter);
   app.use("/api/vsai", vsaiRouter);
   app.use("/api/messages", messagingRouter);

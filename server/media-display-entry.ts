@@ -8,6 +8,7 @@ import admin from "firebase-admin";
 import express from "express";
 import { handleMediaDisplay } from "./routes/mediaDisplay";
 import siteContentRouter from "./routes/siteContent";
+import clientDeliveryMediaRouter from "./routes/clientDeliveryMedia";
 
 if (!admin.apps.length) {
   const bucket = process.env.VITE_FIREBASE_STORAGE_BUCKET || process.env.FIREBASE_STORAGE_BUCKET;
@@ -48,6 +49,7 @@ function adapt(res: ServerResponse): DisplayResponse {
 }
 
 let siteApp: ReturnType<typeof express> | null = null;
+let deliveryApp: ReturnType<typeof express> | null = null;
 
 function siteContentApp() {
   if (!siteApp) {
@@ -59,10 +61,27 @@ function siteContentApp() {
   return siteApp;
 }
 
+function deliveryMediaApp() {
+  if (!deliveryApp) {
+    deliveryApp = express();
+    deliveryApp.use("/api/deliver", clientDeliveryMediaRouter);
+  }
+  return deliveryApp;
+}
+
+function isDeliveryMedia(url: string): boolean {
+  const path = url.split("?")[0] || "";
+  return /^\/api\/deliver\/[^/]+\/media\/[^/]+\/?$/.test(path)
+    || /^\/api\/deliver\/[^/]+\/download\.zip\/?$/.test(path);
+}
+
 export default function mediaDisplayHandler(req: IncomingMessage, res: ServerResponse) {
   const url = req.url || "";
   if (url.startsWith("/api/site-content/media") || url.startsWith("/api/site-content/dropbox")) {
     return siteContentApp()(req as never, res as never);
+  }
+  if (isDeliveryMedia(url)) {
+    return deliveryMediaApp()(req as never, res as never);
   }
   return handleMediaDisplay(req as never, adapt(res) as never, (() => undefined) as never);
 }
