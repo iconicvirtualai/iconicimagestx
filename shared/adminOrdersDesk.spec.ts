@@ -24,7 +24,9 @@ import {
   parseOrderDeskPrefs,
   reorderDeskSections,
   shootWhen,
+  cycleOrderLineSort,
   sortDeskOrders,
+  sortOrderLineItems,
 } from "./adminOrdersDesk.ts";
 
 const NOW = new Date("2026-11-10T18:00:00.000Z");
@@ -211,6 +213,20 @@ describe("orders desk counts", () => {
     expect(manual).toEqual(["old", "new"]);
     expect(applyManualOrder([newer, older], manual).map((row) => row.id)).toEqual(["old", "new"]);
     expect(applyManualOrder([newer, older, order({ id: "fresh", status: "request", createdAt: "2026-11-21T15:00:00.000Z" })], manual).map((row) => row.id)[0]).toBe("fresh");
+  });
+
+  it("sorts line items by column and flips the same column", () => {
+    const rows = [
+      order({ id: "b", orderNumber: 12, clientName: "Blair", address: "2 Oak", status: "scheduled", selectedService: "Hollywood" }),
+      order({ id: "a", orderNumber: 40, clientName: "Avery", address: "1 Maple", status: "request", selectedService: "The Essentials" }),
+    ];
+    expect(cycleOrderLineSort(null, "agent")).toEqual({ field: "agent", order: "asc" });
+    expect(cycleOrderLineSort({ field: "agent", order: "asc" }, "agent")).toEqual({ field: "agent", order: "desc" });
+    expect(sortOrderLineItems(rows, { field: "agent", order: "asc" }).map((row) => row.id)).toEqual(["a", "b"]);
+    expect(sortOrderLineItems(rows, { field: "order", order: "desc" }).map((row) => row.id)).toEqual(["a", "b"]);
+    expect(sortOrderLineItems(rows, { field: "address", order: "asc" }).map((row) => row.id)).toEqual(["a", "b"]);
+    expect(sortOrderLineItems(rows, { field: "status", order: "asc" }).map((row) => row.id)).toEqual(["b", "a"]);
+    expect(sortOrderLineItems(rows, { field: "package", order: "desc" }).map((row) => row.id)).toEqual(["a", "b"]);
   });
 });
 

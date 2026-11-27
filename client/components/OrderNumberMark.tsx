@@ -1,6 +1,6 @@
 import { shortOrderNumber } from "@shared/orderProjectInvoice";
 
-/** Large #003-style order number. Long ids and the word EXAMPLE are not shown. */
+/** Bold inline #003-style order number. Long ids and the word EXAMPLE are not shown. */
 export function OrderNumberMark({ value, light = false }: { value?: unknown; light?: boolean }) {
   const label = shortOrderNumber(value);
   if (!label) return null;

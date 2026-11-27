@@ -668,7 +668,7 @@ function EditingStudio({ listings, apiKey, user }: { listings: any[], apiKey: st
                     )}
                   </div>
                   <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-4">
-                    Order #{l.id.substring(0, 6)} • {l.clientName || 'Agent'}
+                    <span className="font-bold tabular-nums">Order #{l.id.substring(0, 6)}</span> • {l.clientName || 'Agent'}
                   </p>
 
                   <div className="flex items-center gap-6 mb-6">

@@ -25,6 +25,31 @@ function labelText(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
+const ARYEO_ORDER_FIELDS = [
+  "aryeoOrderNumber",
+  "aryeoOrderId",
+  "aryeoNumber",
+  "aryeoId",
+  "externalOrderNumber",
+  "legacyOrderNumber",
+] as const;
+
+/** Aryeo order number when a migrated or linked record still carries one. */
+export function aryeoOrderNumber(record: Record<string, unknown> | null | undefined): string {
+  if (!record) return "";
+  const staff = record.staffOnly;
+  const nested = staff && typeof staff === "object" && !Array.isArray(staff) ? staff as Record<string, unknown> : null;
+  for (const source of [record, nested]) {
+    if (!source) continue;
+    for (const key of ARYEO_ORDER_FIELDS) {
+      const value = labelText(source[key]);
+      if (!value || value.length > 40) continue;
+      return value.replace(/^aryeo\s+/i, "");
+    }
+  }
+  return "";
+}
+
 /** #003 from a counter value. Long ids and words are not sequential numbers. */
 export function sequentialOrderLabel(value: unknown): string | null {
   if (typeof value === "number" && Number.isInteger(value) && value >= 1) return formatOrderNumber(value);

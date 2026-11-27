@@ -32,7 +32,7 @@ export default function OrderPaymentPreview() {
         <section className="min-w-0 flex-1 space-y-4">
           <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Sample order · Pay at Booking</p>
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h1 className="text-2xl font-black uppercase tracking-tight sm:text-3xl">Order #018</h1>
+            <h1 className="text-base font-bold tabular-nums tracking-normal text-black">Order #018</h1>
             <span className="rounded-full bg-yellow-100 px-3 py-1 text-[9px] font-black uppercase tracking-widest text-yellow-700">New Request</span>
           </div>
           <div className="rounded-2xl bg-black p-6 text-white">

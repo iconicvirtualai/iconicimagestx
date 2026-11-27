@@ -200,7 +200,7 @@ export default function VirtualStagingProOrder() {
               <div className="w-20 h-20 bg-[#f0fdfa] rounded-full flex items-center justify-center mx-auto mb-8">
                 <CheckCircle2 className="w-10 h-10 text-[#0d9488]" />
               </div>
-              <h1 className="text-3xl font-bold mb-4 tracking-tight">Order {orderNumber} received</h1>
+              <h1 className="mb-4 text-base font-bold tabular-nums tracking-normal">Order {orderNumber} received</h1>
               <p className="text-gray-500 mb-4 leading-relaxed">
                 No payment was taken. We&apos;ll email your invoice after review.
               </p>

@@ -53,8 +53,9 @@
  * Open edit request, Ready for review.
  */
 
-import { adminOrderGalleryLabel, adminOrderPaymentLabel, adminOrderPhotographer, adminOrderPlaced, adminOrderShoot, adminOrderStatusLabel, type AdminOrderListStaff } from "./adminOrderList.ts";
+import { buildAdminOrderListRow, adminOrderGalleryLabel, adminOrderPaymentLabel, adminOrderPhotographer, adminOrderPlaced, adminOrderShoot, adminOrderStatusLabel, type AdminOrderListStaff } from "./adminOrderList.ts";
 import { calendarDateKey, formatChicagoDate } from "./clientHome.ts";
+import { compactOrderLabel } from "./orderNumber.ts";
 import { isPlaytestRecord, isQaOnlyRecord } from "./revenueCount.ts";
 
 const CHICAGO = "America/Chicago";
@@ -693,6 +694,64 @@ function sequentialKey(order: Record<string, unknown>): string | null {
 
 export function parseOrderDeskSort(value: unknown): OrderDeskSort {
   return ORDER_DESK_SORTS.includes(value as OrderDeskSort) ? value as OrderDeskSort : "newest";
+}
+
+export const ORDER_LINE_SORT_FIELDS = ["order", "agent", "address", "package", "status", "date"] as const;
+export type OrderLineSortField = (typeof ORDER_LINE_SORT_FIELDS)[number];
+export type OrderLineSort = { field: OrderLineSortField; order: "asc" | "desc" };
+
+/** First click picks a useful direction. The next click on the same column flips it. */
+export function cycleOrderLineSort(current: OrderLineSort | null, field: OrderLineSortField): OrderLineSort {
+  if (current?.field === field) return { field, order: current.order === "asc" ? "desc" : "asc" };
+  return { field, order: field === "date" || field === "order" ? "desc" : "asc" };
+}
+
+/** Column sort for the incoming-request line table. Empty values stay at the bottom. */
+export function sortOrderLineItems(
+  orders: readonly Record<string, unknown>[],
+  sort: OrderLineSort,
+  staff: AdminOrderListStaff[] = [],
+): Record<string, unknown>[] {
+  const direction = sort.order === "asc" ? 1 : -1;
+  return [...orders].sort((left, right) => {
+    const leftKey = lineSortKey(left, sort.field, staff);
+    const rightKey = lineSortKey(right, sort.field, staff);
+    const leftEmpty = leftKey == null;
+    const rightEmpty = rightKey == null;
+    if (leftEmpty || rightEmpty) {
+      if (leftEmpty && rightEmpty) return text(left.id).localeCompare(text(right.id));
+      return leftEmpty ? 1 : -1;
+    }
+    const ranked = typeof leftKey === "number" && typeof rightKey === "number"
+      ? leftKey - rightKey
+      : String(leftKey).localeCompare(String(rightKey), undefined, { sensitivity: "base", numeric: true });
+    if (ranked !== 0) return ranked * direction;
+    return text(left.id).localeCompare(text(right.id));
+  });
+}
+
+function lineSortKey(
+  order: Record<string, unknown>,
+  field: OrderLineSortField,
+  staff: AdminOrderListStaff[],
+): string | number | null {
+  const row = buildAdminOrderListRow(order, staff);
+  if (field === "order") {
+    const digits = (compactOrderLabel(order) || row.orderCode).replace(/\D/g, "");
+    if (!digits) return null;
+    const amount = Number(digits);
+    return Number.isFinite(amount) ? amount : null;
+  }
+  if (field === "agent") return filled(row.clientName);
+  if (field === "address") return filled(row.address);
+  if (field === "package") return filled(row.packageSummary);
+  if (field === "status") return filled(row.statusLabel);
+  return row.shootSort || row.placedSort;
+}
+
+function filled(value: string): string | null {
+  const trimmed = value.trim();
+  return trimmed && trimmed !== "—" ? trimmed : null;
 }
 
 export function sortDeskOrders(

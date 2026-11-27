@@ -601,7 +601,7 @@ export default function AdminMessages() {
                       {selectedConvo.photographerName} ↔ {selectedConvo.clientName}
                     </h2>
                     <p className="text-gray-400 text-sm mb-6">
-                      Order #{selectedConvo.orderId.slice(0, 8)} • Twilio SID:{" "}
+                      <span className="font-bold tabular-nums text-white">Order #{selectedConvo.orderId.slice(0, 8)}</span> • Twilio SID:{" "}
                       {selectedConvo.conversationSid}
                     </p>
 

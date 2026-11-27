@@ -98,7 +98,7 @@ export function AdminOrderList({
               )}
             >
               <Field label="Order #">
-                <div>{row.orderCode}</div>
+                <div className="font-bold tabular-nums">{row.orderCode}</div>
                 {row.calendarHoldFailed ? (
                   <span data-slot="calendar-hold" className="mt-1 inline-flex rounded-full bg-red-100 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-red-700">
                     Calendar hold failed
