@@ -44,13 +44,27 @@ describe("Meet Your Video Team", () => {
     for (const category of SAMPLE_CATEGORIES) {
       expect(html).toContain(category.label);
     }
-    expect(html).toContain("Emily Aguilar");
+    expect(html).toContain("Artwork by Mike");
+    expect(html).toContain("Masterpiece by Armando");
+    expect(html).toContain("Creative magic by Daniel");
     expect(html).not.toContain("13718");
     expect(html).not.toContain("Stonecrop");
     expect(html).not.toContain("luxury listing");
     expect(html).not.toContain(">Your Video Team Is Here<");
+    const clientName = /emily aguilar|brittany cabrera|catie fuller|keller williams|king metals|nubenbrook|chateau creek|client appreciation|bluejack|\bkw\b|a1 commercial|ivy wood|spring trails/i;
+    for (const category of SAMPLE_CATEGORIES) {
+      for (const sample of category.samples) {
+        const words = sample.title.trim().split(/\s+/);
+        expect(words.length, sample.title).toBeGreaterThanOrEqual(2);
+        expect(words.length, sample.title).toBeLessThanOrEqual(5);
+        expect(sample.title, sample.id).not.toMatch(clientName);
+        expect(sample.title, sample.id).not.toMatch(/\b20\d{2}\b/);
+      }
+    }
+    expect(SAMPLE_CATEGORIES.flatMap((category) => category.samples).find((sample) => sample.id === "ev-cookoff")?.title).toBe("Iconic films Chili Cook-Off");
     for (const sample of SAMPLE_CATEGORIES[0].samples) {
       expect(html).toContain(sample.title);
+      expect(html).toContain(`Play ${sample.title}`);
       expect(html).toContain(sample.poster);
       expect(html).not.toContain(sample.src);
     }

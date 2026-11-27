@@ -40,6 +40,7 @@ const APP_SHELL_SOURCES = [
   "/services/virtual-staging/ai-tool",
   "/services/virtual-staging/pro-order",
   "/black-friday",
+  "/black-friday-business",
   "/dev/invoice-template",
   "/dev/listing-style-shots",
   ...STUDIO105_APP_SOURCES,
@@ -65,8 +66,6 @@ const RESERVED: Rewrite[] = [
   // function on its original path, and that rule stays ahead of the SEO shells.
   { source: "/present/:token", destination: "/api/index" },
   { source: "/l/:slug", destination: "/api/index" },
-  { source: "/admin/owners", destination: "/api/index" },
-  { source: "/owners", destination: "/api/index" },
   { source: "/sitemap.xml", destination: "/api/index" },
   { source: "/robots.txt", destination: "/api/index" },
   { source: "/podcast-guest-prep", destination: "/podcast-guest-prep.html" },

@@ -62,6 +62,7 @@ import siteContentRouter from "./routes/siteContent";
 import insightsRouter, { handleInsightShell } from "./routes/insights";
 import newsRouter from "./routes/news";
 import flashSaleRouter from "./routes/flashSale";
+import blackFridayBusinessRouter from "./routes/blackFridayBusiness";
 import testDataCleanupRouter from "./routes/testDataCleanup";
 import holyGrailRouter from "./routes/holyGrail";
 import aryeoEmailNotifyRouter from "./routes/aryeoEmailNotify";
@@ -271,7 +272,7 @@ export function createServer() {
     res.json({ live: clientNotifyLive() });
   });
 
-  // Owners Suite is mounted before other APIs. Staff roles do not open it.
+  // Owners API is mounted before other APIs. The browser portal is not served.
   mountOwners(app);
 
   // ─── API Routes ────────────────────────────────────────────────────
@@ -297,6 +298,7 @@ export function createServer() {
   app.use("/api/insights", insightsRouter);
   app.use("/api/news", newsRouter);
   app.use("/api/flash-sale", flashSaleRouter);
+  app.use("/api/black-friday-business", blackFridayBusinessRouter);
   // Vercel does not chain rewrites. /present/:token is rewritten to this
   // function and the original path is what arrives here. Vite dev leaves the
   // request to the SPA so ListingPresentation still boots from the client.

@@ -1,6 +1,7 @@
 /**
  * Public media for /video-team.
- * Paths, categories, and sample titles follow the staged handoff manifest.
+ * Sample titles are the captions under the cards. They credit Iconic's crew.
+ * Never name a client, a brokerage, a listing, or a client event.
  * Only team-reels/ and samples/ are published.
  */
 
@@ -68,7 +69,7 @@ export const SAMPLE_CATEGORIES: readonly SampleCategory[] = [
     samples: [
       {
         id: "oc-emily",
-        title: "Emily Aguilar",
+        title: "Artwork by Mike",
         src: `${MEDIA}/samples/on-camera/emily-aguilar-stonecrop.mp4`,
         poster: `${MEDIA}/samples/on-camera/emily-aguilar-stonecrop.jpg`,
         width: 608,
@@ -76,7 +77,7 @@ export const SAMPLE_CATEGORIES: readonly SampleCategory[] = [
       },
       {
         id: "oc-brittany",
-        title: "Brittany Cabrera",
+        title: "Masterpiece by Armando",
         src: `${MEDIA}/samples/on-camera/brittany-cabrera-ivy-wood.mp4`,
         poster: `${MEDIA}/samples/on-camera/brittany-cabrera-ivy-wood.jpg`,
         width: 608,
@@ -84,7 +85,7 @@ export const SAMPLE_CATEGORIES: readonly SampleCategory[] = [
       },
       {
         id: "oc-catie",
-        title: "Catie Fuller",
+        title: "Creative magic by Daniel",
         src: `${MEDIA}/samples/on-camera/catie-fuller-spring-trails.mp4`,
         poster: `${MEDIA}/samples/on-camera/catie-fuller-spring-trails.jpg`,
         width: 608,
@@ -98,7 +99,7 @@ export const SAMPLE_CATEGORIES: readonly SampleCategory[] = [
     samples: [
       {
         id: "pr-branding",
-        title: "Branding Web Clip",
+        title: "Iconic behind the lens",
         src: `${MEDIA}/samples/branding/branding-web-clip.mp4`,
         poster: `${MEDIA}/samples/branding/branding-web-clip.jpg`,
         width: 1080,
@@ -112,7 +113,7 @@ export const SAMPLE_CATEGORIES: readonly SampleCategory[] = [
     samples: [
       {
         id: "ev-webclip",
-        title: "Events Web Clip",
+        title: "Shot by Armando",
         src: `${MEDIA}/samples/events/events-web-clip.mp4`,
         poster: `${MEDIA}/samples/events/events-web-clip.jpg`,
         width: 1080,
@@ -120,7 +121,7 @@ export const SAMPLE_CATEGORIES: readonly SampleCategory[] = [
       },
       {
         id: "ev-apprec",
-        title: "Client Appreciation Holiday Photoshoot 2023",
+        title: "Daniel in his element",
         src: `${MEDIA}/samples/events/client-appreciation-2023.mp4`,
         poster: `${MEDIA}/samples/events/client-appreciation-2023.jpg`,
         width: 1080,
@@ -128,7 +129,7 @@ export const SAMPLE_CATEGORIES: readonly SampleCategory[] = [
       },
       {
         id: "ev-cookoff",
-        title: "KW Chili Cook Off 2022",
+        title: "Iconic films Chili Cook-Off",
         src: `${MEDIA}/samples/events/kw-chili-cookoff-2022.mp4`,
         poster: `${MEDIA}/samples/events/kw-chili-cookoff-2022.jpg`,
         width: 720,
@@ -142,7 +143,7 @@ export const SAMPLE_CATEGORIES: readonly SampleCategory[] = [
     samples: [
       {
         id: "re-nubenbrook",
-        title: "Nubenbrook Lake",
+        title: "Mike's eye, Iconic's standard",
         src: `${MEDIA}/samples/real-estate/nubenbrook-lake-listing.mp4`,
         poster: `${MEDIA}/samples/real-estate/nubenbrook-lake-listing.jpg`,
         width: 1080,
@@ -150,7 +151,7 @@ export const SAMPLE_CATEGORIES: readonly SampleCategory[] = [
       },
       {
         id: "re-chateau",
-        title: "Chateau Creek",
+        title: "Mike's listing eye",
         src: `${MEDIA}/samples/real-estate/chateau-creek-unbranded.mp4`,
         poster: `${MEDIA}/samples/real-estate/chateau-creek-unbranded.jpg`,
         width: 608,
@@ -158,7 +159,7 @@ export const SAMPLE_CATEGORIES: readonly SampleCategory[] = [
       },
       {
         id: "re-bluelake",
-        title: "Blue Lake",
+        title: "Pure Iconic",
         src: `${MEDIA}/samples/real-estate/blue-lake-unbranded.mp4`,
         poster: `${MEDIA}/samples/real-estate/blue-lake-unbranded.jpg`,
         width: 608,
@@ -166,7 +167,7 @@ export const SAMPLE_CATEGORIES: readonly SampleCategory[] = [
       },
       {
         id: "re-fawn",
-        title: "Lakefront Aerial",
+        title: "Aerial by Iconic",
         src: `${MEDIA}/samples/real-estate/fawn-rd-aerial.mp4`,
         poster: `${MEDIA}/samples/real-estate/fawn-rd-aerial.jpg`,
         width: 1080,
@@ -180,7 +181,7 @@ export const SAMPLE_CATEGORIES: readonly SampleCategory[] = [
     samples: [
       {
         id: "co-a1",
-        title: "A1 Commercial",
+        title: "Scale by Armando",
         src: `${MEDIA}/samples/commercial/a1-commercial.mp4`,
         poster: `${MEDIA}/samples/commercial/a1-commercial.jpg`,
         width: 1080,
@@ -188,7 +189,7 @@ export const SAMPLE_CATEGORIES: readonly SampleCategory[] = [
       },
       {
         id: "co-king",
-        title: "King Metals and Cores",
+        title: "Daniel, no notes",
         src: `${MEDIA}/samples/commercial/king-metals.mp4`,
         poster: `${MEDIA}/samples/commercial/king-metals.jpg`,
         width: 1080,
@@ -202,7 +203,7 @@ export const SAMPLE_CATEGORIES: readonly SampleCategory[] = [
     samples: [
       {
         id: "pr-product",
-        title: "Product Photography",
+        title: "Cut by Daniel",
         src: `${MEDIA}/samples/product/product-photography.mp4`,
         poster: `${MEDIA}/samples/product/product-photography.jpg`,
         width: 1080,
@@ -216,7 +217,7 @@ export const SAMPLE_CATEGORIES: readonly SampleCategory[] = [
     samples: [
       {
         id: "pr-twilight",
-        title: "Product Twilight",
+        title: "Twilight by Mike",
         src: `${MEDIA}/samples/twilight/product-twilight-video-v2.mp4`,
         poster: `${MEDIA}/samples/twilight/product-twilight-video-v2.jpg`,
         width: 1080,

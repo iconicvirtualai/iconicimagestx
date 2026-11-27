@@ -1647,22 +1647,6 @@
       "destination": "/api/index"
     },
     {
-      "source": "/admin/owners",
-      "destination": "/api/index"
-    },
-    {
-      "source": "/admin/owners/",
-      "destination": "/api/index"
-    },
-    {
-      "source": "/owners",
-      "destination": "/api/index"
-    },
-    {
-      "source": "/owners/",
-      "destination": "/api/index"
-    },
-    {
       "source": "/sitemap.xml",
       "destination": "/api/index"
     },
@@ -1984,6 +1968,14 @@
     },
     {
       "source": "/black-friday/",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/black-friday-business",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/black-friday-business/",
       "destination": "/seo/app.html"
     },
     {

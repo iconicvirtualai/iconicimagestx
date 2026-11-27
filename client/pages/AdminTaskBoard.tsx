@@ -1,6 +1,6 @@
 /**
  * Admin task board.
- * Reads orders, deliveries, edits, questions, and photos@ when that inbox is connected.
+ * Reads deliveries, production, edits, questions, and photos@ when that inbox is connected.
  * Writes taskBoardItems, and the assignee unread counter when someone else is assigned.
  * Does not email or text anyone.
  */
@@ -66,7 +66,7 @@ export default function AdminTaskBoard() {
         <p className="text-xs text-slate-500">
           {data.sample
             ? "These rows are sample data so the layout can be reviewed. They are not live orders."
-            : "Live tasks come from orders, deliveries, edits, messages, and photos@ when that inbox is connected."}
+            : "Live tasks come from deliveries, production, edits, messages, and photos@ when that inbox is connected."}
         </p>
         <div className="flex gap-3">
           <Link to={data.sample ? "/admin/content?sample=1" : "/admin/content"} className="text-xs font-bold uppercase tracking-widest text-[#0d9488]">Content</Link>

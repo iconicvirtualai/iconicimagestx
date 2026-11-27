@@ -5,12 +5,11 @@
  */
 
 import { useState, useEffect } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { staffLoginAction } from "@shared/staffAccess";
 import { clientPortalEnabled } from "@shared/clientPortal";
 import { CHANGE_PASSWORD_PATH } from "@shared/passwordAccount";
-import { openOwnerSession, ownerLoginNext } from "@/lib/openOwnerSession";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -18,8 +17,6 @@ import { toast } from "sonner";
 export default function AdminLogin() {
   const { signIn, signOutUser, user, isStaff, staffProfile, loading, mustChangePassword } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
-  const ownerNext = ownerLoginNext(location.search);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -27,48 +24,31 @@ export default function AdminLogin() {
 
   // Wait until profile loading finishes. A signed-in user with isStaff still
   // false is only "not staff" after staff/{uid} has been read.
-  // Owner access is a separate server check and does not follow staff role.
+  // Owner logins use the same staff home as every other admin. The dashboard
+  // stays that home.
   useEffect(() => {
     if (loading || !user) return;
     if (mustChangePassword) {
       navigate(CHANGE_PASSWORD_PATH, { replace: true });
       return;
     }
-    let cancelled = false;
-    void (async () => {
-      const owner = await openOwnerSession(user);
-      if (cancelled) return;
-      if (owner) {
-        navigate("/admin/owners", { replace: true });
-        return;
-      }
-      // Sent here from an owner page: a non-owner gets the same 404 as before,
-      // rendered client-side, instead of the staff dashboard.
-      if (ownerNext) {
-        navigate(ownerNext, { replace: true });
-        return;
-      }
-      const action = staffLoginAction({
-        loading,
-        hasUser: Boolean(user),
-        isStaff,
-        role: staffProfile?.role,
-      });
-      if (action.type === "redirect") {
-        navigate(action.path);
-        return;
-      }
-      if (action.type === "not-staff") {
-        toast.error("This login is not an active staff account.");
-        void signOutUser();
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+    const action = staffLoginAction({
+      loading,
+      hasUser: Boolean(user),
+      isStaff,
+      role: staffProfile?.role,
+    });
+    if (action.type === "redirect") {
+      navigate(action.path);
+      return;
+    }
+    if (action.type === "not-staff") {
+      toast.error("This login is not an active staff account.");
+      void signOutUser();
+    }
     // signOutUser identity changes each render; only the auth state should retrigger this.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, isStaff, staffProfile, loading, mustChangePassword, navigate, ownerNext]);
+  }, [user, isStaff, staffProfile, loading, mustChangePassword, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
