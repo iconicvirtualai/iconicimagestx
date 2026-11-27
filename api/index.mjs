@@ -8,7 +8,7 @@ import nodemailer from "nodemailer";
 import twilio from "twilio";
 import { google } from "googleapis";
 import crypto, { randomBytes, createHmac as createHmac$1, timingSafeEqual as timingSafeEqual$1, randomUUID } from "crypto";
-import crypto$1, { timingSafeEqual, createHmac, randomUUID as randomUUID$1, randomBytes as randomBytes$1, createHash } from "node:crypto";
+import crypto$1, { timingSafeEqual, createHmac, createHash, randomUUID as randomUUID$1, randomBytes as randomBytes$1 } from "node:crypto";
 import Stripe from "stripe";
 import * as XLSX from "xlsx";
 import fs from "node:fs/promises";
@@ -317,16 +317,16 @@ const SETTLED$1 = /* @__PURE__ */ new Set(["paid", "comped"]);
 function isGuessableInvoiceId(id) {
   return id.startsWith("listing_") || id.startsWith("ordreq_") || id.startsWith("playtest-");
 }
-function text$B(value) {
+function text$C(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function settled$1(invoice) {
-  return SETTLED$1.has(text$B(invoice?.status).toLowerCase());
+  return SETTLED$1.has(text$C(invoice?.status).toLowerCase());
 }
 function invoicePayLinkFor(invoice, env, extra) {
   if (!invoice || settled$1(invoice)) return null;
-  const id = text$B(invoice.id);
-  const token = text$B(invoice.payToken);
+  const id = text$C(invoice.id);
+  const token = text$C(invoice.payToken);
   if (!id || !token) return null;
   const url = new URL(`${publicSiteUrl(env)}/invoice/${encodeURIComponent(id)}`);
   url.searchParams.set("t", token);
@@ -337,7 +337,7 @@ function clientInvoiceUrl(invoice, env, extra) {
   const tokenized = invoicePayLinkFor(invoice, env, extra);
   if (tokenized) return tokenized;
   if (!invoice || settled$1(invoice)) return null;
-  const id = text$B(invoice.id);
+  const id = text$C(invoice.id);
   if (!id || isGuessableInvoiceId(id)) return null;
   const url = new URL(`${publicSiteUrl(env)}/invoice/${encodeURIComponent(id)}`);
   applyQuery(url, extra);
@@ -346,7 +346,7 @@ function clientInvoiceUrl(invoice, env, extra) {
 function applyQuery(url, extra) {
   if (!extra) return;
   for (const [key, value] of Object.entries(extra)) {
-    const textValue = text$B(value);
+    const textValue = text$C(value);
     if (textValue && key !== "t") url.searchParams.set(key, textValue);
   }
 }
@@ -1567,7 +1567,7 @@ function addressText(value) {
   if (typeof value === "string") return value.trim();
   if (typeof value !== "object" || Array.isArray(value)) return "";
   const address = value;
-  const formatted = text$A(address.formatted) || text$A(address.label);
+  const formatted = text$B(address.formatted) || text$B(address.label);
   if (formatted) return formatted;
   return [address.street, address.city, address.state, address.zip].filter((part) => typeof part === "string" && part.trim()).join(", ");
 }
@@ -1580,7 +1580,7 @@ function recordAddressText(record2) {
   }
   return "";
 }
-function text$A(value) {
+function text$B(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 const ADDRESS_LIMIT = 300;
@@ -2005,13 +2005,15 @@ function publicMediaItem(item, canDownload) {
     return { ...base, url: null, shareUrl: null, embedUrl: null, poster: null, thumbnailUrl: null };
   }
   const url = publicText(item.shareUrl) || publicText(item.embedUrl) || publicText(item.url);
+  const downloadUrl = publicText(item.downloadUrl);
   return {
     ...base,
     url,
     shareUrl: publicText(item.shareUrl) || publicText(item.url) || publicText(item.embedUrl),
     embedUrl: publicText(item.embedUrl) || publicText(item.url),
     poster: publicText(item.poster) || publicText(item.thumbnailUrl),
-    thumbnailUrl: publicText(item.thumbnailUrl) || publicText(item.poster)
+    thumbnailUrl: publicText(item.thumbnailUrl) || publicText(item.poster),
+    ...downloadUrl ? { downloadUrl } : {}
   };
 }
 const PROCESSING_FEE_RATE = 0.028;
@@ -2096,8 +2098,8 @@ const TEAL = "#14B8C4";
 const GREEN = "#16A34A";
 const ROW = "#F3F4F6";
 function receiptProcessing(input) {
-  const status2 = text$z(input.invoice.status).toLowerCase();
-  const paymentStatus = text$z(input.invoice.paymentStatus).toLowerCase();
+  const status2 = text$A(input.invoice.status).toLowerCase();
+  const paymentStatus = text$A(input.invoice.paymentStatus).toLowerCase();
   if (status2 === "comped" || paymentStatus === "comped") return 0;
   const base = roundCents$1(input.subtotal - input.promotions + input.fees);
   const stored = finite$2(input.invoice.processing);
@@ -2386,7 +2388,7 @@ function dollars$1(value) {
   const amount = Number(String(value).replace(/[^0-9.-]/g, ""));
   return Number.isFinite(amount) ? amount : 0;
 }
-function text$z(value) {
+function text$A(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function escapeHtml$c(value) {
@@ -4216,7 +4218,7 @@ function buildClientInvoice(id, data, now = /* @__PURE__ */ new Date(), order) {
     id,
     invoiceNumber: portalDisplayedInvoiceNumber({ ...data, id }, order, now),
     status: typeof data.status === "string" && data.status.trim() ? data.status.trim() : "",
-    clientName: text$y(data.clientName),
+    clientName: text$z(data.clientName),
     address: addressText(data.billToAddress || data.address || data.propertyAddress),
     createdAt,
     issuedOn: formatPortalDate(data.createdAt) || formatPortalDate(data.sentAt) || formatPortalDate(data.paidAt),
@@ -4226,7 +4228,7 @@ function buildClientInvoice(id, data, now = /* @__PURE__ */ new Date(), order) {
     fees: storedAmount(data.fees),
     travel: storedAmount(data.travel),
     promoDiscount: storedAmount(data.promoDiscount),
-    promoCode: text$y(data.promoCode),
+    promoCode: text$z(data.promoCode),
     tax: storedAmount(data.tax),
     total: storedAmount(data.total),
     amountPaid: storedAmount(data.amountPaid),
@@ -4308,15 +4310,15 @@ function storedLines(lineItems, services2) {
     if (typeof item === "string" && item.trim()) return [{ name: item.trim(), qty: null, amount: null }];
     if (!item || typeof item !== "object") return [];
     const record2 = item;
-    const named = text$y(record2.name) || text$y(record2.label);
-    const description = text$y(record2.description);
+    const named = text$z(record2.name) || text$z(record2.label);
+    const description = text$z(record2.description);
     const name = named || description;
     const qty = storedQty(record2.qty ?? record2.quantity);
     const amount = storedAmount(record2.price ?? record2.amount ?? record2.total);
     if (!name && amount == null && qty == null) return [];
     const line = { name: name || "Line item", qty, amount };
-    const id = text$y(record2.id);
-    const category = text$y(record2.category);
+    const id = text$z(record2.id);
+    const category = text$z(record2.category);
     if (id) line.id = id;
     if (category) line.category = category;
     if (named && description) line.description = description;
@@ -4352,7 +4354,7 @@ function isoStamp(value) {
   if (typeof value === "number" && Number.isFinite(value)) return new Date(value).toISOString();
   return null;
 }
-function text$y(value) {
+function text$z(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function roundMoney$7(value) {
@@ -4884,22 +4886,22 @@ function emptyHours() {
     sun: { enabled: false, start: "09:00", end: "13:00" }
   };
 }
-function text$x(value, max) {
+function text$y(value, max) {
   return String(value ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 }
 function clock(value, fallback) {
-  const raw = text$x(value, 5);
+  const raw = text$y(value, 5);
   return /^([01]\d|2[0-3]):[0-5]\d$/.test(raw) ? raw : fallback;
 }
 function flag(value, fallback) {
   return typeof value === "boolean" ? value : fallback;
 }
 function colorOf(value, fallback) {
-  const raw = text$x(value, 7);
+  const raw = text$y(value, 7);
   return /^#[0-9a-fA-F]{6}$/.test(raw) ? raw.toLowerCase() : fallback;
 }
 function photoOf(value) {
-  const raw = text$x(value, 400);
+  const raw = text$y(value, 400);
   if (!raw) return "";
   if (raw.startsWith("https://") || raw.startsWith("/")) return raw;
   return "";
@@ -4947,10 +4949,10 @@ function sanitizeStaffSettings(input, role) {
   }
   const comms = raw.comms && typeof raw.comms === "object" ? raw.comms : {};
   const zones = raw.zones && typeof raw.zones === "object" ? raw.zones : {};
-  const zoneList = Array.isArray(zones.zones) ? zones.zones.map((zone) => text$x(zone, 40)).filter(Boolean).slice(0, 12) : [];
+  const zoneList = Array.isArray(zones.zones) ? zones.zones.map((zone) => text$y(zone, 40)).filter(Boolean).slice(0, 12) : [];
   return {
-    displayName: text$x(raw.displayName, 80),
-    bio: text$x(raw.bio, 500),
+    displayName: text$y(raw.displayName, 80),
+    bio: text$y(raw.bio, 500),
     photoUrl: photoOf(raw.photoUrl),
     color: colorOf(raw.color, base.color),
     hours,
@@ -4970,10 +4972,10 @@ function sanitizeClientSettings(input) {
   const raw = input && typeof input === "object" ? input : {};
   const base = defaultClientSettings();
   const notes = raw.notifications && typeof raw.notifications === "object" ? raw.notifications : {};
-  const services2 = Array.isArray(raw.defaultServices) ? raw.defaultServices.map((item) => text$x(item, 40)).filter((item) => CLIENT_SERVICES.includes(item)).slice(0, 8) : base.defaultServices;
-  const tier = text$x(raw.pricingTier, 20);
+  const services2 = Array.isArray(raw.defaultServices) ? raw.defaultServices.map((item) => text$y(item, 40)).filter((item) => CLIENT_SERVICES.includes(item)).slice(0, 8) : base.defaultServices;
+  const tier = text$y(raw.pricingTier, 20);
   return {
-    displayName: text$x(raw.displayName, 80),
+    displayName: text$y(raw.displayName, 80),
     photoUrl: photoOf(raw.photoUrl),
     color: colorOf(raw.color, base.color),
     notifications: {
@@ -4983,7 +4985,7 @@ function sanitizeClientSettings(input) {
     },
     defaultServices: services2.length ? services2 : ["Photos"],
     pricingTier: PRICING_TIERS.includes(tier) ? tier : "Standard",
-    customerTeamId: text$x(raw.customerTeamId, 80)
+    customerTeamId: text$y(raw.customerTeamId, 80)
   };
 }
 function sanitizePermissions(input) {
@@ -5002,19 +5004,19 @@ function asRecord$8(value) {
 }
 function profileFromStaff(sourceId, data, preview = false) {
   const role = isStaffRole(String(data.role || "")) ? String(data.role) : "photographer";
-  const legalName = text$x(`${data.firstName || ""} ${data.lastName || ""}`, 120) || text$x(data.name, 120) || text$x(data.email, 120) || "Staff";
+  const legalName = text$y(`${data.firstName || ""} ${data.lastName || ""}`, 120) || text$y(data.name, 120) || text$y(data.email, 120) || "Staff";
   const settings = sanitizeStaffSettings(data.profileSettings, role);
   if (!settings.displayName) settings.displayName = legalName;
   return {
     id: profileId("staff", sourceId),
     kind: "staff",
     sourceId,
-    uid: text$x(data.uid, 128) || sourceId,
+    uid: text$y(data.uid, 128) || sourceId,
     role,
     legalName,
     displayName: settings.displayName,
-    email: text$x(data.email, 160).toLowerCase(),
-    phone: text$x(data.phone, 40),
+    email: text$y(data.email, 160).toLowerCase(),
+    phone: text$y(data.phone, 40),
     photoUrl: settings.photoUrl,
     color: settings.color,
     bio: settings.bio,
@@ -5022,27 +5024,27 @@ function profileFromStaff(sourceId, data, preview = false) {
     staffSettings: settings,
     clientSettings: null,
     permissions: data.permissions ? sanitizePermissions(data.permissions) : null,
-    groupIds: Array.isArray(data.groupIds) ? data.groupIds.map((id) => text$x(id, 80)).filter(Boolean) : [],
+    groupIds: Array.isArray(data.groupIds) ? data.groupIds.map((id) => text$y(id, 80)).filter(Boolean) : [],
     card: null,
     preview
   };
 }
 function profileFromClient$1(sourceId, data, card = null, preview = false) {
   const hub = asRecord$8(data.hubProfile);
-  const legalName = text$x(`${data.firstName || hub.firstName || ""} ${data.lastName || hub.lastName || ""}`, 120) || text$x(data.name, 120) || "Client";
+  const legalName = text$y(`${data.firstName || hub.firstName || ""} ${data.lastName || hub.lastName || ""}`, 120) || text$y(data.name, 120) || "Client";
   const settings = sanitizeClientSettings(data.profileSettings);
   if (!settings.displayName) settings.displayName = legalName;
-  const brokerage = text$x(hub.brokerage, 120);
+  const brokerage = text$y(hub.brokerage, 120);
   return {
     id: profileId("client", sourceId),
     kind: "client",
     sourceId,
-    uid: text$x(data.firebaseUid, 128) || sourceId,
+    uid: text$y(data.firebaseUid, 128) || sourceId,
     role: "client",
     legalName,
     displayName: settings.displayName,
-    email: text$x(data.email || hub.email, 160).toLowerCase(),
-    phone: text$x(data.phone || hub.phone, 40),
+    email: text$y(data.email || hub.email, 160).toLowerCase(),
+    phone: text$y(data.phone || hub.phone, 40),
     photoUrl: settings.photoUrl || photoOf(hub.headshotUrl),
     color: settings.color,
     bio: "",
@@ -5050,14 +5052,14 @@ function profileFromClient$1(sourceId, data, card = null, preview = false) {
     staffSettings: null,
     clientSettings: settings,
     permissions: null,
-    groupIds: Array.isArray(data.groupIds) ? data.groupIds.map((id) => text$x(id, 80)).filter(Boolean) : [],
+    groupIds: Array.isArray(data.groupIds) ? data.groupIds.map((id) => text$y(id, 80)).filter(Boolean) : [],
     card,
     preview
   };
 }
 function profileFromAgent(sourceId, data, preview = false) {
-  const legalName = text$x(data.name, 120) || "Agent";
-  const linked = text$x(data.linkedClientId, 128);
+  const legalName = text$y(data.name, 120) || "Agent";
+  const linked = text$y(data.linkedClientId, 128);
   return {
     id: profileId("agent", sourceId),
     kind: "agent",
@@ -5066,11 +5068,11 @@ function profileFromAgent(sourceId, data, preview = false) {
     role: "agent",
     legalName,
     displayName: legalName,
-    email: text$x(data.email, 160).toLowerCase(),
-    phone: text$x(data.phone, 40),
+    email: text$y(data.email, 160).toLowerCase(),
+    phone: text$y(data.phone, 40),
     photoUrl: "",
     color: ROLE_COLOR.agent,
-    bio: text$x(data.notes, 500),
+    bio: text$y(data.notes, 500),
     brokerage: "",
     staffSettings: null,
     clientSettings: null,
@@ -5083,10 +5085,10 @@ function profileFromAgent(sourceId, data, preview = false) {
 function cardSummaryFrom(data) {
   if (!data) return null;
   const card = asRecord$8(data.card);
-  const last4 = text$x(card.last4, 4);
+  const last4 = text$y(card.last4, 4);
   if (!/^\d{4}$/.test(last4)) return null;
   return {
-    brand: text$x(card.brand, 20) || "Card",
+    brand: text$y(card.brand, 20) || "Card",
     last4,
     expMonth: Number(card.expMonth) || 0,
     expYear: Number(card.expYear) || 0
@@ -5325,8 +5327,8 @@ function previewThreads() {
   ];
 }
 function buildOutbound(actor2, input, profiles, groups, now = (/* @__PURE__ */ new Date()).toISOString()) {
-  const subject = text$x(input.subject, 140) || "Message";
-  const body = text$x(input.body, 2e3);
+  const subject = text$y(input.subject, 140) || "Message";
+  const body = text$y(input.body, 2e3);
   if (!body) return { ok: false, error: "Write a message first." };
   const sender = profiles.find((profile) => profile.uid === actor2.uid) || null;
   const senderProfileId = sender?.id || profileId(actor2.kind === "client" ? "client" : "staff", actor2.uid);
@@ -5398,8 +5400,8 @@ function buildDraft(actor2, input, now = (/* @__PURE__ */ new Date()).toISOStrin
     id: input.threadId || `draft-${now}`,
     kind: input.groupId ? "group" : "direct",
     status: "draft",
-    subject: text$x(input.subject, 140),
-    body: text$x(input.body, 2e3),
+    subject: text$y(input.subject, 140),
+    body: text$y(input.body, 2e3),
     messages: [],
     ownerUid: actor2.uid,
     senderUid: actor2.uid,
@@ -5528,40 +5530,40 @@ function bookingListingGroups(input) {
   for (const doc of requests) {
     const node = nodeId("orderRequests", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("listings", text$w(doc.data.listingId)));
-    uf.link(node, nodeId("orders", text$w(doc.data.orderId) || text$w(doc.data.convertedToOrderId)));
-    uf.link(node, nodeId("invoices", text$w(doc.data.invoiceId)));
-    uf.link(node, nodeId("galleries", text$w(doc.data.galleryId)));
+    uf.link(node, nodeId("listings", text$x(doc.data.listingId)));
+    uf.link(node, nodeId("orders", text$x(doc.data.orderId) || text$x(doc.data.convertedToOrderId)));
+    uf.link(node, nodeId("invoices", text$x(doc.data.invoiceId)));
+    uf.link(node, nodeId("galleries", text$x(doc.data.galleryId)));
   }
   for (const doc of orders) {
     const node = nodeId("orders", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$w(doc.data.orderRequestId)));
-    uf.link(node, nodeId("listings", text$w(doc.data.listingId)));
-    uf.link(node, nodeId("invoices", text$w(doc.data.invoiceId)));
-    uf.link(node, nodeId("galleries", text$w(doc.data.galleryId)));
+    uf.link(node, nodeId("orderRequests", text$x(doc.data.orderRequestId)));
+    uf.link(node, nodeId("listings", text$x(doc.data.listingId)));
+    uf.link(node, nodeId("invoices", text$x(doc.data.invoiceId)));
+    uf.link(node, nodeId("galleries", text$x(doc.data.galleryId)));
   }
   for (const doc of invoices) {
     const node = nodeId("invoices", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$w(doc.data.orderRequestId)));
-    uf.link(node, nodeId("orders", text$w(doc.data.orderId)));
-    uf.link(node, nodeId("listings", text$w(doc.data.listingId)));
+    uf.link(node, nodeId("orderRequests", text$x(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$x(doc.data.orderId)));
+    uf.link(node, nodeId("listings", text$x(doc.data.listingId)));
   }
   for (const doc of appointments) {
     const node = nodeId("appointments", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$w(doc.data.orderRequestId)));
-    uf.link(node, nodeId("orders", text$w(doc.data.orderId)));
-    uf.link(node, nodeId("listings", text$w(doc.data.listingId)));
+    uf.link(node, nodeId("orderRequests", text$x(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$x(doc.data.orderId)));
+    uf.link(node, nodeId("listings", text$x(doc.data.listingId)));
   }
   for (const doc of galleries) {
     const node = nodeId("galleries", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$w(doc.data.orderRequestId)));
-    uf.link(node, nodeId("orders", text$w(doc.data.orderId)));
-    uf.link(node, nodeId("invoices", text$w(doc.data.invoiceId)));
-    uf.link(node, nodeId("listings", text$w(doc.data.listingId)));
+    uf.link(node, nodeId("orderRequests", text$x(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$x(doc.data.orderId)));
+    uf.link(node, nodeId("invoices", text$x(doc.data.invoiceId)));
+    uf.link(node, nodeId("listings", text$x(doc.data.listingId)));
   }
   const groups = [];
   for (const nodes of uf.components()) {
@@ -5621,7 +5623,7 @@ function fillEmptyListingFields(existing, desired) {
   return patch;
 }
 function clientOwnsListing(listing, clients) {
-  const clientId2 = text$w(listing.clientId);
+  const clientId2 = text$x(listing.clientId);
   const email = normalizeEmail$1(listing.clientEmail || listing.email);
   if (!clientId2 && !email) return true;
   if (clientId2 && clients.ids.includes(clientId2)) return true;
@@ -5693,10 +5695,10 @@ function chooseListing(group, listings, clients) {
 }
 function listingMatches(doc, group) {
   if (doc.id === group.stableId || group.preferredListingIds.includes(doc.id)) return true;
-  const requestId = text$w(doc.data.orderRequestId);
-  const orderId = text$w(doc.data.orderId);
-  const invoiceId = text$w(doc.data.invoiceId);
-  const appointmentId = text$w(doc.data.appointmentId);
+  const requestId = text$x(doc.data.orderRequestId);
+  const orderId = text$x(doc.data.orderId);
+  const invoiceId = text$x(doc.data.invoiceId);
+  const appointmentId = text$x(doc.data.appointmentId);
   return Boolean(
     requestId && group.orderRequestIds.includes(requestId) || orderId && group.orderIds.includes(orderId) || invoiceId && group.invoiceIds.includes(invoiceId) || appointmentId && group.appointmentIds.includes(appointmentId)
   );
@@ -5706,7 +5708,7 @@ function linksFor(group, listingId, listings, clients) {
   const links = [];
   const push = (collection, docs) => {
     for (const doc of docs) {
-      const current = text$w(doc.data.listingId);
+      const current = text$x(doc.data.listingId);
       if (current === listingId) continue;
       if (current && isPortalListingId(current) && ownedIds.has(current)) continue;
       links.push({ collection, id: doc.id });
@@ -5723,7 +5725,7 @@ function clientsFor(group, identity) {
   const ids = /* @__PURE__ */ new Set();
   const emails = /* @__PURE__ */ new Set();
   const addId = (value) => {
-    const id = text$w(value);
+    const id = text$x(value);
     if (id) ids.add(id);
   };
   const addEmail = (value) => {
@@ -5742,7 +5744,7 @@ function clientsFor(group, identity) {
 function preferredListingIds(group) {
   const ids = [];
   const push = (value) => {
-    const id = text$w(value);
+    const id = text$x(value);
     if (id && isPortalListingId(id) && !ids.includes(id)) ids.push(id);
   };
   for (const doc of [...group.orderRequests, ...group.orders, ...group.invoices, ...group.appointments, ...group.galleries]) {
@@ -5777,9 +5779,9 @@ function bestAddress(group) {
   }
   for (const doc of propertyDocs(group)) {
     for (const key of ["address", "propertyAddress", "shootLocation"]) {
-      if (typeof doc.data[key] === "string" && text$w(doc.data[key])) return text$w(doc.data[key]);
+      if (typeof doc.data[key] === "string" && text$x(doc.data[key])) return text$x(doc.data[key]);
     }
-    if (text$w(doc.data.addressLabel)) return text$w(doc.data.addressLabel);
+    if (text$x(doc.data.addressLabel)) return text$x(doc.data.addressLabel);
   }
   return null;
 }
@@ -5795,7 +5797,7 @@ function firstScheduleDate(group) {
 function firstScheduleTime(group) {
   for (const doc of [...group.appointments, ...group.orders, ...group.orderRequests]) {
     for (const key of ["scheduledTime", "appointmentTime", "apptTime", "requestedTime"]) {
-      const value = text$w(doc.data[key]);
+      const value = text$x(doc.data[key]);
       if (value && !/^tbd$/i.test(value)) return value;
     }
   }
@@ -5812,7 +5814,7 @@ function projectType(group) {
     if (doc.data.projectType === "real_estate") return "real_estate";
     const service = doc.data.selectedService;
     if (service && typeof service === "object") {
-      const category = text$w(service.category);
+      const category = text$x(service.category);
       if (category === "business" || category === "branding") return "business";
       if (category === "listings") return "real_estate";
     }
@@ -5838,7 +5840,7 @@ function namesFrom(value) {
   for (const item of value) {
     if (typeof item === "string" && item.trim()) names.push(item.trim());
     else if (item && typeof item === "object") {
-      const name = text$w(item.name);
+      const name = text$x(item.name);
       if (name) names.push(name);
     }
     if (names.length >= 40) break;
@@ -5863,8 +5865,8 @@ function accessInfo(group) {
   return [firstText$3(group, ["accessMethod"]), firstText$3(group, ["lockboxCode"])].filter(Boolean).join(" - ");
 }
 function clientId(group, identity) {
-  const bookingIds = propertyDocs(group).map((doc) => text$w(doc.data.clientId)).filter(Boolean);
-  const identityIds2 = (identity?.ids || []).map((id) => text$w(id)).filter(Boolean);
+  const bookingIds = propertyDocs(group).map((doc) => text$x(doc.data.clientId)).filter(Boolean);
+  const identityIds2 = (identity?.ids || []).map((id) => text$x(id)).filter(Boolean);
   return bookingIds.find((id) => identityIds2.includes(id)) || bookingIds[0] || identityIds2[0] || "";
 }
 function clientEmail(group, identity) {
@@ -5878,8 +5880,8 @@ function clientEmail(group, identity) {
 }
 function clientName$1(group) {
   for (const doc of propertyDocs(group)) {
-    if (text$w(doc.data.clientName)) return text$w(doc.data.clientName);
-    const joined = `${text$w(doc.data.firstName)} ${text$w(doc.data.lastName)}`.trim();
+    if (text$x(doc.data.clientName)) return text$x(doc.data.clientName);
+    const joined = `${text$x(doc.data.firstName)} ${text$x(doc.data.lastName)}`.trim();
     if (joined) return joined;
   }
   return "";
@@ -5887,7 +5889,7 @@ function clientName$1(group) {
 function chosenInvoiceId(group) {
   const known = new Set(group.invoiceIds);
   for (const doc of [...group.orderRequests, ...group.orders]) {
-    const id = text$w(doc.data.invoiceId);
+    const id = text$x(doc.data.invoiceId);
     if (id && known.has(id)) return id;
   }
   return newestDoc(group.invoices)?.id || group.invoiceIds[0] || "";
@@ -5896,7 +5898,7 @@ function chosenId(docs, ids, pointers = [], keys = []) {
   const known = new Set(ids);
   for (const doc of pointers) {
     for (const key of keys) {
-      const id = text$w(doc.data[key]);
+      const id = text$x(doc.data[key]);
       if (id && known.has(id)) return id;
     }
   }
@@ -5908,7 +5910,7 @@ function propertyDocs(group) {
 function firstText$3(group, keys) {
   for (const doc of propertyDocs(group)) {
     for (const key of keys) {
-      const value = text$w(doc.data[key]);
+      const value = text$x(doc.data[key]);
       if (value) return value;
     }
   }
@@ -5976,7 +5978,7 @@ function hasAddress(value) {
   if (typeof value === "string") return value.trim().length > 0;
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const record2 = value;
-  return ["formatted", "label", "street", "line1", "addressLine1", "city", "state", "zip"].some((key) => text$w(record2[key]).length > 0);
+  return ["formatted", "label", "street", "line1", "addressLine1", "city", "state", "zip"].some((key) => text$x(record2[key]).length > 0);
 }
 function statusKey(value) {
   return String(value || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
@@ -6008,14 +6010,14 @@ function isEmpty(value) {
 function isSentinel$1(value) {
   return Boolean(value && typeof value === "object" && "_methodName" in value);
 }
-function text$w(value) {
+function text$x(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function cleanDocs(docs) {
   const out = [];
   const seen = /* @__PURE__ */ new Set();
   for (const doc of docs || []) {
-    const id = text$w(doc?.id);
+    const id = text$x(doc?.id);
     if (!id || seen.has(id)) continue;
     seen.add(id);
     out.push({ id, data: doc.data && typeof doc.data === "object" ? doc.data : {} });
@@ -6061,6 +6063,26 @@ class UnionFind {
     this.parent.set(id, root);
     return root;
   }
+}
+function text$w(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+function staffOnlyRecord(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return value;
+}
+function lockboxCodeFromOrder(order) {
+  if (!order) return "";
+  const direct = text$w(order.lockboxCode) || text$w(order.supraCode);
+  if (direct) return direct;
+  const staff = staffOnlyRecord(order.staffOnly);
+  if (!staff) return "";
+  return text$w(staff.lockboxCode) || text$w(staff.lockbox) || text$w(staff.supraCode);
+}
+function presentStaffOrder(order) {
+  const code = lockboxCodeFromOrder(order);
+  if (!code || text$w(order.lockboxCode)) return order;
+  return { ...order, lockboxCode: code };
 }
 function visibleToPortalClient(record2, identity) {
   return recordVisibleToIdentity(record2, {
@@ -16045,6 +16067,362 @@ async function loadRevenueDocs(id) {
 function text$g(value) {
   return typeof value === "string" ? value.trim() : "";
 }
+const B2_STORAGE_BACKEND = "b2";
+const FIREBASE_STORAGE_BACKEND = "firebase";
+const B2_MEDIA_ARRAY_KEYS = [
+  "images",
+  "videos",
+  "floorplans",
+  "floorPlans",
+  "tours",
+  "files",
+  "downloads",
+  "mlsFiles",
+  "clientPortalUploads",
+  "socialAssets",
+  "designAssets",
+  "cubiCasaImports",
+  "mediaItems",
+  "videoLinks",
+  "tourLinks"
+];
+const CONTROL = /[\u0000-\u001F\u007F]/;
+function safeB2Key(value) {
+  if (typeof value !== "string") return "";
+  const key = value.trim().replace(/^\/+/, "");
+  if (!key || key.length > 1024) return "";
+  if (key.includes("\\") || key.includes("..") || CONTROL.test(key)) return "";
+  const parts = key.split("/");
+  if (parts.some((part) => !part || part === "." || part === "..")) return "";
+  return key;
+}
+function mediaUsesB2(item, parent) {
+  if (item.storageBackend === FIREBASE_STORAGE_BACKEND) return false;
+  if (item.storageBackend === B2_STORAGE_BACKEND) return Boolean(safeB2Key(item.b2Key));
+  if (parent?.storageBackend === B2_STORAGE_BACKEND) return Boolean(safeB2Key(item.b2Key));
+  return false;
+}
+function resolveB2ObjectKey(item, parent) {
+  if (!mediaUsesB2(item, parent)) return "";
+  const own = safeB2Key(item.b2Key);
+  if (!own) return "";
+  const prefix = parent?.storageBackend === B2_STORAGE_BACKEND ? safeB2Key(parent.b2Key) : "";
+  if (!prefix || own.includes("/") || own === prefix || own.startsWith(`${prefix}/`)) return own;
+  return safeB2Key(`${prefix}/${own}`);
+}
+function savedDownloadName(row, objectKey = "") {
+  for (const key of ["deliveryName", "fileName", "name", "title"]) {
+    const value = typeof row[key] === "string" ? row[key].trim() : "";
+    if (value && !value.includes("/") && !value.includes("\\")) return value.slice(0, 180);
+  }
+  const base = objectKey.split("/").pop() || "download";
+  return base.slice(0, 180);
+}
+function contentDispositionAttachment(filename) {
+  const cleaned = filename.replace(/[^\w.\- ]+/g, "_").replace(/^\.+/, "").trim().slice(0, 180);
+  const safe = cleaned || "download";
+  return `attachment; filename="${safe}"`;
+}
+function publicB2ObjectUrl(baseUrl, objectKey) {
+  const root = baseUrl.trim().replace(/\/+$/, "");
+  const encoded = objectKey.split("/").map(encodeRfc3986).join("/");
+  return `${root}/${encoded}`;
+}
+function encodeRfc3986(value) {
+  return encodeURIComponent(value).replace(/[!'()*]/g, (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`);
+}
+function addressSlug(address) {
+  const street = address.split(",")[0] || address;
+  const slug = street.toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 48);
+  return slug || "listing";
+}
+function fileExtension(name) {
+  const match = name.toLowerCase().match(/\.([a-z0-9]{1,8})$/);
+  const ext = match?.[1] || "jpg";
+  if (ext === "jpeg") return "jpg";
+  if (ext === "tiff") return "tif";
+  if (["jpg", "png", "webp", "gif", "tif"].includes(ext)) return ext;
+  return "jpg";
+}
+function sequenceFileName(index, addressOrSlug, originalName) {
+  const n = Math.max(1, Math.floor(Number.isFinite(index) ? index : 1));
+  const padded = String(n).padStart(3, "0");
+  return `${padded}_${addressSlug(addressOrSlug)}.${fileExtension(originalName)}`;
+}
+function shotKey(shot, index = 0) {
+  for (const value of [shot.id, shot.path, shot.url, shot.fileName, shot.name]) {
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return `idx-${index}`;
+}
+function shotName(shot, index = 0) {
+  for (const value of [shot.name, shot.fileName, shot.title]) {
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  const path2 = typeof shot.path === "string" ? shot.path.split("/").pop() : "";
+  return path2 || `photo-${index + 1}.jpg`;
+}
+function finiteOrder(value) {
+  const n = typeof value === "number" ? value : typeof value === "string" && value.trim() ? Number(value) : NaN;
+  return Number.isFinite(n) ? n : null;
+}
+function isCulledShot(shot) {
+  return shot.culled === true;
+}
+function keptShots(items) {
+  const rows = items.map((item, index) => ({ item, index })).filter(({ item }) => !isCulledShot(item) && item.hiddenFromGallery !== true);
+  const any = rows.some(({ item }) => finiteOrder(item.sortOrder) != null);
+  if (!any) return rows.map(({ item }) => item);
+  return rows.sort((a, b) => {
+    const ao = finiteOrder(a.item.sortOrder);
+    const bo = finiteOrder(b.item.sortOrder);
+    const aKey = ao == null ? Number.MAX_SAFE_INTEGER : ao;
+    const bKey = bo == null ? Number.MAX_SAFE_INTEGER : bo;
+    return aKey - bKey || a.index - b.index;
+  }).map(({ item }) => item);
+}
+function sequenceKeptShots(items, address) {
+  return keptShots(items).map((shot, index) => ({
+    shot,
+    sortOrder: index + 1,
+    deliveryName: sequenceFileName(index + 1, address, shotName(shot, index))
+  }));
+}
+function deliveryFileName(shot, index = 0) {
+  if (typeof shot.deliveryName === "string" && shot.deliveryName.trim()) return shot.deliveryName.trim();
+  return shotName(shot, index);
+}
+function applyPhotoOrder(images, order) {
+  const byKey = /* @__PURE__ */ new Map();
+  images.forEach((image, index) => {
+    byKey.set(shotKey(image, index), { image, index });
+  });
+  const used = /* @__PURE__ */ new Set();
+  const next = [];
+  for (const entry2 of order) {
+    const found = byKey.get(entry2.key);
+    if (!found || used.has(entry2.key)) continue;
+    used.add(entry2.key);
+    next.push({ ...found.image, culled: entry2.culled === true });
+  }
+  images.forEach((image, index) => {
+    const key = shotKey(image, index);
+    if (used.has(key)) return;
+    next.push(image);
+  });
+  let kept = 0;
+  return next.map((image) => {
+    if (image.culled === true) {
+      const rest = { ...image };
+      delete rest.deliveryName;
+      return { ...rest, culled: true };
+    }
+    kept += 1;
+    return { ...image, culled: false, sortOrder: kept };
+  });
+}
+function orderedGalleryMedia(items) {
+  return keptShots(items);
+}
+const B2_PRESIGN_SECONDS = 900;
+const DEFAULT_BUCKET = "iconic-media";
+const DEFAULT_ENDPOINT = "https://s3.us-west-004.backblazeb2.com";
+const MAX_OBJECT_BYTES = 25e6;
+function readB2Settings(env = process.env) {
+  const keyId = (env.B2_KEY_ID || "").trim();
+  const appKey = (env.B2_APP_KEY || "").trim();
+  const bucket2 = (env.B2_BUCKET || "").trim() || DEFAULT_BUCKET;
+  const endpoint = ((env.B2_ENDPOINT || "").trim() || DEFAULT_ENDPOINT).replace(/\/+$/, "");
+  const publicBaseUrl = (env.B2_PUBLIC_BASE_URL || "").trim().replace(/\/+$/, "");
+  let endpointHost = "";
+  try {
+    const url = new URL(endpoint);
+    if (url.protocol !== "https:") return null;
+    endpointHost = url.hostname;
+  } catch {
+    return null;
+  }
+  if (publicBaseUrl) {
+    try {
+      const url = new URL(publicBaseUrl);
+      if (url.protocol !== "https:" && url.protocol !== "http:") return null;
+    } catch {
+      return null;
+    }
+  } else if (!keyId || !appKey) {
+    return null;
+  }
+  return {
+    keyId,
+    appKey,
+    bucket: bucket2,
+    endpoint,
+    region: regionFromHost(endpointHost),
+    publicBaseUrl
+  };
+}
+function presignS3GetUrl(input) {
+  const params = [
+    ["X-Amz-Algorithm", "AWS4-HMAC-SHA256"],
+    ["X-Amz-Credential", `${input.accessKeyId}/${input.amzDate.slice(0, 8)}/${input.region}/s3/aws4_request`],
+    ["X-Amz-Date", input.amzDate],
+    ["X-Amz-Expires", String(input.expires)],
+    ["X-Amz-SignedHeaders", "host"],
+    ...input.extraQuery || []
+  ];
+  params.sort((a, b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : 0);
+  const canonicalQuery = params.map(([key, value]) => `${encodeRfc3986(key)}=${encodeRfc3986(value)}`).join("&");
+  const canonicalRequest = [
+    "GET",
+    input.canonicalUri,
+    canonicalQuery,
+    `host:${input.host}`,
+    "",
+    "host",
+    "UNSIGNED-PAYLOAD"
+  ].join("\n");
+  const scope = `${input.amzDate.slice(0, 8)}/${input.region}/s3/aws4_request`;
+  const stringToSign = [
+    "AWS4-HMAC-SHA256",
+    input.amzDate,
+    scope,
+    createHash("sha256").update(canonicalRequest, "utf8").digest("hex")
+  ].join("\n");
+  const dateKey2 = createHmac("sha256", `AWS4${input.secretAccessKey}`).update(input.amzDate.slice(0, 8), "utf8").digest();
+  const regionKey = createHmac("sha256", dateKey2).update(input.region, "utf8").digest();
+  const serviceKey = createHmac("sha256", regionKey).update("s3", "utf8").digest();
+  const signingKey = createHmac("sha256", serviceKey).update("aws4_request", "utf8").digest();
+  const signature = createHmac("sha256", signingKey).update(stringToSign, "utf8").digest("hex");
+  return `https://${input.host}${input.canonicalUri}?${canonicalQuery}&X-Amz-Signature=${signature}`;
+}
+function b2ObjectUrl(objectKey, options = {}) {
+  const settings = readB2Settings(options.env);
+  if (!settings || !objectKey) return "";
+  if (settings.publicBaseUrl) return publicB2ObjectUrl(settings.publicBaseUrl, objectKey);
+  if (!settings.keyId || !settings.appKey) return "";
+  const now = options.now ?? /* @__PURE__ */ new Date();
+  const endpointHost = new URL(settings.endpoint).hostname;
+  const virtual = dnsBucket(settings.bucket);
+  const host = virtual ? `${settings.bucket}.${endpointHost}` : endpointHost;
+  const encodedKey = objectKey.split("/").map(encodeRfc3986).join("/");
+  const canonicalUri = virtual ? `/${encodedKey}` : `/${encodeRfc3986(settings.bucket)}/${encodedKey}`;
+  const extraQuery = options.disposition ? [["response-content-disposition", options.disposition]] : [];
+  return presignS3GetUrl({
+    host,
+    canonicalUri,
+    region: settings.region,
+    accessKeyId: settings.keyId,
+    secretAccessKey: settings.appKey,
+    amzDate: amzDate(now),
+    expires: B2_PRESIGN_SECONDS,
+    extraQuery
+  });
+}
+function applyB2MediaUrls(record2, options = {}) {
+  const settings = readB2Settings(options.env);
+  if (!settings) return record2;
+  const now = options.now ?? /* @__PURE__ */ new Date();
+  let changed = false;
+  const next = { ...record2 };
+  for (const key of B2_MEDIA_ARRAY_KEYS) {
+    const value = record2[key];
+    if (!Array.isArray(value)) continue;
+    let arrayChanged = false;
+    const items = value.map((item) => {
+      const stamped = stampMediaItem(item, record2, settings, now);
+      if (stamped !== item) arrayChanged = true;
+      return stamped;
+    });
+    if (arrayChanged) {
+      next[key] = items;
+      changed = true;
+    }
+  }
+  return changed ? next : record2;
+}
+function orderedDownloadPlan(items, parent) {
+  const rows = items.filter((item) => Boolean(item) && typeof item === "object");
+  return orderedGalleryMedia(rows).map((item, index) => ({
+    name: deliveryFileName(item, index),
+    key: resolveB2ObjectKey(item, parent),
+    item
+  }));
+}
+async function readB2Object(objectKey, env = process.env) {
+  const url = b2ObjectUrl(objectKey, { env });
+  if (!url) return null;
+  let response;
+  try {
+    response = await fetch(url, { redirect: "error", signal: AbortSignal.timeout(2e4) });
+  } catch {
+    return null;
+  }
+  if (!response.ok) return null;
+  const advertised = Number(response.headers.get("content-length") || 0);
+  if (advertised > MAX_OBJECT_BYTES) return null;
+  const reader = response.body?.getReader();
+  if (!reader) return null;
+  const chunks = [];
+  let total = 0;
+  try {
+    for (; ; ) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > MAX_OBJECT_BYTES) {
+        await reader.cancel().catch(() => void 0);
+        return null;
+      }
+      chunks.push(Buffer.from(value));
+    }
+  } catch {
+    return null;
+  }
+  return chunks.length ? Buffer.concat(chunks) : null;
+}
+function stampMediaItem(item, parent, settings, now) {
+  if (!item || typeof item !== "object" || Array.isArray(item)) return item;
+  const row = item;
+  const objectKey = resolveB2ObjectKey(row, parent);
+  if (!objectKey) return item;
+  const view = objectUrl(settings, objectKey, now);
+  if (!view) return item;
+  const filename = savedDownloadName(row, objectKey);
+  const download = settings.publicBaseUrl ? view : objectUrl(settings, objectKey, now, contentDispositionAttachment(filename));
+  return {
+    ...row,
+    url: view,
+    shareUrl: view,
+    downloadUrl: download || view
+  };
+}
+function objectUrl(settings, objectKey, now, disposition = "") {
+  return b2ObjectUrl(objectKey, {
+    now,
+    disposition,
+    env: settingsToEnv(settings)
+  });
+}
+function settingsToEnv(settings) {
+  return {
+    B2_KEY_ID: settings.keyId,
+    B2_APP_KEY: settings.appKey,
+    B2_BUCKET: settings.bucket,
+    B2_ENDPOINT: settings.endpoint,
+    B2_PUBLIC_BASE_URL: settings.publicBaseUrl
+  };
+}
+function dnsBucket(bucket2) {
+  return /^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/.test(bucket2);
+}
+function regionFromHost(host) {
+  const match = host.match(/^s3\.([a-z0-9-]+)\.backblazeb2\.com$/i);
+  return match?.[1] || "us-west-004";
+}
+function amzDate(now) {
+  const iso = now.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+  return iso;
+}
 const router$E = Router();
 const db$v = () => admin.firestore();
 const dotOptInLimiter = createRateLimiter({ windowMs: 10 * 60 * 1e3, max: 30 });
@@ -16091,7 +16469,7 @@ router$E.get("/", requireStaff, async (req, res) => {
       }
     }
     const snapshot = await query.get();
-    const orders = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const orders = snapshot.docs.map((d) => presentStaffOrder({ id: d.id, ...d.data() }));
     return res.json({
       orders,
       hasMore: orders.length === limitNum,
@@ -16136,7 +16514,7 @@ router$E.get("/:id", requireStaff, async (req, res) => {
   try {
     const orderDoc = await db$v().collection("orders").doc(req.params.id).get();
     if (!orderDoc.exists) return res.status(404).json({ error: "Order not found." });
-    const order = { id: orderDoc.id, ...orderDoc.data() };
+    const order = presentStaffOrder({ id: orderDoc.id, ...orderDoc.data() });
     const [gallery, invoice, appointment, messages] = await Promise.all([
       db$v().collection("galleries").where("orderId", "==", req.params.id).limit(1).get().catch((err) => {
         console.error("[Orders] Gallery lookup failed:", err);
@@ -16157,7 +16535,7 @@ router$E.get("/:id", requireStaff, async (req, res) => {
     ]);
     return res.json({
       order,
-      gallery: !gallery || gallery.empty ? null : { id: gallery.docs[0].id, ...gallery.docs[0].data() },
+      gallery: !gallery || gallery.empty ? null : applyB2MediaUrls({ id: gallery.docs[0].id, ...gallery.docs[0].data() }),
       invoice: !invoice || invoice.empty ? null : { id: invoice.docs[0].id, ...invoice.docs[0].data() },
       appointment: !appointment || appointment.empty ? null : { id: appointment.docs[0].id, ...appointment.docs[0].data() },
       messages: messages ? messages.docs.map((d) => ({ id: d.id, ...d.data() })) : []
@@ -16521,99 +16899,6 @@ async function save(req, res, by) {
   const saved = await writeOrderApproval(String(req.params.id || ""), approval);
   if (!saved) return res.status(404).json({ error: "Order not found." });
   return res.json({ approval: saved });
-}
-function addressSlug(address) {
-  const street = address.split(",")[0] || address;
-  const slug = street.toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 48);
-  return slug || "listing";
-}
-function fileExtension(name) {
-  const match = name.toLowerCase().match(/\.([a-z0-9]{1,8})$/);
-  const ext = match?.[1] || "jpg";
-  if (ext === "jpeg") return "jpg";
-  if (ext === "tiff") return "tif";
-  if (["jpg", "png", "webp", "gif", "tif"].includes(ext)) return ext;
-  return "jpg";
-}
-function sequenceFileName(index, addressOrSlug, originalName) {
-  const n = Math.max(1, Math.floor(Number.isFinite(index) ? index : 1));
-  const padded = String(n).padStart(3, "0");
-  return `${padded}_${addressSlug(addressOrSlug)}.${fileExtension(originalName)}`;
-}
-function shotKey(shot, index = 0) {
-  for (const value of [shot.id, shot.path, shot.url, shot.fileName, shot.name]) {
-    if (typeof value === "string" && value.trim()) return value.trim();
-  }
-  return `idx-${index}`;
-}
-function shotName(shot, index = 0) {
-  for (const value of [shot.name, shot.fileName, shot.title]) {
-    if (typeof value === "string" && value.trim()) return value.trim();
-  }
-  const path2 = typeof shot.path === "string" ? shot.path.split("/").pop() : "";
-  return path2 || `photo-${index + 1}.jpg`;
-}
-function finiteOrder(value) {
-  const n = typeof value === "number" ? value : typeof value === "string" && value.trim() ? Number(value) : NaN;
-  return Number.isFinite(n) ? n : null;
-}
-function isCulledShot(shot) {
-  return shot.culled === true;
-}
-function keptShots(items) {
-  const rows = items.map((item, index) => ({ item, index })).filter(({ item }) => !isCulledShot(item) && item.hiddenFromGallery !== true);
-  const any = rows.some(({ item }) => finiteOrder(item.sortOrder) != null);
-  if (!any) return rows.map(({ item }) => item);
-  return rows.sort((a, b) => {
-    const ao = finiteOrder(a.item.sortOrder);
-    const bo = finiteOrder(b.item.sortOrder);
-    const aKey = ao == null ? Number.MAX_SAFE_INTEGER : ao;
-    const bKey = bo == null ? Number.MAX_SAFE_INTEGER : bo;
-    return aKey - bKey || a.index - b.index;
-  }).map(({ item }) => item);
-}
-function sequenceKeptShots(items, address) {
-  return keptShots(items).map((shot, index) => ({
-    shot,
-    sortOrder: index + 1,
-    deliveryName: sequenceFileName(index + 1, address, shotName(shot, index))
-  }));
-}
-function deliveryFileName(shot, index = 0) {
-  if (typeof shot.deliveryName === "string" && shot.deliveryName.trim()) return shot.deliveryName.trim();
-  return shotName(shot, index);
-}
-function applyPhotoOrder(images, order) {
-  const byKey = /* @__PURE__ */ new Map();
-  images.forEach((image, index) => {
-    byKey.set(shotKey(image, index), { image, index });
-  });
-  const used = /* @__PURE__ */ new Set();
-  const next = [];
-  for (const entry2 of order) {
-    const found = byKey.get(entry2.key);
-    if (!found || used.has(entry2.key)) continue;
-    used.add(entry2.key);
-    next.push({ ...found.image, culled: entry2.culled === true });
-  }
-  images.forEach((image, index) => {
-    const key = shotKey(image, index);
-    if (used.has(key)) return;
-    next.push(image);
-  });
-  let kept = 0;
-  return next.map((image) => {
-    if (image.culled === true) {
-      const rest = { ...image };
-      delete rest.deliveryName;
-      return { ...rest, culled: true };
-    }
-    kept += 1;
-    return { ...image, culled: false, sortOrder: kept };
-  });
-}
-function orderedGalleryMedia(items) {
-  return keptShots(items);
 }
 const OWNER_DISPLAY_TTL_MS = 4 * 60 * 60 * 1e3;
 const DEV_SECRET = "iconic-owner-display-dev-v1";
@@ -17088,7 +17373,7 @@ function arrangementFileName(index, addressOrSlug, originalName) {
   return `${String(n).padStart(3, "0")}_${addressSlug(addressOrSlug)}.${ext}`;
 }
 function rowId(row, fallback) {
-  for (const key of ["id", "path", "storagePath", "url", "shareUrl"]) {
+  for (const key of ["id", "path", "storagePath", "b2Key", "url", "shareUrl"]) {
     const value = text$e(row[key]);
     if (value) return value.slice(0, 180);
   }
@@ -17117,6 +17402,7 @@ function pushRow(out, seen, row, kind, bucket2, index, fallbackName) {
   const platform = text$e(row.platform, 40);
   const caption = text$e(row.caption, 500);
   const webUrl = httpUrl$1(row.webUrl) || httpUrl$1(row.previewUrl) || httpUrl$1(row.displayUrl) || httpUrl$1(row.thumbnailUrl);
+  const downloadUrl = httpUrl$1(row.downloadUrl);
   out.push({
     id,
     kind,
@@ -17134,6 +17420,7 @@ function pushRow(out, seen, row, kind, bucket2, index, fallbackName) {
     ...width != null ? { width } : {},
     ...height != null ? { height } : {},
     ...webUrl ? { webUrl } : {},
+    ...downloadUrl ? { downloadUrl } : {},
     ...row.hiddenFromGallery === true ? { hiddenFromGallery: true } : {}
   });
 }
@@ -17315,7 +17602,7 @@ function hiddenSectionIdSet(arrangement) {
 function isHiddenFromClientGallery(listing, row) {
   if (row.hiddenFromGallery === true || row.culled === true) return true;
   const arrangement = readMediaArrangement(listing?.mediaArrangement);
-  const id = text$e(row.id) || text$e(row.path) || text$e(row.storagePath) || text$e(row.url) || text$e(row.shareUrl);
+  const id = text$e(row.id) || text$e(row.path) || text$e(row.storagePath) || text$e(row.b2Key) || text$e(row.url) || text$e(row.shareUrl);
   const placement = id ? arrangement.placements.find((item) => item.id === id) : void 0;
   if (placement?.hiddenFromGallery) return true;
   const sectionId = text$e(row.sectionId, 32) || placement?.sectionId || "";
@@ -17328,7 +17615,7 @@ function isHiddenFromListingSites(listing, row) {
   if (hidden.size === 0) return false;
   const sectionId = text$e(row.sectionId, 32);
   if (sectionId && hidden.has(sectionId)) return true;
-  const id = text$e(row.id) || text$e(row.path) || text$e(row.storagePath) || text$e(row.url);
+  const id = text$e(row.id) || text$e(row.path) || text$e(row.storagePath) || text$e(row.b2Key) || text$e(row.url);
   if (!id) return false;
   return arrangement.placements.some((placement) => placement.id === id && hidden.has(placement.sectionId));
 }
@@ -17697,7 +17984,7 @@ function publicImages(listing) {
   });
   const coverId = readMediaArrangement(listing.mediaArrangement).coverId;
   if (coverId && Array.isArray(listing.images)) {
-    const cover = listing.images.find((row) => text$d(row.id) === coverId || text$d(row.path) === coverId || text$d(row.url) === coverId);
+    const cover = listing.images.find((row) => text$d(row.id) === coverId || text$d(row.b2Key) === coverId || text$d(row.path) === coverId || text$d(row.url) === coverId);
     const coverUrl = cover ? httpUrl(cover.url) : "";
     const index = coverUrl ? images.findIndex((image) => image.url === coverUrl) : -1;
     if (index > 0) {
@@ -20595,10 +20882,14 @@ function docRecord(snap) {
   if (!snap.exists) return null;
   return { id: snap.id, ...snap.data() || {} };
 }
+function mediaDoc(snap) {
+  const doc = docRecord(snap);
+  return doc ? applyB2MediaUrls(doc) : null;
+}
 async function galleriesWhere(field, id) {
   try {
     const snap = await db$q().collection("galleries").where(field, "==", id).limit(8).get();
-    return snap.docs.map((doc) => docRecord(doc)).filter((doc) => Boolean(doc));
+    return snap.docs.map((doc) => mediaDoc(doc)).filter((doc) => Boolean(doc));
   } catch (err) {
     console.error(`[Galleries] ${field} lookup failed:`, err);
     return [];
@@ -20606,7 +20897,7 @@ async function galleriesWhere(field, id) {
 }
 async function galleryById(id) {
   if (!id) return null;
-  return docRecord(await db$q().collection("galleries").doc(id).get());
+  return mediaDoc(await db$q().collection("galleries").doc(id).get());
 }
 async function relatedForListing(listing) {
   const related = await galleriesWhere("listingId", listing.id);
@@ -20623,8 +20914,8 @@ async function resolveClientGalleryLink(id) {
     db$q().collection("galleries").doc(id).get(),
     db$q().collection("listings").doc(id).get()
   ]);
-  const gallery = docRecord(gallerySnap);
-  const listing = docRecord(listingSnap);
+  const gallery = mediaDoc(gallerySnap);
+  const listing = mediaDoc(listingSnap);
   if (gallery) {
     return decideClientGalleryLink({
       id,
@@ -20665,7 +20956,7 @@ async function resolveClientGalleryLink(id) {
   let pointedListing = null;
   let pointedRelated = relatedGalleries;
   if (!pointedGallery && pointedListingId) {
-    pointedListing = docRecord(await db$q().collection("listings").doc(pointedListingId).get());
+    pointedListing = mediaDoc(await db$q().collection("listings").doc(pointedListingId).get());
     if (pointedListing) pointedRelated = await relatedForListing(pointedListing);
   }
   return decideClientGalleryLink({
@@ -20759,7 +21050,7 @@ function sharePlaybackOpen(listing, invoice, related) {
 }
 async function finishGalleryLink(result, caller) {
   if (!result.ok || result.kind !== "listing") return result;
-  const listing = docRecord(await db$q().collection("listings").doc(result.project.id).get());
+  const listing = mediaDoc(await db$q().collection("listings").doc(result.project.id).get());
   if (!listing) return result;
   const [invoice, related] = await Promise.all([
     invoiceForListing(listing),
@@ -20880,10 +21171,11 @@ function clientGalleryPayload(id, gallery, gate2) {
   const unlocked = clientGalleryDownloadsUnlocked(gate2);
   const invoice = gate2.invoice;
   const showMedia = ["delivered", "approved"].includes(String(gallery.status || ""));
+  const ready = applyB2MediaUrls(gallery);
   const media = orderedGalleryMedia([
-    ...Array.isArray(gallery.mediaItems) ? gallery.mediaItems : [],
-    ...Array.isArray(gallery.videoLinks) ? gallery.videoLinks : [],
-    ...Array.isArray(gallery.tourLinks) ? gallery.tourLinks : []
+    ...Array.isArray(ready.mediaItems) ? ready.mediaItems : [],
+    ...Array.isArray(ready.videoLinks) ? ready.videoLinks : [],
+    ...Array.isArray(ready.tourLinks) ? ready.tourLinks : []
   ]);
   return {
     id,
@@ -20913,7 +21205,7 @@ router$D.get("/", requireStaff, async (req, res) => {
     if (status2) query = query.where("status", "==", status2);
     if (orderId) query = query.where("orderId", "==", orderId);
     const snapshot = await query.limit(100).get();
-    return res.json(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
+    return res.json(snapshot.docs.map((d) => applyB2MediaUrls({ id: d.id, ...d.data() })));
   } catch (err) {
     return res.status(500).json({ error: "Failed to fetch galleries." });
   }
@@ -20967,16 +21259,19 @@ router$D.get("/public/:id/photos.zip", async (req, res) => {
     if (!clientGalleryDownloadsUnlocked(gate2)) {
       return res.status(403).json({ error: ICONIC_DOWNLOAD_LOCK.message });
     }
-    const photos = orderedGalleryMedia(Array.isArray(gallery.mediaItems) ? gallery.mediaItems : []).filter((item) => {
-      const type = String(item.type || "photo").toLowerCase();
-      return type === "photo" || type === "aerial" || type === "mls" || type === "image";
-    }).slice(0, 80);
+    const photos = orderedDownloadPlan(
+      (Array.isArray(gallery.mediaItems) ? gallery.mediaItems : []).filter((item) => {
+        const type = String(item.type || "photo").toLowerCase();
+        return type === "photo" || type === "aerial" || type === "mls" || type === "image";
+      }),
+      gallery
+    ).slice(0, 80);
     const entries = [];
-    for (const item of photos) {
-      const bytes = await readGalleryPhotoBytes(item);
+    for (const photo of photos) {
+      const bytes = photo.key ? await readB2Object(photo.key) : await readGalleryPhotoBytes(photo.item);
       if (!bytes?.length) continue;
       entries.push({
-        name: deliveryFileName(item),
+        name: photo.name,
         data: new Uint8Array(bytes)
       });
     }
@@ -21038,7 +21333,7 @@ router$D.get("/:id", requireAuth, async (req, res) => {
         clientName: gallery.clientName || null
       });
     }
-    return res.json({ id: doc.id, ...gallery });
+    return res.json(applyB2MediaUrls({ id: doc.id, ...gallery }));
   } catch (err) {
     return res.status(500).json({ error: "Failed to fetch gallery." });
   }
@@ -24864,6 +25159,7 @@ function collectTours(listing, galleries, store, savedOrder = false) {
       groupId: "",
       uploadedAt: portalTimestamp(row.uploadedAt || row.createdAt),
       ...deliveryName ? { downloadName: deliveryName } : {},
+      ...downloadLink(row, url),
       provider: provider || "Virtual tour",
       embedUrl: provider === "Matterport" ? url : null
     });
@@ -24900,7 +25196,8 @@ function finishMedia(kind, rows, prefs, include, savedOrder = false, listing = {
       order: savedOrder ? storedOrder ?? index + 1e5 : pref?.order ?? index,
       groupId: kind === "photo" ? savedOrder ? sectionId : groupIdText(pref?.groupId) : "",
       uploadedAt: portalTimestamp(row.uploadedAt || row.createdAt),
-      ...deliveryName ? { downloadName: deliveryName } : {}
+      ...deliveryName ? { downloadName: deliveryName } : {},
+      ...downloadLink(row, url)
     });
   });
   return items.sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
@@ -24920,8 +25217,13 @@ function galleryRows(galleries) {
   return rows;
 }
 function mediaId(kind, row, index) {
-  const raw = text$9(row.id) || text$9(row.path) || text$9(row.storagePath) || text$9(row.url) || text$9(row.shareUrl) || `${kind}-${index}`;
+  const raw = text$9(row.id) || text$9(row.path) || text$9(row.storagePath) || text$9(row.b2Key) || text$9(row.url) || text$9(row.shareUrl) || `${kind}-${index}`;
   return raw.slice(0, 180);
+}
+function downloadLink(row, viewUrl) {
+  const downloadUrl = safeHttpUrl(row.downloadUrl);
+  if (!downloadUrl || downloadUrl === viewUrl) return {};
+  return { downloadUrl };
 }
 const RAW_EXT$1 = /\.(cr2|cr3|nef|nrw|arw|srf|sr2|dng|raw|rw2|orf|raf|pef|3fr|fff|iiq|heic)$/i;
 const IMAGE_EXT$1 = /\.(jpe?g|png|webp|gif)$/i;
@@ -25775,7 +26077,7 @@ async function loadSources(listingId, listing) {
     readWhere("appointments", "listingId", listingId)
   ]);
   return {
-    listing,
+    listing: applyB2MediaUrls(listing),
     orderRequest,
     order,
     invoices: unique([
@@ -25783,7 +26085,7 @@ async function loadSources(listingId, listing) {
       ...legacyDocs,
       ...[...invoicesByListing, ...invoicesByOrder, ...invoicesByRequest].filter((record2) => !invoiceRedirectTarget(record2))
     ]),
-    galleries: unique([galleryDoc, ...galleriesByListing, ...galleriesByOrder]),
+    galleries: unique([galleryDoc, ...galleriesByListing, ...galleriesByOrder]).map((gallery) => applyB2MediaUrls(gallery)),
     appointments: unique([...appointmentsByRequest, ...appointmentsByOrder, ...appointmentsByListing])
   };
 }
@@ -28541,7 +28843,7 @@ router$v.get("/assigned", requirePhotographer, async (req, res) => {
       for (const doc of [...byUid.docs, ...byIds.docs]) merged.set(doc.id, doc);
       docs = [...merged.values()];
     }
-    const listings = docs.map((doc) => serializeDoc(doc.id, doc.data())).sort((a, b) => {
+    const listings = docs.map((doc) => applyB2MediaUrls(serializeDoc(doc.id, doc.data()))).sort((a, b) => {
       const aTime = Date.parse(String(a.apptDate || a.shootDate || "")) || 0;
       const bTime = Date.parse(String(b.apptDate || b.shootDate || "")) || 0;
       return bTime - aTime;
@@ -28557,10 +28859,14 @@ router$v.get("/:id", requireAuth, async (req, res) => {
   try {
     const listing = await assertListingAccess(req, req.params.id);
     const staffDoc = await db$e().collection("staff").doc(req.user.uid).get();
-    const payload = serializeDoc(listing.id, listing);
+    const payload = applyB2MediaUrls(serializeDoc(listing.id, listing));
     if (!staffDoc.exists) {
       delete payload.notes;
       delete payload.internalNotes;
+      delete payload.staffOnly;
+      delete payload.lockboxCode;
+      delete payload.supraCode;
+      delete payload.accessInfo;
     }
     return res.json(payload);
   } catch (err) {
@@ -39713,6 +40019,12 @@ const PUBLIC_PAGES = [
     description: "What Iconic Images does: listing photos, video, aerials, Snap Reels, twilight, and portraits in Spring, The Woodlands, and Houston."
   },
   {
+    path: "/video-team",
+    file: "seo/video-team.html",
+    title: "Meet Your Video Team | Iconic Images",
+    description: "Meet the Iconic Images video crew in Spring, The Woodlands, and Houston. Listing films, on-camera reels, events, and brand video."
+  },
+  {
     path: "/pricing",
     file: "seo/pricing.html",
     title: "Pricing | Iconic Images",
@@ -40208,12 +40520,12 @@ async function galleriesForListing(listingId, listing) {
   const docs = [];
   for (const id of ids) {
     const snap = await db$2().collection("galleries").doc(id).get();
-    if (snap.exists) docs.push({ id: snap.id, ...snap.data() });
+    if (snap.exists) docs.push(applyB2MediaUrls({ id: snap.id, ...snap.data() || {} }));
   }
   try {
     const linked = await db$2().collection("galleries").where("listingId", "==", listingId).limit(5).get();
     linked.docs.forEach((doc) => {
-      if (!docs.some((item) => item.id === doc.id)) docs.push({ id: doc.id, ...doc.data() });
+      if (!docs.some((item) => item.id === doc.id)) docs.push(applyB2MediaUrls({ id: doc.id, ...doc.data() || {} }));
     });
   } catch (err) {
     console.warn("[Presentation] Gallery lookup skipped.", err);
@@ -40224,7 +40536,7 @@ async function listingByToken(token) {
   const snap = await db$2().collection("listings").where("presentationToken", "==", token).limit(1).get();
   if (snap.empty) return null;
   const doc = snap.docs[0];
-  return { id: doc.id, ...doc.data() };
+  return applyB2MediaUrls({ id: doc.id, ...doc.data() || {} });
 }
 async function loadPresentation(token, origin) {
   if (token === PRESENTATION_PREVIEW_TOKEN) return seededPresentation(origin);
@@ -40409,14 +40721,14 @@ async function readPublishedListingSite(slug) {
   if (!isListingSiteSlug(slug)) return null;
   if (useMemory()) {
     for (const listing of memory$3.values()) {
-      const site = buildPublicListingSite(await withClientProfile(listing));
+      const site = buildPublicListingSite(applyB2MediaUrls(await withClientProfile(listing)));
       if (site?.slug === slug) return site;
     }
     return null;
   }
   const snap = await admin.firestore().collection("listings").where("listingSiteSlug", "==", slug).limit(5).get();
   for (const doc of snap.docs) {
-    const listing = jsonSafe({ id: doc.id, ...doc.data() || {} });
+    const listing = applyB2MediaUrls(jsonSafe({ id: doc.id, ...doc.data() || {} }));
     const site = buildPublicListingSite(await withClientProfile(listing));
     if (site?.slug === slug) return site;
   }
@@ -41264,6 +41576,7 @@ const PAGES = [
     ], [
       linkItem("home", "Home", "/"),
       linkItem("whatWeDo", "What we do", "/what-we-do"),
+      linkItem("videoTeam", "Video Team", "/video-team"),
       linkItem("pricing", "Pricing", "/pricing"),
       linkItem("socials", "Socials", "/socials"),
       linkItem("portfolio", "Portfolio", "/portfolio"),
