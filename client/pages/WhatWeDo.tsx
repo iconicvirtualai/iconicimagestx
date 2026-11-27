@@ -287,8 +287,14 @@ export default function WhatWeDo() {
 
         {shootHidden ? null : (
           <section className="scroll-mt-28 bg-black py-20 md:py-28">
-            <div className="mx-auto mb-8 max-w-6xl px-5 sm:px-8 md:px-12">
+            <div className="mx-auto mb-8 flex max-w-6xl flex-col gap-5 px-5 sm:px-8 md:flex-row md:items-end md:justify-between md:px-12">
               <Headline block="shoot" title={shootTitle} line={shootLine} />
+              <Link
+                to="/video-team"
+                className="inline-flex min-h-11 w-fit items-center justify-center rounded-full bg-[#0d9488] px-5 text-sm font-bold text-white transition-colors hover:bg-teal-600"
+              >
+                Meet Your Video Team
+              </Link>
             </div>
             <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto px-5 pb-2 [scrollbar-width:none] sm:px-8 [&::-webkit-scrollbar]:hidden md:mx-auto md:grid md:max-w-6xl md:grid-cols-4 md:overflow-visible md:px-12">
               {shoot.map((card) => (

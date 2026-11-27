@@ -35,7 +35,10 @@ describe("What we do", () => {
     expect(html).toContain("Book our Studio");
     expect(html).toContain('href="/book"');
     expect(html).toContain('href="/studio-105"');
-    expect(html).not.toMatch(/\$\s?\d/);
+    expect(html).toContain('href="/video-team"');
+    expect(html).toContain("Meet Your Video Team");
+    const withoutPromo = html.replace(/<a\b[^>]*data-testid="promo-bar"[\s\S]*?<\/a>/, "");
+    expect(withoutPromo).not.toMatch(/\$\s?\d/);
     expect(html).not.toMatch(/jazmin/i);
 
     const videos = [...html.matchAll(/<video\b[^>]*>/g)].map((match) => match[0]);

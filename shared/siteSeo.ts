@@ -59,6 +59,13 @@ export const PUBLIC_PAGES: readonly PublicPage[] = [
       "What Iconic Images does: listing photos, video, aerials, Snap Reels, twilight, and portraits in Spring, The Woodlands, and Houston.",
   },
   {
+    path: "/video-team",
+    file: "seo/video-team.html",
+    title: "Meet Your Video Team | Iconic Images",
+    description:
+      "Meet the Iconic Images video crew in Spring, The Woodlands, and Houston. Listing films, on-camera reels, events, and brand video.",
+  },
+  {
     path: "/pricing",
     file: "seo/pricing.html",
     title: "Pricing | Iconic Images",

@@ -18,6 +18,7 @@ export default function Footer() {
     : [
         { label: "Home", href: "/" },
         { label: "What we do", href: "/what-we-do" },
+        { label: "Video Team", href: "/video-team" },
         { label: "Pricing", href: "/pricing" },
         { label: "Socials", href: "/socials" },
         { label: "Portfolio", href: "/portfolio" },

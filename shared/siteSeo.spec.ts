@@ -58,6 +58,7 @@ describe("public page meta", () => {
       "/",
       "/about",
       "/what-we-do",
+      "/video-team",
       "/pricing",
       "/studio-105",
       "/portfolio",

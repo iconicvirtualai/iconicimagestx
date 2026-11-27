@@ -268,6 +268,8 @@ describe("spa rewrite coverage", () => {
     expect(footer).not.toContain("Admin Login");
     expect(footer).not.toContain("/admin/login");
     expect(footer).toContain("Client Login");
+    expect(footer).toContain('href: "/video-team"');
+    expect(readFileSync(new URL("../client/components/Header.tsx", import.meta.url), "utf8")).not.toContain("/video-team");
     expect(notFound).toContain("Oops! Page not found");
     expect(notFound).toContain("Return to Home");
     expect(notFound).toContain('content="noindex, nofollow"');
