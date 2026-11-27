@@ -3846,7 +3846,7 @@ function columnLetter(index) {
   }
   return out;
 }
-function columnIndex$1(letter) {
+function columnIndex(letter) {
   let n = 0;
   for (const char of letter.toUpperCase()) {
     if (char < "A" || char > "Z") return -1;
@@ -4487,8 +4487,8 @@ function parseSheetRange(range) {
   const a1 = range.slice(bang + 1).toUpperCase();
   const match = a1.match(/^([A-Z]+)(\d+)?(?::([A-Z]+)(\d+)?)?$/);
   if (!match) throw new Error(`Sheet range ${a1} is not a cell or column range.`);
-  const startCol = columnIndex$1(match[1]);
-  const endCol = match[3] ? columnIndex$1(match[3]) : startCol;
+  const startCol = columnIndex(match[1]);
+  const endCol = match[3] ? columnIndex(match[3]) : startCol;
   if (startCol < 0 || endCol < startCol) throw new Error(`Sheet range ${a1} is not ordered.`);
   return { tab, startCol, endCol };
 }
@@ -15505,13 +15505,13 @@ async function backfillHolidayCalendarEvents() {
   }
   return report;
 }
-const CACHE_MS$1 = 15e3;
+const CACHE_MS = 15e3;
 let cache$1 = null;
 let loggedReadFailure = false;
 async function suggestedAppointmentsAreEnabled(env = process.env, readStored = readStoredFlag, now = Date.now()) {
   const override = suggestedAppointmentsEnvOverride(env);
   if (override !== void 0) return override;
-  if (!cache$1 || now - cache$1.at > CACHE_MS$1) {
+  if (!cache$1 || now - cache$1.at > CACHE_MS) {
     cache$1 = { at: now, stored: await readStored() };
   }
   return suggestedAppointmentsEnabled(env, cache$1.stored);
@@ -15540,28 +15540,28 @@ function clientIp(req) {
   return req.ip || req.socket?.remoteAddress || "unknown";
 }
 function createRateLimiter(options) {
-  const hits2 = /* @__PURE__ */ new Map();
+  const hits = /* @__PURE__ */ new Map();
   return {
     check(key) {
       const now = options.now ? options.now() : Date.now();
       const windowStart = now - options.windowMs;
-      const recent = (hits2.get(key) ?? []).filter((stamp2) => stamp2 > windowStart);
+      const recent = (hits.get(key) ?? []).filter((stamp2) => stamp2 > windowStart);
       const max = typeof options.max === "function" ? options.max() : options.max;
       if (recent.length >= max) {
         const retryAfterSec = Math.max(1, Math.ceil((recent[0] + options.windowMs - now) / 1e3));
-        hits2.set(key, recent);
+        hits.set(key, recent);
         return { allowed: false, retryAfterSec };
       }
       recent.push(now);
-      hits2.set(key, recent);
-      if (hits2.size > 5e3) {
-        const oldest = hits2.keys().next().value;
-        if (oldest) hits2.delete(oldest);
+      hits.set(key, recent);
+      if (hits.size > 5e3) {
+        const oldest = hits.keys().next().value;
+        if (oldest) hits.delete(oldest);
       }
       return { allowed: true, retryAfterSec: 0 };
     },
     reset() {
-      hits2.clear();
+      hits.clear();
     }
   };
 }
@@ -32884,14 +32884,14 @@ function parsePlanBoard(sheets) {
       money2.set(business2, { revenue: null, expenses: null, sawRevenue: false, sawExpense: false });
     }
     rows.slice(headerAt + 1).forEach((row, index) => {
-      const business2 = businessOf(cellAt$2(row, headers.business));
-      const kind = sectionOf(cellAt$2(row, headers.section));
+      const business2 = businessOf(cellAt$1(row, headers.business));
+      const kind = sectionOf(cellAt$1(row, headers.section));
       if (!business2 || !kind) return;
       const purse = money2.get(business2);
       const buckets = lists.get(business2);
       if (!purse || !buckets) return;
       if (kind === "revenue" || kind === "expense") {
-        const amount = parseMoney(cellAt$2(row, headers.amount));
+        const amount = parseMoney(cellAt$1(row, headers.amount));
         if (kind === "revenue") {
           purse.sawRevenue = true;
           if (amount != null) purse.revenue = roundMoney((purse.revenue ?? 0) + amount);
@@ -32901,15 +32901,15 @@ function parsePlanBoard(sheets) {
         }
         return;
       }
-      const item = cellAt$2(row, headers.item);
+      const item = cellAt$1(row, headers.item);
       if (!item) return;
-      const status2 = cellAt$2(row, headers.status);
+      const status2 = cellAt$1(row, headers.status);
       buckets[kind].push({
         item,
-        date: dateKey(cellAt$2(row, headers.date)),
-        amount: parseMoney(cellAt$2(row, headers.amount)),
+        date: dateKey(cellAt$1(row, headers.date)),
+        amount: parseMoney(cellAt$1(row, headers.amount)),
         status: status2 || null,
-        notes: cellAt$2(row, headers.notes) || null,
+        notes: cellAt$1(row, headers.notes) || null,
         done: kind === "todos" && isDone(status2),
         index
       });
@@ -32956,7 +32956,7 @@ function headerMap(row) {
   if (map.business == null || map.section == null) return null;
   return map;
 }
-function cellAt$2(row, index) {
+function cellAt$1(row, index) {
   if (index == null) return "";
   return row[index] || "";
 }
@@ -33321,19 +33321,19 @@ function businesses(sheet) {
     const header2 = businessHeader(rows[headerAt]);
     if (header2) {
       return rows.slice(headerAt + 1).flatMap((row) => {
-        const name = cellAt$1(row, header2.name);
+        const name = cellAt(row, header2.name);
         if (!name || phraseHas(norm(name), "business")) return [];
-        const status2 = cellAt$1(row, header2.status);
-        const note = cellAt$1(row, header2.note) || null;
-        const targetRaw = cellAt$1(row, header2.targetAmount);
+        const status2 = cellAt(row, header2.status);
+        const note = cellAt(row, header2.note) || null;
+        const targetRaw = cellAt(row, header2.targetAmount);
         return [business(name, status2, note, {
-          milestone: cellAt$1(row, header2.milestone) || null,
-          milestoneDue: cellAt$1(row, header2.milestoneDue) || null,
-          nextDate: cellAt$1(row, header2.nextDate) || null,
-          target: cellAt$1(row, header2.target) || null,
+          milestone: cellAt(row, header2.milestone) || null,
+          milestoneDue: cellAt(row, header2.milestoneDue) || null,
+          nextDate: cellAt(row, header2.nextDate) || null,
+          target: cellAt(row, header2.target) || null,
           targetAmount: parseMoney(targetRaw),
-          owners: cellAt$1(row, header2.owners) || null,
-          profitCheck: cellAt$1(row, header2.profitCheck) || null
+          owners: cellAt(row, header2.owners) || null,
+          profitCheck: cellAt(row, header2.profitCheck) || null
         })];
       }).filter((item) => item.name);
     }
@@ -33374,7 +33374,7 @@ function businessHeader(row) {
 function looseHeader(value) {
   return value.toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9$%]+/g, " ").replace(/\s+/g, " ").trim();
 }
-function cellAt$1(row, index) {
+function cellAt(row, index) {
   if (index == null) return "";
   return row[index] || "";
 }
@@ -33962,40 +33962,7 @@ function planBoardFixture() {
   };
 }
 const SHEETS_READONLY_SCOPE = "https://www.googleapis.com/auth/spreadsheets.readonly";
-const CACHE_MS = 6e4;
 const ERROR_CACHE_MS = 15e3;
-const TAB_ALIASES = [
-  { aliases: ["friday scorecard"] },
-  { aliases: ["this week"] },
-  { aliases: ["100k tracker"] },
-  { aliases: ["businesses"] },
-  { aliases: ["30 60 90"] },
-  { aliases: ["owes"] },
-  { aliases: ["decisions"] },
-  { aliases: ["action log"] },
-  { aliases: ["plan board data", "plan board"] }
-];
-function selectOwnerTabs(titles) {
-  const cleaned = titles.filter(Boolean);
-  const picked = [];
-  for (const wanted of TAB_ALIASES) {
-    const match = matchOwnerTab(cleaned, wanted.aliases);
-    if (match && !picked.includes(match)) picked.push(match);
-  }
-  return picked;
-}
-function matchOwnerTab(titles, aliases) {
-  const named = titles.map((title) => ({ title, name: normalizeTabTitle(title) }));
-  for (const alias of aliases) {
-    const exact = named.find((item) => item.name === alias);
-    if (exact) return exact.title;
-  }
-  for (const alias of aliases) {
-    const partial = named.find((item) => item.name.includes(alias));
-    if (partial) return partial.title;
-  }
-  return void 0;
-}
 let cache = null;
 function resolveSheetsCredentials(env = ownerRuntimeEnv()) {
   const fromFirebase = credentialsFromJson(env.FIREBASE_SERVICE_ACCOUNT);
@@ -34045,36 +34012,6 @@ function credentialsFromJson(raw) {
   } catch {
     return null;
   }
-}
-function createReadonlySheetsClient(credentials) {
-  const auth = new google.auth.JWT({
-    email: credentials.client_email,
-    key: credentials.private_key,
-    scopes: [SHEETS_READONLY_SCOPE]
-  });
-  return google.sheets({ version: "v4", auth });
-}
-async function fetchScorecard(_credentials) {
-  return [];
-}
-async function fetchScorecardUnused(credentials) {
-  const sheets = createReadonlySheetsClient(credentials);
-  const meta = await sheets.spreadsheets.get({
-    spreadsheetId: undefined,
-    fields: "sheets.properties.title"
-  });
-  const titles = (meta.data.sheets || []).map((sheet) => sheet.properties?.title || "").filter(Boolean);
-  const matched = selectOwnerTabs(titles);
-  if (!matched.length) return [];
-  const values = await sheets.spreadsheets.values.batchGet({
-    spreadsheetId: undefined,
-    ranges: matched.map((title) => `'${title.replace(/'/g, "''")}'`),
-    valueRenderOption: "FORMATTED_VALUE"
-  });
-  return (values.data.valueRanges || []).map((range, index) => ({
-    title: matched[index] || "",
-    rows: (range.values || []).map((row) => row.map((cell2) => cell2 == null ? "" : String(cell2)))
-  }));
 }
 function empty(note, configured = false) {
   return { configured, note, people: [], blockedEmails: [], blockedPhones: [], blockedNames: [], truncated: false };
@@ -40387,7 +40324,6 @@ const handleListingPhotoUpload = async (req, res) => {
 const DEFAULT_SITE_ORIGIN = "https://iconicimagestx.vercel.app";
 const CANONICAL_WWW_ORIGIN = "https://www.iconicimagestx.com";
 const OG_IMAGE_PATH = "/media/photos/drone-hero.jpg";
-const GENERIC_TITLE = "Iconic Images - Creative Media Partners";
 const PUBLIC_PAGES = [
   {
     path: "/",
@@ -40966,7 +40902,7 @@ async function renderPresentationShell(token, origin) {
     if (!presentation) {
       return { status: 404, html: "<!doctype html><title>Presentation</title><p>This presentation link is not active.</p>" };
     }
-    const shell2 = await readSpaShell$3();
+    const shell2 = await readSpaShell$2();
     const html = shell2 ? injectPresentationMeta(shell2, presentation.meta) : standalonePresentation(presentation);
     return { status: 200, html };
   } catch (err) {
@@ -41028,7 +40964,7 @@ router$b.post("/listings/:id/presentation", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "The presentation link could not be saved." });
   }
 });
-async function readSpaShell$3() {
+async function readSpaShell$2() {
   const candidates = [
     path$1.join(process.cwd(), "dist/spa/index.html")
   ];
@@ -41167,7 +41103,7 @@ async function renderListingSiteShell(slug) {
     if (!site) {
       return { status: 404, html: "<!doctype html><title>Listing</title><p>This listing site is not published.</p>" };
     }
-    const shell2 = readSpaShell$2();
+    const shell2 = readSpaShell$1();
     if (shell2) return { status: 200, html: shell2 };
     return {
       status: 200,
@@ -41213,7 +41149,7 @@ const handleListingSiteInquiry = async (req, res) => {
     return res.status(500).json({ error: "The request could not be saved." });
   }
 };
-function readSpaShell$2() {
+function readSpaShell$1() {
   const candidates = [
     path.resolve(process.cwd(), "dist/spa/index.html"),
     path.resolve(process.cwd(), "dist/index.html")
@@ -41457,38 +41393,9 @@ router$9.get("/inbox", requireAdmin, async (_req, res) => {
   const snapshot = await readPhotosInbox(process.env);
   return res.json(snapshot);
 });
-const OWNER_ORDERS_TAB = "Orders";
-const OWNER_ORDERS_HEADERS = [
-  "Timestamp CT",
-  "Order text",
-  "Status",
-  "Owner bot",
-  "Cadi 2.0 reply"
-];
 const OWNER_ORDER_TEXT_MAX = 2e3;
-const OWNER_ORDER_STATUS_NEW = "New";
-const ORDERS_WRITE_SCOPE = "https://www.googleapis.com/auth/spreadsheets";
-const MINUTE_MS = 6e4;
-const DAY_MS = 24 * 60 * 60 * 1e3;
-const OWNER_ORDER_MINUTE_LIMIT = 5;
-const OWNER_ORDER_DAY_LIMIT = 50;
 const FORMULA_LEAD = /^[=+\-@]/;
 const NOT_CONNECTED = "Orders are not connected.";
-const hits = /* @__PURE__ */ new Map();
-function formatOrderTimestampCt(now) {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Chicago",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true
-  }).formatToParts(now);
-  const read = (type) => parts.find((part) => part.type === type)?.value || "";
-  const period = read("dayPeriod").toUpperCase().startsWith("P") ? "PM" : "AM";
-  return `${read("year")}-${read("month")}-${read("day")} ${read("hour")}:${read("minute")} ${period} CT`;
-}
 function neutralizeSheetFormula(text2) {
   return FORMULA_LEAD.test(text2) ? `'${text2}` : text2;
 }
@@ -41501,29 +41408,6 @@ function prepareOwnerOrderText(raw) {
   }
   return { ok: true, text: neutralizeSheetFormula(trimmed) };
 }
-function consumeOwnerOrderRateLimit(email, now) {
-  const key = email.trim().toLowerCase();
-  const recent = (hits.get(key) || []).filter((stamp2) => now - stamp2 < DAY_MS);
-  const inMinute = recent.filter((stamp2) => now - stamp2 < MINUTE_MS);
-  if (inMinute.length >= OWNER_ORDER_MINUTE_LIMIT) {
-    hits.set(key, recent);
-    return { ok: false, error: "Too many orders. You can submit 5 per minute." };
-  }
-  if (recent.length >= OWNER_ORDER_DAY_LIMIT) {
-    hits.set(key, recent);
-    return { ok: false, error: "Too many orders. You can submit 50 per day." };
-  }
-  recent.push(now);
-  hits.set(key, recent);
-  return { ok: true };
-}
-function releaseOwnerOrderRateLimit(email, now) {
-  const key = email.trim().toLowerCase();
-  const recent = hits.get(key);
-  if (!recent) return;
-  const index = recent.lastIndexOf(now);
-  if (index >= 0) recent.splice(index, 1);
-}
 async function listOwnerOrders() {
   return { orders: [], configured: false, notice: NOT_CONNECTED, readerEmail: null };
 }
@@ -41532,111 +41416,8 @@ async function submitOwnerOrder(input) {
   if ("error" in prepared) return { ok: false, status: 400, error: prepared.error };
   return { ok: false, status: 503, error: NOT_CONNECTED };
 }
-function createOrdersWriteClient(credentials) {
-  const auth = new google.auth.JWT({
-    email: credentials.client_email,
-    key: credentials.private_key,
-    scopes: [ORDERS_WRITE_SCOPE]
-  });
-  return google.sheets({ version: "v4", auth });
-}
-async function readTitles(sheets) {
-  const meta = await sheets.spreadsheets.get({
-    spreadsheetId: undefined,
-    fields: "sheets.properties.title"
-  });
-  return (meta.data.sheets || []).map((sheet) => sheet.properties?.title || "").filter(Boolean);
-}
-async function readOrders(sheets) {
-  const titles = await readTitles(sheets);
-  if (!titles.includes(OWNER_ORDERS_TAB)) return [];
-  const response = await sheets.spreadsheets.values.get({
-    spreadsheetId: undefined,
-    range: sheetRange("A:E"),
-    valueRenderOption: "FORMATTED_VALUE"
-  });
-  return parseOrderRows(response.data.values || []);
-}
-async function appendOrder(sheets, text2, now) {
-  const titles = await readTitles(sheets);
-  if (!titles.includes(OWNER_ORDERS_TAB)) {
-    await sheets.spreadsheets.batchUpdate({
-      spreadsheetId: undefined,
-      requestBody: {
-        requests: [
-          {
-            addSheet: {
-              properties: {
-                title: OWNER_ORDERS_TAB,
-                gridProperties: { frozenRowCount: 1 }
-              }
-            }
-          }
-        ]
-      }
-    });
-    await sheets.spreadsheets.values.update({
-      spreadsheetId: undefined,
-      range: sheetRange("A1:E1"),
-      valueInputOption: "RAW",
-      requestBody: { values: [Array.from(OWNER_ORDERS_HEADERS)] }
-    });
-  }
-  const order = {
-    timestamp: formatOrderTimestampCt(now),
-    text: text2,
-    status: OWNER_ORDER_STATUS_NEW,
-    ownerBot: "",
-    reply: ""
-  };
-  await sheets.spreadsheets.values.append({
-    spreadsheetId: undefined,
-    range: sheetRange("A:E"),
-    valueInputOption: "RAW",
-    insertDataOption: "INSERT_ROWS",
-    requestBody: {
-      values: [[order.timestamp, order.text, order.status, order.ownerBot, order.reply]]
-    }
-  });
-  return order;
-}
-function parseOrderRows(values) {
-  const rows = values.map((row) => row.map((cell2) => cell2 == null ? "" : String(cell2)));
-  if (!rows.length) return [];
-  const header2 = looksLikeHeader(rows[0]) ? rows[0] : [];
-  const data = header2.length ? rows.slice(1) : rows;
-  const timestampAt = columnIndex(header2, "Timestamp CT", 0);
-  const textAt = columnIndex(header2, "Order text", 1);
-  const statusAt = columnIndex(header2, "Status", 2);
-  const ownerBotAt = columnIndex(header2, "Owner bot", 3);
-  const replyAt = columnIndex(header2, "Cadi 2.0 reply", 4);
-  const orders = data.map((row) => ({
-    timestamp: cellAt(row, timestampAt),
-    text: cellAt(row, textAt),
-    status: cellAt(row, statusAt),
-    ownerBot: cellAt(row, ownerBotAt),
-    reply: cellAt(row, replyAt)
-  })).filter((order) => order.timestamp || order.text || order.status || order.ownerBot || order.reply);
-  return orders.slice(-10).reverse();
-}
-function looksLikeHeader(row) {
-  const cells = row.map((cell2) => cell2.trim());
-  return cells.includes("Timestamp CT") || cells.includes("Order text");
-}
-function columnIndex(header2, name, fallback) {
-  const index = header2.findIndex((cell2) => cell2.trim() === name);
-  return index >= 0 ? index : fallback;
-}
-function cellAt(row, index) {
-  return (row[index] || "").trim();
-}
-function sheetRange(a1) {
-  return `'${OWNER_ORDERS_TAB.replace(/'/g, "''")}'!${a1}`;
-}
 const OWNER_WHY = "Freedom to be outside with my dogs, kids, nieces, pig and garden, and to fly to Puerto Rico whenever I want. More traveling, more giving.";
 const NOT_FOUND = { error: "Not found" };
-const OWNER_LOGIN_REDIRECT = "/admin/login?next=/admin/owners";
-const OWNER_PAGE_PATHS = /* @__PURE__ */ new Set(["/admin/owners", "/admin/owners/", "/owners", "/owners/"]);
 function mountOwners(app) {
   app.get("/api/owners/suite", (req, res) => {
     void handleSuite(req, res);
@@ -41702,24 +41483,6 @@ async function handleSession(req, res) {
   res.setHeader("Set-Cookie", sessionCookieHeader(token));
   return res.status(200).json({ ok: true });
 }
-async function handleOwnersPage(req, res) {
-  setPrivate(res);
-  const owner = await resolveOwnerIdentity(req.headers);
-  if (!owner) {
-    if (OWNER_PAGE_PATHS.has(req.path) && !hasBearer(req)) {
-      res.setHeader("Location", OWNER_LOGIN_REDIRECT);
-      return res.status(302).end();
-    }
-    return res.status(404).type("html").send(NOT_FOUND_HTML);
-  }
-  const html = injectDevPreamble(injectRobots(await readSpaShell$1() || FALLBACK_SHELL));
-  return res.status(200).type("html").send(html);
-}
-function hasBearer(req) {
-  const value = req.headers.authorization;
-  const header2 = Array.isArray(value) ? value[0] : value;
-  return typeof header2 === "string" && header2.trim().length > 0;
-}
 function setPrivate(res) {
   res.setHeader("Cache-Control", "private, no-store, max-age=0");
   res.setHeader("Pragma", "no-cache");
@@ -41729,72 +41492,6 @@ function setPrivate(res) {
   res.setHeader("Referrer-Policy", "no-referrer");
   res.setHeader("Vary", "Cookie, Authorization");
 }
-function injectDevPreamble(html) {
-  if (process.env.ICONIC_VITE_DEV !== "1" || html.includes("/@react-refresh")) return html;
-  const preamble = `<script type="module">
-import { injectIntoGlobalHook } from "/@react-refresh";
-injectIntoGlobalHook(window);
-window.$RefreshReg$ = () => {};
-window.$RefreshSig$ = () => (type) => type;
-<\/script>`;
-  return html.includes("</head>") ? html.replace("</head>", `${preamble}
-  </head>`) : `${preamble}${html}`;
-}
-function injectRobots(html) {
-  let next = stripPublicMeta(html).replace(/<title>[\s\S]*?<\/title>/i, `<title>${GENERIC_TITLE}</title>`);
-  const robots = '<meta name="robots" content="noindex, nofollow" />';
-  if (!next.includes("<title>")) {
-    next = next.includes("</head>") ? next.replace("</head>", `    <title>${GENERIC_TITLE}</title>
-  </head>`) : `<title>${GENERIC_TITLE}</title>${next}`;
-  }
-  if (next.includes("</head>")) {
-    return next.replace("</head>", `    ${robots}
-  </head>`);
-  }
-  return `<!doctype html>${robots}${next}`;
-}
-async function readSpaShell$1() {
-  const source = path$1.join(process.cwd(), "index.html");
-  const dist = path$1.join(process.cwd(), "dist/spa/index.html");
-  const preferred = process.env.ICONIC_VITE_DEV === "1" ? [source, dist] : [dist, source];
-  for (const file of preferred) {
-    try {
-      return await fs$1.readFile(file, "utf8");
-    } catch {
-      continue;
-    }
-  }
-  return null;
-}
-const NOT_FOUND_HTML = `<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="robots" content="noindex, nofollow" />
-    <title>Page not found</title>
-  </head>
-  <body style="margin:0;min-height:clamp(560px,50vw,820px);display:flex;align-items:center;justify-content:center;background:#f3f4f6;font-family:Inter,system-ui,sans-serif;color:#111827">
-    <div style="text-align:center">
-      <h1 style="font-size:2.25rem;margin:0 0 .75rem">404</h1>
-      <p style="margin:0 0 1rem;color:#4b5563">Page not found</p>
-      <a href="/" style="color:#3b82f6">Return to Home</a>
-    </div>
-  </body>
-</html>`;
-const FALLBACK_SHELL = `<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="robots" content="noindex, nofollow" />
-    <title>Iconic Images</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/client/main.tsx"><\/script>
-  </body>
-</html>`;
 const CLIENT_REVIEWS = [
   {
     initials: "R.J.",
