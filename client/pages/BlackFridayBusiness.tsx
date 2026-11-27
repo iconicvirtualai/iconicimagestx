@@ -122,7 +122,7 @@ export default function BlackFridayBusiness() {
     <Layout>
       <div className="min-h-screen bg-[#f4eee4] text-[#141414]">
         <section data-testid="bfb-hero" className="bg-[#0b0b0b] px-4 pb-14 pt-36 text-white sm:px-6 sm:pb-16 sm:pt-40">
-          <div className="mx-auto grid max-w-6xl items-center gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(240px,320px)] lg:gap-x-14">
+          <div className="mx-auto grid max-w-6xl items-center gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(280px,380px)] lg:gap-x-14">
             <div className="order-1">
               <p className="inline-flex rounded-full bg-gradient-to-r from-[#0b0b0b] via-[#c9a227] to-[#e6c35c] px-4 py-1.5 text-xs font-black uppercase tracking-[0.18em] text-white shadow-sm ring-1 ring-[#e6c35c]/40 [text-shadow:0_1px_1px_rgba(0,0,0,0.9)]">
                 Black Friday · Business
@@ -133,12 +133,11 @@ export default function BlackFridayBusiness() {
             </div>
             <figure
               data-testid="bfb-video"
-              className="order-2 mx-auto w-[min(220px,68vw)] overflow-hidden rounded-[1.75rem] bg-black shadow-[0_24px_60px_rgba(0,0,0,0.45)] ring-1 ring-[#e6c35c]/45 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:mx-0 lg:w-full lg:justify-self-end"
+              className="order-2 mx-auto w-[min(248px,72vw)] overflow-hidden rounded-xl bg-black shadow-[0_24px_60px_rgba(0,0,0,0.45)] ring-1 ring-[#e6c35c]/45 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:mx-0 lg:w-full lg:justify-self-end lg:rounded-[1.25rem]"
             >
               <video
                 className="aspect-[9/16] h-auto w-full bg-black object-contain"
-                poster="/marketing/black-friday-business/black-friday-business-poster.jpg"
-                controls
+                poster="/marketing/black-friday-business/black-friday-business-poster.jpg?v=2"
                 playsInline
                 muted
                 autoPlay
@@ -146,9 +145,9 @@ export default function BlackFridayBusiness() {
                 preload="metadata"
                 width={1080}
                 height={1920}
-                aria-label="Black Friday social packages"
+                aria-label="Black Friday Reel: Socials done for you. Now go back to work."
               >
-                <source src="/marketing/black-friday-business/black-friday-business-ad.mp4" type="video/mp4" />
+                <source src="/marketing/black-friday-business/black-friday-business-ad.mp4?v=2" type="video/mp4" />
               </video>
             </figure>
             <div className="order-3 lg:col-start-1">
