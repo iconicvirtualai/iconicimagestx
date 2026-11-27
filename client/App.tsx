@@ -38,6 +38,7 @@ const OrderNumberFaces = import.meta.env.DEV
 // Public pages
 import Index from "./pages/Index";
 import About from "./pages/About";
+import AboutOwner from "./pages/AboutOwner";
 import WhatWeDo from "./pages/WhatWeDo";
 import VideoTeam from "./pages/VideoTeam";
 import Portfolio from "./pages/Portfolio";
@@ -194,6 +195,7 @@ const App = () => (
             {/* ─── Public Routes ─────────────────────────────────────────── */}
             <Route path="/" element={<Index />} />
             <Route path="/about" element={<About />} />
+            <Route path="/about/cadi" element={<AboutOwner />} />
             <Route path="/what-we-do" element={<WhatWeDo />} />
             <Route path="/video-team" element={<VideoTeam />} />
             <Route path="/portfolio" element={<Portfolio />} />

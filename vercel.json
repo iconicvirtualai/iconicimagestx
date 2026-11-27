@@ -793,6 +793,26 @@
       ]
     },
     {
+      "source": "/about/cadi",
+      "destination": "/seo/www/about-cadi.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/about/cadi/",
+      "destination": "/seo/www/about-cadi.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.iconicimagestx.com"
+        }
+      ]
+    },
+    {
       "source": "/what-we-do",
       "destination": "/seo/www/what-we-do.html",
       "has": [
@@ -1195,6 +1215,26 @@
     {
       "source": "/about/",
       "destination": "/seo/www/about.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/about/cadi",
+      "destination": "/seo/www/about-cadi.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/about/cadi/",
+      "destination": "/seo/www/about-cadi.html",
       "has": [
         {
           "type": "host",
@@ -1729,6 +1769,14 @@
     {
       "source": "/about/",
       "destination": "/seo/about.html"
+    },
+    {
+      "source": "/about/cadi",
+      "destination": "/seo/about-cadi.html"
+    },
+    {
+      "source": "/about/cadi/",
+      "destination": "/seo/about-cadi.html"
     },
     {
       "source": "/what-we-do",
