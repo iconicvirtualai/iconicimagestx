@@ -1,27 +1,14 @@
 /**
  * Orders for Cadi 2.0.
- * Reads use the readonly Sheets client. Writes use a separate client whose
- * only scope is https://www.googleapis.com/auth/spreadsheets.
- * Cell values are sent as RAW so Sheets does not evaluate them.
+ * The owners portal workbook is no longer read or written.
  */
 
-import { google } from "googleapis";
 import {
-  OWNER_ORDER_STATUS_NEW,
   OWNER_ORDER_TEXT_MAX,
-  OWNER_ORDERS_HEADERS,
-  OWNER_ORDERS_TAB,
   type OwnerOrder,
   type OwnerOrdersResponse,
 } from "../../shared/ownerOrders";
-import {
-  OWNER_SHEET_ID,
-  createReadonlySheetsClient,
-  resolveSheetsCredentials,
-  type SheetsCredentials,
-} from "./ownerSheets";
 
-const ORDERS_WRITE_SCOPE = "https://www.googleapis.com/auth/spreadsheets";
 const MINUTE_MS = 60_000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 export const OWNER_ORDER_MINUTE_LIMIT = 5;
@@ -29,8 +16,6 @@ export const OWNER_ORDER_DAY_LIMIT = 50;
 
 const FORMULA_LEAD = /^[=+\-@]/;
 const NOT_CONNECTED = "Orders are not connected.";
-
-type SheetsClient = ReturnType<typeof createReadonlySheetsClient>;
 
 const hits = new Map<string, number[]>();
 
@@ -97,13 +82,7 @@ export type SubmitOwnerOrderResult =
   | { ok: false; status: 400 | 429 | 503; error: string };
 
 export async function listOwnerOrders(): Promise<OwnerOrdersResponse> {
-  const credentials = resolveSheetsCredentials();
-  if (!credentials) {
-    return { orders: [], configured: false, notice: NOT_CONNECTED, readerEmail: null };
-  }
-  const sheets = createReadonlySheetsClient(credentials);
-  const orders = await readOrders(sheets);
-  return { orders, configured: true, notice: null, readerEmail: credentials.client_email };
+  return { orders: [], configured: false, notice: NOT_CONNECTED, readerEmail: null };
 }
 
 export async function submitOwnerOrder(input: {
@@ -113,135 +92,5 @@ export async function submitOwnerOrder(input: {
 }): Promise<SubmitOwnerOrderResult> {
   const prepared = prepareOwnerOrderText(input.raw);
   if ("error" in prepared) return { ok: false, status: 400, error: prepared.error };
-  const credentials = resolveSheetsCredentials();
-  if (!credentials) return { ok: false, status: 503, error: NOT_CONNECTED };
-
-  const now = input.now ?? new Date();
-  const nowMs = now.getTime();
-  const limit = consumeOwnerOrderRateLimit(input.ownerEmail, nowMs);
-  if ("error" in limit) return { ok: false, status: 429, error: limit.error };
-
-  try {
-    const sheets = createOrdersWriteClient(credentials);
-    const order = await appendOrder(sheets, prepared.text, now);
-    return { ok: true, order };
-  } catch (error) {
-    releaseOwnerOrderRateLimit(input.ownerEmail, nowMs);
-    throw error;
-  }
-}
-
-function createOrdersWriteClient(credentials: SheetsCredentials) {
-  const auth = new google.auth.JWT({
-    email: credentials.client_email,
-    key: credentials.private_key,
-    scopes: [ORDERS_WRITE_SCOPE],
-  });
-  return google.sheets({ version: "v4", auth });
-}
-
-async function readTitles(sheets: SheetsClient): Promise<string[]> {
-  const meta = await sheets.spreadsheets.get({
-    spreadsheetId: OWNER_SHEET_ID,
-    fields: "sheets.properties.title",
-  });
-  return (meta.data.sheets || [])
-    .map((sheet) => sheet.properties?.title || "")
-    .filter(Boolean);
-}
-
-async function readOrders(sheets: SheetsClient): Promise<OwnerOrder[]> {
-  const titles = await readTitles(sheets);
-  if (!titles.includes(OWNER_ORDERS_TAB)) return [];
-  const response = await sheets.spreadsheets.values.get({
-    spreadsheetId: OWNER_SHEET_ID,
-    range: sheetRange("A:E"),
-    valueRenderOption: "FORMATTED_VALUE",
-  });
-  return parseOrderRows(response.data.values || []);
-}
-
-async function appendOrder(sheets: SheetsClient, text: string, now: Date): Promise<OwnerOrder> {
-  const titles = await readTitles(sheets);
-  if (!titles.includes(OWNER_ORDERS_TAB)) {
-    await sheets.spreadsheets.batchUpdate({
-      spreadsheetId: OWNER_SHEET_ID,
-      requestBody: {
-        requests: [
-          {
-            addSheet: {
-              properties: {
-                title: OWNER_ORDERS_TAB,
-                gridProperties: { frozenRowCount: 1 },
-              },
-            },
-          },
-        ],
-      },
-    });
-    await sheets.spreadsheets.values.update({
-      spreadsheetId: OWNER_SHEET_ID,
-      range: sheetRange("A1:E1"),
-      valueInputOption: "RAW",
-      requestBody: { values: [Array.from(OWNER_ORDERS_HEADERS)] },
-    });
-  }
-
-  const order: OwnerOrder = {
-    timestamp: formatOrderTimestampCt(now),
-    text,
-    status: OWNER_ORDER_STATUS_NEW,
-    ownerBot: "",
-    reply: "",
-  };
-  await sheets.spreadsheets.values.append({
-    spreadsheetId: OWNER_SHEET_ID,
-    range: sheetRange("A:E"),
-    valueInputOption: "RAW",
-    insertDataOption: "INSERT_ROWS",
-    requestBody: {
-      values: [[order.timestamp, order.text, order.status, order.ownerBot, order.reply]],
-    },
-  });
-  return order;
-}
-
-function parseOrderRows(values: unknown[][]): OwnerOrder[] {
-  const rows = values.map((row) => row.map((cell) => (cell == null ? "" : String(cell))));
-  if (!rows.length) return [];
-  const header = looksLikeHeader(rows[0]) ? rows[0] : [];
-  const data = header.length ? rows.slice(1) : rows;
-  const timestampAt = columnIndex(header, "Timestamp CT", 0);
-  const textAt = columnIndex(header, "Order text", 1);
-  const statusAt = columnIndex(header, "Status", 2);
-  const ownerBotAt = columnIndex(header, "Owner bot", 3);
-  const replyAt = columnIndex(header, "Cadi 2.0 reply", 4);
-  const orders = data
-    .map((row) => ({
-      timestamp: cellAt(row, timestampAt),
-      text: cellAt(row, textAt),
-      status: cellAt(row, statusAt),
-      ownerBot: cellAt(row, ownerBotAt),
-      reply: cellAt(row, replyAt),
-    }))
-    .filter((order) => order.timestamp || order.text || order.status || order.ownerBot || order.reply);
-  return orders.slice(-10).reverse();
-}
-
-function looksLikeHeader(row: string[]): boolean {
-  const cells = row.map((cell) => cell.trim());
-  return cells.includes("Timestamp CT") || cells.includes("Order text");
-}
-
-function columnIndex(header: string[], name: string, fallback: number): number {
-  const index = header.findIndex((cell) => cell.trim() === name);
-  return index >= 0 ? index : fallback;
-}
-
-function cellAt(row: string[], index: number): string {
-  return (row[index] || "").trim();
-}
-
-function sheetRange(a1: string): string {
-  return `'${OWNER_ORDERS_TAB.replace(/'/g, "''")}'!${a1}`;
+  return { ok: false, status: 503, error: NOT_CONNECTED };
 }

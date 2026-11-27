@@ -35,23 +35,28 @@ function unscheduled(id = "order-123", orderNumber = 123) {
 }
 
 describe("task board derivation", () => {
-  it("builds one schedule task with an order link and does not duplicate it", () => {
-    const input = { orderRequests: [unscheduled()] };
-    const first = buildTaskBoard(input);
-    const again = buildTaskBoard({ ...input, overlays: first.tasks.map(taskToOverlay) });
-    expect(first.tasks).toHaveLength(1);
-    expect(first.tasks[0]).toMatchObject({
-      title: "Schedule order #123",
-      stage: "queued",
-      primaryHref: "/admin/order-request/order-123",
-      primaryHrefLabel: "Open order",
-    });
-    expect(again.tasks.map((task) => task.id)).toEqual(first.tasks.map((task) => task.id));
+  it("does not turn an unscheduled order into an assign-order card", () => {
+    const board = buildTaskBoard({ orderRequests: [unscheduled()] });
+    expect(board.tasks).toHaveLength(0);
+    expect(board.tasks.some((task) => /schedule order/i.test(task.title) || task.origin === "schedule")).toBe(false);
   });
 
   it("keeps a dismissal until the source issue changes", () => {
-    const input = { orderRequests: [unscheduled()] };
+    const gallery = {
+      id: "gallery-128",
+      status: "ready_for_review",
+      listingId: "listing-128",
+      orderId: "order-128",
+      addressLabel: "200 Sample Avenue",
+      mediaCount: 10,
+    };
+    const input = {
+      orderRequests: [{ ...unscheduled("order-128", 128), status: "scheduled" }],
+      galleries: [gallery],
+      listings: [{ id: "listing-128", address: "200 Sample Avenue" }],
+    };
     const task = buildTaskBoard(input).tasks[0];
+    expect(task.service).toBe("deliver");
     const hidden = buildTaskBoard({
       ...input,
       overlays: [{ ...taskToOverlay(task), dismissed: true, fingerprint: task.fingerprint }],
@@ -62,7 +67,8 @@ describe("task board derivation", () => {
     expect(hidden.cleared[0].orderHref).toBe(task.orderHref);
 
     const returned = buildTaskBoard({
-      orderRequests: [{ ...unscheduled(), status: "new" }],
+      ...input,
+      galleries: [{ ...gallery, status: "needs_release" }],
       overlays: [{ ...taskToOverlay(task), dismissed: true, fingerprint: task.fingerprint }],
     });
     expect(returned.tasks).toHaveLength(1);
@@ -105,8 +111,7 @@ describe("task board derivation", () => {
     expect(deliver).toHaveLength(1);
     expect(deliver[0].title).toBe("Deliver order #128");
     expect(deliver[0].primaryHref).toContain("/admin/ops?stage=review");
-    expect(first.tasks.some((task) => task.title === "Schedule order #128")).toBe(false);
-    expect(first.tasks.some((task) => task.title === "Schedule order #123")).toBe(true);
+    expect(first.tasks.some((task) => /schedule order/i.test(task.title) || task.origin === "schedule")).toBe(false);
     expect(first.tasks.some((task) => task.pipelineKey.includes("gallery-pending"))).toBe(false);
     expect(first.tasks.some((task) => task.pipelineKey.includes("order-done"))).toBe(false);
 
@@ -116,7 +121,18 @@ describe("task board derivation", () => {
   });
 
   it("moves a task to the next stage without creating another row", () => {
-    const input = { orderRequests: [unscheduled()] };
+    const input = {
+      orderRequests: [{ ...unscheduled("order-128", 128), status: "scheduled" }],
+      galleries: [{
+        id: "gallery-128",
+        status: "ready_for_review",
+        listingId: "listing-128",
+        orderId: "order-128",
+        addressLabel: "200 Sample Avenue",
+        mediaCount: 10,
+      }],
+      listings: [{ id: "listing-128", address: "200 Sample Avenue" }],
+    };
     const original = buildTaskBoard(input).tasks;
     const moved = withStage(original, original[0].id, "production", "2026-11-08T15:00:00.000Z");
     expect(moved).toHaveLength(1);
@@ -225,7 +241,7 @@ describe("task board derivation", () => {
       query: "",
       prioritySort: false,
     });
-    expect(manual.map((task) => task.title)[0]).toBe("Schedule order #123");
+    expect(manual.map((task) => task.title)[0]).toBe("Deliver order #128");
     const reordered = reorderTasks(board.tasks, manual[0].id, manual[2].id);
     expect(reordered.find((task) => task.id === manual[0].id)?.sort).not.toBe(manual[0].sort);
     expect(board.tasks.map((task) => task.sort)).toEqual(before);
@@ -233,7 +249,7 @@ describe("task board derivation", () => {
 
   it("clears selected tasks without dropping order links and restores them", () => {
     const board = sampleTaskBoard(TODAY);
-    const ids = board.tasks.filter((task) => task.origin === "schedule").map((task) => task.id);
+    const ids = board.tasks.filter((task) => task.origin === "delivery").map((task) => task.id);
     const cleared = withoutTasks(board.tasks, ids);
     expect(cleared.removed.length).toBe(ids.length);
     expect(cleared.removed.every((task) => task.dismissed && task.orderHref)).toBe(true);
@@ -283,7 +299,7 @@ describe("task board derivation", () => {
     });
     expect(manual.ok).toBe(true);
     if (!manual.ok) return;
-    const auto = sampleTaskBoard(TODAY).tasks.find((task) => task.origin === "schedule") as TaskBoardTask;
+    const auto = sampleTaskBoard(TODAY).tasks.find((task) => task.origin === "delivery") as TaskBoardTask;
     expect(taskRemovalWrite(manual.task)).toEqual({
       collection: "taskBoardItems",
       id: "manual_lockbox",
@@ -297,7 +313,7 @@ describe("task board derivation", () => {
     const board = sampleTaskBoard(TODAY);
     expect(board.tasks.every((task) => task.sample)).toBe(true);
     const stats = taskBoardStats(board.tasks, TODAY);
-    expect(stats.open.value).toBe(8);
+    expect(stats.open.value).toBe(7);
     expect(stats.production).toEqual({ value: 2, label: "Mike + Daniel" });
     expect(stats.ready.value).toBe(2);
     expect(stats.overdue.value).toBe(1);
@@ -306,7 +322,7 @@ describe("task board derivation", () => {
     expect(board.tasks.find((task) => task.status === "done")?.title).toBe("Approve gallery · order #122");
     expect(dueLabel(board.tasks.find((task) => task.status === "done")?.dueOn || null, "done", TODAY)).toBe("Done");
     const counts = taskFilterCounts(board.tasks, "sample-cadi", TODAY);
-    expect(counts).toEqual({ all: 9, mine: 3, unassigned: 2, overdue: 1 });
+    expect(counts).toEqual({ all: 8, mine: 3, unassigned: 1, overdue: 1 });
     const listIds = displayTasks(board.tasks, {
       filter: "all",
       meId: null,
@@ -339,5 +355,8 @@ describe("task board derivation", () => {
     expect(overlay?.sort).toBe(10);
     expect(overlay?.dueOn).toBeNull();
     expect(overlay?.assigneeName).toBeNull();
+    const shown = buildTaskBoard({ overlays: overlay ? [overlay] : [] });
+    expect(shown.tasks).toHaveLength(0);
+    expect(shown.cleared).toHaveLength(0);
   });
 });

@@ -9,7 +9,6 @@ import AdminOrders from "@/pages/AdminOrders";
 import AdminTaskBoard from "@/pages/AdminTaskBoard";
 import AdminContent from "@/pages/AdminContent";
 import AdminEvents, { HolidayRsvpsRedirect } from "@/pages/AdminEvents";
-import OwnersSuite from "@/pages/OwnersSuite";
 
 import "./global.css";
 
@@ -371,8 +370,6 @@ const App = () => (
             <Route path="/admin/events" element={<ProtectedRoute requiredRole="coordinator"><AdminEvents /></ProtectedRoute>} />
             <Route path="/admin/events/:eventId" element={<ProtectedRoute requiredRole="coordinator"><AdminEvents /></ProtectedRoute>} />
             <Route path="/admin/holiday-rsvps" element={<HolidayRsvpsRedirect />} />
-            <Route path="/admin/owners" element={<OwnersSuite />} />
-            <Route path="/owners" element={<OwnersSuite />} />
 
             {/* ─── Catch-all ──────────────────────────────────────────────── */}
             <Route path="*" element={<NotFound />} />

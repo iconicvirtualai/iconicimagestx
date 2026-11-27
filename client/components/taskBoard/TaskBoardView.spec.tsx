@@ -44,12 +44,12 @@ describe("task board view", () => {
     const html = renderBoard("list");
     expect(html).toContain("Your entire operation. One checklist.");
     expect(html).toContain("Sample data");
-    expect(html).toContain("Schedule order #123");
+    expect(html).not.toContain("Schedule order");
     expect(html).toContain("Deliver order #128");
     expect(html).toContain("Prepare weekly team agenda");
     expect(html).toContain("Approve gallery · order #122");
     expect(html).toContain("line-through");
-    expect(html).toContain("/admin/order-request/sample-order-123");
+    expect(html).not.toContain("/admin/order-request/sample-order-123");
     expect(html).toContain("/admin/ops?stage=review");
     expect(html).toContain("Mike");
     expect(html).toContain("Daniel");
@@ -69,7 +69,7 @@ describe("task board view", () => {
   it("uses the same tasks on the board", () => {
     const list = renderBoard("list");
     const board = renderBoard("board");
-    for (const title of ["Schedule order #123", "Deliver order #128", "Edit listing reel", "Podcast episode", "Prepare weekly team agenda"]) {
+    for (const title of ["Deliver order #128", "Edit listing reel", "Podcast episode", "Prepare weekly team agenda"]) {
       expect(list).toContain(title);
       expect(board).toContain(title);
     }

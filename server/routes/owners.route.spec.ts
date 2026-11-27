@@ -64,29 +64,29 @@ async function read(path: string, headers: Record<string, string> = {}) {
 }
 
 describe("owners suite access", () => {
-  it("denies an unauthenticated request on the page and the API", async () => {
+  it("does not serve the owners portal pages and denies the API", async () => {
     allowOwnerFixtures();
     const page = await read("/admin/owners");
     const alias = await read("/owners");
     const api = await read("/api/owners/suite");
     const apiPage = await read("/api/owners/page");
-    for (const hit of [page, alias]) {
-      expect(hit.response.status).toBe(302);
-      expect(hit.response.headers.get("location")).toBe("/admin/login?next=/admin/owners");
-    }
-    for (const hit of [page, alias, api, apiPage]) {
-      if (hit !== page && hit !== alias) expect(hit.response.status).toBe(404);
-      expect(hit.response.headers.get("cache-control")).toContain("private");
-      expect(hit.response.headers.get("cache-control")).toContain("no-store");
-      expect(hit.response.headers.get("x-robots-tag")).toContain("noindex");
-      expect(hit.text).not.toContain("4280");
+    for (const hit of [page, alias, apiPage]) {
+      expect(hit.response.status).toBe(404);
+      expect(hit.response.headers.get("location")).toBeNull();
+      expect(hit.text).not.toContain("Owners Suite");
       expect(hit.text).not.toContain("1vHkdHRhAWKcnsv8");
       expect(hit.text).not.toContain(OWNER_WHY);
-      expect(hit.text).not.toContain("Fall mini sessions");
-      expect(hit.text.toLowerCase()).not.toContain("forbidden");
-      expect(hit.text.toLowerCase()).not.toContain("owner");
     }
-    expect(apiPage.text).toContain("Page not found");
+    expect(api.response.status).toBe(404);
+    expect(api.response.headers.get("cache-control")).toContain("private");
+    expect(api.response.headers.get("cache-control")).toContain("no-store");
+    expect(api.response.headers.get("x-robots-tag")).toContain("noindex");
+    expect(api.text).not.toContain("4280");
+    expect(api.text).not.toContain("1vHkdHRhAWKcnsv8");
+    expect(api.text).not.toContain(OWNER_WHY);
+    expect(api.text).not.toContain("Fall mini sessions");
+    expect(api.text.toLowerCase()).not.toContain("forbidden");
+    expect(api.text.toLowerCase()).not.toContain("owner");
   });
 
   it("denies a non-owner admin, including the temp admin token", async () => {
@@ -101,6 +101,7 @@ describe("owners suite access", () => {
     expect(admin.response.status).toBe(404);
     expect(temp.response.status).toBe(404);
     expect(page.response.status).toBe(404);
+    expect(page.response.headers.get("location")).toBeNull();
     expect(admin.text).not.toContain("4280");
     expect(admin.text).not.toContain("Northwind");
     expect(admin.text).not.toContain(OWNER_WHY);
@@ -136,8 +137,9 @@ describe("owners suite access", () => {
     expect(cookie).toContain("HttpOnly");
     expect(cookie.toLowerCase()).toContain("samesite=lax");
     const page = await read("/admin/owners", { cookie: cookie.split(";")[0] });
-    expect(page.response.status).toBe(200);
-    expect(page.text).toContain('name="robots" content="noindex, nofollow"');
+    expect(page.response.status).toBe(404);
+    expect(page.response.headers.get("location")).toBeNull();
+    expect(page.text).not.toContain("Owners Suite");
     expect(page.text).not.toContain("4280");
     expect(page.text).not.toContain(OWNER_WHY);
   });
@@ -202,7 +204,7 @@ describe("owners suite access", () => {
     expect(api.response.status).toBe(404);
   });
 
-  it("rewrites owner pages to the API function before the SPA fallback and sends signed-out visits to login", async () => {
+  it("does not rewrite owner pages to the API or send them to the owners login", async () => {
     const vercel = JSON.parse(fs.readFileSync("vercel.json", "utf8")) as {
       functions: Record<string, unknown>;
       rewrites: Array<{ source: string; destination: string }>;
@@ -221,15 +223,15 @@ describe("owners suite access", () => {
       const index = vercel.rewrites.findIndex((rule) => rule.source === source);
       return {
         source,
-        destination: vercel.rewrites[index]?.destination ?? null,
+        destination: index >= 0 ? vercel.rewrites[index]?.destination ?? null : null,
         beforeSpa: index >= 0 && index < spa,
       };
     });
     expect(ownerRewrites).toEqual([
-      { source: "/owners", destination: "/api/index", beforeSpa: true },
-      { source: "/owners/", destination: "/api/index", beforeSpa: true },
-      { source: "/admin/owners", destination: "/api/index", beforeSpa: true },
-      { source: "/admin/owners/", destination: "/api/index", beforeSpa: true },
+      { source: "/owners", destination: null, beforeSpa: false },
+      { source: "/owners/", destination: null, beforeSpa: false },
+      { source: "/admin/owners", destination: null, beforeSpa: false },
+      { source: "/admin/owners/", destination: null, beforeSpa: false },
     ]);
     expect(vercel.rewrites.some((rule) => rule.destination === "/api/owners/page")).toBe(false);
 
@@ -246,24 +248,27 @@ describe("owners suite access", () => {
       });
     }
     expect(signedOut).toEqual([
-      { path: "/owners", status: 302, notFound: false, noindex: true, leaksWhy: false },
-      { path: "/admin/owners", status: 302, notFound: false, noindex: true, leaksWhy: false },
+      { path: "/owners", status: 404, notFound: false, noindex: false, leaksWhy: false },
+      { path: "/admin/owners", status: 404, notFound: false, noindex: false, leaksWhy: false },
     ]);
     for (const path of ["/owners/", "/admin/owners/"]) {
       const hit = await read(path);
-      expect(hit.response.status).toBe(302);
-      expect(hit.response.headers.get("location")).toBe("/admin/login?next=/admin/owners");
+      expect(hit.response.status).toBe(404);
+      expect(hit.response.headers.get("location")).toBeNull();
     }
-    // A session cookie for someone off the allowlist is treated as signed out.
     const stale = await read("/admin/owners", { cookie: "owners_session=not-a-real-session" });
-    expect(stale.response.status).toBe(302);
+    expect(stale.response.status).toBe(404);
+    expect(stale.response.headers.get("location")).toBeNull();
   });
 
-  it("keeps the route out of the staff shell and ahead of the public SPA rewrite", () => {
+  it("keeps the owners portal out of the staff shell", () => {
     const app = fs.readFileSync("client/App.tsx", "utf8");
-    const ownersLine = app.split("\n").find((line) => line.includes('path="/admin/owners"'));
-    expect(ownersLine).toContain("<OwnersSuite />");
-    expect(ownersLine).not.toContain("ProtectedRoute");
+    const login = fs.readFileSync("client/pages/AdminLogin.tsx", "utf8");
+    expect(app).not.toContain('path="/admin/owners"');
+    expect(app).not.toContain('path="/owners"');
+    expect(app).not.toContain("OwnersSuite");
+    expect(login).not.toContain("/admin/owners");
+    expect(login).not.toContain("openOwnerSession");
     const page = fs.readFileSync("client/pages/OwnersSuite.tsx", "utf8");
     expect(page).not.toContain("1vHkdHRhAWKcnsv8");
     expect(page).not.toContain("4280");
@@ -284,9 +289,6 @@ describe("owners suite access", () => {
     const vercel = JSON.parse(fs.readFileSync("vercel.json", "utf8")) as {
       rewrites: Array<{ source: string; destination: string }>;
     };
-    const spa = vercel.rewrites.findIndex((rule) => rule.destination === "/index.html");
-    const owners = vercel.rewrites.findIndex((rule) => rule.source === "/admin/owners");
-    expect(owners).toBeGreaterThanOrEqual(0);
-    expect(owners).toBeLessThan(spa);
+    expect(vercel.rewrites.some((rule) => rule.source === "/admin/owners" || rule.source === "/owners")).toBe(false);
   });
 });
