@@ -58,6 +58,7 @@ import InsightPost from "./pages/InsightPost";
 import News from "./pages/News";
 import NewsIssue from "./pages/NewsIssue";
 import FlashSale from "./pages/FlashSale";
+import BlackFridayBusiness from "./pages/BlackFridayBusiness";
 import AgentLandingPage from "./pages/AgentLandingPage";
 import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
@@ -238,6 +239,7 @@ const App = () => (
             <Route path="/news/promos/:slug" element={<NewsIssue category="promo" />} />
             <Route path="/news/:slug" element={<NewsIssue category="newsletter" />} />
             <Route path="/black-friday" element={<FlashSale />} />
+            <Route path="/black-friday-business" element={<BlackFridayBusiness />} />
             <Route path="/flash-sale" element={<PortalQueryRedirect to="/black-friday" />} />
             <Route path="/stock-footage" element={<StockFootage />} />
             <Route path="/privacy" element={<Privacy />} />

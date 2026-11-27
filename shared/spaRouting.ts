@@ -40,6 +40,7 @@ const APP_SHELL_SOURCES = [
   "/services/virtual-staging/ai-tool",
   "/services/virtual-staging/pro-order",
   "/black-friday",
+  "/black-friday-business",
   "/dev/invoice-template",
   "/dev/listing-style-shots",
   ...STUDIO105_APP_SOURCES,

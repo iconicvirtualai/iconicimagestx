@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { itemLink, itemText, useSiteHref, useSiteItems, useSiteText } from "@/content/siteContent";
 import { clientPortalEnabled, isClientLoginChrome } from "@shared/clientPortal";
+import { flashSaleOpen } from "@shared/flashSale";
 
 function isStudioNavItem(item: { label: string; href: string }): boolean {
   const href = item.href.split("?")[0].replace(/\/$/, "") || "/";
@@ -14,7 +15,7 @@ function isStudioNavItem(item: { label: string; href: string }): boolean {
 export default function Header() {
   const settings = useSiteSettings();
   const location = useLocation();
-  const showPromo = settings.global.showPromoBar;
+  const showPromo = settings.global.showPromoBar && (flashSaleOpen() || location.pathname !== "/black-friday-business");
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 

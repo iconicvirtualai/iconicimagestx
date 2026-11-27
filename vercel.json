@@ -1963,6 +1963,14 @@
       "destination": "/seo/app.html"
     },
     {
+      "source": "/black-friday-business",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/black-friday-business/",
+      "destination": "/seo/app.html"
+    },
+    {
       "source": "/dev/invoice-template",
       "destination": "/seo/app.html"
     },

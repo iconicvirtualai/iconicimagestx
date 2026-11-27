@@ -59,6 +59,22 @@ describe("promo bar", () => {
     expect(open?.textContent).not.toContain("ICONICAI");
   });
 
+  it("leaves the staging line off the business offer after that deadline", async () => {
+    vi.spyOn(Date, "now").mockReturnValue(SALE_ENDS_MS + 1);
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    await act(async () => {
+      root?.render(
+        <MemoryRouter initialEntries={["/black-friday-business"]}>
+          <PromoBar />
+        </MemoryRouter>,
+      );
+    });
+    expect(container?.querySelector("[data-testid='promo-bar']")).toBeNull();
+    expect(container?.textContent || "").not.toMatch(/\bAI\b/);
+  });
+
   it("returns the AI staging line after that deadline", async () => {
     vi.spyOn(Date, "now").mockReturnValue(SALE_ENDS_MS + 1);
     await renderBar();
