@@ -22,6 +22,7 @@ import { isActiveStaffRecord } from "../../shared/staffAccess";
 import { isTempAdminEnabled, liveServerEnv } from "../../shared/tempAdmin";
 import { resolveClientIdentity } from "../services/clientAccounts";
 import type { AuthenticatedRequest } from "../middleware/auth";
+import { applyB2MediaUrls } from "../services/b2Storage";
 
 const db = () => admin.firestore();
 
@@ -34,10 +35,15 @@ function docRecord(snap: FirebaseFirestore.DocumentSnapshot): GalleryLinkDoc | n
   return { id: snap.id, ...(snap.data() || {}) };
 }
 
+function mediaDoc(snap: FirebaseFirestore.DocumentSnapshot): GalleryLinkDoc | null {
+  const doc = docRecord(snap);
+  return doc ? applyB2MediaUrls(doc) : null;
+}
+
 async function galleriesWhere(field: "listingId" | "orderId", id: string): Promise<GalleryLinkDoc[]> {
   try {
     const snap = await db().collection("galleries").where(field, "==", id).limit(8).get();
-    return snap.docs.map((doc) => docRecord(doc)).filter((doc): doc is GalleryLinkDoc => Boolean(doc));
+    return snap.docs.map((doc) => mediaDoc(doc)).filter((doc): doc is GalleryLinkDoc => Boolean(doc));
   } catch (err) {
     console.error(`[Galleries] ${field} lookup failed:`, err);
     return [];
@@ -46,7 +52,7 @@ async function galleriesWhere(field: "listingId" | "orderId", id: string): Promi
 
 async function galleryById(id: string): Promise<GalleryLinkDoc | null> {
   if (!id) return null;
-  return docRecord(await db().collection("galleries").doc(id).get());
+  return mediaDoc(await db().collection("galleries").doc(id).get());
 }
 
 async function relatedForListing(listing: GalleryLinkDoc): Promise<GalleryLinkDoc[]> {
@@ -65,8 +71,8 @@ export async function resolveClientGalleryLink(id: string): Promise<ClientGaller
     db().collection("galleries").doc(id).get(),
     db().collection("listings").doc(id).get(),
   ]);
-  const gallery = docRecord(gallerySnap);
-  const listing = docRecord(listingSnap);
+  const gallery = mediaDoc(gallerySnap);
+  const listing = mediaDoc(listingSnap);
 
   if (gallery) {
     return decideClientGalleryLink({
@@ -110,7 +116,7 @@ export async function resolveClientGalleryLink(id: string): Promise<ClientGaller
   let pointedListing: GalleryLinkDoc | null = null;
   let pointedRelated = relatedGalleries;
   if (!pointedGallery && pointedListingId) {
-    pointedListing = docRecord(await db().collection("listings").doc(pointedListingId).get());
+    pointedListing = mediaDoc(await db().collection("listings").doc(pointedListingId).get());
     if (pointedListing) pointedRelated = await relatedForListing(pointedListing);
   }
 
@@ -230,7 +236,7 @@ async function finishGalleryLink(
   caller: StudioCaller | null,
 ): Promise<ClientGalleryLinkResult> {
   if (!result.ok || result.kind !== "listing") return result;
-  const listing = docRecord(await db().collection("listings").doc(result.project.id).get());
+  const listing = mediaDoc(await db().collection("listings").doc(result.project.id).get());
   if (!listing) return result;
   const [invoice, related] = await Promise.all([
     invoiceForListing(listing),

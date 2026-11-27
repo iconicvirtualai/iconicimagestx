@@ -34,6 +34,7 @@ import { MoneyAmount } from "@/components/MoneyAmount";
 import { Button } from "@/components/ui/button";
 import { PortalShell, portalHref } from "@/components/client-hub/PortalShell";
 import { ICONIC_DOWNLOAD_LOCK, amountStillDue } from "@shared/paymentAccess";
+import { mediaDownloadHref } from "@shared/b2Media";
 import { samplePortalProfile } from "@/lib/exampleHub";
 import { ClientGalleryMediaFrame } from "@/components/gallery/ClientGalleryMedia";
 import type { ClientGalleryItem } from "@/components/gallery/clientGalleryMedia";
@@ -853,7 +854,7 @@ function MediaTab({
                 <div>
                   <p className="text-sm font-bold truncate">{item.name}</p>
                   {item.downloadName && (
-                    <a href={item.url} download={item.downloadName} data-testid={`media-download-name-${item.id}`} className="block truncate text-[10px] font-bold text-gray-500">{item.downloadName}</a>
+                    <a href={mediaDownloadHref(item)} download={item.downloadName} data-testid={`media-download-name-${item.id}`} className="block truncate text-[10px] font-bold text-gray-500">{item.downloadName}</a>
                   )}
                   {item.hidden && <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Hidden</p>}
                 </div>
@@ -1047,7 +1048,7 @@ function UploadGrid({
         <article key={item.id} className="min-w-0 rounded-2xl border border-gray-100 bg-white p-3" data-testid={`upload-${item.id}`}>
           <ClientGalleryMediaFrame item={portalMediaToGalleryItem(item)} />
           <p className="mt-2 truncate text-sm font-bold">{item.name}</p>
-          <a href={item.url} download={item.downloadName || item.name} className="mt-2 inline-flex min-h-11 items-center gap-2 text-xs font-black uppercase tracking-widest text-[#0d9488]">
+          <a href={mediaDownloadHref(item)} download={item.downloadName || item.name} className="mt-2 inline-flex min-h-11 items-center gap-2 text-xs font-black uppercase tracking-widest text-[#0d9488]">
             <Download className="h-3.5 w-3.5" /> {item.downloadName || "Download"}
           </a>
           <PhotoEditNote item={item} requests={photoEditRequests} saving={saving} onRequest={onRequestPhotoEdit} />

@@ -158,6 +158,7 @@ export interface PublicGalleryMedia {
   embedUrl: string | null;
   poster: string | null;
   thumbnailUrl: string | null;
+  downloadUrl?: string | null;
 }
 
 /**
@@ -191,6 +192,7 @@ export function publicMediaItem(item: Record<string, unknown>, canDownload: bool
   }
 
   const url = publicText(item.shareUrl) || publicText(item.embedUrl) || publicText(item.url);
+  const downloadUrl = publicText(item.downloadUrl);
   return {
     ...base,
     url,
@@ -198,5 +200,6 @@ export function publicMediaItem(item: Record<string, unknown>, canDownload: bool
     embedUrl: publicText(item.embedUrl) || publicText(item.url),
     poster: publicText(item.poster) || publicText(item.thumbnailUrl),
     thumbnailUrl: publicText(item.thumbnailUrl) || publicText(item.poster),
+    ...(downloadUrl ? { downloadUrl } : {}),
   };
 }

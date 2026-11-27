@@ -8,6 +8,7 @@ import {
   photoEditStatusLabel,
   type PhotoEditRequest,
 } from "@shared/photoEditRequest";
+import { mediaDownloadHref } from "@shared/b2Media";
 import type { PortalMediaItem, PortalMediaKind, PortalPhotoGroup } from "@shared/portalListingDetail";
 
 const TILE_SCALE_KEY = "iconic-portal-photo-tile-scale";
@@ -429,7 +430,7 @@ export function PortalPhotoGallery({
           <div className="flex max-h-full w-full max-w-4xl flex-col gap-3">
             <img src={lightbox.replacement.url} alt={lightbox.replacement.name} className="max-h-[70vh] w-full object-contain" />
             <div className="flex flex-wrap justify-end gap-2">
-              <a href={lightbox.replacement.url} download={lightbox.replacement.name} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-white px-4 text-xs font-black uppercase tracking-widest text-black">
+              <a href={mediaDownloadHref(lightbox.replacement)} download={lightbox.replacement.name} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-white px-4 text-xs font-black uppercase tracking-widest text-black">
                 <Download className="h-4 w-4" /> Download
               </a>
               <button type="button" className="inline-flex min-h-11 items-center rounded-xl border border-white px-4 text-xs font-black uppercase tracking-widest text-white" onClick={() => setLightbox(null)}>
@@ -547,7 +548,7 @@ function PhotoTile({
       </div>
       {item.downloadName && (
         <a
-          href={item.url}
+          href={mediaDownloadHref(item)}
           download={item.downloadName}
           data-testid={`photo-download-name-${item.id}`}
           className="mt-1 block truncate text-[10px] font-bold text-gray-500"
@@ -559,7 +560,7 @@ function PhotoTile({
       {carousel && (
         <div className={frame.revised ? "mt-1 grid grid-cols-1 gap-1" : "hidden"}>
           <a
-            href={frames.find((slide) => slide.revised)?.src || frame.src}
+            href={frames.find((slide) => slide.revised)?.src || mediaDownloadHref(item) || frame.src}
             download={frames.find((slide) => slide.revised)?.downloadName || frame.downloadName}
             data-testid={`photo-revised-download-${item.id}`}
             className="inline-flex min-h-8 items-center justify-center gap-1 rounded-lg bg-black px-1 text-[10px] font-black uppercase tracking-wide text-white"

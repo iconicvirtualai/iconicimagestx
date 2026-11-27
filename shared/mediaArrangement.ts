@@ -32,6 +32,8 @@ export interface ArrangementMedia {
   height?: number;
   webUrl?: string;
   hiddenFromGallery?: boolean;
+  /** Signed download. Display keeps using url. */
+  downloadUrl?: string;
 }
 
 export interface MediaSection {
@@ -102,7 +104,7 @@ export function arrangementFileName(index: number, addressOrSlug: string, origin
 }
 
 function rowId(row: Record<string, unknown>, fallback: string): string {
-  for (const key of ["id", "path", "storagePath", "url", "shareUrl"]) {
+  for (const key of ["id", "path", "storagePath", "b2Key", "url", "shareUrl"]) {
     const value = text(row[key]);
     if (value) return value.slice(0, 180);
   }
@@ -142,6 +144,7 @@ function pushRow(
   const platform = text(row.platform, 40);
   const caption = text(row.caption, 500);
   const webUrl = httpUrl(row.webUrl) || httpUrl(row.previewUrl) || httpUrl(row.displayUrl) || httpUrl(row.thumbnailUrl);
+  const downloadUrl = httpUrl(row.downloadUrl);
   out.push({
     id,
     kind,
@@ -159,6 +162,7 @@ function pushRow(
     ...(width != null ? { width } : {}),
     ...(height != null ? { height } : {}),
     ...(webUrl ? { webUrl } : {}),
+    ...(downloadUrl ? { downloadUrl } : {}),
     ...(row.hiddenFromGallery === true ? { hiddenFromGallery: true } : {}),
   });
 }
@@ -568,7 +572,7 @@ export function isHiddenFromClientGallery(
 ): boolean {
   if (row.hiddenFromGallery === true || row.culled === true) return true;
   const arrangement = readMediaArrangement(listing?.mediaArrangement);
-  const id = text(row.id) || text(row.path) || text(row.storagePath) || text(row.url) || text(row.shareUrl);
+  const id = text(row.id) || text(row.path) || text(row.storagePath) || text(row.b2Key) || text(row.url) || text(row.shareUrl);
   const placement = id ? arrangement.placements.find((item) => item.id === id) : undefined;
   if (placement?.hiddenFromGallery) return true;
   const sectionId = text(row.sectionId, 32) || placement?.sectionId || "";
@@ -585,7 +589,7 @@ export function isHiddenFromListingSites(
   if (hidden.size === 0) return false;
   const sectionId = text(row.sectionId, 32);
   if (sectionId && hidden.has(sectionId)) return true;
-  const id = text(row.id) || text(row.path) || text(row.storagePath) || text(row.url);
+  const id = text(row.id) || text(row.path) || text(row.storagePath) || text(row.b2Key) || text(row.url);
   if (!id) return false;
   return arrangement.placements.some((placement) => placement.id === id && hidden.has(placement.sectionId));
 }

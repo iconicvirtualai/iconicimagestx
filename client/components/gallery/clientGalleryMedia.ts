@@ -12,6 +12,7 @@ export interface ClientGalleryItem {
   name?: string | null;
   type?: string | null;
   url?: string | null;
+  downloadUrl?: string | null;
   shareUrl?: string | null;
   embedUrl?: string | null;
   poster?: string | null;

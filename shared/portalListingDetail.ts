@@ -86,6 +86,8 @@ export interface PortalMediaItem {
   uploadedAt: string;
   /** Sequence filename from the saved arrangement, when one has been saved. */
   downloadName?: string;
+  /** Original file. url stays inline for the gallery image. */
+  downloadUrl?: string;
 }
 
 export interface PortalPhotoGroup {
@@ -1097,6 +1099,7 @@ function collectTours(listing: Record<string, unknown>, galleries: Array<Record<
       groupId: "",
       uploadedAt: portalTimestamp(row.uploadedAt || row.createdAt),
       ...(deliveryName ? { downloadName: deliveryName } : {}),
+      ...downloadLink(row, url),
       provider: provider || "Virtual tour",
       embedUrl: provider === "Matterport" ? url : null,
     });
@@ -1143,6 +1146,7 @@ function finishMedia(
       groupId: kind === "photo" ? (savedOrder ? sectionId : groupIdText(pref?.groupId)) : "",
       uploadedAt: portalTimestamp(row.uploadedAt || row.createdAt),
       ...(deliveryName ? { downloadName: deliveryName } : {}),
+      ...downloadLink(row, url),
     });
   });
   return items.sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
@@ -1166,8 +1170,14 @@ function galleryRows(galleries: Array<Record<string, unknown>>): Array<Record<st
 }
 
 function mediaId(kind: PortalMediaKind, row: Record<string, unknown>, index: number): string {
-  const raw = text(row.id) || text(row.path) || text(row.storagePath) || text(row.url) || text(row.shareUrl) || `${kind}-${index}`;
+  const raw = text(row.id) || text(row.path) || text(row.storagePath) || text(row.b2Key) || text(row.url) || text(row.shareUrl) || `${kind}-${index}`;
   return raw.slice(0, 180);
+}
+
+function downloadLink(row: Record<string, unknown>, viewUrl: string): { downloadUrl?: string } {
+  const downloadUrl = safeHttpUrl(row.downloadUrl);
+  if (!downloadUrl || downloadUrl === viewUrl) return {};
+  return { downloadUrl };
 }
 
 const RAW_EXT = /\.(cr2|cr3|nef|nrw|arw|srf|sr2|dng|raw|rw2|orf|raf|pef|3fr|fff|iiq|heic)$/i;

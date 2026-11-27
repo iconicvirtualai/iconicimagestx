@@ -18,6 +18,7 @@ import {
 import { toast } from "sonner";
 import { DragGhost, dragDropClass, type DragGhostModel } from "@/components/drag/DragGhost";
 import { recordAddressText } from "@shared/addressText";
+import { mediaDownloadHref } from "@shared/b2Media";
 import {
   GALLERY_TABS,
   LISTING_KIT_SLOTS,
@@ -1291,7 +1292,7 @@ function ListingKitPanel({
                     <h4 className="truncate text-sm font-semibold">{item.name}</h4>
                     <p className="text-xs text-[#7a8480]">{item.hiddenFromGallery ? "Hidden from gallery" : "On file"}</p>
                   </div>
-                  <a href={item.url} download={item.deliveryName || item.name} aria-label={`Download ${item.name}`} onClick={(event) => event.stopPropagation()}><Download className="h-3.5 w-3.5 text-[#7a8480]" /></a>
+                  <a href={mediaDownloadHref(item)} download={item.deliveryName || item.name} aria-label={`Download ${item.name}`} onClick={(event) => event.stopPropagation()}><Download className="h-3.5 w-3.5 text-[#7a8480]" /></a>
                   <span role="button" aria-label={`Hide ${item.name}`} onClick={(event) => { event.stopPropagation(); onToggleHidden(item.id); }}><EyeOff className="h-3.5 w-3.5 text-[#7a8480]" /></span>
                   <span role="button" aria-label={`Remove ${item.name}`} onClick={(event) => { event.stopPropagation(); onDelete(item.id); }}><Trash2 className="h-3.5 w-3.5 text-red-500" /></span>
                 </div>
@@ -1472,7 +1473,7 @@ async function downloadMany(items: SequencedArrangementItem[], mode: "high" | "w
   for (const item of items) {
     const name = item.deliveryName || item.name || "download";
     if (mode === "high") {
-      triggerDownload(item.url, name);
+      triggerDownload(mediaDownloadHref(item), name);
       continue;
     }
     if (item.webUrl) {
@@ -1481,7 +1482,7 @@ async function downloadMany(items: SequencedArrangementItem[], mode: "high" | "w
     }
     if (item.kind !== "photo" && item.kind !== "floorplan") {
       toast.message(`${item.name} has no web copy stored. Downloaded the original.`);
-      triggerDownload(item.url, name);
+      triggerDownload(mediaDownloadHref(item), name);
       continue;
     }
     try {

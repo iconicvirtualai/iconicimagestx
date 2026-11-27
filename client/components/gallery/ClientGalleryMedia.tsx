@@ -79,7 +79,7 @@ export function ClientGalleryMediaCard({
     isShareKind(kind) &&
     Boolean(onCopyLink);
   const downloadUrl = galleryOffersDownload(item)
-    ? galleryHttpUrl(item.url)
+    ? galleryHttpUrl(item.downloadUrl) || galleryHttpUrl(item.url)
     : null;
 
   return (

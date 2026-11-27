@@ -20,6 +20,7 @@ import {
   seededPresentation,
   type PublicPresentation,
 } from "../../shared/presentation";
+import { applyB2MediaUrls } from "../services/b2Storage";
 
 const router = Router();
 const db = () => admin.firestore();
@@ -42,12 +43,12 @@ async function galleriesForListing(listingId: string, listing: Record<string, un
   const docs: Array<Record<string, unknown>> = [];
   for (const id of ids) {
     const snap = await db().collection("galleries").doc(id).get();
-    if (snap.exists) docs.push({ id: snap.id, ...snap.data() });
+    if (snap.exists) docs.push(applyB2MediaUrls({ id: snap.id, ...(snap.data() || {}) }));
   }
   try {
     const linked = await db().collection("galleries").where("listingId", "==", listingId).limit(5).get();
     linked.docs.forEach((doc) => {
-      if (!docs.some((item) => item.id === doc.id)) docs.push({ id: doc.id, ...doc.data() });
+      if (!docs.some((item) => item.id === doc.id)) docs.push(applyB2MediaUrls({ id: doc.id, ...(doc.data() || {}) }));
     });
   } catch (err) {
     console.warn("[Presentation] Gallery lookup skipped.", err);
@@ -59,7 +60,7 @@ async function listingByToken(token: string) {
   const snap = await db().collection("listings").where("presentationToken", "==", token).limit(1).get();
   if (snap.empty) return null;
   const doc = snap.docs[0];
-  return { id: doc.id, ...doc.data() } as Record<string, unknown> & { id: string };
+  return applyB2MediaUrls({ id: doc.id, ...(doc.data() || {}) }) as Record<string, unknown> & { id: string };
 }
 
 async function loadPresentation(token: string, origin: string): Promise<PublicPresentation | null> {

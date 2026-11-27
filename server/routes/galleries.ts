@@ -12,7 +12,7 @@ import {
   clientGalleryDownloadsUnlocked,
   type GalleryDownloadGate,
 } from "../../shared/paymentAccess";
-import { addressSlug, deliveryFileName, orderedGalleryMedia } from "../../shared/gallerySequence";
+import { addressSlug, orderedGalleryMedia } from "../../shared/gallerySequence";
 import { lockedClientGalleryMedia } from "../../shared/lockedClientMedia";
 import { zipStored } from "../../shared/zipStore";
 import { recordAddressText } from "../../shared/addressText";
@@ -22,6 +22,7 @@ import { galleryStatusNeedsReleaseGate } from "../../shared/galleryRelease";
 import { deliverGalleryToClient } from "../services/galleryDeliver";
 import { loadGalleryReleaseForGallery } from "../services/galleryReleaseGate";
 import { handlePublicGalleryLink } from "./galleryLink";
+import { applyB2MediaUrls, orderedDownloadPlan, readB2Object } from "../services/b2Storage";
 
 const router = Router();
 const db = () => admin.firestore();
@@ -103,10 +104,11 @@ function clientGalleryPayload(id: string, gallery: Record<string, unknown>, gate
   const unlocked = clientGalleryDownloadsUnlocked(gate);
   const invoice = gate.invoice;
   const showMedia = ["delivered", "approved"].includes(String(gallery.status || ""));
+  const ready = applyB2MediaUrls(gallery);
   const media = orderedGalleryMedia([
-    ...(Array.isArray(gallery.mediaItems) ? gallery.mediaItems : []),
-    ...(Array.isArray(gallery.videoLinks) ? gallery.videoLinks : []),
-    ...(Array.isArray(gallery.tourLinks) ? gallery.tourLinks : []),
+    ...(Array.isArray(ready.mediaItems) ? ready.mediaItems : []),
+    ...(Array.isArray(ready.videoLinks) ? ready.videoLinks : []),
+    ...(Array.isArray(ready.tourLinks) ? ready.tourLinks : []),
   ]);
   return {
     id,
@@ -143,7 +145,7 @@ router.get("/", requireStaff, async (req, res) => {
     if (orderId) query = query.where("orderId", "==", orderId) as typeof query;
 
     const snapshot = await query.limit(100).get();
-    return res.json(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
+    return res.json(snapshot.docs.map((d) => applyB2MediaUrls({ id: d.id, ...d.data() })));
   } catch (err) {
     return res.status(500).json({ error: "Failed to fetch galleries." });
   }
@@ -207,18 +209,21 @@ router.get("/public/:id/photos.zip", async (req, res) => {
     if (!clientGalleryDownloadsUnlocked(gate)) {
       return res.status(403).json({ error: ICONIC_DOWNLOAD_LOCK.message });
     }
-    const photos = orderedGalleryMedia(Array.isArray(gallery.mediaItems) ? gallery.mediaItems : [])
-      .filter((item) => {
-        const type = String(item.type || "photo").toLowerCase();
+    const photos = orderedDownloadPlan(
+      (Array.isArray(gallery.mediaItems) ? gallery.mediaItems : []).filter((item) => {
+        const type = String((item as { type?: unknown }).type || "photo").toLowerCase();
         return type === "photo" || type === "aerial" || type === "mls" || type === "image";
-      })
-      .slice(0, 80);
+      }),
+      gallery,
+    ).slice(0, 80);
     const entries: Array<{ name: string; data: Uint8Array }> = [];
-    for (const item of photos) {
-      const bytes = await readGalleryPhotoBytes(item as Record<string, unknown>);
+    for (const photo of photos) {
+      const bytes = photo.key
+        ? await readB2Object(photo.key)
+        : await readGalleryPhotoBytes(photo.item);
       if (!bytes?.length) continue;
       entries.push({
-        name: deliveryFileName(item),
+        name: photo.name,
         data: new Uint8Array(bytes),
       });
     }
@@ -297,7 +302,7 @@ router.get("/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
       });
     }
 
-    return res.json({ id: doc.id, ...gallery });
+    return res.json(applyB2MediaUrls({ id: doc.id, ...gallery }));
   } catch (err) {
     return res.status(500).json({ error: "Failed to fetch gallery." });
   }
