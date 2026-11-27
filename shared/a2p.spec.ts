@@ -37,6 +37,8 @@ describe("A2P crawlable pages", () => {
     expect(html).toContain("Message frequency varies");
     expect(html).toContain("Message and data rates may apply");
     expect(html).toContain("Consent to texts is not required to purchase services");
+    expect(html).toContain("No mobile information will be shared with third parties or affiliates for marketing or promotional purposes.");
+    expect(html).toContain("marketing and promotional SMS");
     expect(html).toContain("7. SMS and Email Program");
     expect(html).toContain("13. Contact");
     expect(html).toContain('href="/privacy"');
@@ -65,7 +67,11 @@ describe("A2P crawlable pages", () => {
     expect(html).toContain('href="https://www.iconicimagestx.com/privacy"');
     expect(html).toContain('href="https://www.iconicimagestx.com/terms"');
     expect(TRANSACTIONAL_SMS_CONSENT_TEXT).toContain("Reply STOP to opt out");
-    expect(TRANSACTIONAL_SMS_CONSENT_TEXT).toContain("Reply HELP for help");
+    expect(TRANSACTIONAL_SMS_CONSENT_TEXT).toContain("HELP for help");
+    expect(TRANSACTIONAL_SMS_CONSENT_TEXT).toContain("transactional and notification texts");
+    expect(TRANSACTIONAL_SMS_CONSENT_TEXT).toContain("marketing and promotional texts");
+    expect(TRANSACTIONAL_SMS_CONSENT_TEXT).toContain("Message & data rates may apply");
+    expect(TRANSACTIONAL_SMS_CONSENT_TEXT).toContain("Consent is not a condition of purchase");
   });
 });
 

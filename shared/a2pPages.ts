@@ -84,17 +84,19 @@ export function privacySections(): ArticleSection[] {
       blocks: [
         {
           type: "html",
-          html: `<p>Iconic Images sends transactional text messages and email related to real estate photography bookings and orders. If you check the consent box beside your phone number and submit a booking or order request, you agree to receive transactional SMS from ${ENTITY}. These messages may include:</p>
+          html: `<p>Iconic Images sends text messages and email related to real estate photography bookings, orders, account updates, and (when you opt in) promotions. If you check the consent box beside your phone number and submit a booking or order request, you agree to receive transactional, notification, and marketing SMS from ${ENTITY}. These messages may include:</p>
 <ul>
   <li>Order-received notices confirming that we received your booking request. An order-received text is not a confirmed appointment until our team confirms the shoot.</li>
   <li>Appointment reminders and schedule updates.</li>
+  <li>Shoot updates and account or order updates.</li>
   <li>Photographer introductions.</li>
   <li>Photo, gallery, and delivery notices.</li>
+  <li>Special offers, seasonal promotions, and marketing updates from Iconic Images.</li>
   <li>Replies to messages you send us.</li>
 </ul>
 <p><strong>Message frequency varies</strong> based on your bookings and order activity. <strong>Message and data rates may apply.</strong></p>
 <p>Reply <strong>STOP</strong> to any message to opt out of SMS. After you opt out, you will receive a single confirmation and no further text messages unless you opt in again. For help, reply <strong>HELP</strong>, email ${a(MAILTO, EMAIL)}, or call ${a(PHONE_HREF, PHONE)}.</p>
-<p>If you check the text-message consent box on a booking or order form, you agree to those messages. Consent to receive text messages is not a condition of purchase. You may request services by phone or email without opting in to SMS. We also send transactional email about bookings, galleries, and invoices. Promotional email or text messages are sent only when you have given separate consent, and you may unsubscribe at any time.</p>
+<p>If you check the text-message consent box on a booking or order form, you agree to those transactional, notification, and marketing messages. Consent to receive text messages is not a condition of purchase. You may request services by phone or email without opting in to SMS. We also send transactional email about bookings, galleries, and invoices. You may also opt in to promotional texts on our SMS signup page. You may unsubscribe at any time.</p>
 <p>Carriers are not liable for delayed or undelivered messages.</p>`,
         },
         {
@@ -245,14 +247,15 @@ export function termsSections(): ArticleSection[] {
       title: "7. SMS and Email Program",
       blocks: [{
         type: "html",
-        html: `<p>Text messages are sent only if you check the consent box on the booking or order form. That box is how you agree to receive transactional booking and appointment SMS from Iconic Images about that order. Messages may include order-received notices, appointment reminders, photographer introductions, and photo-delivery notices. We also send related transactional email.</p>
+        html: `<p>Text messages are sent only if you check the consent box on the booking or order form. That box is how you agree to receive transactional and notification SMS (booking confirmations, appointment reminders, shoot updates, gallery delivery alerts, and account/order updates) and marketing and promotional SMS (special offers, seasonal promotions, and marketing updates) from Iconic Images. We also send related transactional email. You may also opt in to promotional texts on our ${a("/sms", "SMS signup page")}.</p>
 <ul>
-  <li><strong>Message frequency varies</strong> with your bookings.</li>
+  <li><strong>Message frequency varies</strong> with your bookings and any promotional messages you have opted into.</li>
   <li><strong>Message and data rates may apply.</strong></li>
   <li>Reply <strong>STOP</strong> to opt out of text messages. You will receive one confirmation, and then no further SMS unless you opt in again.</li>
   <li>Reply <strong>HELP</strong> for help, or contact ${a(MAILTO, EMAIL)} or ${a(PHONE_HREF, PHONE)}.</li>
 </ul>
-<p>Consent to texts is not required to purchase services. Promotional messages are sent only with separate consent. How we use phone numbers, email addresses, and opt-in data is described in our ${a("/privacy", "Privacy Policy")}. Carriers are not liable for delayed or undelivered messages.</p>`,
+<p>Consent to texts is not required to purchase services. How we use phone numbers, email addresses, and opt-in data is described in our ${a("/privacy", "Privacy Policy")}. Carriers are not liable for delayed or undelivered messages.</p>
+<p>No mobile information will be shared with third parties or affiliates for marketing or promotional purposes.</p>`,
       }],
     },
     {
@@ -383,7 +386,7 @@ export function bookConsentCrawlHtml(): string {
   <div style="max-width:720px;margin:0 auto">
     <p style="margin:0;letter-spacing:.16em;text-transform:uppercase;font-size:12px;font-weight:700;color:#0f766e">Book a shoot</p>
     <h1 style="font-size:32px;line-height:1.15;margin:8px 0 12px">Text message consent</h1>
-    <p style="margin:0 0 16px;color:#44403c">This box is unchecked until you check it. Transactional booking texts are sent only if you do.</p>
+    <p style="margin:0 0 16px;color:#44403c">This box is unchecked until you check it. Transactional, notification, and marketing texts are sent only if you do. Consent is not a condition of purchase.</p>
     <form action="/book" method="get" style="background:#fffdf8;border-radius:28px;padding:20px;box-shadow:0 18px 50px rgba(28,25,23,.08)">
       <label style="display:flex;gap:12px;align-items:flex-start;font-size:15px" for="book-sms-consent">
         <input id="book-sms-consent" name="smsConsent" type="checkbox" value="yes" style="width:22px;height:22px;margin-top:2px;accent-color:#0f766e" />

@@ -29,10 +29,12 @@ export function SmsConsentField({
       <label htmlFor={id} className="text-sm leading-relaxed text-gray-800">
         <span className="sr-only">{TRANSACTIONAL_SMS_CONSENT_TEXT}</span>
         <span aria-hidden="true">
-          I agree to receive transactional booking and appointment text messages from{" "}
-          <strong>Iconic Images</strong>, including order-received notices, appointment reminders, and photo
-          delivery updates. Message frequency varies. Message and data rates may apply. Reply STOP to opt out.
-          Reply HELP for help, or contact{" "}
+          I agree to receive text messages from{" "}
+          <strong>Iconic Images</strong>, including transactional and notification texts (booking
+          confirmations, appointment reminders, shoot updates, gallery delivery alerts, and
+          account/order updates) and marketing and promotional texts (special offers, seasonal
+          promotions, and marketing updates from Iconic Images). Message frequency varies. Message
+          & data rates may apply. Reply STOP to opt out, HELP for help, or contact{" "}
           <a href={BUSINESS_CONTACT.phoneHref} className="font-semibold text-black underline">
             {BUSINESS_CONTACT.phoneDisplay}
           </a>
