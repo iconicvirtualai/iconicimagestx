@@ -122,32 +122,56 @@ export default function BlackFridayBusiness() {
     <Layout>
       <div className="min-h-screen bg-[#f4eee4] text-[#141414]">
         <section data-testid="bfb-hero" className="bg-[#0b0b0b] px-4 pb-14 pt-36 text-white sm:px-6 sm:pb-16 sm:pt-40">
-          <div className="mx-auto max-w-6xl">
-            <p className="inline-flex rounded-full bg-gradient-to-r from-[#0b0b0b] via-[#c9a227] to-[#e6c35c] px-4 py-1.5 text-xs font-black uppercase tracking-[0.18em] text-white shadow-sm ring-1 ring-[#e6c35c]/40 [text-shadow:0_1px_1px_rgba(0,0,0,0.9)]">
-              Black Friday · Business
-            </p>
-            <h1 className="mt-5 max-w-4xl text-4xl font-black tracking-tight sm:text-6xl sm:leading-[1.02]">
-              {BLACK_FRIDAY_BUSINESS_HEADLINE}
-            </h1>
-            <p className="mt-5 max-w-2xl text-base leading-relaxed text-white/80 sm:text-lg">
-              Three prepaid social packages. Paid in full today. The price on the card is the price Square charges.
-            </p>
-            {open ? (
-              <div className="mt-8">
-                <p className="text-sm font-semibold text-[#e6c35c]">Ends Friday, Nov 27, 2026 at 11:59:59 PM CT</p>
-                <div data-testid="bfb-countdown" className="mt-3 grid max-w-xl grid-cols-4 gap-2 sm:gap-3" aria-hidden="true">
-                  {parts.map((part) => (
-                    <div key={part.label} className="rounded-2xl bg-white/10 px-2 py-3 text-center ring-1 ring-white/15">
-                      <span className="block text-2xl font-black tabular-nums sm:text-4xl">{String(part.value).padStart(2, "0")}</span>
-                      <span className="mt-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-white/70">{part.label}</span>
-                    </div>
-                  ))}
+          <div className="mx-auto grid max-w-6xl items-center gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(240px,320px)] lg:gap-x-14">
+            <div className="order-1">
+              <p className="inline-flex rounded-full bg-gradient-to-r from-[#0b0b0b] via-[#c9a227] to-[#e6c35c] px-4 py-1.5 text-xs font-black uppercase tracking-[0.18em] text-white shadow-sm ring-1 ring-[#e6c35c]/40 [text-shadow:0_1px_1px_rgba(0,0,0,0.9)]">
+                Black Friday · Business
+              </p>
+              <h1 className="mt-5 max-w-4xl text-4xl font-black tracking-tight sm:text-6xl sm:leading-[1.02]">
+                {BLACK_FRIDAY_BUSINESS_HEADLINE}
+              </h1>
+            </div>
+            <figure
+              data-testid="bfb-video"
+              className="order-2 mx-auto w-[min(220px,68vw)] overflow-hidden rounded-[1.75rem] bg-black shadow-[0_24px_60px_rgba(0,0,0,0.45)] ring-1 ring-[#e6c35c]/45 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:mx-0 lg:w-full lg:justify-self-end"
+            >
+              <video
+                className="aspect-[9/16] h-auto w-full bg-black object-contain"
+                poster="/marketing/black-friday-business/black-friday-business-poster.jpg"
+                controls
+                playsInline
+                muted
+                autoPlay
+                loop
+                preload="metadata"
+                width={1080}
+                height={1920}
+                aria-label="Black Friday social packages"
+              >
+                <source src="/marketing/black-friday-business/black-friday-business-ad.mp4" type="video/mp4" />
+              </video>
+            </figure>
+            <div className="order-3 lg:col-start-1">
+              <p className="max-w-2xl text-base leading-relaxed text-white/80 sm:text-lg lg:mt-5">
+                Three prepaid social packages. Paid in full today. The price on the card is the price Square charges.
+              </p>
+              {open ? (
+                <div className="mt-8">
+                  <p className="text-sm font-semibold text-[#e6c35c]">Ends Friday, Nov 27, 2026 at 11:59:59 PM CT</p>
+                  <div data-testid="bfb-countdown" className="mt-3 grid max-w-xl grid-cols-4 gap-2 sm:gap-3" aria-hidden="true">
+                    {parts.map((part) => (
+                      <div key={part.label} className="rounded-2xl bg-white/10 px-2 py-3 text-center ring-1 ring-white/15">
+                        <span className="block text-2xl font-black tabular-nums sm:text-4xl">{String(part.value).padStart(2, "0")}</span>
+                        <span className="mt-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-white/70">{part.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="sr-only">Offer ends Friday, November 27, 2026 at 11:59:59 PM Central Time.</p>
                 </div>
-                <p className="sr-only">Offer ends Friday, November 27, 2026 at 11:59:59 PM Central Time.</p>
-              </div>
-            ) : (
-              <p className="mt-6 text-sm font-semibold text-[#e6c35c]">Closed Friday, Nov 27, 2026 at 11:59:59 PM CT.</p>
-            )}
+              ) : (
+                <p className="mt-6 text-sm font-semibold text-[#e6c35c]">Closed Friday, Nov 27, 2026 at 11:59:59 PM CT.</p>
+              )}
+            </div>
           </div>
         </section>
 

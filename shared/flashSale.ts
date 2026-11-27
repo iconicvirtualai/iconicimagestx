@@ -79,9 +79,3 @@ export function formatFlashCents(cents: number): string {
 export function flashSaleCheckoutPath(shoots: 5 | 10): string {
   return `/black-friday?bundle=${shoots}`;
 }
-
-export function flashSaleUseBy(purchasedAt: Date): string {
-  const expires = new Date(purchasedAt.getTime());
-  expires.setUTCDate(expires.getUTCDate() + 90);
-  return expires.toISOString();
-}
