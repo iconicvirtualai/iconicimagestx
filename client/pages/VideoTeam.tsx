@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type MouseEvent } from "react";
-import { Link } from "react-router-dom";
 import { Maximize2, Play, Volume2, VolumeX } from "lucide-react";
 import Layout from "@/components/Layout";
+import VideoTeamOrderForm from "@/components/video-team/VideoTeamOrderForm";
 import {
   CREW,
   SAMPLE_CATEGORIES,
@@ -284,24 +284,7 @@ export default function VideoTeam() {
         </section>
 
         <section className="mx-auto max-w-6xl px-4 pb-20 sm:px-6">
-          <div className="rounded-[2rem] bg-[#141414] px-6 py-12 text-center text-white sm:px-10">
-            <h2 className="text-3xl font-extrabold tracking-tight sm:text-5xl">Book your video shoot</h2>
-            <p className="mx-auto mt-3 max-w-md text-base leading-relaxed text-white/75">Tell us the property, the event, or the brand. We will put a crew on it.</p>
-            <div className="mt-8 flex flex-col items-stretch justify-center gap-3 sm:flex-row">
-              <Link
-                to="/book"
-                className="inline-flex min-h-12 items-center justify-center rounded-full bg-[#0f8f80] px-8 text-base font-bold text-white transition-colors hover:bg-[#0c7569]"
-              >
-                Book your video shoot
-              </Link>
-              <Link
-                to="/contact"
-                className="inline-flex min-h-12 items-center justify-center rounded-full border border-white/30 px-8 text-base font-bold text-white transition-colors hover:bg-white/10"
-              >
-                Contact us
-              </Link>
-            </div>
-          </div>
+          <VideoTeamOrderForm />
         </section>
       </div>
     </Layout>

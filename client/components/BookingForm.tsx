@@ -57,6 +57,11 @@ import ServiceLocationField from "@/components/ServiceLocationField";
 import { BookingSlotPicker, type BookingSlotChoice } from "@/components/BookingSlotPicker";
 import { cleanBookingSlots, suggestedFromAvailability } from "@/components/SuggestedAppointments";
 import type { PickedServiceLocation } from "@shared/serviceLocation";
+import {
+  VIDEO_TEAM_SOURCE,
+  videoTeamBookingQuery,
+  videoTeamStandaloneAddon,
+} from "@shared/videoTeamInquiry";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
@@ -460,6 +465,11 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
       setFormData(prev => ({ ...prev, leadSource: utmSource }));
     }
 
+    const videoTeamContact = videoTeamBookingQuery(searchParams);
+    if (Object.keys(videoTeamContact).length) {
+      setFormData(prev => ({ ...prev, ...videoTeamContact }));
+    }
+
     if (requestedPackage) {
       const link = publicPackageDeepLinkSelection(requestedPackage, catalog);
       if (link.hidden) {
@@ -515,7 +525,11 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
           ? "mls"
           : specializedBoth ? "both" : specializedSocial ? "social" : prev.specializedPhotography
       }));
-      setShowBasics(true);
+      const videoAddonOnly = searchParams.get("utm_source") === VIDEO_TEAM_SOURCE
+        && !apprenticePick
+        && rest.length > 0
+        && rest.every((id) => videoTeamStandaloneAddon(id));
+      setShowBasics(!videoAddonOnly);
     }
   }, [searchParams, initialServiceId, requestedPackage, services, catalog]);
 
@@ -630,8 +644,16 @@ export default function BookingForm({ initialServiceId, initialCategoryId, prefi
     };
     const bookableService = selectable(formData.selectedService);
     const bookableBasic = formData.selectedBasics.some((id) => selectable(id));
-    if (step === 1 && !bookableService && !bookableBasic) {
+    const videoAddonOnly = searchParams.get("utm_source") === VIDEO_TEAM_SOURCE
+      && !formData.selectedService
+      && formData.selectedBasics.length === 0
+      && formData.selectedAddOns.some((id) => videoTeamStandaloneAddon(id));
+    if (step === 1 && !bookableService && !bookableBasic && !videoAddonOnly) {
       toast.error("Please select a Campaign Tier or Basics package");
+      return;
+    }
+    if (step === 1 && videoAddonOnly) {
+      setStep(3);
       return;
     }
     if (step === 3 && !formData.servicePlace) {

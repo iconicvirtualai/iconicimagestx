@@ -536,6 +536,17 @@ export async function confirmBookingCalendarHold(input: {
   return true;
 }
 
+/** Busy blocks on one photographer calendar. Throws when that calendar cannot be read. */
+export async function readPhotographerCalendarBlocks(
+  photographerId: string,
+  range: { timeMin: string; timeMax: string },
+  env: Record<string, string | undefined> = process.env,
+): Promise<CalendarBlock[]> {
+  const person = bookingPhotographerById(photographerId);
+  if (!person) throw new Error("Unknown photographer.");
+  return listCalendarBlocks(person.calendarId, range.timeMin, range.timeMax, env);
+}
+
 export async function deleteBookingCalendarHold(input: {
   calendarId: string;
   eventId: string;

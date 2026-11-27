@@ -19,8 +19,10 @@ describe("Meet Your Video Team", () => {
     expect(html).toContain("The crew");
     expect(html).toContain("What we film");
     expect(html).toContain("Book your video shoot");
-    expect(html).toContain('href="/book"');
-    expect(html).toContain('href="/contact"');
+    expect(html).toContain('data-testid="video-team-order-form"');
+    expect(html).toContain("Name | Contact");
+    expect(html).toContain("26410 Oakridge Dr. Ste 105 - 108, Spring, TX 77380");
+    expect(html).not.toContain("cadi@");
     expect(html).not.toMatch(/jazmin/i);
     expect(html).not.toContain("superpower-reel");
 
