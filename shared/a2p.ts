@@ -6,16 +6,16 @@
 
 import { BUSINESS_CONTACT, LEGAL_BUSINESS_NAME } from "./businessContact.ts";
 
-export const LEGAL_LAST_UPDATED = "October 1, 2026";
+export const LEGAL_LAST_UPDATED = "November 27, 2026";
 
 export const PRIVACY_POLICY_URL = "https://www.iconicimagestx.com/privacy";
 export const TERMS_URL = "https://www.iconicimagestx.com/terms";
 
-export const TRANSACTIONAL_SMS_CONSENT_VERSION = "2026-10-01-transactional-v1";
+export const TRANSACTIONAL_SMS_CONSENT_VERSION = "2026-11-27-transactional-marketing-v1";
 
 /** Visible booking-checkbox copy, including the policy link labels. */
 export const TRANSACTIONAL_SMS_CONSENT_TEXT =
-  "I agree to receive transactional booking and appointment text messages from Iconic Images, including order-received notices, appointment reminders, and photo delivery updates. Message frequency varies. Message and data rates may apply. Reply STOP to opt out. Reply HELP for help, or contact 281.356.0965 or photos@iconicimagestx.com. Consent is not a condition of purchase. Privacy Policy · Terms and Conditions.";
+  "I agree to receive text messages from Iconic Images, including transactional and notification texts (booking confirmations, appointment reminders, shoot updates, gallery delivery alerts, and account/order updates) and marketing and promotional texts (special offers, seasonal promotions, and marketing updates from Iconic Images). Message frequency varies. Message & data rates may apply. Reply STOP to opt out, HELP for help, or contact 281.356.0965 or photos@iconicimagestx.com. Consent is not a condition of purchase. Privacy Policy · Terms and Conditions.";
 
 export const MARKETING_SMS_CONSENT_VERSION = "2026-10-01-marketing-v1";
 
